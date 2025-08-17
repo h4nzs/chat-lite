@@ -1,0 +1,102 @@
+// Datasource & Generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String           @id @default(cuid())
+  email            String           @unique
+  username         String           @unique
+  passwordHash     String
+  name             String
+  avatarUrl        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  messages         Message[]
+  participants     Participant[]
+  messageStatuses  MessageStatus[]
+  refreshTokens  RefreshToken[]
+
+  @@index([email])
+  @@index([username])
+}
+
+
+model Conversation {
+  id            String         @id @default(cuid())
+  isGroup       Boolean        @default(false)
+  title         String?
+  lastMessageAt DateTime?      @db.Timestamptz(6)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  participants  Participant[]
+  messages      Message[]
+
+  @@index([lastMessageAt])
+}
+
+model Participant {
+  id             String       @id @default(cuid())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  joinedAt       DateTime     @default(now())
+  lastReadMsgId  String?
+
+  @@unique([userId, conversationId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String          @id @default(cuid())
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  content        String?
+  imageUrl       String?
+  createdAt      DateTime        @default(now())
+  statuses       MessageStatus[]
+
+  @@index([conversationId, createdAt])
+}
+
+enum DeliveryStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model MessageStatus {
+  id        String          @id @default(cuid())
+  message   Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  status    DeliveryStatus  @default(SENT)
+  updatedAt DateTime        @updatedAt
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  jti          String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+}
