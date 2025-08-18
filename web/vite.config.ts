@@ -9,5 +9,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // test configuration has been moved to vitest.config.ts
+
 });

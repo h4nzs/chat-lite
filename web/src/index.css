@@ -3,3 +3,13 @@
 @tailwind utilities;
 
 :root { color-scheme: light dark; }
+/* --- FIX LAYOUT ROOT --- */
+html, body, #root {
+  height: 100%;
+}
+body {
+  overflow: hidden;
+}
+.min-h-0 {
+  min-height: 0;
+}

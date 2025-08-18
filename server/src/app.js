@@ -30,7 +30,8 @@ app.use(helmet({
       'script-src': ["'self'"],
       'style-src': ["'self'", "'unsafe-inline'"]
     }
-  }
+  },
+   crossOriginResourcePolicy: false
 }))
 
 // CORS dengan kredensial (cookie) – origin spesifik
@@ -49,7 +50,11 @@ app.use('/api/', rateLimit({ windowMs: 60_000, max: 120 }))
 // Ensure upload dir exists (fallback local disk)
 const uploadPath = path.resolve(__dirname, '..', env.uploadDir)
 fs.mkdirSync(uploadPath, { recursive: true })
-app.use('/uploads', express.static(uploadPath))
+
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+  next()
+}, express.static(uploadPath))
 
 // (Opsional) storage service untuk S3 – gunakan di route upload jika ENV tersedia
 export async function saveUpload(file) {
