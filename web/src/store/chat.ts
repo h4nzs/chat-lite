@@ -12,7 +12,7 @@ export type Conversation = {
     name: string
     avatarUrl?: string | null
   }[]
-  lastMessage: Message | null
+  lastMessage: (Message & { preview?: string }) | null
   updatedAt: string
 }
 
@@ -27,6 +27,7 @@ export type Message = {
   fileName?: string | null
   createdAt: string
   error?: boolean
+  preview?: string   // 🔑 tambahkan preview
 }
 
 type State = {
@@ -41,11 +42,7 @@ type State = {
   openConversation: (id: string) => Promise<void>
   loadOlderMessages: (conversationId: string) => Promise<void>
 
-  sendMessage: (
-    conversationId: string,
-    content: string,
-    tempId?: number
-  ) => Promise<void>
+  sendMessage: (conversationId: string, content: string, tempId?: number) => Promise<void>
   addOptimisticMessage: (conversationId: string, msg: Message) => void
   markMessageError: (conversationId: string, tempId: number) => void
 
@@ -61,7 +58,7 @@ type State = {
   setLoading: (id: string, val: boolean) => void
 }
 
-// 🔧 helper untuk sort conversations berdasarkan updatedAt desc
+// helper sort by updatedAt
 function sortConversations(list: Conversation[]) {
   return [...list].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -84,7 +81,6 @@ export const useChatStore = create<State>((set, get) => ({
   async openConversation(id) {
     get().setLoading(id, true)
     try {
-      // fetch messages
       const res = await api<{ items: Message[]; nextCursor: string | null }>(
         `/api/messages/${id}`
       )
@@ -101,59 +97,42 @@ export const useChatStore = create<State>((set, get) => ({
     const socket = getSocket()
     socket.emit('conversation:join', id)
 
-    // =====================
-    // SOCKET: MESSAGE NEW
-    // =====================
     socket.off('message:new')
     socket.on('message:new', (msg: Message & { tempId?: number; preview?: string }) => {
-    set((s) => {
-    const { conversations, messages } = s
-    const curr = messages[msg.conversationId] || []
+      set((s) => {
+        const { conversations, messages } = s
+        const curr = messages[msg.conversationId] || []
 
-    // 1️⃣ hapus pesan optimistic kalau ada
-    let next = msg.tempId
-      ? curr.filter((m) => m.tempId !== msg.tempId)
-      : curr
+        // hapus pesan optimistic kalau ada
+        let next = msg.tempId ? curr.filter((m) => m.tempId !== msg.tempId) : curr
+        if (next.some((m) => m.id === msg.id)) return {}
 
-    // 2️⃣ hindari duplikat
-    if (next.some((m) => m.id === msg.id)) {
-      return {}
-    }
+        // update conversations (pakai preview dari server)
+        let updated = conversations.map((c) =>
+          c.id === msg.conversationId
+            ? { ...c, lastMessage: msg, updatedAt: new Date().toISOString() }
+            : c
+        )
 
-    // 3️⃣ update conversations langsung dari msg.preview
-    let updated = conversations.map((c) =>
-      c.id === msg.conversationId
-        ? {
-            ...c,
-            lastMessage: msg, // msg sudah ada preview dari server
+        if (!updated.find((c) => c.id === msg.conversationId)) {
+          updated.push({
+            id: msg.conversationId,
+            isGroup: false,
+            title: null,
+            participants: [],
+            lastMessage: msg,
             updatedAt: new Date().toISOString()
-          }
-        : c
-    )
+          })
+        }
 
-    // kalau percakapan belum ada (misal baru), tambahkan
-    if (!updated.find((c) => c.id === msg.conversationId)) {
-      updated.push({
-        id: msg.conversationId,
-        isGroup: false,
-        title: null,
-        participants: [],
-        lastMessage: msg,
-        updatedAt: new Date().toISOString()
+        updated = sortConversations(updated)
+
+        return {
+          messages: { ...messages, [msg.conversationId]: [...next, msg] },
+          conversations: updated
+        }
       })
-    }
-
-    // 4️⃣ sort desc by updatedAt
-    updated.sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )
-
-    return {
-      messages: { ...messages, [msg.conversationId]: [...next, msg] },
-      conversations: updated
-    }
-  })
-})
+    })
 
     socket.off('typing')
     socket.on('typing', ({ userId, isTyping, conversationId }) => {
@@ -171,81 +150,59 @@ export const useChatStore = create<State>((set, get) => ({
     const cursor = get().cursors[conversationId]
     if (!cursor) return
 
-    const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(
-      cursor
-    )}`
+    const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(cursor)}`
     const res = await api<{ items: Message[]; nextCursor: string | null }>(url)
 
     set((s) => ({
       messages: {
         ...s.messages,
-        [conversationId]: [
-          ...res.items.reverse(),
-          ...(s.messages[conversationId] || [])
-        ]
+        [conversationId]: [...res.items.reverse(), ...(s.messages[conversationId] || [])]
       },
-      cursors: {
-        ...s.cursors,
-        [conversationId]: res.nextCursor
-      }
+      cursors: { ...s.cursors, [conversationId]: res.nextCursor }
     }))
   },
 
   async sendMessage(conversationId, content, tempId) {
     const socket = getSocket()
     return new Promise((resolve, reject) => {
-      socket.emit(
-        'message:send',
-        { conversationId, content, tempId },
-        (ack: { ok: boolean; msg?: Message }) => {
-          if (ack?.ok && ack.msg) {
-  set((s) => {
-    const { conversations, messages } = s
+      socket.emit('message:send', { conversationId, content, tempId }, (ack: { ok: boolean; msg?: Message }) => {
+        if (ack?.ok && ack.msg) {
+          set((s) => {
+            let updated = s.conversations.map((c) =>
+              c.id === conversationId
+                ? { ...c, lastMessage: ack.msg, updatedAt: new Date().toISOString() }
+                : c
+            )
 
-    let updated = conversations.map((c) =>
-      c.id === conversationId
-        ? {
-            ...c,
-            lastMessage: ack.msg, // sudah ada preview
-            updatedAt: new Date().toISOString()
-          }
-        : c
-    )
+            if (!updated.find((c) => c.id === conversationId)) {
+              updated.push({
+                id: conversationId,
+                isGroup: false,
+                title: null,
+                participants: [],
+                lastMessage: ack.msg,
+                updatedAt: new Date().toISOString()
+              })
+            }
 
-    if (!updated.find((c) => c.id === conversationId)) {
-      updated.push({
-        id: conversationId,
-        isGroup: false,
-        title: null,
-        participants: [],
-        lastMessage: ack.msg,
-        updatedAt: new Date().toISOString()
-      })
-    }
+            updated = sortConversations(updated)
 
-    updated.sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )
-
-    return {
-      messages: {
-        ...messages,
-        [conversationId]: (messages[conversationId] || []).map((m) =>
-          m.tempId === tempId ? ack.msg! : m
-        )
-      },
-      conversations: updated
-    }
-  })
-  resolve()
-}
- else {
-            get().markMessageError(conversationId, tempId!)
-            reject(new Error('Send failed'))
-          }
+            return {
+              messages: {
+                ...s.messages,
+                [conversationId]: (s.messages[conversationId] || []).map((m) =>
+                  m.tempId === tempId ? ack.msg! : m
+                )
+              },
+              conversations: updated
+            }
+          })
+          resolve()
+        } else {
+          get().markMessageError(conversationId, tempId!)
+          reject(new Error('Send failed'))
         }
-      )
+      })
     })
   },
 
@@ -286,40 +243,19 @@ export const useChatStore = create<State>((set, get) => ({
     const form = new FormData()
     form.append('image', file)
     const res = await fetch(
-      `${
-        import.meta.env.VITE_API_URL || 'http://localhost:4000'
-      }/api/conversations/${conversationId}/upload-image`,
-      {
-        method: 'POST',
-        body: form,
-        credentials: 'include'
-      }
+      `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload-image`,
+      { method: 'POST', body: form, credentials: 'include' }
     )
     if (!res.ok) throw new Error('Upload failed')
     const data = (await res.json()) as { imageUrl: string }
 
     const socket = getSocket()
-    socket.emit('message:send', { conversationId, imageUrl: data.imageUrl })
-
-    set((s) => ({
-      conversations: sortConversations(
-        s.conversations.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                lastMessage: {
-                  id: '',
-                  conversationId,
-                  senderId: 'me',
-                  imageUrl: data.imageUrl,
-                  createdAt: new Date().toISOString()
-                } as Message,
-                updatedAt: new Date().toISOString()
-              }
-            : c
-        )
-      )
-    }))
+    socket.emit('message:send', {
+      conversationId,
+      imageUrl: data.imageUrl,
+      // sementara kasih preview, server akan override
+      preview: '📷 Photo'
+    })
   },
 
   async uploadFile(conversationId, file) {
@@ -327,14 +263,8 @@ export const useChatStore = create<State>((set, get) => ({
     form.append('file', file)
 
     const res = await fetch(
-      `${
-        import.meta.env.VITE_API_URL || 'http://localhost:4000'
-      }/api/conversations/${conversationId}/upload`,
-      {
-        method: 'POST',
-        body: form,
-        credentials: 'include'
-      }
+      `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`,
+      { method: 'POST', body: form, credentials: 'include' }
     )
     if (!res.ok) throw new Error('Upload failed')
 
@@ -344,29 +274,10 @@ export const useChatStore = create<State>((set, get) => ({
     socket.emit('message:send', {
       conversationId,
       fileUrl: data.fileUrl,
-      fileName: data.fileName
+      fileName: data.fileName,
+      // sementara preview
+      preview: `📎 ${data.fileName}`
     })
-
-    set((s) => ({
-      conversations: sortConversations(
-        s.conversations.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                lastMessage: {
-                  id: '',
-                  conversationId,
-                  senderId: 'me',
-                  fileUrl: data.fileUrl,
-                  fileName: data.fileName,
-                  createdAt: new Date().toISOString()
-                } as Message,
-                updatedAt: new Date().toISOString()
-              }
-            : c
-        )
-      )
-    }))
   },
 
   setLoading: (id, val) =>

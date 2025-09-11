@@ -6,7 +6,6 @@ const onlineCount = new Map() // userId -> count sockets
 
 export function registerSocket(io) {
   io.engine.on('headers', (headers, req) => {
-    // pastikan cookie diteruskan ke WS
     headers['Access-Control-Allow-Credentials'] = 'true'
   })
 
@@ -23,16 +22,23 @@ export function registerSocket(io) {
     const userId = socket.user.id
     socket.join(`user:${userId}`)
 
-    // online aggregation
+    // === Online presence ===
     const c = (onlineCount.get(userId) || 0) + 1
     onlineCount.set(userId, c)
     if (c === 1) {
-      // kabari hanya ke users yang punya conversation dengan user ini
-      const convs = await prisma.participant.findMany({ where: { userId }, select: { conversationId: true } })
+      const convs = await prisma.participant.findMany({
+        where: { userId },
+        select: { conversationId: true }
+      })
       const convIds = convs.map(x => x.conversationId)
-      const peers = await prisma.participant.findMany({ where: { conversationId: { in: convIds }, userId: { not: userId } }, select: { userId: true } })
+      const peers = await prisma.participant.findMany({
+        where: { conversationId: { in: convIds }, userId: { not: userId } },
+        select: { userId: true }
+      })
       const peerIds = Array.from(new Set(peers.map(p => p.userId)))
-      peerIds.forEach(pid => io.to(`user:${pid}`).emit('presence:update', { userId, online: true }))
+      peerIds.forEach(pid =>
+        io.to(`user:${pid}`).emit('presence:update', { userId, online: true })
+      )
     }
 
     socket.on('conversation:join', (conversationId) => {
@@ -44,54 +50,66 @@ export function registerSocket(io) {
     })
 
     socket.on('typing', ({ conversationId, isTyping }) => {
-      socket.to(`conv:${conversationId}`).emit('typing', { userId, isTyping, conversationId })
+      socket
+        .to(`conv:${conversationId}`)
+        .emit('typing', { userId, isTyping, conversationId })
     })
 
+    // ==========================
+    // Pesan baru (text / image / file)
+    // ==========================
     socket.on('message:send', async ({ conversationId, content, imageUrl, fileUrl, fileName }) => {
-  if (!conversationId || (!content && !imageUrl && !fileUrl)) return
+      if (!conversationId || (!content && !imageUrl && !fileUrl)) return
 
-  const member = await prisma.participant.findFirst({
-    where: { conversationId, userId }
-  })
-  if (!member) return
+      const member = await prisma.participant.findFirst({
+        where: { conversationId, userId }
+      })
+      if (!member) return
 
-  const msg = await prisma.message.create({
-    data: { 
-      conversationId, 
-      senderId: userId, 
-      content: content || null, 
-      imageUrl: imageUrl || null,
-      fileUrl: fileUrl || null,
-      fileName: fileName || null
-    }
-  })
+      const msg = await prisma.message.create({
+        data: {
+          conversationId,
+          senderId: userId,
+          content: content || null,
+          imageUrl: imageUrl || null,
+          fileUrl: fileUrl || null,
+          fileName: fileName || null
+        }
+      })
 
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { lastMessageAt: new Date() }
-  })
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { lastMessageAt: new Date() }
+      })
 
-  // 🔑 bikin preview untuk lastMessage
-  const preview = 
-    msg.content ||
-    (msg.imageUrl ? "📷 Photo" : msg.fileName ? `📎 ${msg.fileName}` : "")
+      // 🔑 Tambahkan field preview
+      const preview =
+        msg.content ||
+        (msg.imageUrl ? '📷 Photo' : msg.fileName ? `📎 ${msg.fileName}` : '')
 
-  // 🔥 kirim msg + preview
-  io.to(`conv:${conversationId}`).emit('message:new', {
-    ...msg,
-    preview
-  })
-})
+      io.to(`conv:${conversationId}`).emit('message:new', {
+        ...msg,
+        preview
+      })
+    })
 
     socket.on('disconnect', async () => {
       const c = (onlineCount.get(userId) || 1) - 1
       if (c <= 0) {
         onlineCount.delete(userId)
-        const convs = await prisma.participant.findMany({ where: { userId }, select: { conversationId: true } })
+        const convs = await prisma.participant.findMany({
+          where: { userId },
+          select: { conversationId: true }
+        })
         const convIds = convs.map(x => x.conversationId)
-        const peers = await prisma.participant.findMany({ where: { conversationId: { in: convIds }, userId: { not: userId } }, select: { userId: true } })
+        const peers = await prisma.participant.findMany({
+          where: { conversationId: { in: convIds }, userId: { not: userId } },
+          select: { userId: true }
+        })
         const peerIds = Array.from(new Set(peers.map(p => p.userId)))
-        peerIds.forEach(pid => io.to(`user:${pid}`).emit('presence:update', { userId, online: false }))
+        peerIds.forEach(pid =>
+          io.to(`user:${pid}`).emit('presence:update', { userId, online: false })
+        )
       } else {
         onlineCount.set(userId, c)
       }
