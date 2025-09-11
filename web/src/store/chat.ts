@@ -79,20 +79,21 @@ try {
 
     socket.off('message:new')
     socket.on('message:new', (msg: Message & { tempId?: number }) => {
-      if (msg.conversationId !== id) return
-      set((s) => {
-         const curr = s.messages[id] || []
+  if (msg.conversationId !== id) return
+  set((s) => {
+    const curr = s.messages[id] || []
 
-    // hapus pesan optimistic yang punya tempId sama (jika server mengirim tempId)
-          const withoutTemp = msg.tempId ? curr.filter(m => m.tempId !== msg.tempId) : curr
+    // 1️⃣ Hapus pesan optimistic berdasarkan tempId (kalau ada)
+    let next = msg.tempId ? curr.filter(m => m.tempId !== msg.tempId) : curr
 
-    // kalau sudah ada id yang sama, jangan duplikasi
-          if (withoutTemp.some(m => m.id === msg.id)) {
-        return { messages: s.messages }
+    // 2️⃣ Hapus duplikat berdasarkan id (kalau sudah ada pesan yang sama)
+    if (next.some(m => m.id === msg.id)) {
+      return { messages: s.messages }
     }
 
+    // 3️⃣ Push pesan baru
     return {
-      messages: { ...s.messages, [id]: [...withoutTemp, msg] }
+      messages: { ...s.messages, [id]: [...next, msg] }
     }
   })
 })
