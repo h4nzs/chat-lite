@@ -18,6 +18,8 @@ export type Message = {
   senderId: string
   content?: string | null
   imageUrl?: string | null
+  fileUrl?: string | null         
+  fileName?: string | null
   createdAt: string
   error?: boolean
 }
@@ -29,6 +31,8 @@ type State = {
   messages: Record<string, Message[]>
   cursors: Record<string, string | null>   // 🔑 simpan nextCursor per conversation
   typing: Record<string, string[]>
+  uploadFile: (conversationId: string, file: File) => Promise<void>
+
 
   loadConversations: () => Promise<void>
   openConversation: (id: string) => Promise<void>
@@ -198,5 +202,26 @@ try {
 setLoading: (id, val) => set(s => ({
   loading: { ...s.loading, [id]: val }
 })),
+
+async uploadFile(conversationId, file) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`, {
+    method: 'POST',
+    body: form,
+    credentials: 'include'
+  })
+  if (!res.ok) throw new Error('Upload failed')
+
+  const data = await res.json() as { fileUrl: string; fileName: string }
+
+  const socket = getSocket()
+  socket.emit('message:send', { 
+    conversationId, 
+    fileUrl: data.fileUrl, 
+    fileName: data.fileName 
+  })
+}
 
 }))

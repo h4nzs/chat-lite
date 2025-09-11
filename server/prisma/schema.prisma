@@ -62,6 +62,8 @@ model Message {
   senderId       String
   content        String?
   imageUrl       String?
+  fileUrl        String?
+  fileName       String?
   createdAt      DateTime        @default(now())
   statuses       MessageStatus[]
 

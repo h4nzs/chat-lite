@@ -14,21 +14,21 @@ export default function Chat() {
   useEffect(() => { loadConversations() }, [loadConversations])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 h-full min-h-0">
+    <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-56px)] bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
-      <aside className="border-r border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
-        <div className="p-3 flex justify-between items-center gap-2 shrink-0">
-          <div className="font-semibold">Conversations</div>
+      <aside className="border-r border-gray-200 dark:border-gray-800 flex flex-col backdrop-blur-md bg-white/60 dark:bg-gray-800/40">
+        <div className="p-4 flex justify-between items-center gap-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="font-semibold text-lg">Conversations</div>
           <div className="flex gap-2">
-            <button className="text-sm underline" onClick={() => setNewChat(v => !v)}>Start new</button>
-            <button className="text-sm underline" onClick={logout}>Sign out</button>
+            <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline" onClick={() => setNewChat(v => !v)}>New</button>
+            <button className="text-sm text-red-600 dark:text-red-400 hover:underline" onClick={logout}>Logout</button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {newChat ? (
             <StartNewChat onStarted={(id) => { setOpen(id); setNewChat(false) }} />
           ) : (
-            <ChatList onOpen={(id) => setOpen(id)} />
+            <ChatList onOpen={(id) => setOpen(id)} activeId={open} />
           )}
         </div>
       </aside>
@@ -38,7 +38,7 @@ export default function Chat() {
         {open ? (
           <ChatWindow id={open} />
         ) : (
-          <div className="flex-1 grid place-items-center text-gray-500">
+          <div className="flex-1 grid place-items-center text-gray-400">
             Pick a conversation
           </div>
         )}

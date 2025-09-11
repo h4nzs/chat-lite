@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { requireAuth } from '../middleware/auth.js'
 import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
+import multer from 'multer'
 
 const prisma = new PrismaClient()
 const router = Router()

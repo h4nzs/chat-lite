@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useChatStore } from '../store/chat'
 
-export default function ChatList({ onOpen }: { onOpen: (id: string) => void }) {
+export default function ChatList({ onOpen, activeId }: { onOpen: (id: string) => void, activeId?: string | null }) {
   const conversations = useChatStore((s) => s.conversations)
   const loadConversations = useChatStore((s) => s.loadConversations)
 
@@ -11,27 +11,34 @@ export default function ChatList({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <div className="divide-y divide-gray-200 dark:divide-gray-800">
-      {conversations.map((c) => (
-        <button
-          key={c.id}
-          onClick={() => onOpen(c.id)}
-          className="w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800"
-        >
-          <div className="font-medium">
-            {c.title ||
-              (Array.isArray(c.participants)
-                ? c.participants.map((p) => p.name).join(', ')
-                : '')}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-            {c.lastMessage?.content
-              ? c.lastMessage.content
-              : c.lastMessage?.imageUrl
-              ? '📷 Image'
-              : 'No messages'}
-          </div>
-        </button>
-      ))}
+      {conversations.map((c) => {
+        const isActive = c.id === activeId
+        return (
+          <button
+            key={c.id}
+            onClick={() => onOpen(c.id)}
+            className={`w-full text-left p-4 transition flex flex-col 
+              ${isActive 
+                ? 'bg-gradient-to-r from-purple-500/90 to-blue-500/90 text-white shadow-md' 
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+          >
+            <div className="font-medium truncate">
+              {c.title ||
+                (Array.isArray(c.participants)
+                  ? c.participants.map((p) => p.name).join(', ')
+                  : '')}
+            </div>
+            <div className={`text-sm truncate ${isActive ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+              {c.lastMessage?.content
+                ? c.lastMessage.content
+                : c.lastMessage?.imageUrl
+                ? '📷 Image'
+                : 'No messages'}
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }

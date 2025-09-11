@@ -11,6 +11,7 @@ export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore(s => s.user?.id)
   const sendMessage = useChatStore(s => s.sendMessage)
   const uploadImage = useChatStore(s => s.uploadImage)
+  const uploadFile = useChatStore(s => (s as any).uploadFile)
   const messages = useChatStore(s => s.messages[id] || [])
   const openConversation = useChatStore(s => s.openConversation)
   const loadOlderMessages = useChatStore(s => s.loadOlderMessages)
@@ -113,47 +114,62 @@ export default function ChatWindow({ id }: { id: string }) {
         ) : (
           <>
             {messages.map(m => {
-  const isMe = m.senderId === meId // nanti ganti dengan user?.id
+  const isMe = m.senderId === meId
   return (
-    <div
-      key={m.tempId || m.id}
-      className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-    >
+    <div key={m.tempId || m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`
-          max-w-[70%] px-3 py-2 rounded-2xl text-sm shadow
+          max-w-[70%] px-4 py-2 rounded-2xl text-sm shadow-md break-words
           ${isMe
-            ? 'bg-blue-500 text-white rounded-br-none'
-            : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-none'}
+            ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-br-none'
+            : 'bg-gradient-to-r from-red-500 to-blue-500 text-white rounded-bl-none'
+          }
         `}
       >
-        {/* isi pesan text */}
-        {m.content && <p>{m.content}</p>}
+        {/* TEXT */}
+        {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
 
-        {/* isi pesan image */}
-        {m.imageUrl && (
-          <img
-            src={
-              m.imageUrl.startsWith('http')
-                ? m.imageUrl
-                : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl}`
+        {/* IMAGE PREVIEW */}
+{(m.imageUrl || (m.fileUrl && /\.(png|jpe?g|gif|webp)$/i.test(m.fileUrl))) && (
+  <img
+    src={
+      (m.imageUrl || m.fileUrl)!.startsWith('http')
+        ? (m.imageUrl || m.fileUrl)!
+        : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`
+    }
+    alt={m.fileName || 'uploaded'}
+    className="max-w-[220px] rounded-md mt-2 shadow-sm cursor-pointer hover:opacity-90 transition"
+    onClick={() => window.open(
+      (m.imageUrl || m.fileUrl)!.startsWith('http')
+        ? (m.imageUrl || m.fileUrl)!
+        : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
+      '_blank'
+    )}
+  />
+)}
+
+        {/* FILE ATTACHMENT */}
+        {m.fileUrl && !m.imageUrl && (
+          <a
+            href={
+              m.fileUrl.startsWith('http')
+                ? m.fileUrl
+                : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.fileUrl}`
             }
-            alt="uploaded"
-            className="max-w-[200px] rounded-md mt-1"
-          />
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm underline mt-2 hover:opacity-80"
+          >
+            📎 {m.fileName || 'Download file'}
+          </a>
         )}
 
-        {/* error info */}
-        {m.error && (
-          <p className="text-xs text-red-300 mt-1">Failed to send</p>
-        )}
+        {/* ERROR STATE */}
+        {m.error && <p className="text-xs text-red-300 mt-1">Failed to send</p>}
 
-        {/* timestamp */}
+        {/* TIMESTAMP */}
         <div className="text-[10px] opacity-70 mt-1 text-right">
-          {new Date(m.createdAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>
@@ -174,37 +190,34 @@ export default function ChatWindow({ id }: { id: string }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-2 flex gap-2">
-          {/* tombol upload */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-2"
-            aria-label="Upload image"
-          >
-            📎
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (e) => {
-              if (e.target.files?.[0]) {
-                try {
-                  await uploadImage(id, e.target.files[0])
-                } catch {
-                  toast.error('Upload gagal')
-                }
-                e.target.value = ''
-              }
-            }}
-          />
+        <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-center bg-white/60 dark:bg-gray-800/50 backdrop-blur-md shadow-inner rounded-t-xl">
+  <button
+    type="button"
+    onClick={() => fileInputRef.current?.click()}
+    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+    aria-label="Upload image"
+  >
+    📎
+  </button>
+  <input
+  ref={fileInputRef}
+  type="file"
+  className="hidden"
+  onChange={async (e) => {
+    if (e.target.files?.[0]) {
+      try {
+        await uploadFile(id, e.target.files[0])
+      } catch {
+        toast.error('Upload gagal')
+      }
+      e.target.value = ''
+    }
+  }}
+/>
 
-          {/* input pesan */}
-          <input
-            value={text}
-            onChange={(e) => {
+  <input
+    value={text}
+    onChange={(e) => {
               setText(e.target.value)
               const socket = getSocket()
               socket.emit('typing', { conversationId: id, isTyping: true })
@@ -213,14 +226,16 @@ export default function ChatWindow({ id }: { id: string }) {
                 socket.emit('typing', { conversationId: id, isTyping: false })
               }, 1000)
             }}
-            placeholder="Type a message"
-            className="flex-1 p-2 border rounded"
-          />
-
-          <button type="submit" className="px-4 bg-blue-600 text-white rounded">
-            Send
-          </button>
-        </form>
+    placeholder="Type a message"
+    className="flex-1 p-2 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent focus:outline-none"
+  />
+  <button
+    type="submit"
+    className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow hover:opacity-90 transition"
+  >
+    Send
+  </button>
+</form>
       </div>
     </div>
   )

@@ -60,6 +60,31 @@ export function registerSocket(io) {
       })
     })
 
+    socket.on('message:send', async ({ conversationId, content, imageUrl, fileUrl, fileName }) => {
+  if (!conversationId || (!content && !imageUrl && !fileUrl)) return
+
+  const member = await prisma.participant.findFirst({ where: { conversationId, userId } })
+  if (!member) return
+
+  const msg = await prisma.message.create({
+    data: { 
+      conversationId, 
+      senderId: userId, 
+      content: content || null, 
+      imageUrl: imageUrl || null,
+      fileUrl: fileUrl || null,
+      fileName: fileName || null
+    }
+  })
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date() }
+  })
+
+  io.to(`conv:${conversationId}`).emit('message:new', msg)
+})
+
     socket.on('disconnect', async () => {
       const c = (onlineCount.get(userId) || 1) - 1
       if (c <= 0) {
