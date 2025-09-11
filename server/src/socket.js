@@ -47,23 +47,12 @@ export function registerSocket(io) {
       socket.to(`conv:${conversationId}`).emit('typing', { userId, isTyping, conversationId })
     })
 
-    socket.on('message:send', async ({ conversationId, content, imageUrl }) => {
-      if (!conversationId || (!content && !imageUrl)) return
-      const member = await prisma.participant.findFirst({ where: { conversationId, userId } })
-      if (!member) return
-      const msg = await prisma.message.create({
-        data: { conversationId, senderId: userId, content: content || null, imageUrl: imageUrl || null }
-      })
-      await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } })
-      io.to(`conv:${conversationId}`).emit('message:new', {
-        id: msg.id, conversationId, senderId: userId, content: msg.content, imageUrl: msg.imageUrl, createdAt: msg.createdAt
-      })
-    })
-
     socket.on('message:send', async ({ conversationId, content, imageUrl, fileUrl, fileName }) => {
   if (!conversationId || (!content && !imageUrl && !fileUrl)) return
 
-  const member = await prisma.participant.findFirst({ where: { conversationId, userId } })
+  const member = await prisma.participant.findFirst({
+    where: { conversationId, userId }
+  })
   if (!member) return
 
   const msg = await prisma.message.create({
@@ -82,7 +71,16 @@ export function registerSocket(io) {
     data: { lastMessageAt: new Date() }
   })
 
-  io.to(`conv:${conversationId}`).emit('message:new', msg)
+  // 🔑 bikin preview untuk lastMessage
+  const preview = 
+    msg.content ||
+    (msg.imageUrl ? "📷 Photo" : msg.fileName ? `📎 ${msg.fileName}` : "")
+
+  // 🔥 kirim msg + preview
+  io.to(`conv:${conversationId}`).emit('message:new', {
+    ...msg,
+    preview
+  })
 })
 
     socket.on('disconnect', async () => {

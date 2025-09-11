@@ -1,7 +1,13 @@
 import { useEffect } from 'react'
 import { useChatStore } from '../store/chat'
 
-export default function ChatList({ onOpen, activeId }: { onOpen: (id: string) => void, activeId?: string | null }) {
+export default function ChatList({
+  onOpen,
+  activeId
+}: {
+  onOpen: (id: string) => void
+  activeId?: string | null
+}) {
   const conversations = useChatStore((s) => s.conversations)
   const loadConversations = useChatStore((s) => s.loadConversations)
 
@@ -13,9 +19,11 @@ export default function ChatList({ onOpen, activeId }: { onOpen: (id: string) =>
     <div className="divide-y divide-gray-200 dark:divide-gray-800">
       {conversations.map((c) => {
         const isActive = c.id === activeId
-        const title = c.title || (Array.isArray(c.participants)
-          ? c.participants.map((p) => p.name).join(', ')
-          : '')
+        const title =
+          c.title ||
+          (Array.isArray(c.participants)
+            ? c.participants.map((p) => p.name).join(', ')
+            : '')
 
         return (
           <button
@@ -27,8 +35,17 @@ export default function ChatList({ onOpen, activeId }: { onOpen: (id: string) =>
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
           >
+            {/* Judul percakapan */}
             <div className="font-medium truncate">{title}</div>
-            <div className={`text-sm truncate ${isActive ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+
+            {/* Preview pesan terakhir */}
+            <div
+              className={`text-sm truncate ${
+                isActive
+                  ? 'text-white/80'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
               {c.lastMessage?.preview || 'No messages'}
             </div>
           </button>
