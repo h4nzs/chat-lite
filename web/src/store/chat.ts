@@ -51,8 +51,9 @@ export const useChatStore = create<State>((set, get) => ({
   conversations: [],
   activeId: null,
   messages: {},
-  cursors: {},           // 🔑 init cursors
+  cursors: {},
   typing: {},
+  loading: {},
 
   async loadConversations() {
     const items = await api<Conversation[]>('/api/conversations')
@@ -61,42 +62,42 @@ export const useChatStore = create<State>((set, get) => ({
 
   async openConversation(id) {
     get().setLoading(id, true)
-try {
-  // fetch messages...
-} finally {
-  get().setLoading(id, false)
-}
-
-    set({ activeId: id })
-    const res = await api<{ items: Message[]; nextCursor: string | null }>(`/api/messages/${id}`)
-    set((s) => ({
-      messages: { ...s.messages, [id]: res.items.reverse() },
-      cursors: { ...s.cursors, [id]: res.nextCursor }
-    }))
+    try {
+      const res = await api<{ items: Message[]; nextCursor: string | null }>(`/api/messages/${id}`)
+      set((s) => ({
+        activeId: id,
+        messages: { ...s.messages, [id]: res.items.reverse() },
+        cursors: { ...s.cursors, [id]: res.nextCursor }
+      }))
+    } finally {
+      get().setLoading(id, false)
+    }
 
     const socket = getSocket()
     socket.emit('conversation:join', id)
 
     socket.off('message:new')
     socket.on('message:new', (msg: Message & { tempId?: number }) => {
-  if (msg.conversationId !== id) return
-  set((s) => {
-    const curr = s.messages[id] || []
+      set((s) => {
+        const curr = s.messages[msg.conversationId] || []
 
-    // 1️⃣ Hapus pesan optimistic berdasarkan tempId (kalau ada)
-    let next = msg.tempId ? curr.filter(m => m.tempId !== msg.tempId) : curr
+        // filter pesan temp & duplikat
+        let next = msg.tempId ? curr.filter(m => m.tempId !== msg.tempId) : curr
+        if (next.some(m => m.id === msg.id)) {
+          return { messages: s.messages }
+        }
 
-    // 2️⃣ Hapus duplikat berdasarkan id (kalau sudah ada pesan yang sama)
-    if (next.some(m => m.id === msg.id)) {
-      return { messages: s.messages }
-    }
+        // update conversations → lastMessage
+        const updatedConvs = s.conversations.map(c =>
+          c.id === msg.conversationId ? { ...c, lastMessage: msg, updatedAt: new Date().toISOString() } : c
+        )
 
-    // 3️⃣ Push pesan baru
-    return {
-      messages: { ...s.messages, [id]: [...next, msg] }
-    }
-  })
-})
+        return {
+          messages: { ...s.messages, [msg.conversationId]: [...next, msg] },
+          conversations: updatedConvs
+        }
+      })
+    })
 
     socket.off('typing')
     socket.on('typing', ({ userId, isTyping, conversationId }) => {
@@ -112,7 +113,7 @@ try {
 
   async loadOlderMessages(conversationId) {
     const cursor = get().cursors[conversationId]
-    if (!cursor) return  // 🚫 tidak ada lagi data
+    if (!cursor) return
 
     const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(cursor)}`
     const res = await api<{ items: Message[]; nextCursor: string | null }>(url)
@@ -122,10 +123,7 @@ try {
         ...s.messages,
         [conversationId]: [...res.items.reverse(), ...(s.messages[conversationId] || [])]
       },
-      cursors: {
-        ...s.cursors,
-        [conversationId]: res.nextCursor
-      }
+      cursors: { ...s.cursors, [conversationId]: res.nextCursor }
     }))
   },
 
@@ -134,14 +132,15 @@ try {
     return new Promise((resolve, reject) => {
       socket.emit('message:send', { conversationId, content, tempId }, (ack: { ok: boolean, msg?: Message }) => {
         if (ack?.ok && ack.msg) {
-          set((s) => ({
-            messages: {
-              ...s.messages,
-              [conversationId]: (s.messages[conversationId] || []).map(m =>
-                m.tempId === tempId ? ack.msg! : m
-              )
-            }
-          }))
+          set((s) => {
+            const updatedMsgs = (s.messages[conversationId] || []).map(m =>
+              m.tempId === tempId ? ack.msg! : m
+            )
+            const updatedConvs = s.conversations.map(c =>
+              c.id === conversationId ? { ...c, lastMessage: ack.msg!, updatedAt: new Date().toISOString() } : c
+            )
+            return { messages: { ...s.messages, [conversationId]: updatedMsgs }, conversations: updatedConvs }
+          })
           resolve()
         } else {
           get().markMessageError(conversationId, tempId!)
@@ -153,10 +152,7 @@ try {
 
   addOptimisticMessage(conversationId, msg) {
     set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: [...(s.messages[conversationId] || []), msg]
-      }
+      messages: { ...s.messages, [conversationId]: [...(s.messages[conversationId] || []), msg] }
     }))
   },
 
@@ -197,32 +193,41 @@ try {
 
     const socket = getSocket()
     socket.emit('message:send', { conversationId, imageUrl: data.imageUrl })
+
+    // update conversations → lastMessage
+    set((s) => ({
+      conversations: s.conversations.map(c =>
+        c.id === conversationId
+          ? { ...c, lastMessage: { id: '', conversationId, senderId: 'me', imageUrl: data.imageUrl, createdAt: new Date().toISOString() } as Message }
+          : c
+      )
+    }))
   },
-  loading: {}, // { [conversationId]: boolean }
 
-setLoading: (id, val) => set(s => ({
-  loading: { ...s.loading, [id]: val }
-})),
+  async uploadFile(conversationId, file) {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`, {
+      method: 'POST',
+      body: form,
+      credentials: 'include'
+    })
+    if (!res.ok) throw new Error('Upload failed')
 
-async uploadFile(conversationId, file) {
-  const form = new FormData()
-  form.append('file', file)
+    const data = await res.json() as { fileUrl: string; fileName: string }
 
-  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`, {
-    method: 'POST',
-    body: form,
-    credentials: 'include'
-  })
-  if (!res.ok) throw new Error('Upload failed')
+    const socket = getSocket()
+    socket.emit('message:send', { conversationId, fileUrl: data.fileUrl, fileName: data.fileName })
 
-  const data = await res.json() as { fileUrl: string; fileName: string }
+    // update conversations → lastMessage
+    set((s) => ({
+      conversations: s.conversations.map(c =>
+        c.id === conversationId
+          ? { ...c, lastMessage: { id: '', conversationId, senderId: 'me', fileUrl: data.fileUrl, fileName: data.fileName, createdAt: new Date().toISOString() } as Message }
+          : c
+      )
+    }))
+  },
 
-  const socket = getSocket()
-  socket.emit('message:send', { 
-    conversationId, 
-    fileUrl: data.fileUrl, 
-    fileName: data.fileName 
-  })
-}
-
+  setLoading: (id, val) => set((s) => ({ loading: { ...s.loading, [id]: val } }))
 }))

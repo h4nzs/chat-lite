@@ -30,28 +30,38 @@ export default function ChatWindow({ id }: { id: string }) {
   }, [id, openConversation])
 
   // scroll ke bawah saat pesan baru datang
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight
-    }
-  }, [messages.length])
+// scroll otomatis hanya jika user dekat bawah
+useEffect(() => {
+  const el = listRef.current
+  if (!el) return
+
+  const threshold = 100
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+
+  if (atBottom) {
+    el.scrollTop = el.scrollHeight
+  } else {
+    setShowScrollButton(true) // ada pesan baru, tapi user bukan di bawah
+  }
+}, [messages.length]) 
+
+const [showScrollButton, setShowScrollButton] = useState(false)
 
   // handler untuk infinite scroll (ambil older saat scrollTop = 0)
-  const handleScroll = useCallback(async () => {
-    const el = listRef.current
-    if (!el) return
-    if (el.scrollTop === 0 && !loadingOlder) {
-      setLoadingOlder(true)
-      try {
-        // Versi store terbaru pakai cursor -> cukup panggil tanpa argumen
-        await loadOlderMessages(id)
-      } catch {
-        toast.error('Gagal memuat pesan lama')
-      } finally {
-        setLoadingOlder(false)
-      }
-    }
-  }, [id, loadingOlder, loadOlderMessages])
+const handleScroll = useCallback(() => {
+  const el = listRef.current
+  if (!el) return
+
+  if (el.scrollTop === 0 && !loadingOlder) {
+    setLoadingOlder(true)
+    loadOlderMessages(id).finally(() => setLoadingOlder(false))
+  }
+
+  // cek apakah user di bawah atau tidak
+  const threshold = 100
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+  setShowScrollButton(!atBottom)
+}, [id, loadingOlder, loadOlderMessages])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,7 +92,7 @@ export default function ChatWindow({ id }: { id: string }) {
   }, [id, text, sendMessage])
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+      <div className="flex flex-col h-full min-h-0 relative">
       {/* AREA PESAN: hanya bagian ini yang scroll */}
       <div
         ref={listRef}
@@ -237,6 +247,20 @@ export default function ChatWindow({ id }: { id: string }) {
   </button>
 </form>
       </div>
+      {showScrollButton && (
+  <button
+    onClick={() => {
+      if (listRef.current) {
+        listRef.current.scrollTop = listRef.current.scrollHeight
+      }
+      setShowScrollButton(false)
+    }}
+    className="absolute bottom-20 right-6 p-2 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition"
+    aria-label="Scroll to bottom"
+  >
+    ⬇️
+  </button>
+)}
     </div>
   )
 }
