@@ -170,4 +170,20 @@ router.post('/:id/upload-image', requireAuth, imageUpload.single('image'), async
   res.json({ imageUrl: url, conversationId, msg })
 })
 
+router.delete('/:conversationId/messages/:id', requireAuth, async (req, res) => {
+  const me = req.user.id
+  const { conversationId, id } = req.params
+
+  const msg = await prisma.message.findUnique({ where: { id } })
+  if (!msg || msg.senderId !== me) return res.status(403).json({ error: 'Forbidden' })
+
+  await prisma.message.update({
+    where: { id },
+    data: { content: '[deleted]', imageUrl: null, fileUrl: null, fileName: null }
+  })
+
+  io.to(`conv:${conversationId}`).emit('message:deleted', { id, conversationId })
+  res.json({ ok: true })
+})
+
 export default router

@@ -41,6 +41,16 @@ export function registerSocket(io) {
       )
     }
 
+    // === Request daftar online ===
+    socket.on('presence:who', (ids, cb) => {
+      if (!Array.isArray(ids)) return
+      const status = ids.map(id => ({
+        userId: id,
+        online: onlineCount.has(id)
+      }))
+      cb(status)
+    })
+
     socket.on('conversation:join', (conversationId) => {
       socket.join(`conv:${conversationId}`)
     })
@@ -58,7 +68,7 @@ export function registerSocket(io) {
     // ==========================
     // Pesan baru (text / image / file)
     // ==========================
-    socket.on('message:send', async ({ conversationId, content, imageUrl, fileUrl, fileName }) => {
+    socket.on('message:send', async ({ conversationId, content, imageUrl, fileUrl, fileName }, cb) => {
       if (!conversationId || (!content && !imageUrl && !fileUrl)) return
 
       const member = await prisma.participant.findFirst({
@@ -82,14 +92,42 @@ export function registerSocket(io) {
         data: { lastMessageAt: new Date() }
       })
 
-      // 🔑 Tambahkan field preview
       const preview =
         msg.content ||
         (msg.imageUrl ? '📷 Photo' : msg.fileName ? `📎 ${msg.fileName}` : '')
 
-      io.to(`conv:${conversationId}`).emit('message:new', {
-        ...msg,
-        preview
+      const payload = { ...msg, preview }
+
+      io.to(`conv:${conversationId}`).emit('message:new', payload)
+
+      if (cb) cb({ ok: true, msg: payload })
+    })
+
+    // ==========================
+    // Hapus pesan
+    // ==========================
+    socket.on('message:delete', async ({ messageId, conversationId }) => {
+      if (!messageId || !conversationId) return
+
+      const member = await prisma.participant.findFirst({
+        where: { conversationId, userId }
+      })
+      if (!member) return
+
+      // soft delete: ubah content jadi null
+      const deleted = await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          content: null,
+          imageUrl: null,
+          fileUrl: null,
+          fileName: null
+        }
+      })
+
+      io.to(`conv:${conversationId}`).emit('message:deleted', {
+        id: messageId,
+        conversationId
       })
     })
 

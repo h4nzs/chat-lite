@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
 import { getSocket } from '../lib/socket'
+import { encryptMessage, decryptMessage } from "../utils/crypto"
 
 export type Conversation = {
   id: string
@@ -27,7 +28,7 @@ export type Message = {
   fileName?: string | null
   createdAt: string
   error?: boolean
-  preview?: string   // 🔑 tambahkan preview
+  preview?: string
 }
 
 type State = {
@@ -37,15 +38,15 @@ type State = {
   messages: Record<string, Message[]>
   cursors: Record<string, string | null>
   typing: Record<string, string[]>
+  presence: Record<string, boolean>
 
   loadConversations: () => Promise<void>
   openConversation: (id: string) => Promise<void>
   loadOlderMessages: (conversationId: string) => Promise<void>
-
   sendMessage: (conversationId: string, content: string, tempId?: number) => Promise<void>
+  deleteMessage: (conversationId: string, messageId: string) => void
   addOptimisticMessage: (conversationId: string, msg: Message) => void
   markMessageError: (conversationId: string, tempId: number) => void
-
   searchUsers: (
     q: string
   ) => Promise<
@@ -54,11 +55,9 @@ type State = {
   startConversation: (peerId: string) => Promise<string>
   uploadImage: (conversationId: string, file: File) => Promise<void>
   uploadFile: (conversationId: string, file: File) => Promise<void>
-
   setLoading: (id: string, val: boolean) => void
 }
 
-// helper sort by updatedAt
 function sortConversations(list: Conversation[]) {
   return [...list].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -72,6 +71,7 @@ export const useChatStore = create<State>((set, get) => ({
   cursors: {},
   typing: {},
   loading: {},
+  presence: {},
 
   async loadConversations() {
     const items = await api<Conversation[]>('/api/conversations')
@@ -84,8 +84,12 @@ export const useChatStore = create<State>((set, get) => ({
       const res = await api<{ items: Message[]; nextCursor: string | null }>(
         `/api/messages/${id}`
       )
+      const decryptedItems = res.items.map((m) => ({
+        ...m,
+        content: m.content ? decryptMessage(m.content) : null,
+      }))
       set((s) => ({
-        messages: { ...s.messages, [id]: res.items.reverse() },
+        messages: { ...s.messages, [id]: decryptedItems.reverse() },
         cursors: { ...s.cursors, [id]: res.nextCursor }
       }))
     } finally {
@@ -103,14 +107,17 @@ export const useChatStore = create<State>((set, get) => ({
         const { conversations, messages } = s
         const curr = messages[msg.conversationId] || []
 
-        // hapus pesan optimistic kalau ada
         let next = msg.tempId ? curr.filter((m) => m.tempId !== msg.tempId) : curr
         if (next.some((m) => m.id === msg.id)) return {}
 
-        // update conversations (pakai preview dari server)
+        const decryptedMsg = {
+          ...msg,
+          content: msg.content ? decryptMessage(msg.content) : null,
+        }
+
         let updated = conversations.map((c) =>
           c.id === msg.conversationId
-            ? { ...c, lastMessage: msg, updatedAt: new Date().toISOString() }
+            ? { ...c, lastMessage: decryptedMsg, updatedAt: new Date().toISOString() }
             : c
         )
 
@@ -120,7 +127,7 @@ export const useChatStore = create<State>((set, get) => ({
             isGroup: false,
             title: null,
             participants: [],
-            lastMessage: msg,
+            lastMessage: decryptedMsg,
             updatedAt: new Date().toISOString()
           })
         }
@@ -128,8 +135,40 @@ export const useChatStore = create<State>((set, get) => ({
         updated = sortConversations(updated)
 
         return {
-          messages: { ...messages, [msg.conversationId]: [...next, msg] },
+          messages: { ...messages, [msg.conversationId]: [...next, decryptedMsg] },
           conversations: updated
+        }
+      })
+    })
+
+    // ✅ listener untuk pesan dihapus
+    socket.off('message:deleted')
+    socket.on('message:deleted', ({ id, conversationId }) => {
+      set((s) => {
+        const updatedMessages = (s.messages[conversationId] || []).map(m =>
+          m.id === id ? { ...m, content: '[deleted]', imageUrl: null, fileUrl: null, fileName: null } : m
+        )
+
+        const updatedConversations = s.conversations.map(c => {
+          if (c.id === conversationId && c.lastMessage?.id === id) {
+            return {
+              ...c,
+              lastMessage: {
+                ...c.lastMessage,
+                content: '[deleted]',
+                imageUrl: null,
+                fileUrl: null,
+                fileName: null,
+                preview: undefined
+              }
+            }
+          }
+          return c
+        })
+
+        return {
+          messages: { ...s.messages, [conversationId]: updatedMessages },
+          conversations: updatedConversations
         }
       })
     })
@@ -144,6 +183,13 @@ export const useChatStore = create<State>((set, get) => ({
         return { typing: { ...s.typing, [id]: Array.from(curr) } }
       })
     })
+
+    socket.off('presence:update')
+    socket.on('presence:update', ({ userId, online }) => {
+      set((s) => ({
+        presence: { ...s.presence, [userId]: online }
+      }))
+    })
   },
 
   async loadOlderMessages(conversationId) {
@@ -153,10 +199,15 @@ export const useChatStore = create<State>((set, get) => ({
     const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(cursor)}`
     const res = await api<{ items: Message[]; nextCursor: string | null }>(url)
 
+    const decryptedItems = res.items.map((m) => ({
+      ...m,
+      content: m.content ? decryptMessage(m.content) : null,
+    }))
+
     set((s) => ({
       messages: {
         ...s.messages,
-        [conversationId]: [...res.items.reverse(), ...(s.messages[conversationId] || [])]
+        [conversationId]: [...decryptedItems.reverse(), ...(s.messages[conversationId] || [])]
       },
       cursors: { ...s.cursors, [conversationId]: res.nextCursor }
     }))
@@ -165,12 +216,18 @@ export const useChatStore = create<State>((set, get) => ({
   async sendMessage(conversationId, content, tempId) {
     const socket = getSocket()
     return new Promise((resolve, reject) => {
-      socket.emit('message:send', { conversationId, content, tempId }, (ack: { ok: boolean; msg?: Message }) => {
+      const encrypted = encryptMessage(content)
+      socket.emit('message:send', { conversationId, content: encrypted, tempId }, (ack: { ok: boolean; msg?: Message }) => {
         if (ack?.ok && ack.msg) {
+          const decryptedAck = {
+            ...ack.msg,
+            content: ack.msg.content ? decryptMessage(ack.msg.content) : null,
+          }
+
           set((s) => {
             let updated = s.conversations.map((c) =>
               c.id === conversationId
-                ? { ...c, lastMessage: ack.msg, updatedAt: new Date().toISOString() }
+                ? { ...c, lastMessage: decryptedAck, updatedAt: new Date().toISOString() }
                 : c
             )
 
@@ -180,7 +237,7 @@ export const useChatStore = create<State>((set, get) => ({
                 isGroup: false,
                 title: null,
                 participants: [],
-                lastMessage: ack.msg,
+                lastMessage: decryptedAck,
                 updatedAt: new Date().toISOString()
               })
             }
@@ -191,7 +248,7 @@ export const useChatStore = create<State>((set, get) => ({
               messages: {
                 ...s.messages,
                 [conversationId]: (s.messages[conversationId] || []).map((m) =>
-                  m.tempId === tempId ? ack.msg! : m
+                  m.tempId === tempId ? decryptedAck : m
                 )
               },
               conversations: updated
@@ -204,6 +261,12 @@ export const useChatStore = create<State>((set, get) => ({
         }
       })
     })
+  },
+
+  // ✅ fungsi untuk hapus pesan
+  deleteMessage(conversationId, messageId) {
+    const socket = getSocket()
+    socket.emit('message:delete', { conversationId, messageId })
   },
 
   addOptimisticMessage(conversationId, msg) {
@@ -253,7 +316,6 @@ export const useChatStore = create<State>((set, get) => ({
     socket.emit('message:send', {
       conversationId,
       imageUrl: data.imageUrl,
-      // sementara kasih preview, server akan override
       preview: '📷 Photo'
     })
   },
@@ -275,7 +337,6 @@ export const useChatStore = create<State>((set, get) => ({
       conversationId,
       fileUrl: data.fileUrl,
       fileName: data.fileName,
-      // sementara preview
       preview: `📎 ${data.fileName}`
     })
   },

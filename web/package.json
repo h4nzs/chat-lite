@@ -13,6 +13,7 @@
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
     "classnames": "^2.5.1",
+    "crypto-js": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",

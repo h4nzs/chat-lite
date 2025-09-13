@@ -10,6 +10,7 @@ export default function ChatList({
 }) {
   const conversations = useChatStore((s) => s.conversations)
   const loadConversations = useChatStore((s) => s.loadConversations)
+  const presence = useChatStore((s) => s.presence)
 
   useEffect(() => {
     loadConversations()
@@ -25,6 +26,10 @@ export default function ChatList({
             ? c.participants.map((p) => p.name).join(', ')
             : '')
 
+        // 🔑 Ambil participant lain (selain diri kita)
+        const peer = c.participants[0]
+        const isOnline = peer ? presence[peer.id] : false
+
         return (
           <button
             key={c.id}
@@ -35,8 +40,18 @@ export default function ChatList({
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
           >
-            {/* Judul percakapan */}
-            <div className="font-medium truncate">{title}</div>
+            {/* Judul percakapan + indikator online */}
+            <div className="flex items-center gap-2">
+              <div className="font-medium truncate">{title}</div>
+              {peer && (
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isOnline ? 'bg-green-500' : 'bg-gray-400'
+                  }`}
+                  title={isOnline ? 'Online' : 'Offline'}
+                ></span>
+              )}
+            </div>
 
             {/* Preview pesan terakhir */}
             <div
