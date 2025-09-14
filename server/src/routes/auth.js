@@ -10,7 +10,7 @@ import { env } from '../config.js'
 const prisma = new PrismaClient()
 const router = Router()
 
-function setAuthCookies(res, { access, refresh }) {
+function setAuthCookies (res, { access, refresh }) {
   const isProd = env.nodeEnv === 'production'
   res.cookie('at', access, {
     httpOnly: true, secure: isProd, sameSite: 'lax', path: '/', maxAge: 1000 * 60 * 15
@@ -20,7 +20,7 @@ function setAuthCookies(res, { access, refresh }) {
   })
 }
 
-async function issueTokens(user) {
+async function issueTokens (user) {
   const access = signAccessToken({ id: user.id, email: user.email, username: user.username })
   const jti = newJti()
   const refresh = signAccessToken({ sub: user.id, jti }, { expiresIn: '30d' })

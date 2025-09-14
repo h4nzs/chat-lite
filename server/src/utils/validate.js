@@ -1,7 +1,7 @@
 import { ZodError } from 'zod'
 import { ApiError } from './errors.js'
 
-export function zodValidate(schema) {
+export function zodValidate (schema) {
   return (req, _res, next) => {
     try {
       if (schema.body) req.body = schema.body.parse(req.body)

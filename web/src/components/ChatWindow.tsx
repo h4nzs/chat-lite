@@ -11,7 +11,7 @@ export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore(s => s.user?.id)
   const sendMessage = useChatStore(s => s.sendMessage)
   const uploadImage = useChatStore(s => s.uploadImage)
-  const uploadFile = useChatStore(s => (s as any).uploadFile)
+  const uploadFile = useChatStore(s => s.uploadFile)
   const deleteMessage = useChatStore(s => s.deleteMessage)
   const messages = useChatStore(s => s.messages[id] || [])
   const openConversation = useChatStore(s => s.openConversation)
@@ -48,6 +48,34 @@ export default function ChatWindow({ id }: { id: string }) {
       })()
     }
   }, [id, loadingOlder, loadOlderMessages])
+
+  // Scroll to bottom when messages are first loaded
+  useEffect(() => {
+    if (messages.length > 0 && listRef.current) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        if (listRef.current) {
+          listRef.current.scrollTop = listRef.current.scrollHeight
+        }
+      }, 0)
+    }
+  }, [messages.length, id])
+
+  // Auto-scroll to bottom when new messages are added and user is near bottom
+  useEffect(() => {
+    if (listRef.current) {
+      const el = listRef.current
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
+      if (nearBottom) {
+        // Scroll to bottom when new messages are added
+        setTimeout(() => {
+          if (listRef.current) {
+            listRef.current.scrollTop = listRef.current.scrollHeight
+          }
+        }, 0)
+      }
+    }
+  }, [messages.length])
 
   const handleScroll = useCallback(() => {
     const el = listRef.current
@@ -86,6 +114,48 @@ export default function ChatWindow({ id }: { id: string }) {
     }
   }, [id, text, sendMessage])
 
+  // Format timestamp to show time and date
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    
+    // If message is from today, show only time
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+    
+    // If message is from this year, show date and time without year
+    if (date.getFullYear() === now.getFullYear()) {
+      return date.toLocaleDateString([], {
+        month: 'short',
+        day: 'numeric'
+      }) + ' ' + date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+    
+    // If message is from previous years, show full date and time
+    return date.toLocaleDateString([], {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }) + ' ' + date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // Check if file is an image based on file extension
+  const isImageFile = (fileUrl: string | null | undefined) => {
+    if (!fileUrl) return false;
+    const imageExtensions = /\.(png|jpe?g|gif|webp)(\?.*)?$/i;
+    return imageExtensions.test(fileUrl);
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0 relative">
       {/* AREA PESAN */}
@@ -118,6 +188,9 @@ export default function ChatWindow({ id }: { id: string }) {
         ) : (
           <>
             {messages.map(m => {
+              // Log message for debugging
+              console.log('Rendering message:', m);
+              
               const isMe = m.senderId === meId
               return (
                 <div
@@ -137,26 +210,39 @@ export default function ChatWindow({ id }: { id: string }) {
                     {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
 
                     {/* IMAGE PREVIEW */}
-                    {(m.imageUrl || (m.fileUrl && /\.(png|jpe?g|gif|webp)$/i.test(m.fileUrl))) && (
-                      <img
-                        src={
-                          (m.imageUrl || m.fileUrl)!.startsWith('http')
-                            ? (m.imageUrl || m.fileUrl)!
-                            : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`
-                        }
-                        alt={m.fileName || 'uploaded'}
-                        className="max-w-[220px] rounded-md mt-2 shadow-sm cursor-pointer hover:opacity-90 transition"
-                        onClick={() => window.open(
-                          (m.imageUrl || m.fileUrl)!.startsWith('http')
-                            ? (m.imageUrl || m.fileUrl)!
-                            : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
-                          '_blank'
-                        )}
-                      />
+                    {(m.imageUrl || (m.fileUrl && isImageFile(m.fileUrl))) && (
+                      <div className="mt-2 flex flex-col items-start">
+                        <img
+                          src={
+                            (m.imageUrl || m.fileUrl)!.startsWith('http')
+                              ? (m.imageUrl || m.fileUrl)!
+                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`
+                          }
+                          alt={m.fileName || 'uploaded'}
+                          className="max-w-[220px] max-h-[200px] rounded-md shadow-sm cursor-pointer hover:opacity-90 transition object-contain bg-white"
+                          onClick={() => window.open(
+                            (m.imageUrl || m.fileUrl)!.startsWith('http')
+                              ? (m.imageUrl || m.fileUrl)!
+                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
+                            '_blank'
+                          )}
+                        />
+                        <button 
+                          className="mt-1 text-xs text-white/80 hover:text-white underline"
+                          onClick={() => window.open(
+                            (m.imageUrl || m.fileUrl)!.startsWith('http')
+                              ? (m.imageUrl || m.fileUrl)!
+                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
+                            '_blank'
+                          )}
+                        >
+                          Zoom
+                        </button>
+                      </div>
                     )}
 
                     {/* FILE ATTACHMENT */}
-                    {m.fileUrl && !m.imageUrl && (
+                    {m.fileUrl && !m.imageUrl && !isImageFile(m.fileUrl) && (
                       <a
                         href={
                           m.fileUrl.startsWith('http')
@@ -177,10 +263,7 @@ export default function ChatWindow({ id }: { id: string }) {
                     {/* TIMESTAMP + DELETE BUTTON */}
                     <div className="flex justify-between items-center mt-1 text-[10px] opacity-70">
                       <span>
-                        {new Date(m.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {formatTimestamp(m.createdAt)}
                       </span>
                       {isMe && !m.error && m.id && (
                         <button
@@ -230,7 +313,12 @@ export default function ChatWindow({ id }: { id: string }) {
       {/* FOOTER */}
       <div className="border-t shrink-0">
         {typingUsers.length > 0 && (
-          <div className="px-3 py-1 text-sm text-gray-500 border-b">
+          <div className="px-3 py-1 text-sm text-gray-500 border-b flex items-center">
+            <div className="flex space-x-1 mr-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            </div>
             {typingUsers.length === 1
               ? 'Someone is typing...'
               : `${typingUsers.length} people are typing...`}
@@ -255,12 +343,18 @@ export default function ChatWindow({ id }: { id: string }) {
             className="hidden"
             onChange={async (e) => {
               if (e.target.files?.[0]) {
+                const file = e.target.files[0];
                 try {
-                  await uploadFile(id, e.target.files[0])
+                  // Check if file is an image
+                  if (file.type.startsWith('image/')) {
+                    await uploadImage(id, file);
+                  } else {
+                    await uploadFile(id, file);
+                  }
                 } catch {
-                  toast.error('Upload gagal')
+                  toast.error('Upload gagal');
                 }
-                e.target.value = ''
+                e.target.value = '';
               }
             }}
           />

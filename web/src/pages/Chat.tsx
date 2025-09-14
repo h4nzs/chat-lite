@@ -14,9 +14,9 @@ export default function Chat() {
   useEffect(() => { loadConversations() }, [loadConversations])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-56px)] bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
-      <aside className="border-r border-gray-200 dark:border-gray-800 flex flex-col backdrop-blur-md bg-white/60 dark:bg-gray-800/40">
+    <div className="flex h-[calc(100vh-56px)] bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar - Hidden on mobile when chat is open */}
+      <aside className={`border-r border-gray-200 dark:border-gray-800 flex flex-col backdrop-blur-md bg-white/60 dark:bg-gray-800/40 md:w-1/3 ${open ? 'hidden md:flex absolute inset-0 z-10 md:relative' : 'w-full md:relative'}`}>
         <div className="p-4 flex justify-between items-center gap-2 border-b border-gray-200 dark:border-gray-700">
           <div className="font-semibold text-lg">Conversations</div>
           <div className="flex gap-2">
@@ -33,8 +33,8 @@ export default function Chat() {
         </div>
       </aside>
 
-      {/* Chat Window */}
-      <main className="md:col-span-2 flex flex-col h-full min-h-0">
+      {/* Chat Window - Full width on mobile when open */}
+      <main className={`flex flex-col h-full min-h-0 ${open ? 'w-full md:w-2/3' : 'hidden md:flex md:w-2/3'}`}>
         {open ? (
           <ChatWindow id={open} />
         ) : (

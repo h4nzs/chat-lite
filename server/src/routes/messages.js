@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client'
 import { requireAuth } from '../middleware/auth.js'
 import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
-import multer from 'multer'
 
 const prisma = new PrismaClient()
 const router = Router()
@@ -59,11 +58,14 @@ router.post('/', requireAuth, zodValidate(postSchema), async (req, res) => {
   const member = await prisma.participant.findFirst({ where: { conversationId, userId: me } })
   if (!member) return res.status(403).json({ error: 'Forbidden' })
 
+  // Sanitize content to prevent XSS
+  const sanitizedContent = content ? xss(content) : null
+
   const msg = await prisma.message.create({
     data: {
       conversationId,
       senderId: me,
-      content: content || null,
+      content: sanitizedContent || null,
       imageUrl: imageUrl || null
     }
   })

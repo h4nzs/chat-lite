@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   }
 })
 
-function fileFilter(_req, file, cb) {
+function fileFilter (_req, file, cb) {
   if (!ALLOWED[file.mimetype]) return cb(new Error('Invalid file type'))
   cb(null, true)
 }
@@ -34,6 +34,6 @@ export const upload = multer({
 })
 
 // helper kalau nanti mau ke S3
-export async function saveUpload(file) {
+export async function saveUpload (file) {
   return { url: `/uploads/${file.filename}` }
 }

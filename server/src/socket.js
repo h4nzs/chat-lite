@@ -1,10 +1,11 @@
 import { verifyJwt } from './utils/jwt.js'
 import { PrismaClient } from '@prisma/client'
+import xss from 'xss'
 
 const prisma = new PrismaClient()
 const onlineCount = new Map() // userId -> count sockets
 
-export function registerSocket(io) {
+export function registerSocket (io) {
   io.engine.on('headers', (headers, req) => {
     headers['Access-Control-Allow-Credentials'] = 'true'
   })
@@ -76,11 +77,14 @@ export function registerSocket(io) {
       })
       if (!member) return
 
+      // Sanitize content to prevent XSS
+      const sanitizedContent = content ? xss(content) : null
+
       const msg = await prisma.message.create({
         data: {
           conversationId,
           senderId: userId,
-          content: content || null,
+          content: sanitizedContent || null,
           imageUrl: imageUrl || null,
           fileUrl: fileUrl || null,
           fileName: fileName || null

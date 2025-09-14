@@ -1,7 +1,7 @@
 import { verifyJwt } from '../utils/jwt.js'
 import { ApiError } from '../utils/errors.js'
 
-export function requireAuth(req, _res, next) {
+export function requireAuth (req, _res, next) {
   const header = req.headers.authorization || ''
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : null
   const cookieToken = req.cookies?.at // access token httpOnly

@@ -75,7 +75,36 @@ export const useChatStore = create<State>((set, get) => ({
 
   async loadConversations() {
     const items = await api<Conversation[]>('/api/conversations')
-    set({ conversations: sortConversations(items) })
+    // Decrypt last message content if it's encrypted
+    const decryptedItems = items.map(conversation => {
+      if (conversation.lastMessage && conversation.lastMessage.content) {
+        try {
+          // Check if content is encrypted (starts with 'U2FsdGVkX1' which is base64 prefix for CryptoJS)
+          if (conversation.lastMessage.content.startsWith('U2FsdGVkX1')) {
+            return {
+              ...conversation,
+              lastMessage: {
+                ...conversation.lastMessage,
+                content: decryptMessage(conversation.lastMessage.content),
+                preview: decryptMessage(conversation.lastMessage.content)
+              }
+            }
+          }
+        } catch (e) {
+          // If decryption fails, keep original content
+          return {
+            ...conversation,
+            lastMessage: {
+              ...conversation.lastMessage,
+              content: '[Failed to decrypt]',
+              preview: '[Failed to decrypt]'
+            }
+          }
+        }
+      }
+      return conversation
+    })
+    set({ conversations: sortConversations(decryptedItems) })
   },
 
   async openConversation(id) {
@@ -113,7 +142,11 @@ export const useChatStore = create<State>((set, get) => ({
         const decryptedMsg = {
           ...msg,
           content: msg.content ? decryptMessage(msg.content) : null,
+          preview: msg.content ? decryptMessage(msg.content) : msg.preview
         }
+
+        // Log message for debugging
+        console.log('Received message:', decryptedMsg);
 
         let updated = conversations.map((c) =>
           c.id === msg.conversationId
@@ -222,7 +255,11 @@ export const useChatStore = create<State>((set, get) => ({
           const decryptedAck = {
             ...ack.msg,
             content: ack.msg.content ? decryptMessage(ack.msg.content) : null,
+            preview: ack.msg.content ? decryptMessage(ack.msg.content) : ack.msg.preview
           }
+
+          // Log message for debugging
+          console.log('Acknowledged message:', decryptedAck);
 
           set((s) => {
             let updated = s.conversations.map((c) =>
@@ -306,7 +343,7 @@ export const useChatStore = create<State>((set, get) => ({
     const form = new FormData()
     form.append('image', file)
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload-image`,
+      `${import.meta.env.VITE_API_URL as string || 'http://localhost:4000'}/api/conversations/${conversationId}/upload-image`,
       { method: 'POST', body: form, credentials: 'include' }
     )
     if (!res.ok) throw new Error('Upload failed')
@@ -321,24 +358,47 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   async uploadFile(conversationId, file) {
-    const form = new FormData()
-    form.append('file', file)
+    // Check if file is an image
+    const isImage = file.type.startsWith('image/');
+    
+    if (isImage) {
+      // Upload image through image endpoint
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL as string || 'http://localhost:4000'}/api/conversations/${conversationId}/upload-image`,
+        { method: 'POST', body: form, credentials: 'include' }
+      );
+      if (!res.ok) throw new Error('Upload failed');
+      const data = (await res.json()) as { imageUrl: string };
 
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`,
-      { method: 'POST', body: form, credentials: 'include' }
-    )
-    if (!res.ok) throw new Error('Upload failed')
+      const socket = getSocket();
+      socket.emit('message:send', {
+        conversationId,
+        imageUrl: data.imageUrl,
+        preview: '📷 Photo'
+      });
+    } else {
+      // Upload file through file endpoint
+      const form = new FormData();
+      form.append('file', file);
 
-    const data = (await res.json()) as { fileUrl: string; fileName: string }
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL as string || 'http://localhost:4000'}/api/conversations/${conversationId}/upload`,
+        { method: 'POST', body: form, credentials: 'include' }
+      );
+      if (!res.ok) throw new Error('Upload failed');
 
-    const socket = getSocket()
-    socket.emit('message:send', {
-      conversationId,
-      fileUrl: data.fileUrl,
-      fileName: data.fileName,
-      preview: `📎 ${data.fileName}`
-    })
+      const data = (await res.json()) as { fileUrl: string; fileName: string };
+
+      const socket = getSocket();
+      socket.emit('message:send', {
+        conversationId,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        preview: `📎 ${data.fileName}`
+      });
+    }
   },
 
   setLoading: (id, val) =>

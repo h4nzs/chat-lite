@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:4000'
 
 export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: HeadersInit = { 'Content-Type': 'application/json', ...(opts.headers || {}) }

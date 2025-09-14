@@ -6,14 +6,13 @@ import { useAuthStore } from '../store/auth'
 export default function MessageInput({ conversationId }: { conversationId: string }) {
   const [text, setText] = useState('')
   const sendMessage = useChatStore((s) => s.sendMessage)
-  const token = useAuthStore((s) => s.token)!
 
   useEffect(() => {
-    const socket = getSocket(token)
+    const socket = getSocket()
     return () => {
       socket.emit('typing', { conversationId, isTyping: false })
     }
-  }, [token, conversationId])
+  }, [conversationId])
 
   return (
     <form
@@ -30,7 +29,7 @@ export default function MessageInput({ conversationId }: { conversationId: strin
         value={text}
         onChange={(e) => {
           setText(e.target.value)
-          getSocket(token).emit('typing', { conversationId, isTyping: e.target.value.length > 0 })
+          getSocket().emit('typing', { conversationId, isTyping: e.target.value.length > 0 })
         }}
         className="flex-1 p-2 border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
         placeholder="Type a message"

@@ -15,7 +15,7 @@ export default function App() {
           {/* gunakan flex-col agar header fixed di atas, content isi penuh */}
           <div className="flex flex-col h-full">
             <header className="shrink-0 p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-              <Link to="/" className="font-semibold">Chat-Lite</Link>
+              <Link to="/" className="font-semibold text-lg">Chat-Lite</Link>
               <ThemeToggle />
             </header>
             {/* --- FIX: wrapper isi agar scroll hanya terjadi di dalam halaman Chat --- */}
@@ -47,10 +47,10 @@ function ThemeToggle() {
   return (
     <button
       aria-label="Toggle theme"
-      className="px-2 py-1 rounded border border-gray-300 dark:border-gray-700"
+      className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700 text-sm"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
     >
-      {theme === 'dark' ? 'Light' : 'Dark'}
+      {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
     </button>
   )
 }

@@ -64,7 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
             createdAt: last.createdAt,
             senderId: last.senderId,
             preview:
-              last.content ||
+              (last.content && !last.content.startsWith('U2FsdGVkX1')) ? last.content : 
               (last.imageUrl ? '📷 Photo' : last.fileName ? `📎 ${last.fileName}` : '')
           }
         : null,
@@ -182,7 +182,7 @@ router.delete('/:conversationId/messages/:id', requireAuth, async (req, res) => 
     data: { content: '[deleted]', imageUrl: null, fileUrl: null, fileName: null }
   })
 
-  io.to(`conv:${conversationId}`).emit('message:deleted', { id, conversationId })
+  req.app.get('io').to(`conv:${conversationId}`).emit('message:deleted', { id, conversationId })
   res.json({ ok: true })
 })
 

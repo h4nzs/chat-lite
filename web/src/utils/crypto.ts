@@ -1,6 +1,6 @@
 import CryptoJS from "crypto-js"
 
-const SECRET_KEY = import.meta.env.VITE_CHAT_SECRET || "default-secret"
+const SECRET_KEY = (import.meta.env.VITE_CHAT_SECRET as string) || "default-secret"
 
 // Enkripsi teks
 export function encryptMessage(text: string): string {
