@@ -83,7 +83,6 @@ export async function authFetch<T>(
         // refresh gagal → redirect login
         document.cookie =
           "at=; Max-Age=0; path=/; SameSite=Lax; Secure"; // hapus cookie at
-        localStorage.removeItem("token");
         window.location.href = "/login";
         throw new ApiError(401, "Session expired, please log in again");
       }

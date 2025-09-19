@@ -42,7 +42,10 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // === STATIC FILES ===
-app.use("/uploads", express.static(path.resolve(process.cwd(), env.uploadDir)));
+app.use("/uploads", cors({
+  origin: env.corsOrigin || "http://localhost:5173",
+  credentials: true
+}), express.static(path.resolve(process.cwd(), env.uploadDir)));
 
 // === ROUTES ===
 app.use("/api/auth", authRouter);

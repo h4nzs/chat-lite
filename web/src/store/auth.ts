@@ -71,7 +71,6 @@ export const useAuthStore = create<State>((set, get) => ({
     // Clear token dari storage
     eraseCookie("at");
     eraseCookie("rt");
-    localStorage.removeItem("token");
 
     set({ user: null });
     disconnectSocket();

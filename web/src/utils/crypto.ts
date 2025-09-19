@@ -42,6 +42,15 @@ export async function decryptMessage(cipher: string, conversationId: string = 'd
       throw new Error('Invalid cipher text')
     }
     
+    // Cek apakah cipher adalah pesan teks biasa (tidak dienkripsi)
+    // Jika cipher tidak berupa base64 yang valid, asumsikan itu adalah teks biasa
+    try {
+      sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
+    } catch {
+      // Jika tidak bisa di-decode sebagai base64, asumsikan itu adalah teks biasa
+      return cipher;
+    }
+    
     await sodium.ready
     const key = await getConversationKey(conversationId)
     const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL)

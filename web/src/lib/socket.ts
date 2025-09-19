@@ -1,6 +1,5 @@
 import { io, Socket } from "socket.io-client";
 import { useChatStore } from "@store/chat";
-import { getCookie } from "./tokenStorage";
 import { toast } from "react-hot-toast";
 
 const WS_URL =
@@ -8,17 +7,12 @@ const WS_URL =
 let socket: Socket | null = null;
 let connectionTimeout: NodeJS.Timeout | null = null;
 
-// Ambil token dari cookie "at"
-function getToken(): string | null {
-  return getCookie("at");
-}
-
 export function getSocket() {
   if (!socket) {
     socket = io(WS_URL, {
       transports: ["websocket"],
       withCredentials: true,
-      auth: { token: getToken() || "" }, // kirim token akses
+      // Hapus properti auth karena token tidak lagi dibaca secara manual
     });
 
     // === Event listeners ===
@@ -66,18 +60,11 @@ export function getSocket() {
         connectionTimeout = null;
       }
 
-      // refresh token saat reconnect
-      socket.auth = { token: getToken() || "" };
-
       const activeId = useChatStore.getState().activeId;
       if (activeId) {
         socket.emit("conversation:join", activeId);
         useChatStore.getState().openConversation(activeId);
       }
-    });
-
-    socket.on("reconnect_attempt", () => {
-      socket.auth = { token: getToken() || "" }; // selalu refresh token
     });
 
     socket.on("reconnect_failed", () => {

@@ -133,10 +133,22 @@ export const useChatStore = create<State>((set, get) => ({
         const res = await api<{ items: Message[]; nextCursor: string | null }>(
           `/api/messages/${id}`
         );
-        const decryptedItems = res.items.map((m) => ({
-          ...m,
-          content: m.content ? decryptMessage(m.content, m.conversationId) : null,
-        }));
+        const decryptedItems = res.items.map((m) => {
+          // Jika content tidak ada atau kosong, kembalikan null
+          if (!m.content) {
+            return { ...m, content: null };
+          }
+          
+          // Coba decrypt pesan
+          try {
+            const decryptedContent = decryptMessage(m.content, m.conversationId);
+            return { ...m, content: decryptedContent };
+          } catch (error) {
+            console.error('Decryption failed for message:', m.id, error);
+            // Kembalikan content asli jika decryption gagal
+            return { ...m, content: m.content };
+          }
+        });
         const messages = decryptedItems.reverse();
         set((s) => ({
           messages: { ...s.messages, [id]: messages },

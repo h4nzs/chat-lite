@@ -116,9 +116,9 @@ export default function ChatWindow({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 w-full">
       {/* Message area (flex-1) */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden w-full">
         {loadingOlder && (
           <div className="text-center text-gray-400 text-sm py-2">
             Loading older...
@@ -126,7 +126,7 @@ export default function ChatWindow({ id }: { id: string }) {
         )}
 
         {loadingMessages ? (
-          <div className="space-y-4 animate-pulse p-4">
+          <div className="space-y-4 animate-pulse p-4 h-full">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -171,7 +171,7 @@ export default function ChatWindow({ id }: { id: string }) {
       </div>
 
       {/* Footer / input area (sticky at bottom) */}
-      <div className="shrink-0 border-t bg-white/90 dark:bg-gray-900/90 backdrop-blur-md">
+      <div className="shrink-0 border-t bg-white/90 dark:bg-gray-900/90 backdrop-blur-md w-full">
         {typingUsers.length > 0 && (
           <div className="px-3 py-1 text-sm text-gray-500 border-b">
             {typingUsers.length === 1
@@ -180,7 +180,7 @@ export default function ChatWindow({ id }: { id: string }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-center">
+        <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-center w-full">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}

@@ -79,6 +79,7 @@ router.post(
           name,
           avatarUrl: user.avatarUrl,
         },
+        token: tokens.access, // token sebagai fallback/debugging
       });
     } catch (e: any) {
       if (e.code === "P2002")
@@ -120,6 +121,7 @@ router.post(
           name: user.name,
           avatarUrl: user.avatarUrl,
         },
+        token: tokens.access, // token sebagai fallback/debugging
       });
     } catch (e) {
       next(e);
