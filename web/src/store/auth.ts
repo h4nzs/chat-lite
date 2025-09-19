@@ -37,43 +37,25 @@ export const useAuthStore = create<State>((set, get) => ({
       set({ user: me });
       get().ensureSocket();
     } catch {
-      // not logged in
-      set({ user: null });
+      set({ user: null }); // tidak login
     }
   },
 
   async login(emailOrUsername: string, password: string) {
-    const res = await api<{ user: User; token: string }>("/api/auth/login", {
+    const res = await api<{ user: User }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ emailOrUsername, password }),
     });
-
-    // Store token in localStorage and secure cookie
-    if (res.token) {
-      localStorage.setItem("token", res.token);
-      setSecureCookie("token", res.token, 30); // 30 days
-    }
 
     set({ user: res.user });
     get().ensureSocket();
   },
 
-  async register(data: {
-    email: string;
-    username: string;
-    password: string;
-    name: string;
-  }) {
-    const res = await api<{ user: User; token: string }>("/api/auth/register", {
+  async register(data) {
+    const res = await api<{ user: User }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     });
-
-    // Store token in localStorage and secure cookie
-    if (res.token) {
-      localStorage.setItem("token", res.token);
-      setSecureCookie("token", res.token, 30); // 30 days
-    }
 
     set({ user: res.user });
     get().ensureSocket();
@@ -86,9 +68,10 @@ export const useAuthStore = create<State>((set, get) => ({
       // ignore network errors
     }
 
-    // Clear token from localStorage and cookies
+    // Clear token dari storage
+    eraseCookie("at");
+    eraseCookie("rt");
     localStorage.removeItem("token");
-    eraseCookie("token");
 
     set({ user: null });
     disconnectSocket();

@@ -45,7 +45,7 @@ export function socketAuthMiddleware(
   next: (err?: Error) => void
 ) {
   try {
-    // 1. Ambil token dari auth handshake
+    // 1. Ambil token dari handshake.auth
     let token: string | null =
       socket.handshake.auth?.token ||
       (socket.handshake.headers?.authorization?.startsWith("Bearer ")

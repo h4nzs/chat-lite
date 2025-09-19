@@ -1,35 +1,47 @@
-// Helper function to set secure cookies
-export function setSecureCookie(name: string, value: string, days?: number) {
-  let expires = "";
-  if (days) {
-    const date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    expires = "; expires=" + date.toUTCString();
-  }
-  
-  // Use secure settings for cookies
-  const isProd = import.meta.env.PROD;
-  document.cookie = 
-    name + "=" + (value || "") + 
-    expires + 
-    "; path=/" + 
-    (isProd ? "; secure" : "") + 
-    "; samesite=lax";
-}
-
-// Helper function to get cookie value
+// Ambil cookie
 export function getCookie(name: string): string | null {
-  const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
-  for(let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-  }
-  return null;
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
 }
 
-// Helper function to erase cookie
-export function eraseCookie(name: string) {   
-  document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+// Set cookie biasa
+export function setCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return;
+  const d = new Date();
+  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+  const expires = "expires=" + d.toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(
+    value
+  )};${expires};path=/;SameSite=Lax`;
+}
+
+// Set cookie “secure” (nama saja, browser client tidak bisa bikin httpOnly/secure asli)
+export function setSecureCookie(name: string, value: string, days = 7) {
+  if (typeof document === "undefined") return;
+  const d = new Date();
+  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+  const expires = "expires=" + d.toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(
+    value
+  )};${expires};path=/;SameSite=Lax;Secure`;
+}
+
+// Hapus cookie
+export function eraseCookie(name: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+}
+
+// === LocalStorage fallback ===
+export function setLocalToken(token: string) {
+  localStorage.setItem("token", token);
+}
+
+export function getLocalToken(): string | null {
+  return localStorage.getItem("token");
+}
+
+export function clearLocalToken() {
+  localStorage.removeItem("token");
 }

@@ -12,16 +12,16 @@ export default function Chat() {
   const logout = useAuthStore(s => s.logout)
 
   // Load push notifications hook
-  usePushNotifications();
+  usePushNotifications()
 
   useEffect(() => {
     loadConversations()
   }, [loadConversations])
 
   return (
-    <div className="h-screen flex flex-col min-h-0">
+    <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b flex items-center justify-between shrink-0">
+      <div className="p-3 border-b flex items-center justify-between">
         <h1 className="font-bold text-xl">💬 ChatLite</h1>
         <button
           onClick={logout}
@@ -41,15 +41,13 @@ export default function Chat() {
               useChatStore.getState().openConversation(id)
             }}
           />
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <ChatList
-              activeId={activeId}
-              onOpen={(id) => {
-                useChatStore.setState({ activeId: id })
-                useChatStore.getState().openConversation(id)
-              }}
-            />
-          </div>
+          <ChatList
+            activeId={activeId}
+            onOpen={(id) => {
+              useChatStore.setState({ activeId: id })
+              useChatStore.getState().openConversation(id)
+            }}
+          />
         </div>
 
         {/* Main Chat Window */}

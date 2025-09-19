@@ -101,7 +101,9 @@ router.post(
     try {
       const { emailOrUsername, password } = req.body;
       const user = await prisma.user.findFirst({
-        where: { OR: [{ email: emailOrUsername }, { username: emailOrUsername }] },
+        where: {
+          OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
+        },
       });
       if (!user) throw new ApiError(401, "Invalid credentials");
 
@@ -169,7 +171,7 @@ router.post("/logout", async (req, res) => {
       });
     }
   }
-  res.clearCookie("at");
+  res.clearCookie("at", { path: "/" });
   res.clearCookie("rt", { path: "/" });
   res.json({ ok: true });
 });

@@ -21,35 +21,41 @@ export default function ChatWindow({ id }: { id: string }) {
   const loadingMessages = useChatStore((s) => (s as any).loading?.[id] ?? false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<List>(null)
+  const listRef = useRef<List | null>(null)
   const sizeMap = useRef<{ [key: number]: number }>({})
-  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
 
   useEffect(() => {
     openConversation(id)
   }, [id, openConversation])
 
-  // scroll ke bawah saat buka chat / ada pesan baru
+  // autoscroll to bottom when messages change (only if at bottom)
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length === 0) return
+    if (atBottom) {
       listRef.current?.scrollToItem(messages.length - 1, "end")
     }
-  }, [messages.length, id])
+  }, [messages.length, atBottom])
 
   const getSize = (index: number) => sizeMap.current[index] || 80
   const setSize = (index: number, size: number) => {
-    sizeMap.current = { ...sizeMap.current, [index]: size }
-    listRef.current?.resetAfterIndex(index)
+    if (sizeMap.current[index] !== size) {
+      sizeMap.current = { ...sizeMap.current, [index]: size }
+      listRef.current?.resetAfterIndex(index)
+    }
   }
 
-  // infinite scroll
+  // handle list scroll (detect near-top for loading more and atBottom state)
   const handleScroll = useCallback(
-    ({ scrollOffset }: { scrollOffset: number }) => {
-      if (loadingOlder) return
-      if (scrollOffset < 50) {
+    ({ scrollDirection, scrollOffset, scrollUpdateWasRequested, clientHeight, scrollHeight }: any) => {
+      // near top?
+      if (scrollOffset < 80 && !loadingOlder) {
         setLoadingOlder(true)
         loadOlderMessages(id).finally(() => setLoadingOlder(false))
       }
+      // at bottom?
+      const nearBottom = scrollHeight - (scrollOffset + clientHeight) < 120
+      setAtBottom(nearBottom)
     },
     [id, loadingOlder, loadOlderMessages]
   )
@@ -76,7 +82,8 @@ export default function ChatWindow({ id }: { id: string }) {
 
       try {
         await sendMessage(id, content, tempId)
-        listRef.current?.scrollToItem(messages.length, "end") // auto-scroll setelah kirim
+        // ensure scroll to bottom after send
+        listRef.current?.scrollToItem(messages.length, "end")
       } catch {
         toast.error("Pesan gagal dikirim")
         useChatStore.getState().markMessageError(id, tempId)
@@ -110,7 +117,7 @@ export default function ChatWindow({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* AREA PESAN */}
+      {/* Message area (flex-1) */}
       <div className="flex-1 min-h-0">
         {loadingOlder && (
           <div className="text-center text-gray-400 text-sm py-2">
@@ -136,6 +143,7 @@ export default function ChatWindow({ id }: { id: string }) {
             ))}
           </div>
         ) : (
+          // AutoSizer + VariableSizeList
           <AutoSizer>
             {({ height, width }) => (
               <List
@@ -162,8 +170,8 @@ export default function ChatWindow({ id }: { id: string }) {
         )}
       </div>
 
-      {/* FOOTER STICKY */}
-      <div className="border-t bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg shrink-0">
+      {/* Footer / input area (sticky at bottom) */}
+      <div className="shrink-0 border-t bg-white/90 dark:bg-gray-900/90 backdrop-blur-md">
         {typingUsers.length > 0 && (
           <div className="px-3 py-1 text-sm text-gray-500 border-b">
             {typingUsers.length === 1
@@ -220,19 +228,6 @@ export default function ChatWindow({ id }: { id: string }) {
           </button>
         </form>
       </div>
-
-      {showScrollButton && (
-        <button
-          onClick={() => {
-            listRef.current?.scrollToItem(messages.length - 1, "end")
-            setShowScrollButton(false)
-          }}
-          className="absolute bottom-24 right-6 p-2 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition"
-          aria-label="Scroll to bottom"
-        >
-          ⬇️
-        </button>
-      )}
     </div>
   )
 }

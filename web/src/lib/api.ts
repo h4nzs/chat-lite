@@ -1,7 +1,7 @@
 const API_URL =
   (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
-// Custom error class for API errors
+// === Custom error class ===
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -17,11 +17,14 @@ export class ApiError extends Error {
  * Wrapper fetch untuk API.
  * Selalu kirim credentials supaya cookie (at/rt) ikut terkirim.
  */
-export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+export async function api<T = any>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
   try {
     const res = await fetch(API_URL + path, {
       ...options,
-      credentials: "include", // 🔥 wajib untuk cookie based auth
+      credentials: "include", // 🔥 cookie at/rt otomatis ikut
       headers: {
         "Content-Type": "application/json",
         ...(options.headers || {}),
@@ -55,22 +58,32 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
  * Wrapper untuk request yang butuh auth.
  * Jika 401 → coba refresh token sekali.
  */
-export async function authFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+export async function authFetch<T>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
   try {
     return await api<T>(url, options);
   } catch (err) {
-    if (err instanceof ApiError && (err.status === 401 || /Unauthorized/i.test(err.message))) {
+    if (
+      err instanceof ApiError &&
+      (err.status === 401 || /Unauthorized/i.test(err.message))
+    ) {
       try {
+        // coba refresh
         const refreshRes = await api<{ ok: boolean }>("/api/auth/refresh", {
           method: "POST",
         });
 
         if (refreshRes.ok) {
-          // coba ulang request sekali
+          // ulang sekali
           return await api<T>(url, options);
         }
-      } catch (refreshErr) {
-        // Kalau refresh gagal → logout paksa
+      } catch {
+        // refresh gagal → redirect login
+        document.cookie =
+          "at=; Max-Age=0; path=/; SameSite=Lax; Secure"; // hapus cookie at
+        localStorage.removeItem("token");
         window.location.href = "/login";
         throw new ApiError(401, "Session expired, please log in again");
       }
