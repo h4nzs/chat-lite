@@ -1,18 +1,107 @@
-const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:4000'
+const API_URL =
+  (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
-export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const headers: HeadersInit = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
-  const res = await fetch(`${API_URL}${path}`, { ...opts, headers, credentials: 'include' })
-  let data: any = null
-  try { data = await res.json() } catch { /* ignore */ }
-  if (!res.ok) {
-    const msg = data?.error || data?.message || 'Request failed'
-    throw new Error(msg)
+// Custom error class for API errors
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public details?: any
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
-  return data as T
 }
 
+/**
+ * Wrapper fetch untuk API.
+ * Selalu kirim credentials supaya cookie (at/rt) ikut terkirim.
+ */
+export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+  try {
+    const res = await fetch(API_URL + path, {
+      ...options,
+      credentials: "include", // 🔥 wajib untuk cookie based auth
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new ApiError(res.status, res.statusText, text);
+    }
+
+    return res.json();
+  } catch (error: any) {
+    // Network errors
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      throw new ApiError(
+        0,
+        "Network error. Please check your connection and try again."
+      );
+    }
+
+    // Re-throw ApiError
+    if (error instanceof ApiError) throw error;
+
+    // Generic fallback
+    throw new ApiError(500, "An unexpected error occurred. Please try again.");
+  }
+}
+
+/**
+ * Wrapper untuk request yang butuh auth.
+ * Jika 401 → coba refresh token sekali.
+ */
+export async function authFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  try {
+    return await api<T>(url, options);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 401 || /Unauthorized/i.test(err.message))) {
+      try {
+        const refreshRes = await api<{ ok: boolean }>("/api/auth/refresh", {
+          method: "POST",
+        });
+
+        if (refreshRes.ok) {
+          // coba ulang request sekali
+          return await api<T>(url, options);
+        }
+      } catch (refreshErr) {
+        // Kalau refresh gagal → logout paksa
+        window.location.href = "/login";
+        throw new ApiError(401, "Session expired, please log in again");
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * Helper untuk mapping error ke pesan user-friendly.
+ */
 export function handleApiError(e: unknown): string {
-  if (e instanceof Error) return e.message
-  return 'Something went wrong'
+  if (e instanceof ApiError) {
+    switch (e.status) {
+      case 0:
+        return "Network connection failed. Please check your internet connection.";
+      case 400:
+        return `Invalid request: ${e.message}`;
+      case 401:
+        return "Authentication failed. Please log in again.";
+      case 403:
+        return "Access denied. You don't have permission to perform this action.";
+      case 404:
+        return "Resource not found.";
+      case 500:
+        return "Server error. Please try again later.";
+      default:
+        return e.message || "An error occurred. Please try again.";
+    }
+  }
+
+  if (e instanceof Error) return e.message;
+  return "Something went wrong";
 }

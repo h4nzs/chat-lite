@@ -1,11 +1,13 @@
 export class ApiError extends Error {
-  constructor (status, message) {
+  status: number;
+  
+  constructor (status: number, message: string) {
     super(message)
     this.status = status
   }
 }
 
-export function errorHandler (err, _req, res, _next) {
+export function errorHandler (err: any, _req: any, res: any, _next: any) {
   const status = err.status || 500
   const message = err.message || 'Internal Server Error'
   if (status >= 500) console.error(err)

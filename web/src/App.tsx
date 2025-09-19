@@ -4,11 +4,22 @@ import Register from './pages/Register'
 import Chat from './pages/Chat'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuthStore } from './store/auth'
+import { Toaster } from 'react-hot-toast'
 
 export default function App() {
   const theme = useAuthStore((s) => s.theme)
   return (
     <div className={theme === 'dark' ? 'dark' : ''}>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: theme === 'dark' ? '#333' : '#fff',
+            color: theme === 'dark' ? '#fff' : '#333',
+          },
+        }}
+      />
       {/* --- FIX: kunci tinggi + cegah scroll global --- */}
       <div className="h-[100dvh] overflow-hidden bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
         <BrowserRouter>

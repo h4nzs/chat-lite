@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useChatStore } from '../store/chat'
-import { getSocket } from '../lib/socket'
-import { useAuthStore } from '../store/auth'
+import { useChatStore } from '@store/chat'
+import { getSocket } from '@lib/socket'
+import { useAuthStore } from '@store/auth'
 
 export default function MessageInput({ conversationId }: { conversationId: string }) {
   const [text, setText] = useState('')
@@ -29,12 +29,19 @@ export default function MessageInput({ conversationId }: { conversationId: strin
         value={text}
         onChange={(e) => {
           setText(e.target.value)
-          getSocket().emit('typing', { conversationId, isTyping: e.target.value.length > 0 })
+          const socket = getSocket()
+          socket.emit('typing', { conversationId, isTyping: !!e.target.value.trim() })
         }}
-        className="flex-1 p-2 border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
-        placeholder="Type a message"
+        className="flex-1 px-4 py-2 border rounded-full dark:bg-gray-800 dark:border-gray-700"
+        placeholder="Type a message..."
       />
-      <button className="px-3 py-2 rounded bg-black text-white dark:bg-white dark:text-black" aria-label="Send">Send</button>
+      <button
+        type="submit"
+        className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50"
+        disabled={!text.trim()}
+      >
+        Send
+      </button>
     </form>
   )
 }

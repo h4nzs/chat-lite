@@ -1,334 +1,178 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { useChatStore } from '../store/chat'
-import { useAuthStore } from '../store/auth'
-import { getSocket } from '../lib/socket'
-import toast from 'react-hot-toast'
+import { useEffect, useState, useRef, useCallback } from "react"
+import { useChatStore } from "@store/chat"
+import { useAuthStore } from "@store/auth"
+import { getSocket } from "@lib/socket"
+import toast from "react-hot-toast"
+import { VariableSizeList as List } from "react-window"
+import AutoSizer from "react-virtualized-auto-sizer"
+import MessageItem from "./MessageItem"
 
 export default function ChatWindow({ id }: { id: string }) {
-  const [text, setText] = useState('')
+  const [text, setText] = useState("")
   const [loadingOlder, setLoadingOlder] = useState(false)
 
-  const meId = useAuthStore(s => s.user?.id)
-  const sendMessage = useChatStore(s => s.sendMessage)
-  const uploadImage = useChatStore(s => s.uploadImage)
-  const uploadFile = useChatStore(s => s.uploadFile)
-  const deleteMessage = useChatStore(s => s.deleteMessage)
-  const messages = useChatStore(s => s.messages[id] || [])
-  const openConversation = useChatStore(s => s.openConversation)
-  const loadOlderMessages = useChatStore(s => s.loadOlderMessages)
-  const typingUsers = useChatStore(s => s.typing[id] || [])
-  const loadingMessages = useChatStore(s => (s as any).loading?.[id] ?? false)
+  const meId = useAuthStore((s) => s.user?.id)
+  const sendMessage = useChatStore((s) => s.sendMessage)
+  const uploadFile = useChatStore((s) => (s as any).uploadFile)
+  const messages = useChatStore((s) => s.messages[id] || [])
+  const openConversation = useChatStore((s) => s.openConversation)
+  const loadOlderMessages = useChatStore((s) => s.loadOlderMessages)
+  const typingUsers = useChatStore((s) => s.typing[id] || [])
+  const loadingMessages = useChatStore((s) => (s as any).loading?.[id] ?? false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<List>(null)
+  const sizeMap = useRef<{ [key: number]: number }>({})
   const [showScrollButton, setShowScrollButton] = useState(false)
 
   useEffect(() => {
     openConversation(id)
   }, [id, openConversation])
 
-  // auto scroll + infinite scroll
+  // scroll ke bawah saat buka chat / ada pesan baru
   useEffect(() => {
-    const el = listRef.current
-    if (!el) return
-
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
-    setShowScrollButton(!nearBottom)
-
-    if (el.scrollTop === 0 && !loadingOlder) {
-      setLoadingOlder(true)
-      ;(async () => {
-        try {
-          await loadOlderMessages(id)
-        } catch {
-          toast.error('Gagal memuat pesan lama')
-        } finally {
-          setLoadingOlder(false)
-        }
-      })()
-    }
-  }, [id, loadingOlder, loadOlderMessages])
-
-  // Scroll to bottom when messages are first loaded
-  useEffect(() => {
-    if (messages.length > 0 && listRef.current) {
-      // Use setTimeout to ensure DOM is updated
-      setTimeout(() => {
-        if (listRef.current) {
-          listRef.current.scrollTop = listRef.current.scrollHeight
-        }
-      }, 0)
+    if (messages.length > 0) {
+      listRef.current?.scrollToItem(messages.length - 1, "end")
     }
   }, [messages.length, id])
 
-  // Auto-scroll to bottom when new messages are added and user is near bottom
-  useEffect(() => {
-    if (listRef.current) {
-      const el = listRef.current
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
-      if (nearBottom) {
-        // Scroll to bottom when new messages are added
-        setTimeout(() => {
-          if (listRef.current) {
-            listRef.current.scrollTop = listRef.current.scrollHeight
-          }
-        }, 0)
+  const getSize = (index: number) => sizeMap.current[index] || 80
+  const setSize = (index: number, size: number) => {
+    sizeMap.current = { ...sizeMap.current, [index]: size }
+    listRef.current?.resetAfterIndex(index)
+  }
+
+  // infinite scroll
+  const handleScroll = useCallback(
+    ({ scrollOffset }: { scrollOffset: number }) => {
+      if (loadingOlder) return
+      if (scrollOffset < 50) {
+        setLoadingOlder(true)
+        loadOlderMessages(id).finally(() => setLoadingOlder(false))
       }
-    }
-  }, [messages.length])
+    },
+    [id, loadingOlder, loadOlderMessages]
+  )
 
-  const handleScroll = useCallback(() => {
-    const el = listRef.current
-    if (!el || loadingOlder) return
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      const content = text.trim()
+      if (!content) return
 
-    if (el.scrollTop < 50) {
-      setLoadingOlder(true)
-      loadOlderMessages(id).finally(() => setLoadingOlder(false))
-    }
-  }, [id, loadingOlder, loadOlderMessages])
+      const tempId = Date.now()
+      useChatStore.getState().addOptimisticMessage(id, {
+        id: "",
+        tempId,
+        conversationId: id,
+        senderId: meId || "me",
+        content,
+        createdAt: new Date().toISOString(),
+      })
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    const content = text.trim()
-    if (!content) return
+      setText("")
+      const socket = getSocket()
+      socket.emit("typing", { conversationId: id, isTyping: false })
 
-    const tempId = Date.now()
-    useChatStore.getState().addOptimisticMessage(id, {
-      id: '',
-      tempId,
-      conversationId: id,
-      senderId: meId || 'me',
-      content,
-      createdAt: new Date().toISOString()
-    })
+      try {
+        await sendMessage(id, content, tempId)
+        listRef.current?.scrollToItem(messages.length, "end") // auto-scroll setelah kirim
+      } catch {
+        toast.error("Pesan gagal dikirim")
+        useChatStore.getState().markMessageError(id, tempId)
+      }
+    },
+    [id, text, sendMessage, messages.length, meId]
+  )
 
-    setText('')
-    const socket = getSocket()
-    socket.emit('typing', { conversationId: id, isTyping: false })
-
-    try {
-      await sendMessage(id, content, tempId)
-    } catch {
-      toast.error('Pesan gagal dikirim')
-      useChatStore.getState().markMessageError(id, tempId)
-    }
-  }, [id, text, sendMessage])
-
-  // Format timestamp to show time and date
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    
-    // If message is from today, show only time
-    if (date.toDateString() === now.toDateString()) {
-      return date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    }
-    
-    // If message is from this year, show date and time without year
-    if (date.getFullYear() === now.getFullYear()) {
-      return date.toLocaleDateString([], {
-        month: 'short',
-        day: 'numeric'
-      }) + ' ' + date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    }
-    
-    // If message is from previous years, show full date and time
-    return date.toLocaleDateString([], {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }) + ' ' + date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     })
   }
 
-  // Check if file is an image based on file extension
   const isImageFile = (fileUrl: string | null | undefined) => {
-    if (!fileUrl) return false;
-    const imageExtensions = /\.(png|jpe?g|gif|webp)(\?.*)?$/i;
-    return imageExtensions.test(fileUrl);
+    if (!fileUrl) return false
+    return /\.(png|jpe?g|gif|webp)$/i.test(fileUrl)
+  }
+
+  const deleteMessage = async (conversationId: string, messageId: string) => {
+    try {
+      await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+    } catch {
+      toast.error("Gagal menghapus pesan")
+    }
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="flex flex-col h-full min-h-0">
       {/* AREA PESAN */}
-      <div
-        ref={listRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0"
-      >
+      <div className="flex-1 min-h-0">
         {loadingOlder && (
-          <div className="text-center text-gray-400 text-sm py-2">Loading older...</div>
+          <div className="text-center text-gray-400 text-sm py-2">
+            Loading older...
+          </div>
         )}
 
         {loadingMessages ? (
-          <div className="space-y-4 animate-pulse">
+          <div className="space-y-4 animate-pulse p-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}
+                className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}
               >
                 <div
                   className={`rounded-2xl px-4 py-2 max-w-[70%] h-6 w-[60%] ${
                     i % 2 === 0
-                      ? 'bg-gray-300 dark:bg-gray-700'
-                      : 'bg-blue-300 dark:bg-blue-700'
+                      ? "bg-gray-300 dark:bg-gray-700"
+                      : "bg-blue-300 dark:bg-blue-700"
                   }`}
                 />
               </div>
             ))}
           </div>
         ) : (
-          <>
-            {messages.map(m => {
-              // Log message for debugging
-              console.log('Rendering message:', m);
-              
-              const isMe = m.senderId === meId
-              return (
-                <div
-                  key={m.tempId || m.id}
-                  className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`
-                      max-w-[70%] px-4 py-2 rounded-2xl text-sm shadow-md break-words
-                      ${isMe
-                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-br-none'
-                        : 'bg-gradient-to-r from-red-500 to-blue-500 text-white rounded-bl-none'
-                      }
-                    `}
-                  >
-                    {/* TEXT */}
-                    {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
-
-                    {/* IMAGE PREVIEW */}
-                    {(m.imageUrl || (m.fileUrl && isImageFile(m.fileUrl))) && (
-                      <div className="mt-2 flex flex-col items-start">
-                        <img
-                          src={
-                            (m.imageUrl || m.fileUrl)!.startsWith('http')
-                              ? (m.imageUrl || m.fileUrl)!
-                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`
-                          }
-                          alt={m.fileName || 'uploaded'}
-                          className="max-w-[220px] max-h-[200px] rounded-md shadow-sm cursor-pointer hover:opacity-90 transition object-contain bg-white"
-                          onClick={() => window.open(
-                            (m.imageUrl || m.fileUrl)!.startsWith('http')
-                              ? (m.imageUrl || m.fileUrl)!
-                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
-                            '_blank'
-                          )}
-                        />
-                        <button 
-                          className="mt-1 text-xs text-white/80 hover:text-white underline"
-                          onClick={() => window.open(
-                            (m.imageUrl || m.fileUrl)!.startsWith('http')
-                              ? (m.imageUrl || m.fileUrl)!
-                              : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.imageUrl || m.fileUrl}`,
-                            '_blank'
-                          )}
-                        >
-                          Zoom
-                        </button>
-                      </div>
-                    )}
-
-                    {/* FILE ATTACHMENT */}
-                    {m.fileUrl && !m.imageUrl && !isImageFile(m.fileUrl) && (
-                      <a
-                        href={
-                          m.fileUrl.startsWith('http')
-                            ? m.fileUrl
-                            : `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${m.fileUrl}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm underline mt-2 hover:opacity-80"
-                      >
-                        📎 {m.fileName || 'Download file'}
-                      </a>
-                    )}
-
-                    {/* ERROR STATE */}
-                    {m.error && <p className="text-xs text-red-300 mt-1">Failed to send</p>}
-
-                    {/* TIMESTAMP + DELETE BUTTON */}
-                    <div className="flex justify-between items-center mt-1 text-[10px] opacity-70">
-                      <span>
-                        {formatTimestamp(m.createdAt)}
-                      </span>
-                      {isMe && !m.error && m.id && (
-                        <button
-                          onClick={async () => {
-                            // 🔥 Optimistic delete
-                            const original = { ...m }
-                            useChatStore.setState(s => ({
-                              messages: {
-                                ...s.messages,
-                                [id]: (s.messages[id] || []).map(msg =>
-                                  msg.id === m.id
-                                    ? { ...msg, content: '[deleting…]' }
-                                    : msg
-                                )
-                              }
-                            }))
-
-                            try {
-                              await deleteMessage(id, m.id)
-                            } catch {
-                              toast.error('Gagal menghapus pesan')
-                              // rollback
-                              useChatStore.setState(s => ({
-                                messages: {
-                                  ...s.messages,
-                                  [id]: (s.messages[id] || []).map(msg =>
-                                    msg.id === original.id ? original : msg
-                                  )
-                                }
-                              }))
-                            }
-                          }}
-                          className="ml-2 text-xs text-red-400 hover:text-red-600"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </>
+          <AutoSizer>
+            {({ height, width }) => (
+              <List
+                ref={listRef}
+                height={height}
+                itemCount={messages.length}
+                itemSize={getSize}
+                width={width}
+                onScroll={handleScroll}
+                itemData={{
+                  messages,
+                  conversationId: id,
+                  formatTimestamp,
+                  isImageFile,
+                  deleteMessage,
+                  setSize,
+                  meId,
+                }}
+              >
+                {MessageItem}
+              </List>
+            )}
+          </AutoSizer>
         )}
       </div>
 
-      {/* FOOTER */}
-      <div className="border-t shrink-0">
+      {/* FOOTER STICKY */}
+      <div className="border-t bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-lg shrink-0">
         {typingUsers.length > 0 && (
-          <div className="px-3 py-1 text-sm text-gray-500 border-b flex items-center">
-            <div className="flex space-x-1 mr-2">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-            </div>
+          <div className="px-3 py-1 text-sm text-gray-500 border-b">
             {typingUsers.length === 1
-              ? 'Someone is typing...'
+              ? "Someone is typing..."
               : `${typingUsers.length} people are typing...`}
           </div>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="p-3 flex gap-2 items-center bg-white/60 dark:bg-gray-800/50 backdrop-blur-md shadow-inner rounded-t-xl"
-        >
+        <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-center">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -343,18 +187,13 @@ export default function ChatWindow({ id }: { id: string }) {
             className="hidden"
             onChange={async (e) => {
               if (e.target.files?.[0]) {
-                const file = e.target.files[0];
                 try {
-                  // Check if file is an image
-                  if (file.type.startsWith('image/')) {
-                    await uploadImage(id, file);
-                  } else {
-                    await uploadFile(id, file);
-                  }
+                  await uploadFile(id, e.target.files[0])
+                  listRef.current?.scrollToItem(messages.length, "end")
                 } catch {
-                  toast.error('Upload gagal');
+                  toast.error("Upload gagal")
                 }
-                e.target.value = '';
+                e.target.value = ""
               }
             }}
           />
@@ -364,10 +203,10 @@ export default function ChatWindow({ id }: { id: string }) {
             onChange={(e) => {
               setText(e.target.value)
               const socket = getSocket()
-              socket.emit('typing', { conversationId: id, isTyping: true })
+              socket.emit("typing", { conversationId: id, isTyping: true })
               clearTimeout((window as any).typingTimer)
               ;(window as any).typingTimer = setTimeout(() => {
-                socket.emit('typing', { conversationId: id, isTyping: false })
+                socket.emit("typing", { conversationId: id, isTyping: false })
               }, 1000)
             }}
             placeholder="Type a message"
@@ -385,15 +224,10 @@ export default function ChatWindow({ id }: { id: string }) {
       {showScrollButton && (
         <button
           onClick={() => {
-            if (listRef.current) {
-              listRef.current.scrollTo({
-                top: listRef.current.scrollHeight,
-                behavior: 'smooth',
-              })
-            }
+            listRef.current?.scrollToItem(messages.length - 1, "end")
             setShowScrollButton(false)
           }}
-          className="absolute bottom-20 right-6 p-2 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition"
+          className="absolute bottom-24 right-6 p-2 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition"
           aria-label="Scroll to bottom"
         >
           ⬇️

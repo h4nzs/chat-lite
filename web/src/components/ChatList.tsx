@@ -1,29 +1,60 @@
 import { useEffect } from 'react'
-import { useChatStore } from '../store/chat'
+import { useChatStore } from '@store/chat'
+import { getSocket } from '@lib/socket'
+
+interface ChatListProps {
+  onOpen: (id: string) => void
+  activeId?: string | null
+}
 
 export default function ChatList({
   onOpen,
   activeId
-}: {
-  onOpen: (id: string) => void
-  activeId?: string | null
-}) {
+}: ChatListProps) {
   const conversations = useChatStore((s) => s.conversations)
   const loadConversations = useChatStore((s) => s.loadConversations)
   const presence = useChatStore((s) => s.presence)
+  const storeActiveId = useChatStore((s) => s.activeId)
 
   useEffect(() => {
     loadConversations()
+
+    const socket = getSocket()
+
+    // ✅ Listener untuk conversation baru
+    socket.off('conversation:new')
+    socket.on('conversation:new', (conv) => {
+      useChatStore.setState((s) => {
+        // Cegah duplikat
+        if (s.conversations.some((c) => c.id === conv.id)) return {}
+
+        const updated = [...s.conversations, conv].sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+
+        return { conversations: updated }
+      })
+    })
+
+    return () => {
+      socket.off('conversation:new')
+    }
   }, [loadConversations])
 
   // Format timestamp for conversation
   const formatConversationTime = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    const diffInDays = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+    )
 
     if (diffInDays === 0) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
     } else if (diffInDays === 1) {
       return 'Yesterday'
     } else if (diffInDays < 7) {
@@ -33,10 +64,12 @@ export default function ChatList({
     }
   }
 
+  const activeConversationId = activeId ?? storeActiveId
+
   return (
     <div className="divide-y divide-gray-200 dark:divide-gray-800">
       {conversations.map((c) => {
-        const isActive = c.id === activeId
+        const isActive = c.id === activeConversationId
         const title =
           c.title ||
           (Array.isArray(c.participants)
@@ -50,11 +83,17 @@ export default function ChatList({
         return (
           <button
             key={c.id}
-            onClick={() => onOpen(c.id)}
+            onClick={() => {
+              // Update ke store
+              useChatStore.setState({ activeId: c.id })
+              // Trigger ke parent (jika ada)
+              onOpen(c.id)
+            }}
             className={`w-full text-left p-4 transition flex flex-col
-              ${isActive
-                ? 'bg-gradient-to-r from-purple-500/90 to-blue-500/90 text-white shadow-md'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+              ${
+                isActive
+                  ? 'bg-gradient-to-r from-purple-500/90 to-blue-500/90 text-white shadow-md'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
           >
             {/* Judul percakapan + indikator online */}
@@ -71,7 +110,13 @@ export default function ChatList({
                 )}
               </div>
               {c.lastMessage && (
-                <div className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+                <div
+                  className={`text-xs ${
+                    isActive
+                      ? 'text-white/80'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                >
                   {formatConversationTime(c.lastMessage.createdAt)}
                 </div>
               )}
@@ -81,12 +126,12 @@ export default function ChatList({
             <div className="flex items-center justify-between mt-1">
               <div
                 className={`text-sm truncate ${
-                  isActive
-                    ? 'text-white/80'
-                    : 'text-gray-500 dark:text-gray-400'
+                  isActive ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
-                {c.lastMessage?.preview || c.lastMessage?.content || 'No messages'}
+                {c.lastMessage?.preview ||
+                  c.lastMessage?.content ||
+                  'No messages'}
               </div>
             </div>
           </button>

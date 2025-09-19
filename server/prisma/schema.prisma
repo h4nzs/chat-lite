@@ -15,15 +15,18 @@ model User {
   passwordHash     String
   name             String
   avatarUrl        String?
+  pushSubscription Json?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   messages         Message[]
   participants     Participant[]
   messageStatuses  MessageStatus[]
-  refreshTokens  RefreshToken[]
+  refreshTokens    RefreshToken[]
+  reactions        MessageReaction[]
 
   @@index([email])
   @@index([username])
+  @@index([createdAt])
 }
 
 
@@ -38,7 +41,10 @@ model Conversation {
   messages      Message[]
 
   @@index([lastMessageAt])
+  @@index([createdAt])
+  @@index([isGroup])
 }
+
 
 model Participant {
   id             String       @id @default(cuid())
@@ -48,11 +54,15 @@ model Participant {
   conversationId String
   joinedAt       DateTime     @default(now())
   lastReadMsgId  String?
+  role           String       @default("MEMBER") // "ADMIN" or "MEMBER"
 
   @@unique([userId, conversationId])
   @@index([conversationId])
   @@index([userId])
+  @@index([joinedAt])
+  @@index([lastReadMsgId])
 }
+
 
 model Message {
   id             String          @id @default(cuid())
@@ -66,15 +76,20 @@ model Message {
   fileName       String?
   createdAt      DateTime        @default(now())
   statuses       MessageStatus[]
+  reactions      MessageReaction[]
 
   @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([createdAt])
 }
+
 
 enum DeliveryStatus {
   SENT
   DELIVERED
   READ
 }
+
 
 model MessageStatus {
   id        String          @id @default(cuid())
@@ -87,7 +102,27 @@ model MessageStatus {
 
   @@unique([messageId, userId])
   @@index([userId])
+  @@index([status])
+  @@index([updatedAt])
 }
+
+
+model MessageReaction {
+  id        String    @id @default(cuid())
+  message   Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  emoji     String
+  createdAt DateTime  @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+  @@index([emoji])
+  @@index([createdAt])
+}
+
 
 model RefreshToken {
   id           String   @id @default(cuid())
@@ -101,4 +136,6 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([jti])
+  @@index([revokedAt])
 }

@@ -2,11 +2,12 @@ import multer from 'multer'
 import fs from 'node:fs'
 import path from 'node:path'
 import { env } from '../config.js'
+import { Request } from 'express'
 
 const uploadPath = path.resolve(process.cwd(), env.uploadDir)
 fs.mkdirSync(uploadPath, { recursive: true })
 
-const ALLOWED = {
+const ALLOWED: { [key: string]: string } = {
   'image/png': '.png',
   'image/jpeg': '.jpg',
   'image/webp': '.webp',
@@ -14,15 +15,15 @@ const ALLOWED = {
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadPath),
-  filename: (_req, file, cb) => {
+  destination: (_req: Request, _file: Express.Multer.File, cb: any) => cb(null, uploadPath),
+  filename: (_req: Request, file: Express.Multer.File, cb: any) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
     const ext = path.extname(file.originalname).toLowerCase()
     cb(null, `${unique}${ext}`)
   }
 })
 
-function fileFilter (_req, file, cb) {
+function fileFilter (_req: Request, file: Express.Multer.File, cb: any) {
   if (!ALLOWED[file.mimetype]) return cb(new Error('Invalid file type'))
   cb(null, true)
 }
@@ -34,6 +35,6 @@ export const upload = multer({
 })
 
 // helper kalau nanti mau ke S3
-export async function saveUpload (file) {
+export async function saveUpload (file: Express.Multer.File) {
   return { url: `/uploads/${file.filename}` }
 }

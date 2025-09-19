@@ -10,7 +10,19 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@store/*": ["src/store/*"],
+      "@utils/*": ["src/utils/*"],
+      "@lib/*": ["src/lib/*"],
+      "@pages/*": ["src/pages/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@services/*": ["src/services/*"],
+      "@tests/*": ["src/tests/*"]
+    }
   },
   "include": ["src"],
   "references": []

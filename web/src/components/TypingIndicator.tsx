@@ -1,4 +1,4 @@
-import { useChatStore } from '../store/chat'
+import { useChatStore } from '@store/chat'
 
 export default function TypingIndicator({ conversationId }: { conversationId: string }) {
   const typing = useChatStore((s) => s.typing[conversationId] || [])
