@@ -27,9 +27,45 @@ router.get("/me", requireAuth, async (req, res, next) => {
     }
     
     console.log(`[Users Controller] Data user ditemukan untuk userId: ${userId}`);
-    res.json({ user }); // 🔥 wrap pakai { user }
+    res.json(user); // Direct user object, consistent with frontend expectations
   } catch (e) {
     console.error("[Users Controller] Error:", e);
+    next(e);
+  }
+});
+
+// === GET: Search users by query ===
+router.get("/search", requireAuth, async (req, res, next) => {
+  try {
+    const { q } = req.query as { q?: string };
+    console.log(`[Users Controller] Searching users with query: ${q}`);
+
+    if (!q || q.trim().length === 0) {
+      return res.json([]);
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        avatarUrl: true,
+      },
+      take: 20, // Limit results
+    });
+
+    console.log(`[Users Controller] Found ${users.length} users matching query: ${q}`);
+    res.json(users);
+  } catch (e) {
+    console.error("[Users Controller] Search Error:", e);
     next(e);
   }
 });

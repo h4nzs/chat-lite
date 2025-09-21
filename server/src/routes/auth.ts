@@ -74,12 +74,11 @@ router.post(
       res.json({
         user: {
           id: user.id,
-          email,
-          username,
-          name,
+          email: user.email,
+          username: user.username,
+          name: user.name,
           avatarUrl: user.avatarUrl,
         },
-        token: tokens.access, // token sebagai fallback/debugging
       });
     } catch (e: any) {
       if (e.code === "P2002")
@@ -121,7 +120,6 @@ router.post(
           name: user.name,
           avatarUrl: user.avatarUrl,
         },
-        token: tokens.access, // token sebagai fallback/debugging
       });
     } catch (e) {
       next(e);

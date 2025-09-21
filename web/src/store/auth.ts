@@ -33,10 +33,13 @@ export const useAuthStore = create<State>((set, get) => ({
 
   async bootstrap() {
     try {
+      console.log("Bootstrapping user..."); // Debug log
       const me = await authFetch<User>("/api/users/me");
+      console.log("User data:", me); // Debug log
       set({ user: me });
       get().ensureSocket();
-    } catch {
+    } catch (error) {
+      console.error("Bootstrap error:", error); // Debug log
       set({ user: null }); // tidak login
     }
   },

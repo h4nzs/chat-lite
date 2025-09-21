@@ -1,13 +1,23 @@
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react"
 import { useChatStore } from "@store/chat"
 import { useAuthStore } from "@store/auth"
 import { getSocket } from "@lib/socket"
 import toast from "react-hot-toast"
-import { VariableSizeList as List } from "react-window"
+import { VariableSizeList as List, ListChildComponentProps } from "react-window"
 import AutoSizer from "react-virtualized-auto-sizer"
 import MessageItem from "./MessageItem"
+import { useScrollToBottom } from "@hooks/useScrollToBottom"
 
-export default function ChatWindow({ id }: { id: string }) {
+type ItemData = {
+  messages: any[]
+  conversationId: string
+  setSize: (index: number, size: number) => void
+  meId?: string | null
+  formatTimestamp: (ts: string) => string
+  deleteMessage: (conversationId: string, messageId: string) => Promise<void>
+}
+
+function ChatWindow({ id }: { id: string }) {
   const [text, setText] = useState("")
   const [loadingOlder, setLoadingOlder] = useState(false)
 
@@ -19,43 +29,48 @@ export default function ChatWindow({ id }: { id: string }) {
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages)
   const typingUsers = useChatStore((s) => s.typing[id] || [])
   const loadingMessages = useChatStore((s) => (s as any).loading?.[id] ?? false)
+  const deleteMessage = useChatStore((s) => (s as any).deleteMessage)
+
+  // Debug: log messages to see if data is loaded
+  useEffect(() => {
+    console.log(`Messages for conversation ${id}:`, messages)
+  }, [id, messages])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<List | null>(null)
+  const listRef = useRef<List>(null)
+  const { scrollToBottom } = useScrollToBottom(listRef)
   const sizeMap = useRef<{ [key: number]: number }>({})
-  const [atBottom, setAtBottom] = useState(true)
 
   useEffect(() => {
     openConversation(id)
   }, [id, openConversation])
 
-  // autoscroll to bottom when messages change (only if at bottom)
   useEffect(() => {
-    if (messages.length === 0) return
-    if (atBottom) {
-      listRef.current?.scrollToItem(messages.length - 1, "end")
-    }
-  }, [messages.length, atBottom])
+    if (messages.length > 0) scrollToBottom()
+  }, [messages.length, id, scrollToBottom])
 
-  const getSize = (index: number) => sizeMap.current[index] || 80
-  const setSize = (index: number, size: number) => {
-    if (sizeMap.current[index] !== size) {
-      sizeMap.current = { ...sizeMap.current, [index]: size }
-      listRef.current?.resetAfterIndex(index)
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      // Reset size map when component unmounts
+      sizeMap.current = {}
     }
-  }
+  }, [])
 
-  // handle list scroll (detect near-top for loading more and atBottom state)
+  const getSize = useCallback((index: number) => sizeMap.current[index] || 80, [])
+
+  const setSize = useCallback((index: number, size: number) => {
+    sizeMap.current = { ...sizeMap.current, [index]: size }
+    listRef.current?.resetAfterIndex(index)
+  }, [])
+
   const handleScroll = useCallback(
-    ({ scrollDirection, scrollOffset, scrollUpdateWasRequested, clientHeight, scrollHeight }: any) => {
-      // near top?
-      if (scrollOffset < 80 && !loadingOlder) {
+    ({ scrollOffset }: { scrollOffset: number }) => {
+      if (loadingOlder) return
+      if (scrollOffset < 50) {
         setLoadingOlder(true)
         loadOlderMessages(id).finally(() => setLoadingOlder(false))
       }
-      // at bottom?
-      const nearBottom = scrollHeight - (scrollOffset + clientHeight) < 120
-      setAtBottom(nearBottom)
     },
     [id, loadingOlder, loadOlderMessages]
   )
@@ -78,11 +93,15 @@ export default function ChatWindow({ id }: { id: string }) {
 
       setText("")
       const socket = getSocket()
-      socket.emit("typing", { conversationId: id, isTyping: false })
+      try {
+        socket.emit("typing", { conversationId: id, isTyping: false })
+      } catch (err) {
+        // ignore socket errors
+      }
 
       try {
         await sendMessage(id, content, tempId)
-        // ensure scroll to bottom after send
+        // scroll to new bottom
         listRef.current?.scrollToItem(messages.length, "end")
       } catch {
         toast.error("Pesan gagal dikirim")
@@ -92,41 +111,44 @@ export default function ChatWindow({ id }: { id: string }) {
     [id, text, sendMessage, messages.length, meId]
   )
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  const formatTimestamp = useCallback((ts: string) =>
+    new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  , [])
 
-  const isImageFile = (fileUrl: string | null | undefined) => {
-    if (!fileUrl) return false
-    return /\.(png|jpe?g|gif|webp)$/i.test(fileUrl)
-  }
+  // Prepare itemData --- ensure MessageItem ALWAYS receives formatTimestamp & deleteMessage
+  const itemData: ItemData = useMemo(() => ({
+    messages,
+    conversationId: id,
+    setSize,
+    meId,
+    formatTimestamp,
+    deleteMessage,
+  }), [messages, id, setSize, meId, formatTimestamp, deleteMessage])
 
-  const deleteMessage = async (conversationId: string, messageId: string) => {
-    try {
-      await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-    } catch {
-      toast.error("Gagal menghapus pesan")
-    }
-  }
+  // Row component for react-window
+  const Row = memo(({ index, style, data }: ListChildComponentProps<ItemData>) => {
+    return <MessageItem index={index} style={style} data={data} />
+  }, (prevProps, nextProps) => {
+    // Optimasi memoization untuk Row component
+    return (
+      prevProps.index === nextProps.index &&
+      prevProps.style === nextProps.style &&
+      prevProps.data.conversationId === nextProps.data.conversationId
+    )
+  })
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full">
-      {/* Message area (flex-1) */}
-      <div className="flex-1 min-h-0 overflow-hidden w-full">
+    <div className="flex flex-col h-full min-h-0 bg-gray-50 dark:bg-gray-900">
+      {/* Area pesan */}
+      <div className="flex-1 min-h-0">
         {loadingOlder && (
           <div className="text-center text-gray-400 text-sm py-2">
-            Loading older...
+            Loading older messages...
           </div>
         )}
 
         {loadingMessages ? (
-          <div className="space-y-4 animate-pulse p-4 h-full">
+          <div className="space-y-4 animate-pulse p-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -134,16 +156,17 @@ export default function ChatWindow({ id }: { id: string }) {
               >
                 <div
                   className={`rounded-2xl px-4 py-2 max-w-[70%] h-6 w-[60%] ${
-                    i % 2 === 0
-                      ? "bg-gray-300 dark:bg-gray-700"
-                      : "bg-blue-300 dark:bg-blue-700"
+                    i % 2 === 0 ? "bg-gray-300 dark:bg-gray-700" : "bg-blue-300 dark:bg-blue-700"
                   }`}
                 />
               </div>
             ))}
           </div>
+        ) : messages.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            No messages yet. Start the conversation!
+          </div>
         ) : (
-          // AutoSizer + VariableSizeList
           <AutoSizer>
             {({ height, width }) => (
               <List
@@ -153,34 +176,24 @@ export default function ChatWindow({ id }: { id: string }) {
                 itemSize={getSize}
                 width={width}
                 onScroll={handleScroll}
-                itemData={{
-                  messages,
-                  conversationId: id,
-                  formatTimestamp,
-                  isImageFile,
-                  deleteMessage,
-                  setSize,
-                  meId,
-                }}
+                itemData={itemData}
               >
-                {MessageItem}
+                {Row}
               </List>
             )}
           </AutoSizer>
         )}
       </div>
 
-      {/* Footer / input area (sticky at bottom) */}
-      <div className="shrink-0 border-t bg-white/90 dark:bg-gray-900/90 backdrop-blur-md w-full">
+      {/* Footer / input */}
+      <div className="shrink-0 border-t bg-white dark:bg-gray-800 shadow-lg p-3">
         {typingUsers.length > 0 && (
           <div className="px-3 py-1 text-sm text-gray-500 border-b">
-            {typingUsers.length === 1
-              ? "Someone is typing..."
-              : `${typingUsers.length} people are typing...`}
+            {typingUsers.length === 1 ? "Someone is typing..." : `${typingUsers.length} people are typing...`}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-center w-full">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center mt-2">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -189,6 +202,7 @@ export default function ChatWindow({ id }: { id: string }) {
           >
             📎
           </button>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -197,7 +211,7 @@ export default function ChatWindow({ id }: { id: string }) {
               if (e.target.files?.[0]) {
                 try {
                   await uploadFile(id, e.target.files[0])
-                  listRef.current?.scrollToItem(messages.length, "end")
+                  scrollToBottom()
                 } catch {
                   toast.error("Upload gagal")
                 }
@@ -208,21 +222,18 @@ export default function ChatWindow({ id }: { id: string }) {
 
           <input
             value={text}
-            onChange={(e) => {
-              setText(e.target.value)
-              const socket = getSocket()
-              socket.emit("typing", { conversationId: id, isTyping: true })
-              clearTimeout((window as any).typingTimer)
-              ;(window as any).typingTimer = setTimeout(() => {
-                socket.emit("typing", { conversationId: id, isTyping: false })
-              }, 1000)
-            }}
-            placeholder="Type a message"
-            className="flex-1 p-2 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent focus:outline-none"
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 p-3 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"
-            className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow hover:opacity-90 transition"
+            disabled={!text.trim()}
+            className={`px-6 py-3 rounded-full font-semibold shadow transition ${
+              text.trim() 
+                ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90" 
+                : "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
+            }`}
           >
             Send
           </button>
@@ -231,3 +242,7 @@ export default function ChatWindow({ id }: { id: string }) {
     </div>
   )
 }
+
+export default memo(ChatWindow, (prevProps, nextProps) => {
+  return prevProps.id === nextProps.id
+})

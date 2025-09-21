@@ -19,24 +19,31 @@ export function registerSocket(httpServer: HttpServer) {
       // Logging untuk debugging
       console.log("Socket handshake headers:", socket.handshake.headers);
       
-      // Ekstrak token dari cookie
+      // Ekstrak token dari cookie dengan penanganan yang lebih baik
       if (socket.handshake.headers?.cookie) {
-        const cookies = Object.fromEntries(
-          socket.handshake.headers.cookie.split(";").map((c) => {
-            const [k, v] = c.trim().split("=");
-            return [k, decodeURIComponent(v)];
-          })
-        );
+        // Parse cookies dengan cara yang lebih aman
+        const cookies: Record<string, string> = {};
+        socket.handshake.headers.cookie.split(";").forEach((cookie) => {
+          const parts = cookie.trim().split("=");
+          if (parts.length === 2) {
+            const key = parts[0].trim();
+            const value = decodeURIComponent(parts[1].trim());
+            cookies[key] = value;
+          }
+        });
+        
         token = cookies["at"] || null;
         console.log("Token from cookie:", token);
       }
 
       const user = verifySocketAuth(token);
       if (!user) {
+        console.log("Socket authentication failed: No valid user found");
         return next(new Error("Unauthorized"));
       }
 
       (socket as any).user = user;
+      console.log("Socket authentication successful for user:", user);
       next();
     } catch (err) {
       console.error("Socket authentication error:", err);

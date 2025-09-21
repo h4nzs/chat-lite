@@ -3,8 +3,9 @@ import type { Message } from '@store/chat'
 import cls from 'classnames'
 import { useChatStore } from '@store/chat'
 import { Spinner } from './Spinner'
+import { memo } from 'react'
 
-export default function MessageBubble({ m }: { m: Message }) {
+function MessageBubble({ m }: { m: Message }) {
   const me = useAuthStore((s) => s.user?.id)
   const mine = m.senderId === me
   const activeId = useChatStore((s) => s.activeId)
@@ -56,3 +57,13 @@ export default function MessageBubble({ m }: { m: Message }) {
     </div>
   )
 }
+
+export default memo(MessageBubble, (prevProps, nextProps) => {
+  // Memoization untuk mencegah re-render yang tidak perlu
+  return (
+    prevProps.m.id === nextProps.m.id &&
+    prevProps.m.content === nextProps.m.content &&
+    prevProps.m.imageUrl === nextProps.m.imageUrl &&
+    prevProps.m.senderId === nextProps.m.senderId
+  )
+})

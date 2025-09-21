@@ -17,6 +17,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       : null);
 
   if (!token) {
+    console.log('[Auth Middleware] No token found in request');
     return res.status(401).json({ error: "Unauthorized" });
   }
 

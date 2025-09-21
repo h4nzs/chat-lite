@@ -29,6 +29,8 @@ export type Message = {
   createdAt: string;
   error?: boolean;
   preview?: string;
+  reactions?: { emoji: string; userIds: string[] }[];
+  readBy?: string[];
 };
 
 type State = {
@@ -39,8 +41,10 @@ type State = {
   cursors: Record<string, string | null>;
   typing: Record<string, string[]>;
   presence: Record<string, boolean>;
+  deleteLoading: Record<string, boolean>;
+  conversationCursor: string | null; // Tambahkan ini untuk paginasi conversations
 
-  loadConversations: () => Promise<void>;
+  loadConversations: (cursor?: string) => Promise<void>;
   openConversation: (id: string) => Promise<void>;
   loadOlderMessages: (conversationId: string) => Promise<void>;
 
@@ -90,9 +94,16 @@ function clearCachedMessages(conversationId: string): void {
 }
 
 function sortConversations(list: Conversation[]) {
-  return [...list].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
+  // Gunakan Intl.Collator untuk sorting yang lebih efisien
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  
+  const sorted = [...list].sort((a, b) => {
+    // Urutkan berdasarkan updatedAt terbaru
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+  
+  console.log("Sorting conversations:", list, "Result:", sorted); // Debug log
+  return sorted;
 }
 
 export const useChatStore = create<State>((set, get) => ({
@@ -103,10 +114,37 @@ export const useChatStore = create<State>((set, get) => ({
   typing: {},
   loading: {},
   presence: {},
+  deleteLoading: {},
 
-  async loadConversations() {
-    const items = await api<Conversation[]>("/api/conversations");
-    set({ conversations: sortConversations(items) });
+async loadConversations(cursor?: string) {
+  try {
+    const url = cursor 
+      ? `/api/conversations?cursor=${encodeURIComponent(cursor)}` 
+      : "/api/conversations";
+      
+    const response = await api<{ items: Conversation[]; nextCursor: string | null }>(url);
+    console.log("Conversations API response:", response); // Debug log
+    const { items, nextCursor } = response;
+
+    // 🔒 Normalisasi data agar selalu punya id
+    const normalized = items
+      .filter(c => !!c.id) // skip kalau id kosong
+      .map(c => ({
+        ...c,
+        id: c.id || (c as any)._id || (c as any).conversationId,
+      }));
+
+    set((state) => {
+      // Jika ada cursor, tambahkan ke daftar yang sudah ada, jika tidak timpa
+      const conversations = cursor 
+        ? [...state.conversations, ...normalized]
+        : normalized;
+        
+      return { 
+        conversations: sortConversations(conversations),
+        conversationCursor: nextCursor
+      };
+    });
 
     const socket = getSocket();
 
@@ -114,168 +152,234 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("conversation:new");
     socket.on("conversation:new", (conv: Conversation) => {
       set((s) => {
+        if (!conv?.id) return {}; // skip invalid
         if (s.conversations.some((c) => c.id === conv.id)) return {};
         return { conversations: sortConversations([...s.conversations, conv]) };
       });
     });
-  },
+  } catch (error) {
+    console.error("Failed to load conversations:", error);
+  }
+},
 
   async openConversation(id) {
-    get().setLoading(id, true);
-    try {
-      // Check cache first
-      const cachedMessages = getCachedMessages(id);
-      if (cachedMessages) {
-        set((s) => ({
-          messages: { ...s.messages, [id]: cachedMessages },
-        }));
-      } else {
-        const res = await api<{ items: Message[]; nextCursor: string | null }>(
-          `/api/messages/${id}`
-        );
-        const decryptedItems = res.items.map((m) => {
-          // Jika content tidak ada atau kosong, kembalikan null
-          if (!m.content) {
-            return { ...m, content: null };
-          }
-          
-          // Coba decrypt pesan
-          try {
-            const decryptedContent = decryptMessage(m.content, m.conversationId);
-            return { ...m, content: decryptedContent };
-          } catch (error) {
-            console.error('Decryption failed for message:', m.id, error);
-            // Kembalikan content asli jika decryption gagal
-            return { ...m, content: m.content };
-          }
-        });
-        const messages = decryptedItems.reverse();
-        set((s) => ({
-          messages: { ...s.messages, [id]: messages },
-          cursors: { ...s.cursors, [id]: res.nextCursor },
-        }));
+  console.log("Opening conversation:", id); // Debug log
+  get().setLoading(id, true);
+  try {
+    // Check cache first
+    const cachedMessages = getCachedMessages(id);
+    if (cachedMessages) {
+      console.log("Using cached messages for conversation:", id); // Debug log
+      set((s) => ({
+        messages: { ...s.messages, [id]: cachedMessages },
+      }));
+    } else {
+      console.log("Fetching messages from API for conversation:", id); // Debug log
+      const res = await api<{ items: Message[]; nextCursor: string | null }>(
+        `/api/messages/${id}`
+      );
+      console.log("Messages API response:", res); // Debug log
+      
+      const decryptedItems = await Promise.all(res.items.map(async (m) => {
+        // Jika content tidak ada atau kosong, kembalikan null
+        if (!m.content) {
+          return { ...m, content: null };
+        }
         
-        // Cache the messages
-        setCachedMessages(id, messages);
-      }
-    } finally {
-      get().setLoading(id, false);
+        // Coba decrypt pesan
+        try {
+          const decryptedContent = await decryptMessage(m.content, m.conversationId);
+          return { ...m, content: decryptedContent };
+        } catch (error) {
+          console.error('Decryption failed for message:', m.id, error);
+          // Kembalikan content asli jika decryption gagal
+          return { ...m, content: `[Failed to decrypt: ${m.content}]` };
+        }
+      }));
+      const messages = decryptedItems.reverse();
+      console.log("Decrypted messages:", messages); // Debug log
+      
+      set((s) => ({
+        messages: { ...s.messages, [id]: messages },
+        cursors: { ...s.cursors, [id]: res.nextCursor },
+      }));
+      
+      // Cache the messages
+      setCachedMessages(id, messages);
     }
+  } finally {
+    get().setLoading(id, false);
+  }
 
-    set({ activeId: id });
+  set({ activeId: id });
 
-    const socket = getSocket();
-    socket.emit("conversation:join", id);
+  const socket = getSocket();
+  socket.emit("conversation:join", id);
 
-    socket.off("message:new");
-    socket.on(
-      "message:new",
-      (msg: Message & { tempId?: number; preview?: string }) => {
-        set((s) => {
-          const { conversations, messages } = s;
-          const curr = messages[msg.conversationId] || [];
+  socket.off("message:new");
+  socket.on(
+    "message:new",
+    (msg: Message & { tempId?: number; preview?: string }) => {
+      console.log("New message received:", msg); // Debug log
+      set((s) => {
+        const { conversations, messages } = s;
+        const curr = messages[msg.conversationId] || [];
 
-          let next = msg.tempId
-            ? curr.filter((m) => m.tempId !== msg.tempId)
-            : curr;
-          if (next.some((m) => m.id === msg.id)) return {};
+        let next = msg.tempId
+          ? curr.filter((m) => m.tempId !== msg.tempId)
+          : curr;
+        if (next.some((m) => m.id === msg.id)) return {};
 
-          const decryptedMsg = {
-            ...msg,
-            content: msg.content ? decryptMessage(msg.content, msg.conversationId) : null,
-          };
+        // Decrypt the message content asynchronously
+        Promise.resolve().then(async () => {
+          try {
+            const decryptedContent = msg.content 
+              ? await decryptMessage(msg.content, msg.conversationId) 
+              : null;
+            
+            const decryptedMsg = {
+              ...msg,
+              content: decryptedContent,
+            };
 
-          let updated = conversations.map((c) =>
-            c.id === msg.conversationId
-              ? {
-                  ...c,
+            set((state) => {
+              let updated = state.conversations.map((c) =>
+                c.id === msg.conversationId
+                  ? {
+                      ...c,
+                      lastMessage: decryptedMsg,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : c
+              );
+
+              if (!updated.find((c) => c.id === msg.conversationId)) {
+                updated.push({
+                  id: msg.conversationId,
+                  isGroup: false,
+                  title: null,
+                  participants: [],
                   lastMessage: decryptedMsg,
                   updatedAt: new Date().toISOString(),
-                }
-              : c
-          );
+                });
+              }
 
-          if (!updated.find((c) => c.id === msg.conversationId)) {
-            updated.push({
-              id: msg.conversationId,
-              isGroup: false,
-              title: null,
-              participants: [],
-              lastMessage: decryptedMsg,
-              updatedAt: new Date().toISOString(),
+              updated = sortConversations(updated);
+
+              return {
+                messages: {
+                  ...state.messages,
+                  [msg.conversationId]: [...next, decryptedMsg],
+                },
+                conversations: updated,
+              };
+            });
+          } catch (error) {
+            console.error('Decryption failed for new message:', msg.id, error);
+            // Use the original message if decryption fails
+            const decryptedMsg = {
+              ...msg,
+              content: msg.content ? `[Failed to decrypt: ${msg.content}]` : "[Failed to decrypt]",
+            };
+
+            set((state) => {
+              let updated = state.conversations.map((c) =>
+                c.id === msg.conversationId
+                  ? {
+                      ...c,
+                      lastMessage: decryptedMsg,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : c
+              );
+
+              if (!updated.find((c) => c.id === msg.conversationId)) {
+                updated.push({
+                  id: msg.conversationId,
+                  isGroup: false,
+                  title: null,
+                  participants: [],
+                  lastMessage: decryptedMsg,
+                  updatedAt: new Date().toISOString(),
+                });
+              }
+
+              updated = sortConversations(updated);
+
+              return {
+                messages: {
+                  ...state.messages,
+                  [msg.conversationId]: [...next, decryptedMsg],
+                },
+                conversations: updated,
+              };
             });
           }
+        });
+        
+        // Return empty update for now, as the actual update will happen asynchronously
+        return {};
+      });
+    }
+  );
 
-          updated = sortConversations(updated);
+  socket.off("message:deleted");
+  socket.on("message:deleted", ({ id: messageId, conversationId }) => {
+    set((s) => {
+      const updatedMessages = (s.messages[conversationId] || []).map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              content: "[deleted]",
+              imageUrl: null,
+              fileUrl: null,
+              fileName: null,
+            }
+          : m
+      );
 
+      const updatedConversations = s.conversations.map((c) => {
+        if (c.id === conversationId && c.lastMessage?.id === messageId) {
           return {
-            messages: {
-              ...messages,
-              [msg.conversationId]: [...next, decryptedMsg],
+            ...c,
+            lastMessage: {
+              ...c.lastMessage,
+              content: "[deleted]",
+              imageUrl: null,
+              fileUrl: null,
+              fileName: null,
+              preview: undefined,
             },
-            conversations: updated,
           };
-        });
-      }
-    );
-
-    socket.off("message:deleted");
-    socket.on("message:deleted", ({ id, conversationId }) => {
-      set((s) => {
-        const updatedMessages = (s.messages[conversationId] || []).map((m) =>
-          m.id === id
-            ? {
-                ...m,
-                content: "[deleted]",
-                imageUrl: null,
-                fileUrl: null,
-                fileName: null,
-              }
-            : m
-        );
-
-        const updatedConversations = s.conversations.map((c) => {
-          if (c.id === conversationId && c.lastMessage?.id === id) {
-            return {
-              ...c,
-              lastMessage: {
-                ...c.lastMessage,
-                content: "[deleted]",
-                imageUrl: null,
-                fileUrl: null,
-                fileName: null,
-                preview: undefined,
-              },
-            };
-          }
-          return c;
-        });
-
-        return {
-          messages: { ...s.messages, [conversationId]: updatedMessages },
-          conversations: updatedConversations,
-        };
+        }
+        return c;
       });
-    });
 
-    socket.off("typing");
-    socket.on("typing", ({ userId, isTyping, conversationId }) => {
-      if (conversationId !== id) return;
-      set((s) => {
-        const curr = new Set(s.typing[id] || []);
-        if (isTyping) curr.add(userId);
-        else curr.delete(userId);
-        return { typing: { ...s.typing, [id]: Array.from(curr) } };
-      });
+      return {
+        messages: { ...s.messages, [conversationId]: updatedMessages },
+        conversations: updatedConversations,
+      };
     });
+  });
 
-    socket.off("presence:update");
-    socket.on("presence:update", ({ userId, online }) => {
-      set((s) => ({
-        presence: { ...s.presence, [userId]: online },
-      }));
+  socket.off("typing");
+  socket.on("typing", ({ userId, isTyping, conversationId }) => {
+    if (conversationId !== id) return;
+    set((s) => {
+      const curr = new Set(s.typing[id] || []);
+      if (isTyping) curr.add(userId);
+      else curr.delete(userId);
+      return { typing: { ...s.typing, [id]: Array.from(curr) } };
     });
-  },
+  });
+
+  socket.off("presence:update");
+  socket.on("presence:update", ({ userId, online }) => {
+    set((s) => ({
+      presence: { ...s.presence, [userId]: online },
+    }));
+  });
+},
 
   async loadOlderMessages(conversationId) {
     const cursor = get().cursors[conversationId];
@@ -288,10 +392,10 @@ export const useChatStore = create<State>((set, get) => ({
       url
     );
 
-    const decryptedItems = res.items.map((m) => ({
+    const decryptedItems = await Promise.all(res.items.map(async (m) => ({
       ...m,
-      content: m.content ? decryptMessage(m.content, m.conversationId) : null,
-    }));
+      content: m.content ? await decryptMessage(m.content, m.conversationId) : null,
+    })));
 
     set((s) => ({
       messages: {
@@ -436,14 +540,19 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   async searchUsers(q) {
-    return api(`/api/users/search?q=${encodeURIComponent(q)}`);
+    console.log("Searching users with query:", q); // Debug log
+    const result = await api(`/api/users/search?q=${encodeURIComponent(q)}`);
+    console.log("Search users result:", result); // Debug log
+    return result;
   },
 
   async startConversation(peerId) {
+    console.log("Starting conversation with peer:", peerId); // Debug log
     const r = await api<{ id: string }>("/api/conversations/start", {
       method: "POST",
       body: JSON.stringify({ peerId }),
     });
+    console.log("Start conversation result:", r); // Debug log
 
     // ✅ langsung trigger loadConversations agar sinkron
     await get().loadConversations();

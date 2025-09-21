@@ -8,15 +8,29 @@ const router = Router();
 router.get("/", requireAuth, async (req, res, next) => {
   try {
     const userId = (req as any).user.id;
-    
-    console.log(`[Conversations Controller] Mencoba mengambil daftar percakapan untuk userId: ${userId}`);
+    const { cursor } = req.query as { cursor?: string };
+    console.log(`[Conversations Controller] Mencoba mengambil daftar percakapan untuk userId: ${userId}`, cursor ? `with cursor: ${cursor}` : '');
+
+    // Parse cursor if provided
+    const cursorDate = cursor ? new Date(cursor) : undefined;
+
+    const whereClause = {
+      participants: {
+        some: { userId },
+      },
+      ...(cursorDate && {
+        updatedAt: {
+          lt: cursorDate,
+        },
+      }),
+    };
 
     const conversations = await prisma.conversation.findMany({
-      where: {
-        participants: {
-          some: { userId },
-        },
+      where: whereClause,
+      orderBy: {
+        updatedAt: "desc",
       },
+      take: 20, // Pagination limit
       include: {
         participants: {
           include: {
@@ -36,20 +50,36 @@ router.get("/", requireAuth, async (req, res, next) => {
         },
       },
     });
+
+    // Transform agar sesuai dengan frontend
+    const transformedConversations = conversations.map(conv => {
+      const lastMessage = conv.messages.length > 0 ? conv.messages[0] : null;
+      return {
+        id: conv.id, // pastikan ada id
+        isGroup: conv.isGroup,
+        title: conv.title,
+        updatedAt: conv.updatedAt,
+        lastMessage,
+        participants: conv.participants.map(p => ({
+          id: p.user.id,
+          username: p.user.username,
+          name: p.user.name,
+          avatarUrl: p.user.avatarUrl,
+        })),
+      };
+    });
+
+    console.log(`[Conversations Controller] Menemukan ${transformedConversations.length} percakapan untuk pengguna ${userId}`);
     
-    // Transform participants data to match frontend expectations
-    const transformedConversations = conversations.map(conv => ({
-      ...conv,
-      participants: conv.participants.map(p => ({
-        id: p.user.id,
-        username: p.user.username,
-        name: p.user.name,
-        avatarUrl: p.user.avatarUrl,
-      }))
-    }));
-    
-    console.log(`[Conversations Controller] Menemukan ${conversations.length} percakapan untuk pengguna ${userId}`);
-    res.json(transformedConversations);
+    // Return in the format expected by frontend: { items, nextCursor }
+    const nextCursor = transformedConversations.length === 20 
+      ? transformedConversations[transformedConversations.length - 1].updatedAt
+      : null;
+      
+    res.json({
+      items: transformedConversations,
+      nextCursor
+    });
   } catch (e) {
     console.error("[Conversations Controller] Error:", e);
     next(e);
