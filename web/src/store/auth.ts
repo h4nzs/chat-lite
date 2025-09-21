@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
 import { setSecureCookie, eraseCookie } from "@lib/tokenStorage";
+import { clearKeyCache } from "@utils/crypto";
 
 type User = {
   id: string;
@@ -74,6 +75,9 @@ export const useAuthStore = create<State>((set, get) => ({
     // Clear token dari storage
     eraseCookie("at");
     eraseCookie("rt");
+    
+    // Clear encryption key cache
+    clearKeyCache();
 
     set({ user: null });
     disconnectSocket();

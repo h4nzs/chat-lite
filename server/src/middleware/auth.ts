@@ -49,7 +49,7 @@ export function socketAuthMiddleware(
 ) {
   try {
     // Prioritaskan validasi token dengan cara mem-parsing cookie langsung dari header
-    let token: string | null = null;
+    let token: string | undefined = undefined;
     
     // Logging untuk debugging
     console.log("Socket handshake headers:", socket.handshake.headers);
@@ -62,7 +62,7 @@ export function socketAuthMiddleware(
           return [k, decodeURIComponent(v)];
         })
       );
-      token = cookies["at"] || null;
+      token = cookies["at"] || undefined;
       console.log("Token from cookie:", token);
     }
 

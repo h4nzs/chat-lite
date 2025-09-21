@@ -11,6 +11,7 @@ import {
 import { z } from "zod";
 import { zodValidate } from "../utils/validate.js";
 import { env } from "../config.js";
+import { JwtPayload } from "jsonwebtoken";
 
 const router = Router();
 
@@ -133,7 +134,7 @@ router.post("/refresh", async (req, res, next) => {
     const token = req.cookies?.rt;
     if (!token) throw new ApiError(401, "No refresh token");
 
-    const payload = verifyJwt(token);
+    const payload = verifyJwt(token) as JwtPayload | null;
     if (!payload?.jti || !payload?.sub)
       throw new ApiError(401, "Invalid refresh token");
 
@@ -163,7 +164,7 @@ router.post("/refresh", async (req, res, next) => {
 router.post("/logout", async (req, res) => {
   const r = req.cookies?.rt;
   if (r) {
-    const payload = verifyJwt(r);
+    const payload = verifyJwt(r) as JwtPayload | null;
     if (payload?.jti) {
       await prisma.refreshToken.updateMany({
         where: { jti: payload.jti },

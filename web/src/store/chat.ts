@@ -181,14 +181,18 @@ async loadConversations(cursor?: string) {
       console.log("Messages API response:", res); // Debug log
       
       const decryptedItems = await Promise.all(res.items.map(async (m) => {
+        console.log("Decrypting message:", m); // Debug log
+        console.log("Message encrypted content:", m.content); // Debug log
         // Jika content tidak ada atau kosong, kembalikan null
         if (!m.content) {
+          console.log("Message has no content, returning null"); // Debug log
           return { ...m, content: null };
         }
         
         // Coba decrypt pesan
         try {
           const decryptedContent = await decryptMessage(m.content, m.conversationId);
+          console.log("Decrypted content:", decryptedContent); // Debug log
           return { ...m, content: decryptedContent };
         } catch (error) {
           console.error('Decryption failed for message:', m.id, error);
@@ -220,7 +224,11 @@ async loadConversations(cursor?: string) {
   socket.on(
     "message:new",
     (msg: Message & { tempId?: number; preview?: string }) => {
-      console.log("New message received:", msg); // Debug log
+      console.log("=== NEW MESSAGE RECEIVED ===");
+      console.log("Received message:", msg);
+      console.log("Message content:", msg.content);
+      console.log("Conversation ID:", msg.conversationId);
+      console.log("=== END NEW MESSAGE RECEIVED ===");
       set((s) => {
         const { conversations, messages } = s;
         const curr = messages[msg.conversationId] || [];
@@ -233,9 +241,13 @@ async loadConversations(cursor?: string) {
         // Decrypt the message content asynchronously
         Promise.resolve().then(async () => {
           try {
+            console.log("=== DECRYPTING NEW MESSAGE ===");
+            console.log("Message to decrypt:", msg.content);
+            console.log("Conversation ID:", msg.conversationId);
             const decryptedContent = msg.content 
               ? await decryptMessage(msg.content, msg.conversationId) 
               : null;
+            console.log("Decrypted content:", decryptedContent);
             
             const decryptedMsg = {
               ...msg,
@@ -414,15 +426,23 @@ async loadConversations(cursor?: string) {
   },
 
   async sendMessage(conversationId, content, tempId) {
+    console.log("=== SEND MESSAGE ===");
+    console.log("Input content:", content);
+    console.log("Conversation ID:", conversationId);
+    console.log("Temp ID:", tempId);
     const socket = getSocket();
     return new Promise((resolve, reject) => {
       encryptMessage(content, conversationId).then(encrypted => {
+        console.log("Encrypted content:", encrypted);
         socket.emit(
           "message:send",
           { conversationId, content: encrypted, tempId },
           (ack: { ok: boolean; msg?: Message }) => {
+            console.log("Received acknowledgment:", ack);
             if (ack?.ok && ack.msg) {
+              console.log("Decrypting acknowledgment message content:", ack.msg.content);
               decryptMessage(ack.msg.content || "", ack.msg.conversationId).then(decryptedContent => {
+                console.log("Decrypted acknowledgment content:", decryptedContent);
                 const decryptedAck = {
                   ...ack.msg,
                   content: decryptedContent,
@@ -463,7 +483,8 @@ async loadConversations(cursor?: string) {
                   };
                 });
                 resolve();
-              }).catch(() => {
+              }).catch((error) => {
+                console.error("Decryption failed in sendMessage:", error);
                 const decryptedAck = {
                   ...ack.msg,
                   content: "[Failed to decrypt]",
@@ -506,6 +527,7 @@ async loadConversations(cursor?: string) {
                 resolve();
               });
             } else {
+              console.log("Acknowledgment failed, marking message error");
               get().markMessageError(conversationId, tempId!);
               reject(new Error("Send failed"));
             }

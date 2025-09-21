@@ -50,6 +50,11 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       orderBy: { createdAt: "desc" },
       take: 50, // Limit to 50 messages per page
     });
+    console.log("Retrieved messages from database:", messages);
+    // Log the encrypted content of each message
+    messages.forEach((msg, index) => {
+      console.log(`Message ${index} encrypted content:`, msg.content);
+    });
 
     // Reverse to show oldest first
     const items = messages.reverse();

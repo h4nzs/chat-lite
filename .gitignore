@@ -9,7 +9,6 @@ server/dist
 web/dist
 # Keep environment variables out of version control
 .env
-.env.example
 *.log
 
 /generated/prisma
