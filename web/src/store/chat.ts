@@ -166,51 +166,92 @@ async loadConversations(cursor?: string) {
   console.log("Opening conversation:", id); // Debug log
   get().setLoading(id, true);
   try {
-    // Check cache first
-    const cachedMessages = getCachedMessages(id);
-    if (cachedMessages) {
-      console.log("Using cached messages for conversation:", id); // Debug log
-      set((s) => ({
-        messages: { ...s.messages, [id]: cachedMessages },
-      }));
-    } else {
-      console.log("Fetching messages from API for conversation:", id); // Debug log
-      const res = await api<{ items: Message[]; nextCursor: string | null }>(
-        `/api/messages/${id}`
-      );
-      console.log("Messages API response:", res); // Debug log
+    // Always fetch fresh messages from API to ensure completeness
+    // This fixes the issue where cached messages were incomplete after refresh
+    console.log("Fetching messages from API for conversation:", id); // Debug log
+    
+    // Load initial batch of messages
+    const res = await api<{ items: Message[]; nextCursor: string | null }>(
+      `/api/messages/${id}`
+    );
+    console.log("Messages API response:", res); // Debug log
+    
+    let allMessages: Message[] = [];
+    let nextCursor = res.nextCursor;
+    
+    // Decrypt initial batch
+    const decryptedItems = await Promise.all(res.items.map(async (m) => {
+      console.log("Decrypting message:", m); // Debug log
+      console.log("Message encrypted content:", m.content); // Debug log
+      // Jika content tidak ada atau kosong, kembalikan null
+      if (!m.content) {
+        console.log("Message has no content, returning null"); // Debug log
+        return { ...m, content: null };
+      }
       
-      const decryptedItems = await Promise.all(res.items.map(async (m) => {
-        console.log("Decrypting message:", m); // Debug log
-        console.log("Message encrypted content:", m.content); // Debug log
-        // Jika content tidak ada atau kosong, kembalikan null
+      // Coba decrypt pesan
+      try {
+        const decryptedContent = await decryptMessage(m.content, m.conversationId);
+        console.log("Decrypted content:", decryptedContent); // Debug log
+        return { ...m, content: decryptedContent };
+      } catch (error) {
+        console.error('Decryption failed for message:', m.id, error);
+        // Kembalikan content asli jika decryption gagal
+        return { ...m, content: `[Failed to decrypt: ${m.content}]` };
+      }
+    }));
+    
+    allMessages = [...decryptedItems.reverse()];
+    
+    // Load additional batches if there are more messages
+    let batchCount = 0;
+    const MAX_BATCHES = 10; // Prevent infinite loops
+    
+    while (nextCursor && batchCount < MAX_BATCHES) {
+      console.log("Fetching additional messages with cursor:", nextCursor); // Debug log
+      const nextRes = await api<{ items: Message[]; nextCursor: string | null }>(
+        `/api/messages/${id}?cursor=${encodeURIComponent(nextCursor)}`
+      );
+      
+      console.log("Next batch response:", nextRes);
+      
+      const nextDecryptedItems = await Promise.all(nextRes.items.map(async (m) => {
         if (!m.content) {
-          console.log("Message has no content, returning null"); // Debug log
           return { ...m, content: null };
         }
         
-        // Coba decrypt pesan
         try {
+          console.log("Decrypting message in batch:", m.id, "with content:", m.content);
           const decryptedContent = await decryptMessage(m.content, m.conversationId);
-          console.log("Decrypted content:", decryptedContent); // Debug log
+          console.log("Decrypted content in batch:", decryptedContent);
           return { ...m, content: decryptedContent };
         } catch (error) {
-          console.error('Decryption failed for message:', m.id, error);
-          // Kembalikan content asli jika decryption gagal
+          console.error('Decryption failed for message in batch:', m.id, error);
           return { ...m, content: `[Failed to decrypt: ${m.content}]` };
         }
       }));
-      const messages = decryptedItems.reverse();
-      console.log("Decrypted messages:", messages); // Debug log
       
-      set((s) => ({
-        messages: { ...s.messages, [id]: messages },
-        cursors: { ...s.cursors, [id]: res.nextCursor },
-      }));
+      allMessages = [...nextDecryptedItems.reverse(), ...allMessages];
+      nextCursor = nextRes.nextCursor;
+      batchCount++;
       
-      // Cache the messages
-      setCachedMessages(id, messages);
+      console.log(`Loaded batch ${batchCount}, nextCursor:`, nextCursor);
     }
+    
+    if (batchCount >= MAX_BATCHES) {
+      console.warn("Reached maximum batch limit, stopping pagination");
+    }
+    
+    console.log("All decrypted messages:", allMessages); // Debug log
+    console.log(`Loaded total of ${allMessages.length} messages`);
+    
+    set((s) => ({
+      messages: { ...s.messages, [id]: allMessages },
+      cursors: { ...s.cursors, [id]: nextCursor },
+    }));
+    
+    // Cache all messages
+    setCachedMessages(id, allMessages);
   } finally {
     get().setLoading(id, false);
   }
@@ -394,35 +435,55 @@ async loadConversations(cursor?: string) {
 },
 
   async loadOlderMessages(conversationId) {
-    const cursor = get().cursors[conversationId];
-    if (!cursor) return;
+    try {
+      const cursor = get().cursors[conversationId];
+      if (!cursor) return;
 
-    const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(
-      cursor
-    )}`;
-    const res = await api<{ items: Message[]; nextCursor: string | null }>(
-      url
-    );
+      const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(
+        cursor
+      )}`;
+      console.log("Loading older messages with URL:", url);
+      const res = await api<{ items: Message[]; nextCursor: string | null }>(
+        url
+      );
+      console.log("Received older messages response:", res);
 
-    const decryptedItems = await Promise.all(res.items.map(async (m) => ({
-      ...m,
-      content: m.content ? await decryptMessage(m.content, m.conversationId) : null,
-    })));
+      const decryptedItems = await Promise.all(res.items.map(async (m) => {
+        if (!m.content) {
+          return { ...m, content: null };
+        }
+        
+        try {
+          console.log("Decrypting older message:", m.id);
+          const decryptedContent = await decryptMessage(m.content, m.conversationId);
+          console.log("Decrypted older message content:", decryptedContent);
+          return { ...m, content: decryptedContent };
+        } catch (error) {
+          console.error('Decryption failed for older message:', m.id, error);
+          return { ...m, content: `[Failed to decrypt: ${m.content}]` };
+        }
+      }));
 
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: [
-          ...decryptedItems.reverse(),
-          ...(s.messages[conversationId] || []),
-        ],
-      },
-      cursors: { ...s.cursors, [conversationId]: res.nextCursor },
-    }));
-    
-    // Update cache
-    const currentMessages = get().messages[conversationId] || [];
-    setCachedMessages(conversationId, currentMessages);
+      set((s) => {
+        const updatedMessages = {
+          ...s.messages,
+          [conversationId]: [
+            ...decryptedItems,
+            ...(s.messages[conversationId] || []),
+          ],
+        };
+        
+        // Update cache with all messages for this conversation
+        setCachedMessages(conversationId, updatedMessages[conversationId]);
+        
+        return {
+          messages: updatedMessages,
+          cursors: { ...s.cursors, [conversationId]: res.nextCursor },
+        };
+      });
+    } catch (error) {
+      console.error("Failed to load older messages:", error);
+    }
   },
 
   async sendMessage(conversationId, content, tempId) {

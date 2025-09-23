@@ -60,7 +60,9 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
     const items = messages.reverse();
     
     // Determine next cursor (oldest message's createdAt)
-    const nextCursor = items.length > 0 ? items[0].createdAt : null;
+    const nextCursor = items.length > 0 ? items[0]?.createdAt : null;
+    
+    console.log(`Returning ${items.length} messages with nextCursor:`, nextCursor);
 
     res.json({
       items,

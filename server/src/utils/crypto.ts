@@ -1,28 +1,40 @@
 import sodium from 'libsodium-wrappers'
 import { env } from '../config.js'
 
-// In-memory storage for per-conversation keys (in production, this should be in a secure store)
-const conversationKeys = new Map<string, Uint8Array>()
+// Cache for derived keys to avoid recomputation
+const keyCache = new Map<string, Uint8Array>()
 
-// Generate a random key for libsodium
-async function generateKey(): Promise<Uint8Array> {
+// Generate a deterministic key for a conversation based on conversation ID only
+async function generateConversationKey(conversationId: string): Promise<Uint8Array> {
   await sodium.ready
-  return sodium.randombytes_buf(sodium.crypto_secretbox_KEYBYTES)
-}
-
-// Get or create a key for a conversation
-async function getConversationKey(conversationId: string): Promise<Uint8Array> {
-  if (!conversationKeys.has(conversationId)) {
-    const key = await generateKey()
-    conversationKeys.set(conversationId, key)
+  
+  // Check cache first
+  const cacheKey = `${conversationId}`
+  if (keyCache.has(cacheKey)) {
+    return keyCache.get(cacheKey)!
   }
-  return conversationKeys.get(conversationId)!
+  
+  // Create a deterministic key based on conversation ID only
+  // This ensures both sender and receiver use the same key
+  const keyMaterial = `${conversationId}`
+  
+  // Use crypto_generichash to derive a key from the key material
+  const derivedKey = sodium.crypto_generichash(
+    sodium.crypto_secretbox_KEYBYTES,
+    keyMaterial,
+    'chat-lite-key-derivation-salt'
+  )
+  
+  // Cache the key
+  keyCache.set(cacheKey, derivedKey)
+  
+  return derivedKey
 }
 
 // Encrypt message with libsodium
 export async function encryptMessage(text: string, conversationId: string): Promise<string> {
   await sodium.ready
-  const key = await getConversationKey(conversationId)
+  const key = await generateConversationKey(conversationId)
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
   const encrypted = sodium.crypto_secretbox_easy(text, nonce, key)
   
@@ -38,24 +50,47 @@ export async function encryptMessage(text: string, conversationId: string): Prom
 // Decrypt message with libsodium
 export async function decryptMessage(cipher: string, conversationId: string): Promise<string> {
   try {
-    await sodium.ready
-    const key = await getConversationKey(conversationId)
-    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL)
+    // Check if cipher is valid
+    if (!cipher || typeof cipher !== 'string') {
+      throw new Error('Invalid cipher text');
+    }
+    
+    // Cek apakah cipher adalah pesan teks biasa (tidak dienkripsi)
+    // Jika cipher tidak berupa base64 yang valid, asumsikan itu adalah teks biasa
+    try {
+      sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
+    } catch {
+      // Jika tidak bisa di-decode sebagai base64, asumsikan itu adalah teks biasa
+      return cipher;
+    }
+    
+    await sodium.ready;
+    const key = await generateConversationKey(conversationId);
+    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
+    
+    // Check if combined data is valid
+    if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
+      throw new Error('Incomplete input data');
+    }
     
     // Extract nonce and encrypted data
-    const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES)
-    const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES)
+    const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
+    const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
     
     // Decrypt
-    const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key)
-    return sodium.to_string(decrypted)
+    const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
+    return sodium.to_string(decrypted);
   } catch (error) {
-    console.error('Decryption failed:', error)
+    console.error('Decryption failed:', error);
     // Return a more specific error message
-    if (error instanceof Error && error.message.includes('incorrect key')) {
-      return '[Failed to decrypt: Invalid key]'
+    if (error instanceof Error) {
+      if (error.message.includes('incorrect key')) {
+        return '[Failed to decrypt: Invalid key]';
+      } else if (error.message.includes('incomplete input')) {
+        return '[Failed to decrypt: Incomplete data]';
+      }
     }
-    return '[Failed to decrypt: Message may be corrupted]'
+    return '[Failed to decrypt: Message may be corrupted]';
   }
 }
 
