@@ -1,141 +1,98 @@
-**Misi Kritis: Audit, Identifikasi, dan Perbaikan Total Aplikasi Chat-Lite**
+ ---
 
-### Konteks
-Anda adalah seorang **Senior Full-Stack Developer dan Code Auditor** dengan spesialisasi dalam debugging masalah kompleks pada aplikasi web modern (React, Node.js, Prisma, JWT, WebSocket). Proyek "chat-lite" saat ini berada dalam kondisi kritis: tampilan aplikasi di web browser blank putih dan terdapat error pada console. Upaya perbaikan yang terfokus sebelumnya gagal, menandakan adanya masalah mendasar atau beberapa bug yang saling terkait.
+# 📋 ChatLite ToDo / Issue List
 
-### Misi Utama
-Tugas Anda adalah melakukan **analisis dan audit end-to-end secara sistematis** pada seluruh basis kode (frontend dan backend). Identifikasi **semua** error, bug, inkonsistensi logika, dan potensi masalah (*code smells*) yang menyebabkan kegagalan fungsionalitas saat ini. Setelah identifikasi, implementasikan perbaikan yang bersih, efisien, dan benar secara fundamental.
+## 🔴 Bug Fixes
 
-### **Metodologi Kerja yang Wajib Diikuti:**
+1. **ConversationId `undefined`**
 
-#### **Fase 1: Analisis Statis & Investigasi Menyeluruh**
+   * **File:** `chat.ts`, `ChatList.tsx`, `StartNewChat.tsx`
+   * **Issue:** `openConversation` kadang dipanggil dengan `id=undefined` → server error 404.
+   * **Fix:** Tambahkan guard `if (!id) return` sebelum panggil API/socket. Pastikan setiap `onOpen` atau `onStarted` selalu memberi `id` valid.
 
-1.  **Lacak Alur Otentikasi Penuh:**
+2. **Virtualized list tidak muncul / putih**
 
-2.  **Audit semua file dan kodenya:**
+   * **File:** `ChatWindow.tsx`
+   * **Issue:** `AutoSizer` + `VariableSizeList` butuh parent `min-h-0` di flex container.
+   * **Fix:** Pastikan parent `<div className="flex-1 flex flex-col min-h-0">` ada di Chat.tsx dan ChatWindow\.tsx.
 
-3.  **Analisis Kode Frontend:**
+3. **Runtime crash saat error message render**
 
-#### **Fase 2: Implementasi Perbaikan Holistik**
+   * **File:** `MessageItem.tsx`
+   * **Issue:** Bila `formatTimestamp` tidak diberikan atau file util return undefined, seluruh app blank.
+   * **Fix:** Tambahkan React Error Boundary + default fallback timestamp (`?? new Date().toLocaleTimeString()`).
 
-1.  **Perbaiki Akar Masalah:** Berdasarkan temuan Anda di Fase 1, perbaiki masalah utamanya. Ini bukan tentang menambal gejala, tetapi memperbaiki logika yang salah. Jika masalahnya ada di query Prisma, perbaiki query tersebut. Jika masalahnya di pembuatan JWT, perbaiki *payload*-nya.
+4. **`as any` untuk store actions**
 
-2.  **Standardisasi & Konsistensi:**
+   * **File:** `ChatWindow.tsx`, `chat.ts`
+   * **Issue:** `(s as any).uploadFile`, `(s as any).deleteMessage` → rawan runtime error.
+   * **Fix:** Tambahkan tipe di store state biar aman.
 
-3.  **Hapus Kode Bermasalah:** Singkirkan semua kode sisa, variabel yang tidak digunakan, atau logika duplikat yang dapat menyebabkan kebingungan atau bug di masa depan.
+5. **Socket auth**
 
-4.  **tampilan aplikasi blank putih saat membuka percakapan**  
+   * **File:** `@lib/socket.ts`, server `auth.ts`
+   * **Issue:** Kadang `Unauthorized socket connection` muncul (token hilang/expire).
+   * **Fix:** Pastikan handshake bawa cookie/token. Tambah handler `socket.on("connect_error", …)` untuk fallback login/refresh.
 
-#### **Fase 3: Laporan & Penjelasan**
+---
 
-Setelah semua perbaikan diimplementasikan, sediakan laporan singkat dalam format berikut:
+## 🟠 Enhancements
 
--   **Akar Masalah yang Ditemukan:** Tempat untuk mengirim pesan masih tidak tampil.
--   **Ringkasan Perubahan:** Buat daftar file yang telah Anda modifikasi dan jelaskan secara singkat perubahan penting yang dibuat di setiap file.
+6. **Error & loading states lebih jelas**
 
-### **Tujuan Akhir**
-Aplikasi harus berfungsi penuh: Pengguna dapat login, melihat daftar percakapan dan user lain, membuka percakapan, melihat riwayat pesan, dan mengirim pesan baru secara *real-time* tanpa ada error apapun di konsol browser maupun server. Saya memberikan Anda otonomi penuh untuk melakukan refaktor yang diperlukan demi mencapai tujuan ini.
+   * **File:** `ChatWindow.tsx`, `StartNewChat.tsx`
+   * **Issue:** User tidak selalu tahu kalau sedang loading/fail.
+   * **Fix:** Tambah spinner / disable tombol saat async, tampilkan error message di UI.
 
-### **error yang muncul di konsol browser**
+7. **Refactor util/helper**
 
-Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: array.
+   * **File:** `MessageItem.tsx`, `ChatWindow.tsx`
+   * **Issue:** Ada duplikasi `formatTimestamp`, `getFullUrl`.
+   * **Fix:** Buat `src/lib/utils.ts` untuk simpan semua helper (timestamp, fileUrl builder, file type checks).
 
-Check the render method of `List`.
-    React 22
-        createFiberFromTypeAndProps
-        createFiberFromElement
-        createChild
-        reconcileChildrenArray
-        reconcileChildFibersImpl
-        createChildReconciler
-        reconcileChildren
-        beginWork
-        runWithFiberInDEV
-        performUnitOfWork
-        workLoopSync
-        renderRootSync
-        performWorkOnRoot
-        performSyncWorkOnRoot
-        flushSyncWorkAcrossRoots_impl
-        processRootScheduleInMicrotask
-        scheduleImmediateRootScheduleTask
-        scheduleImmediateRootScheduleTask
-        ensureRootIsScheduled
-        scheduleUpdateOnFiber
-        forceStoreRerender
-        subscribeToStore
-    setState vanilla.mjs:9
-    setState vanilla.mjs:9
-    openConversation chat.ts:153
-    onOpen Chat.tsx:48
-    onClick ChatList.tsx:74
-    React 13
-        executeDispatch
-        runWithFiberInDEV
-        processDispatchQueue
-        dispatchEventForPluginEventSystem
-        batchedUpdates$1
-        dispatchEventForPluginEventSystem
-        dispatchEvent
-        dispatchDiscreteEvent
-        addTrappedEventListener
-        listenToNativeEvent
-        listenToAllSupportedEvents
-        listenToAllSupportedEvents
-        createRoot
-    <anonymous> main.tsx:6
-react-dom-client.development.js:4259:28
-    React 22
-        createFiberFromTypeAndProps
-        createFiberFromElement
-        createChild
-        reconcileChildrenArray
-        reconcileChildFibersImpl
-        createChildReconciler
-        reconcileChildren
-        beginWork
-        runWithFiberInDEV
-        performUnitOfWork
-        workLoopSync
-        renderRootSync
-        performWorkOnRoot
-        performSyncWorkOnRoot
-        flushSyncWorkAcrossRoots_impl
-        processRootScheduleInMicrotask
-        scheduleImmediateRootScheduleTask
-    (Async: VoidFunction)
-        scheduleImmediateRootScheduleTask
-        ensureRootIsScheduled
-        scheduleUpdateOnFiber
-        forceStoreRerender
-        subscribeToStore
-    setState vanilla.mjs:9
-    forEach self-hosted:4148
-    setState vanilla.mjs:9
-    openConversation chat.ts:153
-    InterpretGeneratorResume self-hosted:1332
-    AsyncFunctionNext self-hosted:800
-    (Async: async)
-    onOpen Chat.tsx:48
-    onClick ChatList.tsx:74
-    React 11
-        executeDispatch
-        runWithFiberInDEV
-        processDispatchQueue
-        dispatchEventForPluginEventSystem
-        batchedUpdates$1
-        dispatchEventForPluginEventSystem
-        dispatchEvent
-        dispatchDiscreteEvent
-    (Async: EventListener.handleEvent)
-        addTrappedEventListener
-        listenToNativeEvent
-        listenToAllSupportedEvents
-    forEach self-hosted:4148
-    React 2
-        listenToAllSupportedEvents
-        createRoot
-    <anonymous> main.tsx:6
-An error occurred in the <div> component.
+8. **Scroll behavior kadang salah**
 
-Consider adding an error boundary to your tree to customize error handling behavior.
+   * **File:** `ChatWindow.tsx`
+   * **Issue:** Scroll ke bawah tidak selalu jalan pas pesan baru / upload.
+   * **Fix:** Tambah `useLayoutEffect` + `scrollToBottom()` setelah `messages` update.
+
+9. **Error boundary global**
+
+   * **File:** `App.tsx` (root)
+   * **Enhancement:** Bungkus ChatWindow dengan `<ErrorBoundary>` supaya error lokal tidak blank total.
+
+10. **UX: fokus input otomatis**
+
+    * **File:** `ChatWindow.tsx`
+    * **Enhancement:** Setelah buka percakapan, otomatis fokus ke input text.
+
+11. **Presence lebih akurat**
+
+    * **File:** `ChatList.tsx`
+    * **Issue:** Sekarang cuma ambil peer\[0], group chat belum benar.
+    * **Fix:** Periksa semua peserta (kecuali diri sendiri), tampilkan online count.
+
+---
+
+## 🟢 Nice-to-have
+
+12. **Testing**
+
+    * Tambah unit test untuk:
+
+      * `openConversation`
+      * `sendMessage` (optimistic update)
+      * `loadOlderMessages`
+      * `deleteMessage`
+    * Bisa pakai Vitest/Jest.
+
+13. **Caching lebih pintar**
+
+    * Saat banyak percakapan, batasi jumlah cache per conversation agar memory stabil.
+
+14. **Accessibility**
+
+    * Tambah label `aria-label` untuk input file / tombol send.
+    * Pastikan tombol send bisa di-trigger dengan Enter/Shift+Enter di input.
+
+---
