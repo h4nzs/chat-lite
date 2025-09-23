@@ -62,6 +62,11 @@ export default function Chat() {
                 <ChatList
                   activeId={activeId}
                   onOpen={(id) => {
+                    // Fix: Add guard for undefined id
+                    if (!id) {
+                      console.warn("onOpen called with undefined id");
+                      return;
+                    }
                     useChatStore.setState({ activeId: id })
                     useChatStore.getState().openConversation(id)
                   }}

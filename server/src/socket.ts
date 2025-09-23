@@ -40,7 +40,14 @@ export function registerSocket(httpServer: HttpServer) {
       const user = verifySocketAuth(token || undefined);
       if (!user) {
         console.log("Socket authentication failed: No valid user found");
-        return next(new Error("Unauthorized"));
+        // Provide more specific error message for debugging
+        if (!token) {
+          console.log("No token provided in socket handshake");
+          return next(new Error("Unauthorized: No token provided"));
+        } else {
+          console.log("Token verification failed for token:", token.substring(0, 20) + "...");
+          return next(new Error("Unauthorized: Token verification failed"));
+        }
       }
 
       (socket as any).user = user;

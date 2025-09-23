@@ -163,8 +163,14 @@ async loadConversations(cursor?: string) {
 },
 
   async openConversation(id) {
-  console.log("Opening conversation:", id); // Debug log
-  get().setLoading(id, true);
+    // Fix: Add guard for undefined id
+    if (!id) {
+      console.warn("openConversation called with undefined id");
+      return;
+    }
+    
+    console.log("Opening conversation:", id); // Debug log
+    get().setLoading(id, true);
   try {
     // Always fetch fresh messages from API to ensure completeness
     // This fixes the issue where cached messages were incomplete after refresh

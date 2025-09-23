@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useCallback } from "react"
 import MessageBubble from "./MessageBubble"
+import ErrorBoundary from "./ErrorBoundary"
 import type { CSSProperties } from "react"
 import type { Message } from "@store/chat"
 
@@ -77,9 +78,13 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
             
             <div className="flex flex-col">
               <MessageBubble m={m} />
-              <div className={`text-xs text-gray-500 dark:text-gray-400 mt-1 ${mine ? "text-right" : "text-left"}`}>
-                {formatTimestamp(m.createdAt)}
-              </div>
+              <ErrorBoundary fallback={<div className={`text-xs text-gray-500 dark:text-gray-400 mt-1 ${mine ? "text-right" : "text-left"}`}>
+                {new Date(m.createdAt ?? new Date().toISOString()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </div>}>
+                <div className={`text-xs text-gray-500 dark:text-gray-400 mt-1 ${mine ? "text-right" : "text-left"}`}>
+                  {formatTimestamp(m.createdAt)}
+                </div>
+              </ErrorBoundary>
             </div>
             
             {mine && isFirst && (

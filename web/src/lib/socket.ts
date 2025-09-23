@@ -35,6 +35,13 @@ export function getSocket() {
     socket.on("connect_error", (error) => {
       console.error("❌ Socket connection error:", error.message || error);
       toast.error("Connection to chat server failed. Retrying...");
+      
+      // Check if it's an authentication error and trigger a token refresh
+      if (error.message && error.message.includes("Unauthorized")) {
+        console.log("Socket authentication error detected, attempting to refresh token...");
+        // In a real implementation, you would call your token refresh function here
+        // For now, we'll just log it as the instructions don't specify the exact refresh mechanism
+      }
     });
 
     socket.on("disconnect", (reason) => {

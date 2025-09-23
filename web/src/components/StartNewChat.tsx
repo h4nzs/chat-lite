@@ -73,7 +73,12 @@ export default function StartNewChat({ onStarted }: { onStarted: (id: string) =>
 
                   // ✅ Normalisasi supaya ID tidak undefined
                   const validId = String(id)
-                  onStarted(validId) // parent akan set activeId + openConversation
+                  // Fix: Add guard for undefined/empty id
+                  if (validId && validId !== "undefined" && validId !== "null") {
+                    onStarted(validId) // parent akan set activeId + openConversation
+                  } else {
+                    console.warn("onStarted called with invalid id:", validId)
+                  }
                 } catch (e) {
                   setErr(handleApiError(e))
                 } finally {
