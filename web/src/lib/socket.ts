@@ -28,6 +28,12 @@ export function getSocket() {
       if (activeId) {
         socket?.emit("conversation:join", activeId);
       }
+      
+      // Update presence status to online when connected
+      const userId = useAuthStore.getState().user?.id;
+      if (userId) {
+        socket?.emit("presence:update", { userId, online: true });
+      }
     });
 
     socket.on("connect_error", (err: any) => {

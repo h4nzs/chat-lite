@@ -54,6 +54,7 @@ type State = {
   ) => Promise<void>;
   addOptimisticMessage: (conversationId: string, msg: Message) => void;
   markMessageError: (conversationId: string, tempId: number) => void;
+  replaceMessageTemp: (conversationId: string, tempId: number, msg: Message) => void;
 
   searchUsers: (
     q: string
@@ -448,6 +449,17 @@ export const useChatStore = create<State>((set, get) => ({
         ...s.messages,
         [conversationId]: (s.messages[conversationId] || []).map((m) =>
           m.tempId === tempId ? { ...m, error: true } : m
+        ),
+      },
+    }));
+  },
+
+  replaceMessageTemp(conversationId, tempId, msg) {
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [conversationId]: (s.messages[conversationId] || []).map((m) =>
+          m.tempId === tempId ? { ...msg } : m
         ),
       },
     }));

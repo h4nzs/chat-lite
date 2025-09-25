@@ -68,6 +68,115 @@ export function registerSocket(httpServer: HttpServer) {
       console.log(`👥 ${socket.user?.id} joined conversation ${conversationId}`);
     });
 
+    socket.on("presence:update", async (data) => {
+      try {
+        // Broadcast presence status to all users
+        io.emit("presence:update", {
+          userId: socket.user.id,
+          online: true,
+        });
+      } catch (error) {
+        console.error("Presence update error:", error);
+      }
+    });
+
+    socket.on("typing", async (data) => {
+      try {
+        const { conversationId, isTyping } = data;
+        if (!conversationId) return;
+        
+        // Broadcast typing status to all users in the conversation except sender
+        socket.to(conversationId).emit("typing", {
+          userId: socket.user.id,
+          isTyping,
+          conversationId,
+        });
+      } catch (error) {
+        console.error("Typing event error:", error);
+      }
+    });
+
+    socket.on("group:create", async (data, cb) => {
+      try {
+        const { title, participantIds } = data;
+        
+        // Validate input
+        if (!title || !Array.isArray(participantIds) || participantIds.length === 0) {
+          return cb?.({ ok: false, error: "Title and participant IDs are required" });
+        }
+
+        // Verify all participants exist
+        const participants = await prisma.user.findMany({
+          where: {
+            id: { in: [socket.user.id, ...participantIds] }, // Include the creator
+          },
+          select: { id: true },
+        });
+
+        // Check if all requested participants exist
+        const foundIds = participants.map(p => p.id);
+        const allRequiredIds = [socket.user.id, ...participantIds];
+        const missingIds = allRequiredIds.filter(id => !foundIds.includes(id));
+        
+        if (missingIds.length > 0) {
+          return cb?.({ ok: false, error: `Users not found: ${missingIds.join(', ')}` });
+        }
+
+        // Create the group conversation
+        const conversation = await prisma.conversation.create({
+          data: {
+            isGroup: true,
+            title: title.trim(),
+            participants: {
+              create: allRequiredIds.map(userId => ({ userId }))
+            }
+          },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    name: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        // Transform response to match frontend expectations
+        const transformed = {
+          id: conversation.id,
+          isGroup: conversation.isGroup,
+          title: conversation.title,
+          updatedAt: conversation.updatedAt,
+          participants: conversation.participants.map((p) => ({
+            id: p.user.id,
+            username: p.user.username,
+            name: p.user.name,
+            avatarUrl: p.user.avatarUrl,
+          })),
+          lastMessage: null,
+        };
+
+        // Notify all participants about the new group
+        conversation.participants.forEach(participant => {
+          if (participant.userId !== socket.user.id) {
+            // Only notify other participants
+            io.to(`user:${participant.userId}`).emit("conversation:new", transformed);
+          }
+        });
+
+        cb?.({ ok: true, id: conversation.id });
+      } catch (error) {
+        console.error("Group creation error:", error);
+        cb?.({ ok: false, error: "Failed to create group" });
+      }
+    });
+
     socket.on("message:send", async (data, cb) => {
       try {
         console.log("=== MESSAGE:SEND EVENT ===");
@@ -111,6 +220,12 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("disconnect", () => {
       console.log("❌ User disconnected:", socket.user?.id);
+      
+      // Update user's online status to false when they disconnect
+      io.emit("presence:update", {
+        userId: socket.user?.id,
+        online: false,
+      });
     });
   });
 

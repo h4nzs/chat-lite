@@ -24,6 +24,8 @@ export default function ChatWindow({ id }: { id: string }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<List>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { scrollToBottom } =
     useScrollToBottom?.(listRef) ?? {
       scrollToBottom: () =>
@@ -32,7 +34,12 @@ export default function ChatWindow({ id }: { id: string }) {
   const sizeMap = useRef<{ [key: number]: number }>({});
 
   useEffect(() => {
-    if (id) openConversation(id);
+    if (id) {
+      openConversation(id);
+    } else {
+      // If no id is provided, clear the active conversation
+      useChatStore.setState({ activeId: null });
+    }
   }, [id, openConversation]);
 
   useEffect(() => {
@@ -75,6 +82,12 @@ export default function ChatWindow({ id }: { id: string }) {
       });
 
       setText("");
+      
+      // Clear the typing timeout and emit typing false
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
       const socket = getSocket();
       socket.emit("typing", { conversationId: id, isTyping: false });
 
@@ -88,6 +101,36 @@ export default function ChatWindow({ id }: { id: string }) {
     },
     [id, text, sendMessage, messages.length, meId]
   );
+
+  // Handle typing indicator
+  useEffect(() => {
+    if (!id) return;
+
+    const socket = getSocket();
+
+    const handleTypingChange = () => {
+      // Emit typing start
+      socket.emit("typing", { conversationId: id, isTyping: true });
+
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Set new timeout to stop typing after 1 second of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("typing", { conversationId: id, isTyping: false });
+      }, 1000);
+    };
+
+    // Cleanup function
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        socket.emit("typing", { conversationId: id, isTyping: false });
+      }
+    };
+  }, [id]);
 
   const formatTimestamp = (ts: string) =>
     new Date(ts).toLocaleTimeString([], {
@@ -200,8 +243,26 @@ export default function ChatWindow({ id }: { id: string }) {
           />
 
           <input
+            ref={inputRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              // Trigger typing event when user types
+              if (id) {
+                const socket = getSocket();
+                socket.emit("typing", { conversationId: id, isTyping: true });
+                
+                // Clear previous timeout
+                if (typingTimeoutRef.current) {
+                  clearTimeout(typingTimeoutRef.current);
+                }
+                
+                // Set new timeout to stop typing after 1 second of inactivity
+                typingTimeoutRef.current = setTimeout(() => {
+                  socket.emit("typing", { conversationId: id, isTyping: false });
+                }, 1000);
+              }
+            }}
             placeholder="Type a message"
             className="flex-1 px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent focus:outline-none"
           />

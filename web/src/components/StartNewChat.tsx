@@ -108,9 +108,9 @@ export default function StartNewChat({ onStarted }: { onStarted: (id: string) =>
         )}
       </div>
       
-      {showGroupModal && (
+      {showGroupModal ? (
         <CreateGroupChat onClose={() => setShowGroupModal(false)} />
-      )}
+      ) : null}
     </div>
   )
 }
