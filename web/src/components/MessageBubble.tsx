@@ -1,69 +1,80 @@
-import { useAuthStore } from '@store/auth'
-import type { Message } from '@store/chat'
-import cls from 'classnames'
-import { useChatStore } from '@store/chat'
-import { Spinner } from './Spinner'
-import { memo } from 'react'
+import { useAuthStore } from "@store/auth";
+import type { Message } from "@store/chat";
+import cls from "classnames";
+import { useChatStore } from "@store/chat";
+import { Spinner } from "./Spinner";
+import { memo } from "react";
 
 function MessageBubble({ m }: { m: Message }) {
-  const me = useAuthStore((s) => s.user?.id)
-  const mine = m.senderId === me
-  const activeId = useChatStore((s) => s.activeId)
-  const conversations = useChatStore((s) => s.conversations)
-  const deleteLoading = useChatStore((state) => state.deleteLoading[m.id])
-  
-  // Get conversation participants
-  const conversation = conversations.find(c => c.id === activeId)
-  const participants = conversation?.participants || []
-  const otherParticipants = participants.filter(p => p.id !== me)
-  
-  // Check if content failed to decrypt
-  const isDecryptionFailed = m.content && (
-    m.content.includes('[Failed to decrypt') || 
-    m.content.includes('[Invalid encrypted message]') ||
-    m.content.includes('[Decryption key not available]')
-  )
-  
-  // Check if message is read by other participants
-  const isRead = mine && m.readBy && m.readBy.length > 0
-  const readByCount = m.readBy ? m.readBy.length : 0
-  
+  const me = useAuthStore((s) => s.user?.id);
+  const mine = m.senderId === me;
+  const activeId = useChatStore((s) => s.activeId);
+  const conversations = useChatStore((s) => s.conversations);
+  const deleteLoading = useChatStore((state) => state.deleteLoading[m.id]);
+
+  // Ambil partisipan
+  const conversation = conversations.find((c) => c.id === activeId);
+  const participants = conversation?.participants || [];
+  const otherParticipants = participants.filter((p) => p.id !== me);
+
+  // Flag decrypt gagal
+  const isDecryptionFailed =
+    m.content &&
+    (m.content.includes("[Failed to decrypt") ||
+      m.content.includes("[Invalid encrypted message]") ||
+      m.content.includes("[Decryption key not available]"));
+
+  // Pesan sudah dibaca
+  const isRead = mine && m.readBy && m.readBy.length > 0;
+  const readByCount = m.readBy ? m.readBy.length : 0;
+
   return (
-    <div className={cls('max-w-[75%] rounded px-3 py-2 relative', mine ? 'ml-auto bg-blue-600 text-white' : 'mr-auto bg-gray-200 dark:bg-gray-800')}>
+    <div
+      className={cls(
+        "relative px-4 py-2 rounded-2xl shadow-sm max-w-[70%] whitespace-pre-wrap break-words",
+        mine
+          ? "ml-auto bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+          : "mr-auto bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+      )}
+    >
       {deleteLoading ? (
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <Spinner size="sm" />
-          <span className="ml-2">Deleting...</span>
+          <span className="text-sm">Deleting...</span>
         </div>
       ) : m.imageUrl ? (
-        <img src={m.imageUrl} alt="img" className="rounded" />
+        <img
+          src={m.imageUrl}
+          alt="img"
+          className="rounded-md max-w-[220px] max-h-[200px] object-contain shadow cursor-pointer hover:opacity-90"
+          onClick={() => window.open(m.imageUrl!, "_blank")}
+        />
       ) : isDecryptionFailed ? (
-        <div className="text-red-300 italic">
-          <span className="font-semibold">Decryption Error:</span> This message could not be decrypted. It may have been corrupted or the encryption key is not available.
+        <div className="text-sm italic text-red-200">
+          🔒 Message could not be decrypted
         </div>
       ) : (
-        m.content
+        <span className="leading-relaxed">{m.content}</span>
       )}
-      
+
       {/* Read receipts */}
       {mine && isRead && (
-        <div className="absolute -bottom-5 right-0 text-xs text-gray-500 flex items-center">
-          <span className="mr-1">✓✓</span>
+        <div className="absolute -bottom-4 right-2 text-xs text-gray-400 flex items-center gap-1">
+          <span>✓✓</span>
           {otherParticipants.length > 1 && readByCount > 0 && (
             <span>{readByCount}</span>
           )}
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default memo(MessageBubble, (prevProps, nextProps) => {
-  // Memoization untuk mencegah re-render yang tidak perlu
-  return (
+export default memo(
+  MessageBubble,
+  (prevProps, nextProps) =>
     prevProps.m.id === nextProps.m.id &&
     prevProps.m.content === nextProps.m.content &&
     prevProps.m.imageUrl === nextProps.m.imageUrl &&
     prevProps.m.senderId === nextProps.m.senderId
-  )
-})
+);

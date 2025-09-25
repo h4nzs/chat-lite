@@ -12,7 +12,6 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
     const userId = (req as any).user.id;
     const { cursor } = req.query;
 
-    // --- LOGGING KRUSIAL ---
     console.log(`[Messages Controller] Mencoba mengambil pesan untuk conversationId: ${conversationId}`);
     console.log(`[Messages Controller] ID pengguna yang meminta: ${userId}`);
     if (cursor) {
@@ -30,16 +29,15 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       throw new ApiError(404, "Conversation not found");
     }
 
-    // --- LOGGING HASIL VALIDASI ---
     const isParticipant = conversation.participants.some((p) => p.userId === userId);
     if (!isParticipant) {
-      console.error(`[Messages Controller] Otorisasi GAGAL. Pengguna ${userId} tidak ditemukan sebagai partisipan di percakapan ${conversationId}.`);
+      console.error(`[Messages Controller] Otorisasi GAGAL. Pengguna ${userId} bukan partisipan di percakapan ${conversationId}.`);
       throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
     }
-    
-    console.log(`[Messages Controller] Otorisasi BERHASIL. Pengguna adalah partisipan.`);
 
-    // Query messages with optional cursor-based pagination
+    console.log(`[Messages Controller] Otorisasi BERHASIL.`);
+
+    // Query dengan pagination
     const whereClause = {
       conversationId,
       ...(cursor ? { createdAt: { lt: new Date(cursor as string) } } : {}),
@@ -48,20 +46,24 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
     const messages = await prisma.message.findMany({
       where: whereClause,
       orderBy: { createdAt: "desc" },
-      take: 50, // Limit to 50 messages per page
-    });
-    console.log("Retrieved messages from database:", messages);
-    // Log the encrypted content of each message
-    messages.forEach((msg, index) => {
-      console.log(`Message ${index} encrypted content:`, msg.content);
+      take: 50,
     });
 
-    // Reverse to show oldest first
-    const items = messages.reverse();
-    
-    // Determine next cursor (oldest message's createdAt)
+    console.log(`Retrieved ${messages.length} messages from DB`);
+
+    // --- 🔑 Tambahkan preview berdasarkan fileUrl / imageUrl ---
+    const items = messages
+      .map((m) => {
+        let preview: string | undefined = undefined;
+        if (m.imageUrl) preview = "📷 Photo";
+        else if (m.fileUrl) preview = `📎 ${m.fileName || "File"}`;
+
+        return { ...m, preview };
+      })
+      .reverse(); // urutkan dari lama ke baru
+
     const nextCursor = items.length > 0 ? items[0]?.createdAt : null;
-    
+
     console.log(`Returning ${items.length} messages with nextCursor:`, nextCursor);
 
     res.json({
