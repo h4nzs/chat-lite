@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
-import { setSecureCookie, eraseCookie } from "@lib/tokenStorage";
+import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
+import { useChatStore } from "./chat";
 
 type User = {
   id: string;
@@ -28,20 +29,24 @@ type State = {
   setTheme: (t: "light" | "dark") => void;
 };
 
+// Restore user dari localStorage kalau ada
+const savedUser = localStorage.getItem("user");
+
 export const useAuthStore = create<State>((set, get) => ({
-  user: null,
+  user: savedUser ? JSON.parse(savedUser) : null,
   theme: (localStorage.getItem("theme") as "light" | "dark") || "light",
 
   async bootstrap() {
     try {
-      console.log("Bootstrapping user..."); // Debug log
+      console.log("Bootstrapping user...");
       const me = await authFetch<User>("/api/users/me");
-      console.log("User data:", me); // Debug log
       set({ user: me });
+      localStorage.setItem("user", JSON.stringify(me));
       get().ensureSocket();
     } catch (error) {
-      console.error("Bootstrap error:", error); // Debug log
-      set({ user: null }); // tidak login
+      console.error("Bootstrap error:", error);
+      set({ user: null });
+      localStorage.removeItem("user");
     }
   },
 
@@ -50,8 +55,8 @@ export const useAuthStore = create<State>((set, get) => ({
       method: "POST",
       body: JSON.stringify({ emailOrUsername, password }),
     });
-
     set({ user: res.user });
+    localStorage.setItem("user", JSON.stringify(res.user));
     get().ensureSocket();
   },
 
@@ -60,8 +65,8 @@ export const useAuthStore = create<State>((set, get) => ({
       method: "POST",
       body: JSON.stringify(data),
     });
-
     set({ user: res.user });
+    localStorage.setItem("user", JSON.stringify(res.user));
     get().ensureSocket();
   },
 
@@ -75,11 +80,16 @@ export const useAuthStore = create<State>((set, get) => ({
     // Clear token dari storage
     eraseCookie("at");
     eraseCookie("rt");
-    
+
     // Clear encryption key cache
     clearKeyCache();
 
+    // Clear state lokal
+    localStorage.removeItem("user");
+    localStorage.removeItem("activeId");
     set({ user: null });
+    useChatStore.setState({ activeId: null });
+
     disconnectSocket();
   },
 

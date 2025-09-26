@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { useChatStore } from "@store/chat";
 import { toast } from "react-hot-toast";
+import { useAuthStore } from "@store/auth";
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;

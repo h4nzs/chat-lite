@@ -31,6 +31,8 @@ export type Message = {
   preview?: string;
   reactions?: { emoji: string; userIds: string[] }[];
   readBy?: string[];
+  // optional optimistic marker
+  optimistic?: boolean;
 };
 
 type State = {
@@ -104,9 +106,12 @@ function withPreview(msg: Message): Message {
   return msg;
 }
 
+// === Restore activeId dari localStorage saat init ===
+const initialActiveId = localStorage.getItem("activeId");
+
 export const useChatStore = create<State>((set, get) => ({
   conversations: [],
-  activeId: null,
+  activeId: initialActiveId,
   messages: {},
   cursors: {},
   typing: {},
@@ -116,7 +121,6 @@ export const useChatStore = create<State>((set, get) => ({
 
   async loadConversations() {
     const items = await api<Conversation[]>("/api/conversations");
-    // server sudah kasih preview di lastMessage, tapi fallback di sini
     const safeItems = items.map((c) => ({
       ...c,
       lastMessage: c.lastMessage ? withPreview(c.lastMessage) : null,
@@ -144,6 +148,9 @@ export const useChatStore = create<State>((set, get) => ({
       console.warn("[ChatStore] openConversation dipanggil tanpa id");
       return;
     }
+
+    // 🔑 persist activeId ke localStorage
+    localStorage.setItem("activeId", id);
 
     get().setLoading(id, true);
     try {
@@ -394,7 +401,10 @@ export const useChatStore = create<State>((set, get) => ({
                           [conversationId]: (
                             s.messages[conversationId] || []
                           ).map((m) =>
-                            m.tempId === tempId ? decryptedAck : m
+                            // replace by tempId if present
+                            m.tempId === tempId || m.id === `temp-${tempId}`
+                              ? decryptedAck
+                              : m
                           ),
                         },
                         conversations: updated,
@@ -413,7 +423,9 @@ export const useChatStore = create<State>((set, get) => ({
                         [conversationId]: (
                           s.messages[conversationId] || []
                         ).map((m) =>
-                          m.tempId === tempId ? decryptedAck : m
+                          m.tempId === tempId || m.id === `temp-${tempId}`
+                            ? decryptedAck
+                            : m
                         ),
                       },
                     }));
@@ -435,10 +447,20 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   addOptimisticMessage(conversationId, msg) {
+    // Ensure optimistic message has a stable temporary id & id
+    const tempId = msg.tempId ?? Date.now();
+    const optimistic: Message = withPreview({
+      ...msg,
+      tempId,
+      id: msg.id && msg.id.length > 0 ? msg.id : `temp-${tempId}`,
+      optimistic: true,
+      error: false,
+    });
+
     set((s) => ({
       messages: {
         ...s.messages,
-      [conversationId]: [...(s.messages[conversationId] || []), withPreview(msg)],
+        [conversationId]: [...(s.messages[conversationId] || []), optimistic],
       },
     }));
   },
@@ -448,7 +470,9 @@ export const useChatStore = create<State>((set, get) => ({
       messages: {
         ...s.messages,
         [conversationId]: (s.messages[conversationId] || []).map((m) =>
-          m.tempId === tempId ? { ...m, error: true } : m
+          m.tempId === tempId || m.id === `temp-${tempId}`
+            ? { ...m, error: true }
+            : m
         ),
       },
     }));
@@ -459,7 +483,7 @@ export const useChatStore = create<State>((set, get) => ({
       messages: {
         ...s.messages,
         [conversationId]: (s.messages[conversationId] || []).map((m) =>
-          m.tempId === tempId ? { ...msg } : m
+          m.tempId === tempId || m.id === `temp-${tempId}` ? { ...msg } : m
         ),
       },
     }));

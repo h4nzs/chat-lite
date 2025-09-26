@@ -8,18 +8,19 @@ import AutoSizer from "react-virtualized-auto-sizer";
 import MessageItem from "@components/MessageItem";
 import { useScrollToBottom } from "@hooks/useScrollToBottom";
 
-export default function ChatWindow({ id }: { id: string }) {
+export default function ChatWindow({ id }: { id: string | null }) {
   const [text, setText] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const meId = useAuthStore((s) => s.user?.id);
+  const conversations = useChatStore((s) => s.conversations);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const uploadFile = useChatStore((s) => (s as any).uploadFile);
-  const messages = useChatStore((s) => s.messages[id] || []);
+  const messages = useChatStore((s) => (id ? s.messages[id] || [] : []));
   const openConversation = useChatStore((s) => s.openConversation);
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
-  const typingUsers = useChatStore((s) => s.typing[id] || []);
-  const loadingMessages = useChatStore((s) => (s as any).loading?.[id] ?? false);
+  const typingUsers = useChatStore((s) => (id ? s.typing[id] || [] : []));
+  const loadingMessages = useChatStore((s) => (id ? (s as any).loading?.[id] ?? false : false));
   const deleteMessage = useChatStore((s) => (s as any).deleteMessage);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,14 +34,17 @@ export default function ChatWindow({ id }: { id: string }) {
     };
   const sizeMap = useRef<{ [key: number]: number }>({});
 
+  // Fallback: pilih percakapan pertama kalau id null
   useEffect(() => {
-    if (id) {
+    if (!id && conversations.length > 0) {
+      const firstId = conversations[0].id;
+      useChatStore.setState({ activeId: firstId });
+      openConversation(firstId);
+    } else if (id) {
       openConversation(id);
-    } else {
-      // If no id is provided, clear the active conversation
-      useChatStore.setState({ activeId: null });
     }
-  }, [id, openConversation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, conversations]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -56,7 +60,7 @@ export default function ChatWindow({ id }: { id: string }) {
 
   const handleScroll = useCallback(
     ({ scrollOffset }: { scrollOffset: number }) => {
-      if (loadingOlder) return;
+      if (!id || loadingOlder) return;
       if (scrollOffset < 50) {
         setLoadingOlder(true);
         loadOlderMessages(id).finally(() => setLoadingOlder(false));
@@ -68,10 +72,13 @@ export default function ChatWindow({ id }: { id: string }) {
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!id) return;
+
       const content = text.trim();
       if (!content) return;
 
       const tempId = Date.now();
+      // Tambah optimistic message ke store (dengan tempId)
       useChatStore.getState().addOptimisticMessage(id, {
         id: "",
         tempId,
@@ -81,9 +88,12 @@ export default function ChatWindow({ id }: { id: string }) {
         createdAt: new Date().toISOString(),
       });
 
+      // langsung scroll ke bawah supaya pesan optimistik kelihatan segera
+      scrollToBottom();
+
       setText("");
-      
-      // Clear the typing timeout and emit typing false
+
+      // Clear typing timeout & emit false
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
@@ -93,13 +103,13 @@ export default function ChatWindow({ id }: { id: string }) {
 
       try {
         await sendMessage(id, content, tempId);
-        listRef.current?.scrollToItem(messages.length, "end");
+        // sendMessage logic di store akan mengganti optimistic message dengan ack
       } catch {
         toast.error("Pesan gagal dikirim");
         useChatStore.getState().markMessageError(id, tempId);
       }
     },
-    [id, text, sendMessage, messages.length, meId]
+    [id, text, sendMessage, messages.length, meId, scrollToBottom]
   );
 
   // Handle typing indicator
@@ -109,21 +119,17 @@ export default function ChatWindow({ id }: { id: string }) {
     const socket = getSocket();
 
     const handleTypingChange = () => {
-      // Emit typing start
       socket.emit("typing", { conversationId: id, isTyping: true });
 
-      // Clear previous timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
 
-      // Set new timeout to stop typing after 1 second of inactivity
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("typing", { conversationId: id, isTyping: false });
       }, 1000);
     };
 
-    // Cleanup function
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -154,8 +160,9 @@ export default function ChatWindow({ id }: { id: string }) {
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Messages area */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         {loadingOlder && (
           <div className="text-center text-gray-400 text-sm py-2">
             Loading older...
@@ -204,7 +211,7 @@ export default function ChatWindow({ id }: { id: string }) {
       </div>
 
       {/* Footer input */}
-      <div className="border-t bg-white dark:bg-gray-800 shadow-inner p-3">
+      <div className="shrink-0 border-t bg-white dark:bg-gray-800 shadow-inner p-3">
         {typingUsers.length > 0 && (
           <div className="px-3 py-1 text-sm text-gray-500 border-b">
             {typingUsers.length === 1
@@ -213,10 +220,7 @@ export default function ChatWindow({ id }: { id: string }) {
           </div>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex gap-2 items-center mt-2"
-        >
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -225,47 +229,16 @@ export default function ChatWindow({ id }: { id: string }) {
           >
             📎
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={async (e) => {
-              if (e.target.files?.[0]) {
-                try {
-                  await uploadFile(id, e.target.files[0]);
-                  scrollToBottom();
-                } catch {
-                  toast.error("Upload gagal");
-                }
-                e.target.value = "";
-              }
-            }}
-          />
+          <input ref={fileInputRef} type="file" className="hidden" />
 
           <input
             ref={inputRef}
             value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              // Trigger typing event when user types
-              if (id) {
-                const socket = getSocket();
-                socket.emit("typing", { conversationId: id, isTyping: true });
-                
-                // Clear previous timeout
-                if (typingTimeoutRef.current) {
-                  clearTimeout(typingTimeoutRef.current);
-                }
-                
-                // Set new timeout to stop typing after 1 second of inactivity
-                typingTimeoutRef.current = setTimeout(() => {
-                  socket.emit("typing", { conversationId: id, isTyping: false });
-                }, 1000);
-              }
-            }}
+            onChange={(e) => setText(e.target.value)}
             placeholder="Type a message"
-            className="flex-1 px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent focus:outline-none"
+            className="flex-1 min-w-0 px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent focus:outline-none"
           />
+
           <button
             type="submit"
             className="px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow hover:opacity-90 transition"
@@ -273,6 +246,9 @@ export default function ChatWindow({ id }: { id: string }) {
             Send
           </button>
         </form>
+        <div className="shrink-0 border-t bg-red-500 p-3">
+        DEBUG FOOTER
+        </div>
       </div>
     </div>
   );
