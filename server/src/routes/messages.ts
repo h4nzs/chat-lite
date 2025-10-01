@@ -12,10 +12,10 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
     const userId = (req as any).user.id;
     const { cursor } = req.query;
 
-    console.log(`[Messages Controller] Mencoba mengambil pesan untuk conversationId: ${conversationId}`);
-    console.log(`[Messages Controller] ID pengguna yang meminta: ${userId}`);
+    // console.log(`[Messages Controller] Mencoba mengambil pesan untuk conversationId: ${conversationId}`);
+    // console.log(`[Messages Controller] ID pengguna yang meminta: ${userId}`);
     if (cursor) {
-      console.log(`[Messages Controller] Cursor: ${cursor}`);
+      // console.log(`[Messages Controller] Cursor: ${cursor}`);
     }
 
     // cek user anggota
@@ -49,8 +49,6 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       take: 50,
     });
 
-    console.log(`Retrieved ${messages.length} messages from DB`);
-
     // --- 🔑 Tambahkan preview berdasarkan fileUrl / imageUrl ---
     const items = messages
       .map((m) => {
@@ -63,8 +61,6 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       .reverse(); // urutkan dari lama ke baru
 
     const nextCursor = items.length > 0 ? items[0]?.createdAt : null;
-
-    console.log(`Returning ${items.length} messages with nextCursor:`, nextCursor);
 
     res.json({
       items,

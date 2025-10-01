@@ -7,6 +7,24 @@ import Reactions from "./Reactions";
 import { getSocket } from "@lib/socket";
 import { isImageFile, isVideoFile, isAudioFile } from "@lib/fileUtils";
 
+// Simple function to sanitize HTML content to prevent XSS
+function sanitizeHtml(content: string): string {
+  if (!content) return '';
+  
+  // Remove potentially dangerous tags and attributes
+  let sanitized = content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '');
+  
+  return sanitized;
+}
+
 type ItemData = {
   messages: Message[];
   conversationId: string;
@@ -93,7 +111,7 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
             : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         }`}
       >
-        {m.content}
+        <span dangerouslySetInnerHTML={{__html: sanitizeHtml(m.content || '')}} />
       </div>
     );
   };

@@ -1,137 +1,228 @@
- ---
+# Implementation Plan: Proper End-to-End Encryption for Chat-Lite
 
-# 🟢 Gambaran Arsitektur
+## Overview
+The current encryption implementation uses a deterministic key derived solely from the conversation ID, making it possible for any participant (current or future) to decrypt all messages in a conversation. This is not true end-to-end encryption. This document outlines a plan to implement proper end-to-end encryption using public-key cryptography.
 
-* **Backend**:
+## Current Issues
+1. **Weak Key Generation**: Encryption key depends only on conversation ID
+2. **Compromised Confidentiality**: All participants can decrypt all historical messages
+3. **No Forward Secrecy**: Messages remain decryptable even after leaving a conversation
+4. **Server Access**: Server can potentially decrypt messages if it has conversation IDs
 
-  * Express.js + Prisma ORM.
-  * JWT digunakan untuk otentikasi, cookie HTTPOnly untuk menyimpan token.
-  * Socket.IO dipakai untuk realtime (pesan baru, typing indicator, presence).
-  * Routes: `/api/auth`, `/api/users`, `/api/conversations`, `/api/messages`.
-  * Middleware: auth check, error handler.
+## Proposed Solution: Asymmetric Key Encryption with Session Keys
 
-* **Frontend**:
+### 1. Architecture Overview
+- Each user generates and maintains their own public/private key pair
+- For each conversation, generate a unique session key
+- Encrypt session key with each participant's public key
+- Use session key to encrypt message content
+- Store encrypted session key with each message
 
-  * React (Vite) + Zustand (state management).
-  * Routing: React Router.
-  * Socket.IO client.
-  * Store utama: `auth.ts`, `chat.ts`.
-  * UI: komponen ChatWindow, Sidebar, GroupModal, dll.
-  * Styling pakai Tailwind + beberapa custom CSS.
+### 2. Implementation Steps
 
----
+#### Phase 1: Key Management System
+1. **User Key Pair Generation**:
+   - Implement per-user public/private key pair generation using libsodium
+   - Store private key in browser's secure storage (e.g., Web Crypto API with secure wrapping)
+   - Store public key in the database with user profile
 
-# 🔴 Masalah Utama yang user Sebutkan
+2. **Database Schema Changes**:
+   - Add `publicKey` field to `User` model in `schema.prisma`
+   - Add `encryptedSessionKey` field to `Message` model
+   - Add `sessionId` field to `Message` model for grouping messages with the same session key
 
-1. **Pesan tidak ter-load penuh saat refresh**
+3. **API Endpoints**:
+   - Create endpoint for users to upload their public key
+   - Create endpoint for fetching user public keys
 
-   * `chat.ts` → fungsi `openConversation` memanggil `loadMessages`, tapi UI ChatWindow tidak menunggu atau subscribe perubahan state dengan benar.
-   * Ada mismatch antara struktur pesan yang datang dari API dan yang dipakai di UI (`lastMessage` terupdate, tapi array `messages` di store kosong / tidak lengkap).
-   * **Saran**: pastikan `loadMessages(conversationId)` dipanggil setiap kali aktifkan percakapan, dan store harus sinkron dengan payload API (cek field `id`, `content`, `senderId`, `createdAt`).
+#### Phase 2: Session Key Management
+1. **Session Key Generation**:
+   - When a conversation starts or when new users join, generate a new random session key
+   - Encrypt the session key with each participant's public key
+   - Store encrypted session keys in a separate table
 
-2. **Form input pesan/file/tombol send tidak muncul**
+2. **Database Schema for Session Keys**:
+   - Create `SessionKey` model with `id`, `conversationId`, `sessionId`, `userId`, `encryptedKey`, `createdAt`
+   - Add indexes for efficient retrieval
 
-   * Di `ChatWindow.tsx`, bagian `<MessageInput>` dikondisikan dengan `activeConversation`. Kalau `activeId` di store null atau `activeConversation` tidak resolve, input tidak dirender.
-   * Kemungkinan `activeConversation` gagal karena `conversationId` tidak pernah dipass dengan benar ke ChatWindow.
-   * **Saran**: debugging props & selector store, pastikan `activeId` di-set di `openConversation`.
+#### Phase 3: Message Encryption & Decryption
+1. **Frontend Changes**:
+   - Update `encryptMessage()` to:
+     - Fetch current session key (or generate new one if needed)
+     - Encrypt message with session key
+     - Include encrypted session key reference with message
+   - Update `decryptMessage()` to:
+     - Retrieve appropriate encrypted session key
+     - Decrypt session key with user's private key
+     - Decrypt message with session key
 
-3. **Indicator "is typing" dan online dot tidak berfungsi**
+2. **Backend Changes**:
+   - Update message storage to include encrypted session key reference
 
-   * Socket event `typing` dan `presence:update` belum di-bind di `chat.ts`.
-   * Ada kode listener yang kosong atau belum dipanggil (`initSocketListeners`).
-   * **Saran**: buat listener socket di chat store → update `typing` & `presence` state di Zustand.
+#### Phase 4: Migration and Security Improvements
+1. **Migration Path**:
+   - Plan migration for existing messages
+   - Maintain backward compatibility with existing messages
 
-4. **Tombol tambah grup baru tidak memunculkan modal**
+2. **Forward Secrecy**:
+   - Implement rotation of session keys periodically
+   - Option to generate new session key when users join/leave conversations
 
-   * Di `Sidebar.tsx`, tombol + membuka modal dengan `useModal` hook. Tapi `GroupModal` tidak dimount ke DOM global (render conditional salah).
-   * **Saran**: pastikan `<GroupModal />` selalu ada di tree App (tapi hidden kalau state false), jangan hanya render saat ditekan tombol.
+## Technical Implementation Details
 
----
+### New Schema Additions
+```prisma
+model User {
+  // ... existing fields
+  publicKey      String?
+  privateKey     String?  // For migration purposes, will be removed from database
+}
 
-# 🟡 Masalah Tambahan yang ditemukan
+model SessionKey {
+  id              String   @id @default(cuid())
+  conversationId  String
+  sessionId       String
+  userId          String
+  encryptedKey    String   // Session key encrypted with user's public key
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime?
+  
+  @@index([conversationId])
+  @@index([userId])
+  @@index([sessionId])
+}
 
-### Backend
+model Message {
+  // ... existing fields
+  sessionId           String?      // References the session key set used for encryption
+  encryptedSessionKey String?      // Encrypted session key for this specific message (for forward secrecy)
+}
+```
 
-* **JWT refresh**: tidak ada mekanisme refresh token. Kalau token expired, user harus login ulang.
-* **Error handling**: banyak route tidak membungkus `async/await` dengan error handler → potensi crash kalau query Prisma gagal.
-* **Socket auth**: tidak ada middleware socket.io untuk verifikasi token, sehingga bisa dimanipulasi.
-* **Messages API**:
+### Key Generation and Storage
+1. **Client-side Key Generation**:
+   - Use libsodium.js to generate Ed25519 key pairs
+   - Store private key using Web Crypto API with password-based wrapping
+   - Upload public key to server for distribution
 
-  * Route `POST /api/messages` tidak jelas — kadang dipanggil, kadang pakai socket. Bisa bikin race condition (pesan double atau tidak sinkron).
-  * Tidak ada pagination di `GET /messages`. Kalau chat panjang, load berat.
+2. **Session Key Handling**:
+   - Generate a new random symmetric key (e.g., 256-bit) for each session
+   - Encrypt session key with each participant's RSA public key
+   - Store encrypted session keys in the database
 
-### Frontend
+### Encryption Process
+```typescript
+// When sending a message:
+async function encryptMessageForParticipants(text: string, conversationId: string, participantPublicKeys: string[]) {
+  // Generate or retrieve session key
+  const sessionKey = await getCurrentSessionKey(conversationId);
+  
+  // Encrypt the message content with the session key
+  const encryptedContent = await encryptWithSymmetricKey(text, sessionKey);
+  
+  // Encrypt the session key with each participant's public key
+  const encryptedSessionKeys = participantPublicKeys.map(pubKey => 
+    encryptWithPublicKey(sessionKey, pubKey)
+  );
+  
+  return {
+    encryptedContent,
+    encryptedSessionKeys,  // Send to server for distribution
+    sessionId: sessionKey.id
+  };
+}
+```
 
-* **Zustand stores**:
+### Decryption Process
+```typescript
+// When receiving a message:
+async function decryptMessageForUser(encryptedContent: string, encryptedSessionKey: string, sessionId: string) {
+  // Decrypt the session key with user's private key
+  const sessionKey = await decryptWithPrivateKey(encryptedSessionKey, userPrivateKey);
+  
+  // Decrypt the message content with the session key
+  const decryptedContent = await decryptWithSymmetricKey(encryptedContent, sessionKey);
+  
+  return decryptedContent;
+}
+```
 
-  * `chat.ts` belum robust → tidak punya `replaceMessageTemp`, jadi pesan optimistik tidak terganti oleh pesan server.
-  * `auth.ts` hanya set user saat login, tapi tidak re-fetch profile saat reload → bisa bikin session hilang walau cookie ada.
-* **Socket lifecycle**:
+## Implementation Timeline
 
-  * Socket diinisialisasi di `lib/socket.ts`, tapi store `chat.ts` tidak otomatis bind listener.
-  * `socket.disconnect()` tidak dipanggil saat logout → user bisa masih "online" di server.
-* **UI/UX**:
+### Week 1: Key Management
+- Generate user key pairs
+- Store public keys in database
+- Create API endpoints for key management
 
-  * Tidak ada loading state saat fetch messages.
-  * File upload belum terhubung ke backend. Input file hanya ada placeholder.
-  * Modal pembuatan grup hanya set state lokal, tidak ada call API `/conversations/group`.
-  * Typing indicator UI ada, tapi tidak ada store `typing` → tidak jalan.
-* **Routing**:
+### Week 2: Session Key System
+- Implement session key generation
+- Create database schema for session keys
+- Update conversation creation logic
 
-  * Kalau akses `/chat/:id` langsung via URL, kadang store `conversations` belum ter-load, sehingga `activeConversation` null → input pesan tidak muncul.
+### Week 3: Encryption/Decryption Logic
+- Update frontend encryption/decryption functions
+- Update backend message handling
+- Implement key caching for performance
 
----
+### Week 4: Testing & Migration
+- Comprehensive testing of new system
+- Plan for migrating existing messages
+- Performance optimization and security audit
 
-# 🔧 Rekomendasi Perbaikan Bertahap
+## Security Considerations
 
-1. **Pesan tidak load penuh**
+### Forward Secrecy
+- Option to rotate session keys periodically
+- New session keys when participants join/leave conversations
+- Ability to re-encrypt session keys when participants change
 
-   * Tambahkan `loadMessages(conversationId)` di `ChatWindow` dengan `useEffect` saat `activeId` berubah.
-   * Tambahkan logging pada API response `/api/conversations/:id/messages` → pastikan struktur sama dengan yang dipakai frontend.
+### Key Storage
+- Client-side private key storage using Web Crypto API with password wrapping
+- Server never has access to unencrypted private keys
+- Secure key backup/restore mechanism
 
-2. **Form input tidak muncul**
+### Performance
+- Efficient key caching to avoid repeated decryption
+- Batch operations for multi-user session key distribution
+- Consider message threading for conversation sessions
 
-   * Perbaiki logika render `MessageInput` di ChatWindow → jangan tergantung pada `activeConversation` yang kadang null, cukup cek `activeId`.
+## Rollout Strategy
 
-3. **Typing & online status**
+### Phase 1: New Conversations Only
+- Implement new encryption for new conversations only
+- Maintain backward compatibility for existing conversations
+- Gradually migrate old conversations
 
-   * Tambahkan `initSocketListeners` di chat store.
-   * Emit event `typing` saat user mulai/berhenti mengetik.
-   * Update store `presence` saat server kirim `presence:update`.
+### Phase 2: All Conversations
+- Apply new encryption to all new messages
+- Provide option to re-encrypt old conversations
 
-4. **Modal tambah grup**
+### Phase 3: Complete Migration
+- Complete migration of all historical messages (optional)
+- Full removal of old encryption system
 
-   * Render `<GroupModal />` di root App (selalu ada di DOM), lalu toggle visible pakai Zustand/hook modal.
-   * Pastikan form `POST /api/conversations/group` dipanggil saat submit.
+## Testing Requirements
 
-5. **Tambahan (penting untuk stabilitas)**
+1. **Unit Tests**:
+   - Key generation and storage
+   - Encryption/decryption functions
+   - Session key management
 
-   * Tambahkan `socketAuthMiddleware` di backend untuk validasi JWT di handshake.
-   * Tambahkan pagination di API messages.
-   * Tambahkan handler `replaceMessageTemp` di store → supaya pesan tidak dobel.
-   * Tambahkan `revalidateUser()` di `auth.ts` agar user tetap login saat refresh kalau cookie masih valid.
+2. **Integration Tests**:
+   - End-to-end message sending/receiving
+   - Multi-user conversation scenarios
+   - Key rotation scenarios
 
----
+3. **Security Tests**:
+   - Verify that server cannot decrypt messages
+   - Verify that users cannot decrypt messages from conversations they're not in
+   - Test forward secrecy implementation
 
-# 📝 Ringkasan Daftar Masalah
+## Risk Mitigation
 
-✅ sudah disebut user
-⚠️ tambahan hasil analisis
+1. **User Key Loss**: Implement secure key backup/recovery system
+2. **Performance Impact**: Optimize key caching, batch operations, and minimize encryption overhead
+3. **Backward Compatibility**: Maintain support for existing messages during transition
+4. **Migration Errors**: Thorough testing and rollback procedures
 
-* [✅] Pesan tidak ter-load penuh saat refresh.
-* [✅] Form input pesan/file/send tidak muncul.
-* [✅] Indicator typing & online dot tidak jalan.
-* [✅] Tombol tambah grup baru tidak memunculkan modal.
-* [⚠️] Tidak ada refresh token (session bisa cepat expired).
-* [⚠️] API error handling kurang aman (raw async/await tanpa catch).
-* [⚠️] Socket tidak autentikasi dengan JWT.
-* [⚠️] Duplikasi logic kirim pesan (via API dan socket).
-* [⚠️] Tidak ada pagination pada pesan.
-* [⚠️] Store `chat.ts` minim fitur (tidak ada replaceMessageTemp, typing, presence).
-* [⚠️] Auth store tidak fetch ulang user saat reload.
-* [⚠️] Socket lifecycle tidak di-manage saat logout.
-* [⚠️] UI file upload belum nyambung ke backend.
-* [⚠️] Modal group hanya dummy (tidak panggil API).
-* [⚠️] Routing langsung ke `/chat/:id` bisa gagal load conversation.
-
----
+This plan provides a comprehensive approach to implementing true end-to-end encryption while maintaining system functionality and security.

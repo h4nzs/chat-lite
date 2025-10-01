@@ -5,6 +5,24 @@ import { useChatStore } from "@store/chat";
 import { Spinner } from "./Spinner";
 import { memo } from "react";
 
+// Simple function to sanitize HTML content to prevent XSS
+function sanitizeHtml(content: string): string {
+  if (!content) return '';
+  
+  // Remove potentially dangerous tags and attributes
+  let sanitized = content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '');
+  
+  return sanitized;
+}
+
 function MessageBubble({ m }: { m: Message }) {
   const me = useAuthStore((s) => s.user?.id);
   const mine = m.senderId === me;
@@ -54,7 +72,7 @@ function MessageBubble({ m }: { m: Message }) {
           🔒 Message could not be decrypted
         </div>
       ) : (
-        <span className="leading-relaxed">{m.content}</span>
+        <span className="leading-relaxed" dangerouslySetInnerHTML={{__html: sanitizeHtml(m.content || '')}} />
       )}
 
       {/* Read receipts */}

@@ -12,6 +12,7 @@ import usersRouter from "./routes/users.js";
 import conversationsRouter from "./routes/conversations.js";
 import messagesRouter from "./routes/messages.js";
 import uploadsRouter from "./routes/uploads.js";
+import keysRouter from "./routes/keys.js";
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/conversations", uploadsRouter);
+app.use("/api/keys", keysRouter);
 
 // === HEALTH CHECK ===
 app.get("/health", (_req: Request, res: Response) => {

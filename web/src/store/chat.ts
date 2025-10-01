@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
-import { encryptMessage, decryptMessage } from "@utils/crypto";
+import { encryptMessage, decryptMessage } from "@utils/advancedCrypto";
 
 export type Conversation = {
   id: string;
@@ -26,6 +26,8 @@ export type Message = {
   imageUrl?: string | null;
   fileUrl?: string | null;
   fileName?: string | null;
+  sessionId?: string | null; // New field for session key ID
+  encryptedSessionKey?: string | null; // New field for encrypted session key
   createdAt: string;
   error?: boolean;
   preview?: string;
@@ -168,11 +170,19 @@ export const useChatStore = create<State>((set, get) => ({
           res.items.map(async (m) => {
             if (!m.content) return withPreview({ ...m, content: null });
             try {
-              const decryptedContent = await decryptMessage(
-                m.content,
-                m.conversationId
-              );
-              return withPreview({ ...m, content: decryptedContent });
+              // Check if this is the new format with session keys
+              if (m.sessionId && m.encryptedSessionKey) {
+                const decryptedContent = await decryptMessage({
+                  content: m.content,
+                  sessionId: m.sessionId,
+                  encryptedSessionKey: m.encryptedSessionKey
+                });
+                return withPreview({ ...m, content: decryptedContent });
+              } else {
+                // This is an old message, might need legacy decryption
+                // For now, return as is but in the future we'd implement migration
+                return withPreview({ ...m, content: m.content });
+              }
             } catch (err) {
               console.error("Decrypt failed:", m.id, err);
               return withPreview({ ...m, content: m.content });
@@ -210,9 +220,19 @@ export const useChatStore = create<State>((set, get) => ({
           .then(async () => {
             let decryptedContent: string | null = null;
             try {
-              decryptedContent = msg.content
-                ? await decryptMessage(msg.content, msg.conversationId)
-                : null;
+              // Check if this is the new format with session keys
+              if (msg.sessionId && msg.encryptedSessionKey) {
+                decryptedContent = msg.content
+                  ? await decryptMessage({
+                      content: msg.content,
+                      sessionId: msg.sessionId,
+                      encryptedSessionKey: msg.encryptedSessionKey
+                    })
+                  : null;
+              } else {
+                // This is an old message format
+                decryptedContent = msg.content || "[Failed to decrypt]";
+              }
             } catch (err) {
               console.error("Decrypt failed (new):", msg.id, err);
               decryptedContent = msg.content || "[Failed to decrypt]";
@@ -355,16 +375,17 @@ export const useChatStore = create<State>((set, get) => ({
     const socket = getSocket();
     return new Promise((resolve, reject) => {
       encryptMessage(content, conversationId)
-        .then((encrypted) => {
+        .then(({ content: encryptedContent, sessionId, encryptedSessionKey }) => {
           socket.emit(
             "message:send",
-            { conversationId, content: encrypted, tempId },
+            { conversationId, content: encryptedContent, sessionId, encryptedSessionKey, tempId },
             (ack: { ok: boolean; msg?: Message }) => {
               if (ack?.ok && ack.msg) {
-                decryptMessage(
-                  ack.msg.content || "",
-                  ack.msg.conversationId
-                )
+                decryptMessage({
+                  content: ack.msg.content || "",
+                  sessionId: ack.msg.sessionId,
+                  encryptedSessionKey: ack.msg.encryptedSessionKey
+                })
                   .then((decryptedContent) => {
                     const decryptedAck = withPreview({
                       ...ack.msg,

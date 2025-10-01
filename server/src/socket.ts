@@ -61,7 +61,7 @@ export function registerSocket(httpServer: HttpServer) {
 
   // === Events ===
   io.on("connection", (socket: any) => {
-    console.log("✅ User connected:", socket.user);
+    // console.log("✅ User connected:", socket.user);
 
     socket.on("conversation:join", (conversationId: string) => {
       socket.join(conversationId);
@@ -179,36 +179,25 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("message:send", async (data, cb) => {
       try {
-        console.log("=== MESSAGE:SEND EVENT ===");
-        console.log("Received message data:", data);
-        console.log("Received content type:", typeof data.content);
-        console.log("Received content length:", data.content ? data.content.length : 0);
-        console.log("Conversation ID:", data.conversationId);
-        console.log("Sender ID:", socket.user.id);
-        // Save message to database
+        // Save message to database with session key info
         const newMessage = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
             senderId: socket.user.id,
             content: data.content || null,
+            sessionId: data.sessionId || null, // New field for session key ID
+            encryptedSessionKey: data.encryptedSessionKey || null, // New field for encrypted session key
             imageUrl: data.imageUrl || null,
             fileUrl: data.fileUrl || null,
             fileName: data.fileName || null,
           },
         });
-        console.log("Saved message to database:", newMessage);
-        console.log("Encrypted content in database:", newMessage.content);
-        console.log("Database content type:", typeof newMessage.content);
-        console.log("Database content length:", newMessage.content ? newMessage.content.length : 0);
 
         // Broadcast ke semua member di room conversation
         const broadcastData = {
           ...newMessage,
           tempId: data.tempId,
         };
-        console.log("Broadcasting message:", broadcastData);
-        console.log("Encrypted content in broadcast:", broadcastData.content);
-        console.log("=== END MESSAGE:SEND EVENT ===");
         io.to(data.conversationId).emit("message:new", broadcastData);
 
         cb?.({ ok: true, msg: newMessage });

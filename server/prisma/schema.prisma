@@ -15,6 +15,7 @@ model User {
   passwordHash     String
   name             String
   avatarUrl        String?
+  publicKey        String?
   pushSubscription Json?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -65,21 +66,24 @@ model Participant {
 
 
 model Message {
-  id             String          @id @default(cuid())
-  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  conversationId String
-  sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  senderId       String
-  content        String?
-  imageUrl       String?
-  fileUrl        String?
-  fileName       String?
-  createdAt      DateTime        @default(now())
-  statuses       MessageStatus[]
-  reactions      MessageReaction[]
+  id                  String          @id @default(cuid())
+  conversation        Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId      String
+  sender              User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId            String
+  content             String?
+  imageUrl            String?
+  fileUrl             String?
+  fileName            String?
+  sessionId           String?         // References the session key set used for encryption
+  encryptedSessionKey String?         // Encrypted session key for this specific message (for forward secrecy)
+  createdAt           DateTime        @default(now())
+  statuses            MessageStatus[]
+  reactions           MessageReaction[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+  @@index([sessionId])
   @@index([createdAt])
 }
 
@@ -138,4 +142,19 @@ model RefreshToken {
   @@index([expiresAt])
   @@index([jti])
   @@index([revokedAt])
+}
+
+
+model SessionKey {
+  id              String   @id @default(cuid())
+  conversationId  String
+  sessionId       String
+  userId          String
+  encryptedKey    String   // Session key encrypted with user's public key
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime?
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([sessionId])
 }

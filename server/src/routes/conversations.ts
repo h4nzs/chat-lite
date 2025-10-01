@@ -8,7 +8,7 @@ const router = Router();
 router.get("/", requireAuth, async (req, res, next) => {
   try {
     const userId = (req as any).user.id;
-    console.log(`[Conversations Controller] Mencoba mengambil daftar percakapan untuk userId: ${userId}`);
+    // console.log(`[Conversations Controller] Mencoba mengambil daftar percakapan untuk userId: ${userId}`);
 
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -64,7 +64,7 @@ router.get("/", requireAuth, async (req, res, next) => {
       };
     });
 
-    console.log(`[Conversations Controller] Menemukan ${transformed.length} percakapan`);
+    // console.log(`[Conversations Controller] Menemukan ${transformed.length} percakapan`);
     res.json(transformed);
   } catch (e) {
     console.error("[Conversations Controller] Error:", e);

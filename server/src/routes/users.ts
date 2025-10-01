@@ -71,7 +71,7 @@ router.get("/search", requireAuth, async (req, res, next) => {
 });
 
 // === GET: Semua user (public list) ===
-router.get("/", async (req, res, next) => {
+router.get("/", requireAuth, async (req, res, next) => {
   try {
     console.log(`[Users Controller] Mengambil daftar semua user (public)`);
     const users = await prisma.user.findMany({
