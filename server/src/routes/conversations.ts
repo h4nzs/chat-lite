@@ -72,6 +72,43 @@ router.get("/", requireAuth, async (req, res, next) => {
   }
 });
 
+// === GET: Public keys of participants in a conversation ===
+router.get("/:conversationId/participants/keys", requireAuth, async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = (req as any).user.id;
+
+    // Verify user is a participant of the conversation
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { participants: true }
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const isParticipant = conversation.participants.some(p => p.userId === userId);
+    if (!isParticipant) {
+      return res.status(403).json({ error: "You are not a participant of this conversation" });
+    }
+
+    // Get public keys of all participants
+    const participantIds = conversation.participants.map(p => p.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: participantIds } },
+      select: { id: true, username: true, publicKey: true }
+    });
+
+    // Filter out users without public keys
+    const participantsWithKeys = users.filter(u => u.publicKey);
+
+    res.json({ participants: participantsWithKeys });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // === POST: Create new group conversation ===
 router.post("/group", requireAuth, async (req, res, next) => {
   try {

@@ -543,7 +543,7 @@ export const useChatStore = create<State>((set, get) => ({
     const res = await fetch(
       `${
         import.meta.env.VITE_API_URL || "http://localhost:4000"
-      }/api/conversations/${conversationId}/upload-image`,
+      }/api/uploads/${conversationId}/upload-image`,
       { method: "POST", body: form, credentials: "include" }
     );
     if (!res.ok) throw new Error("Upload failed");
@@ -564,7 +564,7 @@ export const useChatStore = create<State>((set, get) => ({
     const res = await fetch(
       `${
         import.meta.env.VITE_API_URL || "http://localhost:4000"
-      }/api/conversations/${conversationId}/upload`,
+      }/api/uploads/${conversationId}/upload`,
       { method: "POST", body: form, credentials: "include" }
     );
     if (!res.ok) throw new Error("Upload failed");
