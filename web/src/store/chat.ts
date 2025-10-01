@@ -162,40 +162,53 @@ export const useChatStore = create<State>((set, get) => ({
           messages: { ...s.messages, [id]: cachedMessages },
         }));
       } else {
-        const res = await api<{ items: Message[]; nextCursor: string | null }>(
-          `/api/messages/${id}`
-        );
+        try {
+          const res = await api<{ items: Message[]; nextCursor: string | null }>(
+            `/api/messages/${id}`
+          );
 
-        const decryptedItems = await Promise.all(
-          res.items.map(async (m) => {
-            if (!m.content) return withPreview({ ...m, content: null });
-            try {
-              // Check if this is the new format with session keys
-              if (m.sessionId && m.encryptedSessionKey) {
-                const decryptedContent = await decryptMessage({
-                  content: m.content,
-                  sessionId: m.sessionId,
-                  encryptedSessionKey: m.encryptedSessionKey
-                });
-                return withPreview({ ...m, content: decryptedContent });
-              } else {
-                // This is an old message, might need legacy decryption
-                // For now, return as is but in the future we'd implement migration
+          const decryptedItems = await Promise.all(
+            res.items.map(async (m) => {
+              if (!m.content) return withPreview({ ...m, content: null });
+              try {
+                // Check if this is the new format with session keys
+                if (m.sessionId && m.encryptedSessionKey) {
+                  const decryptedContent = await decryptMessage({
+                    content: m.content,
+                    sessionId: m.sessionId,
+                    encryptedSessionKey: m.encryptedSessionKey
+                  });
+                  return withPreview({ ...m, content: decryptedContent });
+                } else {
+                  // This is an old message, might need legacy decryption
+                  // For now, return as is but in the future we'd implement migration
+                  return withPreview({ ...m, content: m.content });
+                }
+              } catch (err) {
+                console.error("Decrypt failed:", m.id, err);
                 return withPreview({ ...m, content: m.content });
               }
-            } catch (err) {
-              console.error("Decrypt failed:", m.id, err);
-              return withPreview({ ...m, content: m.content });
-            }
-          })
-        );
+            })
+          );
 
-        const messages = decryptedItems.reverse();
-        set((s) => ({
-          messages: { ...s.messages, [id]: messages },
-          cursors: { ...s.cursors, [id]: res.nextCursor },
-        }));
-        setCachedMessages(id, messages);
+          const messages = decryptedItems.reverse();
+          set((s) => ({
+            messages: { ...s.messages, [id]: messages },
+            cursors: { ...s.cursors, [id]: res.nextCursor },
+          }));
+          setCachedMessages(id, messages);
+        } catch (error) {
+          // Handle case where conversation doesn't exist
+          if (error instanceof Error && (error.message.includes('404') || error.message.includes('Not Found'))) {
+            console.warn(`[ChatStore] Conversation ${id} not found, clearing from localStorage`);
+            localStorage.removeItem("activeId");
+            set({ activeId: null });
+            // Reload conversations to get fresh data
+            await get().loadConversations();
+            return;
+          }
+          throw error;
+        }
       }
     } finally {
       get().setLoading(id, false);
