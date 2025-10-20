@@ -3,6 +3,8 @@ import { requireAuth } from "../middleware/auth.js";
 import { upload } from "../utils/upload.js";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/errors.js";
+import path from "path";
+import { env } from "../config.js";
 
 const router = Router();
 
@@ -79,9 +81,18 @@ router.post("/:conversationId/upload", requireAuth, upload.single("file"), async
   }
 });
 
-// Helper function to save upload info (currently just returns the URL)
+// Helper function to save upload info with path traversal protection
 async function saveUpload(file: Express.Multer.File) {
-  return { url: `/uploads/${file.filename}` };
+  // Sanitize filename to prevent path traversal
+  const sanitized = path.basename(file.filename);
+  const uploadsDir = path.resolve(process.cwd(), env.uploadDir);
+  const resolved = path.resolve(path.join(uploadsDir, sanitized));
+  
+  if (!resolved.startsWith(uploadsDir)) {
+    throw new ApiError(400, "Invalid file path");
+  }
+  
+  return { url: `/uploads/${sanitized}` };
 }
 
 export default router;

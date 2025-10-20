@@ -24,7 +24,7 @@ function setAuthCookies(
   res.cookie("at", access, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "none" : "lax",
+    sameSite: "strict",  // Changed from conditional to strict
     path: "/",
     maxAge: 1000 * 60 * 15, // 15 menit
   });
@@ -32,7 +32,7 @@ function setAuthCookies(
   res.cookie("rt", refresh, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "none" : "lax",
+    sameSite: "strict",  // Changed from conditional to strict
     path: "/",
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 hari
   });

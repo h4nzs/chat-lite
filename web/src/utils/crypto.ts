@@ -3,10 +3,19 @@ import { useAuthStore } from '@store/auth'
 
 // Cache for derived keys to avoid recomputation
 const keyCache = new Map<string, Uint8Array>()
+const MAX_CACHE_SIZE = 1000;
 
 // Function to clear key cache (useful for logout)
 export function clearKeyCache(): void {
   keyCache.clear()
+}
+
+function cleanupCacheIfNeeded(): void {
+  if (keyCache.size > MAX_CACHE_SIZE) {
+    // Remove oldest entries (first-in-first-out)
+    const firstKey = keyCache.keys().next().value;
+    keyCache.delete(firstKey);
+  }
 }
 
 // Generate a deterministic key for a conversation based on conversation ID only
@@ -19,6 +28,8 @@ async function generateConversationKey(conversationId: string): Promise<Uint8Arr
     console.log("Using cached key for conversation:", conversationId); // Debug log
     return keyCache.get(cacheKey)!
   }
+  
+  cleanupCacheIfNeeded(); // Clean up before adding new entry
   
   // Create a deterministic key based on conversation ID only
   // This ensures both sender and receiver use the same key

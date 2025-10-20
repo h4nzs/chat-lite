@@ -3,6 +3,7 @@ import type { Server as HttpServer } from "http";
 import { socketAuthMiddleware, verifySocketAuth } from "./middleware/auth.js";
 import { prisma } from "./lib/prisma.js";
 import cookie from 'cookie';
+import xss from 'xss';
 
 export function registerSocket(httpServer: HttpServer) {
   const io = new Server(httpServer, {
@@ -171,12 +172,15 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("message:send", async (data, cb) => {
       try {
+        // Sanitize content before storing
+        const sanitizedContent = data.content ? xss(data.content) : null;
+        
         // Save message to database with session key info
         const newMessage = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
             senderId: socket.user.id,
-            content: data.content || null,
+            content: sanitizedContent, // Use sanitized content
             sessionId: data.sessionId || null, // New field for session key ID
             encryptedSessionKey: data.encryptedSessionKey || null, // New field for encrypted session key
             imageUrl: data.imageUrl || null,

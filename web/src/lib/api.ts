@@ -13,6 +13,40 @@ export class ApiError extends Error {
   }
 }
 
+// CSRF token cache
+let csrfToken: string | null = null;
+let csrfTokenExpiry: number | null = null;
+
+// Function to fetch CSRF token
+async function fetchCsrfToken(): Promise<string> {
+  // Check if we have a valid cached token
+  if (csrfToken && csrfTokenExpiry && Date.now() < csrfTokenExpiry) {
+    return csrfToken;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/csrf-token`, {
+      credentials: "include",
+    });
+    
+    if (!res.ok) {
+      throw new Error(`Failed to fetch CSRF token: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    csrfToken = data.csrfToken;
+    
+    // Set expiry time (CSRF tokens can typically be reused until a new one is generated)
+    // For safety, we'll refresh it after 1 hour
+    csrfTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+    
+    return csrfToken;
+  } catch (error) {
+    console.error("Error fetching CSRF token:", error);
+    throw error;
+  }
+}
+
 /**
  * Wrapper fetch untuk API.
  * Selalu kirim credentials supaya cookie (at/rt) ikut terkirim.
@@ -22,14 +56,42 @@ export async function api<T = any>(
   options: RequestInit = {}
 ): Promise<T> {
   try {
+    // Check if this is an auth request that needs CSRF token
+    const needsCsrfToken = path.includes('/auth/') && (options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH' || options.method === 'DELETE');
+    
+    let headers = {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    };
+    
+    // Add CSRF token for auth requests
+    if (needsCsrfToken) {
+      const token = await fetchCsrfToken();
+      headers = {
+        ...headers,
+        "CSRF-Token": token,
+      };
+    }
+
     const res = await fetch(API_URL + path, {
       ...options,
       credentials: "include", // 🔥 cookie at/rt otomatis ikut
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+      headers,
     });
+
+    // If there's a CSRF token error, clear the cached token
+    if (res.status === 403) {
+      const errorText = await res.text();
+      if (errorText.includes('invalid csrf token') || res.headers.get('content-type')?.includes('application/json')) {
+        const jsonError = JSON.parse(errorText);
+        if (jsonError?.message?.toLowerCase().includes('csrf') || jsonError?.error?.toLowerCase().includes('csrf')) {
+          csrfToken = null;
+          csrfTokenExpiry = null;
+        }
+      }
+      // Re-throw with error details
+      throw new ApiError(res.status, errorText);
+    }
 
     if (!res.ok) {
       const text = await res.text();

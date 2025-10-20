@@ -38,8 +38,8 @@ const setupUserEncryptionKeys = async (password: string): Promise<void> => {
     const { publicKey, privateKey } = await generateKeyPair();
     
     // Export public and private keys to base64 strings
-    const publicKeyStr = exportPublicKey(publicKey);
-    const privateKeyStr = exportPrivateKey(privateKey);
+    const publicKeyStr = await exportPublicKey(publicKey);
+    const privateKeyStr = await exportPrivateKey(privateKey);
     
     // Encrypt the private key using the user's password
     const encryptedPrivateKey = await storePrivateKey(privateKey, password);

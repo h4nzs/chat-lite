@@ -133,7 +133,7 @@ export async function encryptMessage(text: string, conversationId: string): Prom
     const myPrivateKey = await retrievePrivateKey(myPrivateKeyStr, password);
     const myPublicKeyStr = localStorage.getItem('publicKey');
     if (!myPublicKeyStr) throw new Error('Public key not available');
-    const myPublicKey = importPublicKey(myPublicKeyStr);
+    const myPublicKey = await importPublicKey(myPublicKeyStr);
     
     // Encrypt the session key for all participants
     // For this implementation, we'll focus on one on one conversations
@@ -143,12 +143,12 @@ export async function encryptMessage(text: string, conversationId: string): Prom
       // Find a participant that is not the current user
       const otherParticipant = participantKeys.find((p: any) => p.id !== (window as any).currentUser?.id); // This would need real user ID
       if (otherParticipant && otherParticipant.publicKey) {
-        targetPublicKey = importPublicKey(otherParticipant.publicKey);
+        targetPublicKey = await importPublicKey(otherParticipant.publicKey);
       } else {
         // If no other participant found, use the first one that has a public key
         const participantWithKey = participantKeys.find((p: any) => p.publicKey);
         if (participantWithKey) {
-          targetPublicKey = importPublicKey(participantWithKey.publicKey);
+          targetPublicKey = await importPublicKey(participantWithKey.publicKey);
         } else {
           throw new Error('No participant with public key found');
         }

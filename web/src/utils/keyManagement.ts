@@ -7,63 +7,67 @@ export async function generateKeyPair(): Promise<{ publicKey: Uint8Array, privat
 }
 
 // Function to export public key in a string format
-export function exportPublicKey(publicKey: Uint8Array): string {
+export async function exportPublicKey(publicKey: Uint8Array): Promise<string> {
+  const sodium = await getSodium();
   return sodium.to_base64(publicKey, sodium.base64_variants.ORIGINAL);
 }
 
 // Function to export private key in a string format
-export function exportPrivateKey(privateKey: Uint8Array): string {
+export async function exportPrivateKey(privateKey: Uint8Array): Promise<string> {
+  const sodium = await getSodium();
   return sodium.to_base64(privateKey, sodium.base64_variants.ORIGINAL);
 }
 
 // Function to import public key from string
-export function importPublicKey(publicKeyStr: string): Uint8Array {
+export async function importPublicKey(publicKeyStr: string): Promise<Uint8Array> {
+  const sodium = await getSodium();
   return sodium.from_base64(publicKeyStr, sodium.base64_variants.ORIGINAL);
 }
 
 // Function to import private key from string
-export function importPrivateKey(privateKeyStr: string): Uint8Array {
+export async function importPrivateKey(privateKeyStr: string): Promise<Uint8Array> {
+  const sodium = await getSodium();
   return sodium.from_base64(privateKeyStr, sodium.base64_variants.ORIGINAL);
 }
 
-// Function to store private key securely in browser storage
 export async function storePrivateKey(privateKey: Uint8Array, password: string): Promise<string> {
-  if (!password || typeof password !== 'string' || password.length === 0) {
-    throw new Error('Password is required and must be a non-empty string');
-  }
-  
-  if (!privateKey || !(privateKey instanceof Uint8Array)) {
-    throw new Error('Private key is required and must be a Uint8Array');
-  }
-  
   const sodium = await getSodium();
-  
+
+  if (!privateKey || !(privateKey instanceof Uint8Array)) {
+    console.error("storePrivateKey: invalid privateKey type", privateKey);
+    throw new TypeError("Private key must be a Uint8Array");
+  }
+  if (!password || typeof password !== "string") {
+    throw new TypeError("Password must be a non-empty string");
+  }
+
   try {
-    // Derive a key from the password
+    const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+    const combinedKey = `${appSecret}-${password}`;
+    const combinedBytes = sodium.from_string(combinedKey);
+
     const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
     const key = sodium.crypto_pwhash(
       sodium.crypto_secretbox_KEYBYTES,
-      password,
+      combinedBytes,
       salt,
       sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
       sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
       sodium.crypto_pwhash_ALG_DEFAULT
     );
-    
-    // Encrypt the private key
+
     const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
-    const encryptedPrivateKey = sodium.crypto_secretbox_easy(privateKey, nonce, key);
-    
-    // Combine salt, nonce, and encrypted key
-    const result = new Uint8Array(salt.length + nonce.length + encryptedPrivateKey.length);
+    const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
+
+    const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);
     result.set(salt, 0);
     result.set(nonce, salt.length);
-    result.set(encryptedPrivateKey, salt.length + nonce.length);
-    
+    result.set(ciphertext, salt.length + nonce.length);
+
     return sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
-  } catch (error) {
-    console.error('Error in storePrivateKey:', error);
-    throw error;
+  } catch (err) {
+    console.error("Error in storePrivateKey:", err);
+    throw err;
   }
 }
 

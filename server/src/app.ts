@@ -4,6 +4,7 @@ import logger from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import csrf from "csurf";
 import { env } from "./config.js";
 import path from "path";
 
@@ -23,8 +24,8 @@ app.use(
   cors({
     origin: env.corsOrigin || "http://localhost:5173",
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],
   })
 );
 
@@ -39,9 +40,25 @@ app.use(
 
 // === MIDDLEWARE ===
 app.use(logger("dev"));
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// === CSRF Protection ===
+app.use(csrf({
+  cookie: { httpOnly: true, sameSite: "strict", secure: env.nodeEnv === "production" }
+}));
+
+// === ROUTE FOR CSRF TOKEN ===
+app.get("/api/csrf-token", (req: Request, res: Response, next) => {
+  try {
+    const token = req.csrfToken();
+    res.json({ csrfToken: token });
+  } catch (err) {
+    console.error("CSRF generation failed:", err);
+    next(err);
+  }
+});
 
 // === STATIC FILES ===
 app.use("/uploads", cors({

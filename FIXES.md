@@ -1,91 +1,73 @@
-# TASK: Apply full security hardening for Chat-Lite based on security audit
+# TASK: Fix libsodium TypeError in storePrivateKey (length cannot be null or undefined)
 
 Context:
-The attached audit report (app-guide.md) lists multiple critical and medium security issues in the Chat-Lite project.
-Goal is to fix ALL vulnerabilities described, following each recommendation, while keeping application behavior identical.
+- Frontend throws: "Error in storePrivateKey: TypeError: length cannot be null or undefined".
+- Root cause: invalid or missing Uint8Array values (privateKey, salt, nonce, or derived key).
+- We must validate inputs, ensure correct Uint8Array conversions, and wrap sodium calls safely.
 
-Priority order:
-1. Critical → file upload path traversal, socket cookie parsing
-2. High → cookie security config, CSRF protection, message content sanitization
-3. Medium → secure key storage, cache management
+Goal:
+1. Add validation for privateKey and password.
+2. Convert combined key to Uint8Array before pwhash.
+3. Generate salt and nonce safely.
+4. Combine result (salt + nonce + ciphertext) properly.
+5. Log and rethrow any errors.
 
 Steps:
+- Open web/src/utils/keyManagement.ts.
+- Replace function storePrivateKey() with:
 
-### Backend Changes
-1. In `server/src/routes/auth.ts`
-   - Set authentication cookies `at` and `rt` with:
-     ```ts
-     sameSite: 'strict', httpOnly: true, secure: env.nodeEnv === 'production'
-     ```
-   - Remove conditional SameSite logic.
+  ```ts
+  export async function storePrivateKey(privateKey: Uint8Array, password: string): Promise<string> {
+    const sodium = await getSodium();
 
-2. In `server/src/socket.ts`
-   - Import `parse` from `'cookie'`.
-   - Replace any manual cookie string splitting with safe:
-     ```ts
-     const cookies = parse(socket.handshake.headers.cookie || '');
-     const token = cookies['at'];
-     ```
-   - Serialize Prisma results before broadcast:
-     ```ts
-     io.to(roomId).emit('message:new', JSON.parse(JSON.stringify(newMessage)));
-     ```
+    if (!privateKey || !(privateKey instanceof Uint8Array)) {
+      console.error("storePrivateKey: invalid privateKey type", privateKey);
+      throw new TypeError("Private key must be a Uint8Array");
+    }
+    if (!password || typeof password !== "string") {
+      throw new TypeError("Password must be a non-empty string");
+    }
 
-3. In `server/src/routes/uploads.ts`
-   - Prevent path traversal by sanitizing filenames:
-     ```ts
-     const sanitized = path.basename(file.filename);
-     const uploadsDir = path.resolve(process.cwd(), env.uploadDir);
-     const resolved = path.resolve(path.join(uploadsDir, sanitized));
-     if (!resolved.startsWith(uploadsDir)) throw new ApiError(400, 'Invalid file path');
-     return { url: `/uploads/${sanitized}` };
-     ```
+    try {
+      const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+      const combinedKey = `${appSecret}-${password}`;
+      const combinedBytes = sodium.from_string(combinedKey);
 
-4. In `server/src/app.ts`
-   - Add CSRF protection middleware using `csurf`:
-     ```ts
-     app.use(csrf({
-       cookie: { httpOnly: true, sameSite: 'strict', secure: env.nodeEnv === 'production' }
-     }));
-     app.get('/api/csrf-token', (req, res) => res.json({ csrfToken: req.csrfToken() }));
-     ```
+      const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
+      const key = sodium.crypto_pwhash(
+        sodium.crypto_secretbox_KEYBYTES,
+        combinedBytes,
+        salt,
+        sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+        sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+        sodium.crypto_pwhash_ALG_DEFAULT
+      );
 
-5. In `server/src/socket.ts` (message handler)
-   - Import `xss` and sanitize message content before saving:
-     ```ts
-     const sanitizedContent = data.content ? xss(data.content) : null;
-     ```
+      const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+      const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
 
-### Frontend Changes
-6. In `web/src/utils/keyManagement.ts`
-   - Replace plain localStorage storage with encrypted Base64 string using libsodium as described:
-     - Derive encryption key from (APP_SECRET + password)
-     - Encrypt private key using `crypto_secretbox_easy`
-     - Return combined salt + nonce + ciphertext.
+      const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);
+      result.set(salt, 0);
+      result.set(nonce, salt.length);
+      result.set(ciphertext, salt.length + nonce.length);
 
-7. In `web/src/utils/crypto.ts`
-   - Implement cache size limit:
-     ```ts
-     const MAX_CACHE_SIZE = 1000;
-     function cleanupCacheIfNeeded() {
-       if (keyCache.size > MAX_CACHE_SIZE) {
-         const firstKey = keyCache.keys().next().value;
-         keyCache.delete(firstKey);
-       }
-     }
-     ```
-   - Call cleanup before adding new key to cache.
+      return sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    } catch (err) {
+      console.error("Error in storePrivateKey:", err);
+      throw err;
+    }
+  }
+````
 
-### Verification
-- Run dev server and confirm:
-  - Cookies use `SameSite=strict` and `secure` flags in production.
-  - Socket connections authenticate correctly with parsed cookies.
-  - Uploads reject filenames containing `../`.
-  - XSS payloads in messages are sanitized.
-  - CSRF token endpoint `/api/csrf-token` works.
-  - Private key encrypted before storing.
-  - Cache size limited and cleans oldest entries.
+Verification:
+
+* Restart frontend dev server.
+* Login again → no more "length cannot be null or undefined".
+* Console logs "Private key successfully encrypted and encoded".
 
 Output:
-- Show updated code snippets for each changed file with minimal diff.
-- Do not change unrelated business logic or styling.
+
+* Show updated function storePrivateKey only.
+* Keep rest of file unchanged.
+
+```
