@@ -95,6 +95,16 @@ function clearCachedMessages(conversationId: string): void {
   messageCache.delete(conversationId);
 }
 
+function normalizeMessageContent(raw: any): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "object" && "content" in raw) {
+    const val = raw.content;
+    return typeof val === "string" ? val : "";
+  }
+  return "";
+}
+
 function sortConversations(list: Conversation[]) {
   return [...list].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -103,9 +113,11 @@ function sortConversations(list: Conversation[]) {
 
 // Helper → kasih preview kalau ada file/gambar
 function withPreview(msg: Message): Message {
-  if (msg.imageUrl) return { ...msg, preview: "📷 Photo" };
-  if (msg.fileUrl) return { ...msg, preview: `📎 ${msg.fileName || "File"}` };
-  return msg;
+  // Normalize content to ensure it's a string
+  const normalizedContent = normalizeMessageContent(msg.content);
+  if (msg.imageUrl) return { ...msg, content: normalizedContent, preview: "📷 Photo" };
+  if (msg.fileUrl) return { ...msg, content: normalizedContent, preview: `📎 ${msg.fileName || "File"}` };
+  return { ...msg, content: normalizedContent };
 }
 
 // === Restore activeId dari localStorage saat init ===
@@ -175,6 +187,9 @@ export const useChatStore = create<State>((set, get) => ({
                 return null; // This will be filtered out below
               }
               
+              // Normalize content before processing
+              m.content = normalizeMessageContent(m.content);
+              
               if (!m.content) return withPreview({ ...m, content: null });
               try {
                 // Check if this is the new format with session keys
@@ -233,10 +248,13 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("message:new");
     socket.on("message:new", (msg: Message & { tempId?: number }) => {
       // Add validation before processing the message
-      if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId || typeof msg.content !== 'string') {
+      if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId) {
         console.warn('Skipped invalid message:', msg)
         return
       }
+      
+      // Normalize content to ensure it's a string
+      msg.content = normalizeMessageContent(msg.content);
       
       set((s) => {
         const curr = s.messages[msg.conversationId] || [];
@@ -251,7 +269,7 @@ export const useChatStore = create<State>((set, get) => ({
             try {
               // Check if this is the new format with session keys
               if (msg.sessionId && msg.encryptedSessionKey) {
-                decryptedContent = msg.content
+                decryptedContent = msg.content && msg.content.length > 0
                   ? await decryptMessage({
                       content: msg.content,
                       sessionId: msg.sessionId,
@@ -382,6 +400,9 @@ export const useChatStore = create<State>((set, get) => ({
           console.warn('Skipping invalid message during older messages load:', m);
           return null; // This will be filtered out below
         }
+        
+        // Normalize content before processing
+        m.content = normalizeMessageContent(m.content);
         
         if (!m.content) return withPreview({ ...m, content: null });
         // Check if this is the new format with session keys

@@ -6,25 +6,24 @@ import { Spinner } from "./Spinner";
 import { memo } from "react";
 
 // Simple function to sanitize HTML content to prevent XSS
-function sanitizeHtml(content: string): string {
-  if (!content) return '';
-  
-  // Remove potentially dangerous tags and attributes
-  let sanitized = content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '');
-  
-  return sanitized;
+function sanitizeHtml(content: any): string {
+  const str = typeof content === "string" ? content : (content?.content ?? "");
+  return str
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, "")
+    .replace(/javascript:/gi, "")
+    .replace(/on\w+="[^"]*"/gi, "")
+    .replace(/on\w+='[^']*'/gi, "");
 }
 
 function MessageBubble({ m }: { m: Message }) {
-  if (!m || !m.id || !m.content) {
+  // Normalize content to ensure it's a string for checks
+  const contentStr = typeof m.content === "string" ? m.content : (m.content?.content ?? "");
+  
+  if (!m || !m.id || !contentStr) {
     console.warn('Invalid message render skipped:', m)
     return null
   }
@@ -42,10 +41,10 @@ function MessageBubble({ m }: { m: Message }) {
 
   // Flag decrypt gagal
   const isDecryptionFailed =
-    m.content &&
-    (m.content.includes("[Failed to decrypt") ||
-      m.content.includes("[Invalid encrypted message]") ||
-      m.content.includes("[Decryption key not available]"));
+    contentStr &&
+    (contentStr.includes("[Failed to decrypt") ||
+      contentStr.includes("[Invalid encrypted message]") ||
+      contentStr.includes("[Decryption key not available]"));
 
   // Pesan sudah dibaca
   const isRead = mine && m.readBy && m.readBy.length > 0;
