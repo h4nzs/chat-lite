@@ -27,6 +27,7 @@ export default function ChatWindow({ id }: { id: string | null }) {
   const listRef = useRef<List>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { scrollToBottom } =
     useScrollToBottom?.(listRef) ?? {
       scrollToBottom: () =>
@@ -34,17 +35,12 @@ export default function ChatWindow({ id }: { id: string | null }) {
     };
   const sizeMap = useRef<{ [key: number]: number }>({});
 
-  // Fallback: pilih percakapan pertama kalau id null
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (!id && conversations.length > 0) {
-      const firstId = conversations[0].id;
-      useChatStore.setState({ activeId: firstId });
-      openConversation(firstId);
-    } else if (id) {
-      openConversation(id);
+    if (messages.length > 0) {
+      scrollToBottom();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, conversations]);
+  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -267,9 +263,6 @@ export default function ChatWindow({ id }: { id: string | null }) {
             Send
           </button>
         </form>
-        <div className="shrink-0 border-t bg-red-500 p-3">
-        DEBUG FOOTER
-        </div>
       </div>
     </div>
   );

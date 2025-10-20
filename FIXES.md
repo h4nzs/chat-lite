@@ -1,77 +1,150 @@
-TASK: Fix libsodium TypeError in storePrivateKey (length cannot be null or undefined)
+# TASK: Fix message rendering and realtime update in ChatLite
 
-Context:
-- Error occurs in storePrivateKey during login (setupUserEncryptionKeys).
-- Root cause: privateKey not a valid Uint8Array or sodium not ready before use.
-- Need to validate inputs, ensure sodium initialized, and generate keypair properly.
+## Context:
+- Current UI shows empty message area (no message bubbles).
+- Messages do not appear in real time until page reload.
+- This indicates that the messages store is not updating React state properly and socket listeners are broken.
+- Also, message normalization and rendering logic may be filtering valid messages.
 
-Goal:
-1. Add strong type validation in storePrivateKey().
-2. Ensure setupUserEncryptionKeys() waits for sodium to initialize before generating keys.
-3. Prevent libsodium "length cannot be null" error.
+## Goals:
+1. Fix Zustand store (web/src/store/chat.ts):
+   - Ensure new messages trigger a React re-render by using immutable updates.
+   - Reconnect socket listeners properly and prevent duplicates.
+   - Normalize message structure before saving to store.
 
-Steps:
-- In web/src/utils/keyManagement.ts, update storePrivateKey:
+2. Fix ChatList.tsx and MessageBubble.tsx rendering:
+   - Ensure `m.content` is a string before render.
+   - Add fallback safe rendering if message is invalid.
 
-  ```ts
-  export async function storePrivateKey(privateKey: Uint8Array | null, password: string): Promise<string> {
-    const sodium = await getSodium();
+---
 
-    if (!privateKey || !(privateKey instanceof Uint8Array)) {
-      console.error("storePrivateKey: invalid privateKey", privateKey);
-      throw new TypeError("Invalid private key — must be Uint8Array");
-    }
+### ✅ Fix 1: Store (web/src/store/chat.ts)
+- Locate `socket.on("message:new", handler)` and replace the handler with:
 
-    if (!password || typeof password !== "string") {
-      throw new TypeError("Invalid password — must be string");
-    }
+```ts
+socket.off("message:new");
+socket.on("message:new", (incomingMsg) => {
+  const msg = normalizeMessage(incomingMsg);
+  if (!msg?.id || !msg?.content) return;
 
-    try {
-      const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
-      const combinedKey = `${appSecret}-${password}`;
-      const combinedBytes = sodium.from_string(combinedKey);
-
-      const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
-      const key = sodium.crypto_pwhash(
-        sodium.crypto_secretbox_KEYBYTES,
-        combinedBytes,
-        salt,
-        sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-        sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-        sodium.crypto_pwhash_ALG_DEFAULT
-      );
-
-      const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
-      const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
-
-      const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);
-      result.set(salt, 0);
-      result.set(nonce, salt.length);
-      result.set(ciphertext, salt.length + nonce.length);
-
-      const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
-      console.log("✅ storePrivateKey: encrypted and encoded successfully");
-      return encoded;
-    } catch (err) {
-      console.error("❌ Error in storePrivateKey:", err);
-      throw err;
-    }
-  }
+  set((state) => ({
+    messages: [...state.messages.filter((m) => m.id !== msg.id), msg],
+  }));
+});
 ````
 
-* In setupUserEncryptionKeys(), before calling storePrivateKey:
+* Add helper at the top:
 
-  ```ts
-  const sodium = await getSodium();
-  const { publicKey, privateKey } = sodium.crypto_box_keypair();
-  await storePrivateKey(privateKey, password);
-  ```
+```ts
+function normalizeMessage(m: any) {
+  if (!m) return m;
+  if (typeof m.content === "object" && m.content !== null) {
+    if ("content" in m.content) m.content = m.content.content;
+  }
+  if (typeof m.content !== "string") m.content = String(m.content ?? "");
+  return m;
+}
+```
 
-Verification:
+* For any function like `sendMessage`, `loadOlderMessages`, `openConversation`, make sure messages are updated immutably:
 
-* Restart frontend.
-* Login again → no "length cannot be null or undefined" errors.
-* Console shows "✅ storePrivateKey: encrypted and encoded successfully".
-* Message encryption logs remain valid.
+```ts
+set((state) => ({ messages: [...state.messages, msg] }));
+```
+
+---
+
+### ✅ Fix 2: Component rendering (web/src/components/MessageBubble.tsx)
+
+Replace current code with:
+
+```tsx
+import React from "react";
+import clsx from "clsx";
+
+export function MessageBubble({ m }) {
+  if (!m || typeof m.content !== "string" || !m.content.trim()) return null;
+
+  const mine = m.mine ?? m.isMine ?? false;
+
+  return (
+    <div
+      className={clsx(
+        "bubble px-3 py-2 rounded-2xl my-1",
+        mine ? "bg-blue-600 text-white ml-auto" : "bg-gray-700 text-gray-100 mr-auto"
+      )}
+    >
+      {m.content}
+    </div>
+  );
+}
+```
+
+---
+
+### ✅ Fix 3: Ensure realtime reactivity in ChatList.tsx or Chat.tsx
+
+Inside the main message list container, add:
+
+```tsx
+const messages = useChatStore((s) => s.messages);
+const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages]);
+
+return (
+  <div className="flex flex-col overflow-y-auto">
+    {messages.map((m) => (
+      <MessageBubble key={m.id} m={m} />
+    ))}
+    <div ref={messagesEndRef} />
+  </div>
+);
+```
+
+---
+
+### ✅ Fix 4: Ensure socket initialization only happens once
+
+In `auth.ts` or `socket.ts`, wrap socket setup in:
+
+```ts
+if (!socket.connected) socket.connect();
+socket.off("message:new");
+socket.on("message:new", handleIncomingMessage);
+```
+
+And call `socket.off()` in cleanup functions or before re-attaching handlers.
+
+---
+
+### ✅ Verification steps:
+
+1. Start server and web app.
+2. Open two browser tabs (User A & User B).
+3. Send messages → should appear immediately without refresh.
+4. Each message bubble must show text content.
+5. After sending, chat automatically scrolls to the newest message.
+
+---
+
+### ✅ Optional enhancement:
+
+If still blank, log what messages look like right before rendering:
+
+```ts
+console.log("Rendering messages:", messages);
+```
+
+---
+
+After implementing this prompt:
+
+* Chat messages will appear instantly (real-time socket updates restored).
+* Bubbles will display proper text.
+* UI scrolls automatically to latest message.
+* No duplicates or blank message placeholders remain.
 
 ```

@@ -103,6 +103,9 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
         </div>
       );
     }
+    if (!m.content) {
+      return null;
+    }
     return (
       <div
         className={`px-3 py-2 rounded-2xl break-words max-w-[70%] shadow ${
@@ -111,7 +114,7 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
             : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         }`}
       >
-        <span dangerouslySetInnerHTML={{__html: sanitizeHtml(m.content || '')}} />
+        <p>{m.content}</p>
       </div>
     );
   };

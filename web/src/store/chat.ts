@@ -105,6 +105,15 @@ function normalizeMessageContent(raw: any): string {
   return "";
 }
 
+function normalizeMessage(m: any) {
+  if (!m) return m;
+  if (typeof m.content === "object" && m.content !== null) {
+    if ("content" in m.content) m.content = m.content.content;
+  }
+  if (typeof m.content !== "string") m.content = String(m.content ?? "");
+  return m;
+}
+
 function sortConversations(list: Conversation[]) {
   return [...list].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -246,83 +255,13 @@ export const useChatStore = create<State>((set, get) => ({
 
     // === Socket events ===
     socket.off("message:new");
-    socket.on("message:new", (msg: Message & { tempId?: number }) => {
-      // Add validation before processing the message
-      if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId) {
-        console.warn('Skipped invalid message:', msg)
-        return
-      }
-      
-      // Normalize content to ensure it's a string
-      msg.content = normalizeMessageContent(msg.content);
-      
-      set((s) => {
-        const curr = s.messages[msg.conversationId] || [];
-        let next = msg.tempId
-          ? curr.filter((m) => m.tempId !== msg.tempId)
-          : curr;
-        if (next.some((m) => m.id === msg.id)) return {};
+    socket.on("message:new", (incomingMsg) => {
+      const msg = normalizeMessage(incomingMsg);
+      if (!msg?.id || !msg?.content) return;
 
-        Promise.resolve()
-          .then(async () => {
-            let decryptedContent: string | null = null;
-            try {
-              // Check if this is the new format with session keys
-              if (msg.sessionId && msg.encryptedSessionKey) {
-                decryptedContent = msg.content && msg.content.length > 0
-                  ? await decryptMessage({
-                      content: msg.content,
-                      sessionId: msg.sessionId,
-                      encryptedSessionKey: msg.encryptedSessionKey
-                    }, msg.conversationId)
-                  : null;
-              } else {
-                // This is an old message format
-                decryptedContent = msg.content || "[Failed to decrypt]";
-              }
-            } catch (err) {
-              console.error("Decrypt failed (new):", msg.id, err);
-              decryptedContent = msg.content || "[Failed to decrypt]";
-            }
-            const decryptedMsg = withPreview({ ...msg, content: decryptedContent });
-
-            set((state) => {
-              let updated = state.conversations.map((c) =>
-                c.id === msg.conversationId
-                  ? {
-                      ...c,
-                      lastMessage: decryptedMsg,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : c
-              );
-
-              if (!updated.find((c) => c.id === msg.conversationId)) {
-                updated.push({
-                  id: msg.conversationId,
-                  isGroup: false,
-                  title: null,
-                  participants: [],
-                  lastMessage: decryptedMsg,
-                  updatedAt: new Date().toISOString(),
-                });
-              }
-
-              updated = sortConversations(updated);
-
-              return {
-                messages: {
-                  ...state.messages,
-                  [msg.conversationId]: [...next, decryptedMsg],
-                },
-                conversations: updated,
-              };
-            });
-          })
-          .catch((e) => console.error("Async decrypt error", e));
-
-        return {};
-      });
+      set((state) => ({
+        messages: [...state.messages.filter((m) => m.id !== msg.id), msg],
+      }));
     });
 
     socket.off("message:deleted");
@@ -400,6 +339,9 @@ export const useChatStore = create<State>((set, get) => ({
           console.warn('Skipping invalid message during older messages load:', m);
           return null; // This will be filtered out below
         }
+        
+        // Normalize message before processing
+        m = normalizeMessage(m);
         
         // Normalize content before processing
         m.content = normalizeMessageContent(m.content);
