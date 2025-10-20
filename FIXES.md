@@ -1,51 +1,77 @@
-# TASK: Disable or repurpose the unused "Encryption Key Settings" page
+TASK: Fix libsodium TypeError in storePrivateKey (length cannot be null or undefined)
 
 Context:
-- The encryption system now automatically manages private keys using libsodium and app secrets.
-- Manual key setup (Settings → Key) is redundant.
-- Console shows decrypt warnings because incoming messages contain placeholder encrypted objects.
+- Error occurs in storePrivateKey during login (setupUserEncryptionKeys).
+- Root cause: privateKey not a valid Uint8Array or sodium not ready before use.
+- Need to validate inputs, ensure sodium initialized, and generate keypair properly.
 
 Goal:
-1. Disable the old key-setting logic temporarily.
-2. Replace its UI with an informational message.
-3. Keep file structure intact for future use.
-4. Prevent confusion or crashes due to undefined local key settings.
+1. Add strong type validation in storePrivateKey().
+2. Ensure setupUserEncryptionKeys() waits for sodium to initialize before generating keys.
+3. Prevent libsodium "length cannot be null" error.
 
 Steps:
-- Open web/src/pages/SettingsKey.tsx (or similar settings key page).
-- Comment out existing logic for manual password handling.
-- Replace render body with:
-  ```tsx
-  <Card>
-    <CardHeader>
-      <CardTitle>Encryption Key Management</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-sm text-muted-foreground">
-        Encryption keys are now generated and managed automatically for each user session.
-        Manual key configuration is no longer required.
-      </p>
-    </CardContent>
-  </Card>
-````
-
-* In crypto.ts, add safe guard in decryptMessage():
+- In web/src/utils/keyManagement.ts, update storePrivateKey:
 
   ```ts
-  if (!cipher || typeof cipher !== "string") {
-    console.warn("Empty or invalid cipher, returning plain text");
-    return "";
+  export async function storePrivateKey(privateKey: Uint8Array | null, password: string): Promise<string> {
+    const sodium = await getSodium();
+
+    if (!privateKey || !(privateKey instanceof Uint8Array)) {
+      console.error("storePrivateKey: invalid privateKey", privateKey);
+      throw new TypeError("Invalid private key — must be Uint8Array");
+    }
+
+    if (!password || typeof password !== "string") {
+      throw new TypeError("Invalid password — must be string");
+    }
+
+    try {
+      const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+      const combinedKey = `${appSecret}-${password}`;
+      const combinedBytes = sodium.from_string(combinedKey);
+
+      const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
+      const key = sodium.crypto_pwhash(
+        sodium.crypto_secretbox_KEYBYTES,
+        combinedBytes,
+        salt,
+        sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+        sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+        sodium.crypto_pwhash_ALG_DEFAULT
+      );
+
+      const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+      const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
+
+      const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);
+      result.set(salt, 0);
+      result.set(nonce, salt.length);
+      result.set(ciphertext, salt.length + nonce.length);
+
+      const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+      console.log("✅ storePrivateKey: encrypted and encoded successfully");
+      return encoded;
+    } catch (err) {
+      console.error("❌ Error in storePrivateKey:", err);
+      throw err;
+    }
   }
+````
+
+* In setupUserEncryptionKeys(), before calling storePrivateKey:
+
+  ```ts
+  const sodium = await getSodium();
+  const { publicKey, privateKey } = sodium.crypto_box_keypair();
+  await storePrivateKey(privateKey, password);
   ```
 
 Verification:
 
-* Open Settings → Key page → shows informational message.
-* No more decrypt warnings for empty messages.
-* App still encrypts/decrypts normally.
-
-Output:
-
-* Show updated SettingsKey page and modified decryptMessage check.
+* Restart frontend.
+* Login again → no "length cannot be null or undefined" errors.
+* Console shows "✅ storePrivateKey: encrypted and encoded successfully".
+* Message encryption logs remain valid.
 
 ```

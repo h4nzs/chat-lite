@@ -30,15 +30,16 @@ export async function importPrivateKey(privateKeyStr: string): Promise<Uint8Arra
   return sodium.from_base64(privateKeyStr, sodium.base64_variants.ORIGINAL);
 }
 
-export async function storePrivateKey(privateKey: Uint8Array, password: string): Promise<string> {
+export async function storePrivateKey(privateKey: Uint8Array | null, password: string): Promise<string> {
   const sodium = await getSodium();
 
   if (!privateKey || !(privateKey instanceof Uint8Array)) {
-    console.error("storePrivateKey: invalid privateKey type", privateKey);
-    throw new TypeError("Private key must be a Uint8Array");
+    console.error("storePrivateKey: invalid privateKey", privateKey);
+    throw new TypeError("Invalid private key — must be Uint8Array");
   }
+
   if (!password || typeof password !== "string") {
-    throw new TypeError("Password must be a non-empty string");
+    throw new TypeError("Invalid password — must be string");
   }
 
   try {
@@ -64,9 +65,11 @@ export async function storePrivateKey(privateKey: Uint8Array, password: string):
     result.set(nonce, salt.length);
     result.set(ciphertext, salt.length + nonce.length);
 
-    return sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    console.log("✅ storePrivateKey: encrypted and encoded successfully");
+    return encoded;
   } catch (err) {
-    console.error("Error in storePrivateKey:", err);
+    console.error("❌ Error in storePrivateKey:", err);
     throw err;
   }
 }
@@ -83,9 +86,13 @@ export async function retrievePrivateKey(encryptedDataStr: string, password: str
   const encryptedPrivateKey = encryptedData.slice(sodium.crypto_pwhash_SALTBYTES + sodium.crypto_secretbox_NONCEBYTES);
   
   // Derive the same key from the password
+  const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+  const combinedKey = `${appSecret}-${password}`;
+  const combinedBytes = sodium.from_string(combinedKey);
+  
   const key = sodium.crypto_pwhash(
     sodium.crypto_secretbox_KEYBYTES,
-    password,
+    combinedBytes,
     salt,
     sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
     sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,

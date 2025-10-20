@@ -81,10 +81,17 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
   console.log("=== DECRYPT MESSAGE ===");
   console.log("Input cipher:", cipher);
   console.log("Conversation ID:", conversationId);
+  
+  // Add safe guard for empty or invalid cipher
+  if (!cipher || typeof cipher !== "string") {
+    console.warn("Empty or invalid cipher, returning plain text");
+    return "";
+  }
+  
   try {
     // Check if cipher is valid and not empty
-    if (!cipher || typeof cipher !== 'string' || cipher.trim() === '') {
-      console.log("Empty or invalid cipher, returning as-is");
+    if (cipher.trim() === '') {
+      console.log("Empty cipher, returning as-is");
       console.log("=== END DECRYPT MESSAGE (empty/invalid) ===");
       return cipher || '';
     }
