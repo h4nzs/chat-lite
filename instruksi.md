@@ -1,228 +1,103 @@
-# Implementation Plan: Proper End-to-End Encryption for Chat-Lite
+## Analisis dan Perbaikan Lanjutan Aplikasi Chat-Lite
 
-## Overview
-The current encryption implementation uses a deterministic key derived solely from the conversation ID, making it possible for any participant (current or future) to decrypt all messages in a conversation. This is not true end-to-end encryption. This document outlines a plan to implement proper end-to-end encryption using public-key cryptography.
+Berdasarkan analisis lanjutan terhadap implementasi sistem enkripsi end-to-end dan masalah-masalah yang muncul, berikut adalah temuan-temuan penting yang perlu diperbaiki:
 
-## Current Issues
-1. **Weak Key Generation**: Encryption key depends only on conversation ID
-2. **Compromised Confidentiality**: All participants can decrypt all historical messages
-3. **No Forward Secrecy**: Messages remain decryptable even after leaving a conversation
-4. **Server Access**: Server can potentially decrypt messages if it has conversation IDs
+### 1. Issue pada Proses Enkripsi/Pengiriman Pesan
+- **Deskripsi**: Terdapat error "Invalid cipher text" saat pengiriman pesan, menunjukkan bahwa fungsi dekripsi dipanggil dengan teks yang kosong atau tidak valid.
+- **Penyebab**: 
+  - Fungsi decryptMessage menerima input yang tidak valid sebelum enkripsi selesai
+  - Konflik antara sistem enkripsi lama (menggunakan conversation ID) dan sistem enkripsi baru (menggunakan session key)
+  - Fungsi sendMessage memanggil decryptMessage dengan data yang tidak lengkap
+- **Dampak**: Pesan tidak dapat terkirim secara benar karena proses enkripsi/gagal dan error terus muncul di konsol
 
-## Proposed Solution: Asymmetric Key Encryption with Session Keys
+### 2. Sistem Pengelolaan Kunci Belum Lengkap
+- **Deskripsi**: Tidak ada proses awal untuk membuat kunci enkripsi, menyebabkan indicator enkripsi menunjukkan status tidak aktif.
+- **Penyebab**:
+  - Fungsi setupUserEncryptionKeys hanya dipanggil saat login/register tapi tidak ada proses untuk pengguna yang sudah terdaftar sebelum implementasi enkripsi
+  - Tidak ada UI untuk memungkinkan pengguna membuat kunci enkripsi secara manual
+  - Proses pengambilan kunci saat decryptMessage bisa gagal karena kunci tidak ditemukan
+- **Dampak**: Fitur enkripsi tidak aktif dan semua pesan dikirim dalam bentuk teks biasa
 
-### 1. Architecture Overview
-- Each user generates and maintains their own public/private key pair
-- For each conversation, generate a unique session key
-- Encrypt session key with each participant's public key
-- Use session key to encrypt message content
-- Store encrypted session key with each message
+### 3. Konflik Sistem Enkripsi Lama dan Baru
+- **Deskripsi**: Aplikasi memiliki dua sistem enkripsi (lama dan baru) yang bisa berkonflik satu sama lain.
+- **Penyebab**:
+  - Fungsi decryptMessage di crypto.ts masih aktif dan bisa dipanggil bersamaan dengan decryptMessage di advancedCrypto.ts
+  - Tidak ada pemilihan yang jelas antara sistem enkripsi berdasarkan format pesan
+- **Dampak**: Proses enkripsi/dekripsi bisa membaca format yang salah dan menghasilkan error
 
-### 2. Implementation Steps
+### 4. Masalah Inisialisasi dan Pengelolaan Libsodium
+- **Deskripsi**: Meskipun sudah dibuat initializer, masih ada potensi race condition dalam inisialisasi libsodium.
+- **Penyebab**:
+  - Fungsi-fungsi enkripsi bisa dipanggil sebelum libsodium sepenuhnya siap
+  - Tidak ada penanganan error jika inisialisasi libsodium gagal
+- **Dampak**: Aplikasi bisa crash atau mengalami error ketika mencoba melakukan operasi kriptografi
 
-#### Phase 1: Key Management System
-1. **User Key Pair Generation**:
-   - Implement per-user public/private key pair generation using libsodium
-   - Store private key in browser's secure storage (e.g., Web Crypto API with secure wrapping)
-   - Store public key in the database with user profile
+### 5. UI/UX untuk Pengelolaan Kunci Belum Selesai
+- **Deskripsi**: Tautan "Enable encryption" menavigasi ke #settings tetapi tidak membuka UI yang sesuai.
+- **Penyebab**:
+  - Tidak ada routing atau komponen untuk halaman pengaturan enkripsi
+  - Proses pembuatan kunci tidak terintegrasi dengan alur pengguna
+- **Dampak**: Pengguna tidak bisa mengaktifkan enkripsi secara visual melalui UI
 
-2. **Database Schema Changes**:
-   - Add `publicKey` field to `User` model in `schema.prisma`
-   - Add `encryptedSessionKey` field to `Message` model
-   - Add `sessionId` field to `Message` model for grouping messages with the same session key
+---
 
-3. **API Endpoints**:
-   - Create endpoint for users to upload their public key
-   - Create endpoint for fetching user public keys
+## Rekomendasi dan Langkah-Langkah Perbaikan
 
-#### Phase 2: Session Key Management
-1. **Session Key Generation**:
-   - When a conversation starts or when new users join, generate a new random session key
-   - Encrypt the session key with each participant's public key
-   - Store encrypted session keys in a separate table
+### Fase 1: Perbaikan Sistem Enkripsi
+1. **Lengkapi sistem enkripsi end-to-end**
+   - Pastikan bahwa semua pesan baru menggunakan sistem enkripsi session key
+   - Tambahkan fallback untuk pesan lama yang menggunakan sistem enkripsi lama
+   - Perbaiki konflik antara dua sistem enkripsi
 
-2. **Database Schema for Session Keys**:
-   - Create `SessionKey` model with `id`, `conversationId`, `sessionId`, `userId`, `encryptedKey`, `createdAt`
-   - Add indexes for efficient retrieval
+2. **Perbaiki proses pengiriman pesan**
+   - Pastikan fungsi decryptMessage tidak dipanggil sebelum proses enkripsi selesai
+   - Tambahkan penanganan error yang lebih baik untuk kasus cipher text kosong atau tidak valid
 
-#### Phase 3: Message Encryption & Decryption
-1. **Frontend Changes**:
-   - Update `encryptMessage()` to:
-     - Fetch current session key (or generate new one if needed)
-     - Encrypt message with session key
-     - Include encrypted session key reference with message
-   - Update `decryptMessage()` to:
-     - Retrieve appropriate encrypted session key
-     - Decrypt session key with user's private key
-     - Decrypt message with session key
+3. **Implementasi sistem fallback**
+   - Buat sistem fallback untuk kembali ke pengiriman teks biasa jika enkripsi gagal
+   - Tambahkan logika untuk menandai pesan yang gagal dienkripsi
 
-2. **Backend Changes**:
-   - Update message storage to include encrypted session key reference
+### Fase 2: Implementasi Pengelolaan Kunci
+1. **Tambahkan UI untuk setup kunci**
+   - Buat halaman pengaturan yang menampilkan status kunci
+   - Tambahkan tombol untuk membuat kunci baru
+   - Implementasikan proses verifikasi bahwa kunci telah dibuat dengan benar
 
-#### Phase 4: Migration and Security Improvements
-1. **Migration Path**:
-   - Plan migration for existing messages
-   - Maintain backward compatibility with existing messages
+2. **Perbaiki flow pembuatan kunci**
+   - Implementasikan pembuatan kunci untuk pengguna yang sudah ada
+   - Tambahkan notifikasi bahwa kunci harus dibuat sebelum enkripsi dapat digunakan
+   - Integrasi pembuatan kunci dengan alur pengguna
 
-2. **Forward Secrecy**:
-   - Implement rotation of session keys periodically
-   - Option to generate new session key when users join/leave conversations
+3. **Tambahkan validasi kunci**
+   - Periksa apakah kunci publik dan private telah dibuat sebelum mengirim pesan terenkripsi
+   - Tambahkan mekanisme untuk menguji bahwa proses enkripsi dan dekripsi berfungsi dengan benar
 
-## Technical Implementation Details
+### Fase 3: Penanganan Error dan Keamanan
+1. **Perbaiki penanganan error libsodium**
+   - Tambahkan penanganan error jika inisialisasi libsodium gagal
+   - Tambahkan fallback ke pengiriman teks biasa jika kriptografi tidak tersedia
 
-### New Schema Additions
-```prisma
-model User {
-  // ... existing fields
-  publicKey      String?
-  privateKey     String?  // For migration purposes, will be removed from database
-}
+2. **Tambahkan penanganan error dalam UI**
+   - Tampilkan notifikasi yang jelas saat enkripsi gagal
+   - Tambahkan indikator visual untuk status enkripsi pesan
+   - Tambahkan retry otomatis jika operasi enkripsi gagal karena race condition
 
-model SessionKey {
-  id              String   @id @default(cuid())
-  conversationId  String
-  sessionId       String
-  userId          String
-  encryptedKey    String   // Session key encrypted with user's public key
-  createdAt       DateTime @default(now())
-  expiresAt       DateTime?
-  
-  @@index([conversationId])
-  @@index([userId])
-  @@index([sessionId])
-}
+3. **Tingkatkan keamanan UI**
+   - Pastikan private key tidak pernah terekspos ke console atau jaringan
+   - Implementasikan penghapusan cache yang aman saat logout
+   - Tambahkan validasi bahwa password yang digunakan untuk enkripsi memenuhi standar keamanan
 
-model Message {
-  // ... existing fields
-  sessionId           String?      // References the session key set used for encryption
-  encryptedSessionKey String?      // Encrypted session key for this specific message (for forward secrecy)
-}
-```
+### Fase 4: Integrasi dan Testing
+1. **Testing sistem enkripsi**
+   - Uji pengiriman pesan antar dua pengguna
+   - Verifikasi bahwa hanya pengirim dan penerima yang bisa membaca pesan
+   - Uji fallback untuk pesan lama dan sistem enkripsi lama
 
-### Key Generation and Storage
-1. **Client-side Key Generation**:
-   - Use libsodium.js to generate Ed25519 key pairs
-   - Store private key using Web Crypto API with password-based wrapping
-   - Upload public key to server for distribution
+2. **Testing UI dan UX**
+   - Uji alur pengguna dari membuat kunci hingga mengirim pesan terenkripsi
+   - Pastikan indicator enkripsi bekerja sebagaimana mestinya
+   - Uji pengalaman pengguna untuk alur setup enkripsi
 
-2. **Session Key Handling**:
-   - Generate a new random symmetric key (e.g., 256-bit) for each session
-   - Encrypt session key with each participant's RSA public key
-   - Store encrypted session keys in the database
-
-### Encryption Process
-```typescript
-// When sending a message:
-async function encryptMessageForParticipants(text: string, conversationId: string, participantPublicKeys: string[]) {
-  // Generate or retrieve session key
-  const sessionKey = await getCurrentSessionKey(conversationId);
-  
-  // Encrypt the message content with the session key
-  const encryptedContent = await encryptWithSymmetricKey(text, sessionKey);
-  
-  // Encrypt the session key with each participant's public key
-  const encryptedSessionKeys = participantPublicKeys.map(pubKey => 
-    encryptWithPublicKey(sessionKey, pubKey)
-  );
-  
-  return {
-    encryptedContent,
-    encryptedSessionKeys,  // Send to server for distribution
-    sessionId: sessionKey.id
-  };
-}
-```
-
-### Decryption Process
-```typescript
-// When receiving a message:
-async function decryptMessageForUser(encryptedContent: string, encryptedSessionKey: string, sessionId: string) {
-  // Decrypt the session key with user's private key
-  const sessionKey = await decryptWithPrivateKey(encryptedSessionKey, userPrivateKey);
-  
-  // Decrypt the message content with the session key
-  const decryptedContent = await decryptWithSymmetricKey(encryptedContent, sessionKey);
-  
-  return decryptedContent;
-}
-```
-
-## Implementation Timeline
-
-### Week 1: Key Management
-- Generate user key pairs
-- Store public keys in database
-- Create API endpoints for key management
-
-### Week 2: Session Key System
-- Implement session key generation
-- Create database schema for session keys
-- Update conversation creation logic
-
-### Week 3: Encryption/Decryption Logic
-- Update frontend encryption/decryption functions
-- Update backend message handling
-- Implement key caching for performance
-
-### Week 4: Testing & Migration
-- Comprehensive testing of new system
-- Plan for migrating existing messages
-- Performance optimization and security audit
-
-## Security Considerations
-
-### Forward Secrecy
-- Option to rotate session keys periodically
-- New session keys when participants join/leave conversations
-- Ability to re-encrypt session keys when participants change
-
-### Key Storage
-- Client-side private key storage using Web Crypto API with password wrapping
-- Server never has access to unencrypted private keys
-- Secure key backup/restore mechanism
-
-### Performance
-- Efficient key caching to avoid repeated decryption
-- Batch operations for multi-user session key distribution
-- Consider message threading for conversation sessions
-
-## Rollout Strategy
-
-### Phase 1: New Conversations Only
-- Implement new encryption for new conversations only
-- Maintain backward compatibility for existing conversations
-- Gradually migrate old conversations
-
-### Phase 2: All Conversations
-- Apply new encryption to all new messages
-- Provide option to re-encrypt old conversations
-
-### Phase 3: Complete Migration
-- Complete migration of all historical messages (optional)
-- Full removal of old encryption system
-
-## Testing Requirements
-
-1. **Unit Tests**:
-   - Key generation and storage
-   - Encryption/decryption functions
-   - Session key management
-
-2. **Integration Tests**:
-   - End-to-end message sending/receiving
-   - Multi-user conversation scenarios
-   - Key rotation scenarios
-
-3. **Security Tests**:
-   - Verify that server cannot decrypt messages
-   - Verify that users cannot decrypt messages from conversations they're not in
-   - Test forward secrecy implementation
-
-## Risk Mitigation
-
-1. **User Key Loss**: Implement secure key backup/recovery system
-2. **Performance Impact**: Optimize key caching, batch operations, and minimize encryption overhead
-3. **Backward Compatibility**: Maintain support for existing messages during transition
-4. **Migration Errors**: Thorough testing and rollback procedures
-
-This plan provides a comprehensive approach to implementing true end-to-end encryption while maintaining system functionality and security.
+3. **Testing error handling**
+   - Uji kasus-kasus error dan pastikan aplikasi tetap fungsional
+   - Verifikasi bahwa pesan tetap bisa dikirim meskipun dengan enkripsi yang gagal

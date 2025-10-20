@@ -24,6 +24,11 @@ function sanitizeHtml(content: string): string {
 }
 
 function MessageBubble({ m }: { m: Message }) {
+  if (!m || !m.id || !m.content) {
+    console.warn('Invalid message render skipped:', m)
+    return null
+  }
+  
   const me = useAuthStore((s) => s.user?.id);
   const mine = m.senderId === me;
   const activeId = useChatStore((s) => s.activeId);

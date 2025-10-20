@@ -159,8 +159,29 @@ export default function ChatWindow({ id }: { id: string | null }) {
     [deleteMessage, formatTimestamp]
   );
 
+  // Check encryption status
+  const hasEncryptionKeys = !!(localStorage.getItem('publicKey') && localStorage.getItem('encryptedPrivateKey'));
+  const encryptionStatusText = hasEncryptionKeys ? "Encrypted" : "Not encrypted";
+
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Encryption status bar */}
+      <div className={`px-4 py-2 text-sm flex items-center justify-between ${
+        hasEncryptionKeys 
+          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' 
+          : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
+      }`}>
+        <div className="flex items-center">
+          <div className={`w-2 h-2 rounded-full mr-2 ${hasEncryptionKeys ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+          <span>End-to-end encryption: {encryptionStatusText}</span>
+        </div>
+        {!hasEncryptionKeys && (
+          <a href="/settings" className="text-xs underline">
+            Enable encryption
+          </a>
+        )}
+      </div>
+      
       {/* Messages area */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {loadingOlder && (

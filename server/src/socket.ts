@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { socketAuthMiddleware, verifySocketAuth } from "./middleware/auth.js";
 import { prisma } from "./lib/prisma.js";
+import cookie from 'cookie';
 
 export function registerSocket(httpServer: HttpServer) {
   const io = new Server(httpServer, {
@@ -22,17 +23,8 @@ export function registerSocket(httpServer: HttpServer) {
       
       // Ekstrak token dari cookie dengan penanganan yang lebih baik
       if (socket.handshake.headers?.cookie) {
-        // Parse cookies dengan cara yang lebih aman
-        const cookies: Record<string, string> = {};
-        socket.handshake.headers.cookie.split(";").forEach((cookie) => {
-          const parts = cookie.trim().split("=");
-          if (parts.length === 2) {
-            const key = parts[0].trim();
-            const value = decodeURIComponent(parts[1].trim());
-            cookies[key] = value;
-          }
-        });
-        
+        // Use safer cookie parsing
+        const cookies = cookie.parse(socket.handshake.headers.cookie);
         token = cookies["at"] || null;
         console.log("Token from cookie:", token);
       }
@@ -194,10 +186,11 @@ export function registerSocket(httpServer: HttpServer) {
         });
 
         // Broadcast ke semua member di room conversation
-        const broadcastData = {
+        // Serialize to ensure Prisma result is properly formatted
+        const broadcastData = JSON.parse(JSON.stringify({
           ...newMessage,
           tempId: data.tempId,
-        };
+        }));
         io.to(data.conversationId).emit("message:new", broadcastData);
 
         cb?.({ ok: true, msg: newMessage });

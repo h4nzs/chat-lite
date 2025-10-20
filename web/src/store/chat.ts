@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
-import { encryptMessage, decryptMessage } from "@utils/advancedCrypto";
+import { encryptMessage, decryptMessage } from "@utils/crypto";
 
 export type Conversation = {
   id: string;
@@ -169,6 +169,12 @@ export const useChatStore = create<State>((set, get) => ({
 
           const decryptedItems = await Promise.all(
             res.items.map(async (m) => {
+              // Add validation for message object
+              if (!m || typeof m !== 'object' || !m.id || !m.senderId) {
+                console.warn('Skipping invalid message during load:', m);
+                return null; // This will be filtered out below
+              }
+              
               if (!m.content) return withPreview({ ...m, content: null });
               try {
                 // Check if this is the new format with session keys
@@ -177,7 +183,7 @@ export const useChatStore = create<State>((set, get) => ({
                     content: m.content,
                     sessionId: m.sessionId,
                     encryptedSessionKey: m.encryptedSessionKey
-                  });
+                  }, m.conversationId);
                   return withPreview({ ...m, content: decryptedContent });
                 } else {
                   // This is an old message, might need legacy decryption
@@ -190,8 +196,12 @@ export const useChatStore = create<State>((set, get) => ({
               }
             })
           );
+          
+          // Filter out any null messages that failed validation
+          const validDecryptedItems = decryptedItems.filter(item => item !== null) as Message[];
 
-          const messages = decryptedItems.reverse();
+          // Don't reverse - keep chronological order (oldest first, newest last)
+          const messages = validDecryptedItems;
           set((s) => ({
             messages: { ...s.messages, [id]: messages },
             cursors: { ...s.cursors, [id]: res.nextCursor },
@@ -222,6 +232,12 @@ export const useChatStore = create<State>((set, get) => ({
     // === Socket events ===
     socket.off("message:new");
     socket.on("message:new", (msg: Message & { tempId?: number }) => {
+      // Add validation before processing the message
+      if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId || typeof msg.content !== 'string') {
+        console.warn('Skipped invalid message:', msg)
+        return
+      }
+      
       set((s) => {
         const curr = s.messages[msg.conversationId] || [];
         let next = msg.tempId
@@ -240,7 +256,7 @@ export const useChatStore = create<State>((set, get) => ({
                       content: msg.content,
                       sessionId: msg.sessionId,
                       encryptedSessionKey: msg.encryptedSessionKey
-                    })
+                    }, msg.conversationId)
                   : null;
               } else {
                 // This is an old message format
@@ -361,19 +377,37 @@ export const useChatStore = create<State>((set, get) => ({
 
     const decryptedItems = await Promise.all(
       res.items.map(async (m) => {
+        // Add validation for message object
+        if (!m || typeof m !== 'object' || !m.id || !m.senderId) {
+          console.warn('Skipping invalid message during older messages load:', m);
+          return null; // This will be filtered out below
+        }
+        
         if (!m.content) return withPreview({ ...m, content: null });
-        return withPreview({
-          ...m,
-          content: await decryptMessage(m.content, m.conversationId),
-        });
+        // Check if this is the new format with session keys
+        if (m.sessionId && m.encryptedSessionKey) {
+          const decryptedContent = await decryptMessage({
+            content: m.content,
+            sessionId: m.sessionId,
+            encryptedSessionKey: m.encryptedSessionKey
+          }, m.conversationId);
+          return withPreview({ ...m, content: decryptedContent });
+        } else {
+          // This is an old message, might need legacy decryption
+          // For now, return as is but in the future we'd implement migration
+          return withPreview({ ...m, content: m.content });
+        }
       })
     );
+    
+    // Filter out any null messages that failed validation
+    const validDecryptedItems = decryptedItems.filter(item => item !== null) as Message[];
 
     set((s) => ({
       messages: {
         ...s.messages,
         [conversationId]: [
-          ...decryptedItems.reverse(),
+          ...validDecryptedItems, // Don't reverse - prepend older messages in chronological order
           ...(s.messages[conversationId] || []),
         ],
       },
@@ -394,11 +428,19 @@ export const useChatStore = create<State>((set, get) => ({
             { conversationId, content: encryptedContent, sessionId, encryptedSessionKey, tempId },
             (ack: { ok: boolean; msg?: Message }) => {
               if (ack?.ok && ack.msg) {
+                // Add validation for message object
+                if (!ack.msg || typeof ack.msg !== 'object' || !ack.msg.id || !ack.msg.senderId) {
+                  console.warn('Received invalid message acknowledgment:', ack.msg);
+                  get().markMessageError(conversationId, tempId!);
+                  reject(new Error("Received invalid message from server"));
+                  return;
+                }
+                
                 decryptMessage({
                   content: ack.msg.content || "",
                   sessionId: ack.msg.sessionId,
                   encryptedSessionKey: ack.msg.encryptedSessionKey
-                })
+                }, conversationId)
                   .then((decryptedContent) => {
                     const decryptedAck = withPreview({
                       ...ack.msg,
@@ -446,11 +488,14 @@ export const useChatStore = create<State>((set, get) => ({
                     });
                     resolve();
                   })
-                  .catch(() => {
+                  .catch((error) => {
+                    console.error('Error in message acknowledgment decryption:', error);
+                    // Fallback to unencrypted content
                     const decryptedAck = withPreview({
                       ...ack.msg,
-                      content: "[Failed to decrypt]",
+                      content: ack.msg.content || "[Failed to decrypt]",
                     });
+
                     set((s) => ({
                       messages: {
                         ...s.messages,
@@ -481,6 +526,12 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   addOptimisticMessage(conversationId, msg) {
+    // Validate message before adding
+    if (!msg || typeof msg !== 'object' || !msg.senderId) {
+      console.warn('Skipping invalid optimistic message:', msg);
+      return;
+    }
+    
     // Ensure optimistic message has a stable temporary id & id
     const tempId = msg.tempId ?? Date.now();
     const optimistic: Message = withPreview({
@@ -500,19 +551,38 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   markMessageError(conversationId, tempId) {
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: (s.messages[conversationId] || []).map((m) =>
-          m.tempId === tempId || m.id === `temp-${tempId}`
-            ? { ...m, error: true }
-            : m
-        ),
-      },
-    }));
+    set((s) => {
+      const conversationMessages = s.messages[conversationId] || [];
+      // Check if there's actually a message to mark as error
+      const hasMessageToMark = conversationMessages.some(m => 
+        m.tempId === tempId || m.id === `temp-${tempId}`
+      );
+      
+      if (!hasMessageToMark) {
+        console.warn(`No message found with tempId ${tempId} to mark as error in conversation ${conversationId}`);
+        return {}; // Return empty update if no message to mark
+      }
+      
+      return {
+        messages: {
+          ...s.messages,
+          [conversationId]: conversationMessages.map((m) =>
+            m.tempId === tempId || m.id === `temp-${tempId}`
+              ? { ...m, error: true }
+              : m
+          ),
+        },
+      };
+    });
   },
 
   replaceMessageTemp(conversationId, tempId, msg) {
+    // Validate replacement message before replacing
+    if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId) {
+      console.warn('Skipping invalid replacement message:', msg);
+      return;
+    }
+    
     set((s) => ({
       messages: {
         ...s.messages,

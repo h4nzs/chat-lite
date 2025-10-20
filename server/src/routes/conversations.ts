@@ -186,4 +186,117 @@ router.post("/group", requireAuth, async (req, res, next) => {
   }
 });
 
+// === POST: Start a new 1-on-1 conversation ===
+router.post("/start", requireAuth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user.id;
+    const { peerId } = req.body;
+
+    if (!peerId) {
+      return res.status(400).json({ error: "Peer ID is required" });
+    }
+
+    if (userId === peerId) {
+      return res.status(400).json({ error: "Cannot start conversation with yourself" });
+    }
+
+    // Check if a conversation already exists between these users
+    const existingConversation = await prisma.conversation.findFirst({
+      where: {
+        isGroup: false,
+        participants: {
+          every: {
+            userId: { in: [userId, peerId] }
+          }
+        }
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (existingConversation) {
+      // Return existing conversation
+      const lastMessage = await prisma.message.findFirst({
+        where: { conversationId: existingConversation.id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const transformed = {
+        id: existingConversation.id,
+        isGroup: existingConversation.isGroup,
+        title: existingConversation.title,
+        updatedAt: existingConversation.updatedAt,
+        participants: existingConversation.participants.map((p) => ({
+          id: p.user.id,
+          username: p.user.username,
+          name: p.user.name,
+          avatarUrl: p.user.avatarUrl,
+        })),
+        lastMessage: lastMessage || null,
+      };
+
+      return res.json(transformed);
+    }
+
+    // Create a new 1-on-1 conversation
+    const conversation = await prisma.conversation.create({
+      data: {
+        isGroup: false, // 1-on-1 conversation
+        participants: {
+          create: [
+            { userId: userId }, // Creator
+            { userId: peerId }  // The other participant
+          ]
+        }
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Transform response to match frontend expectations
+    const transformed = {
+      id: conversation.id,
+      isGroup: conversation.isGroup,
+      title: conversation.title,
+      updatedAt: conversation.updatedAt,
+      participants: conversation.participants.map((p) => ({
+        id: p.user.id,
+        username: p.user.username,
+        name: p.user.name,
+        avatarUrl: p.user.avatarUrl,
+      })),
+      lastMessage: null,
+    };
+
+    res.status(201).json(transformed);
+  } catch (e) {
+    console.error("[Conversations Controller - Start 1-on-1] Error:", e);
+    next(e);
+  }
+});
+
 export default router;

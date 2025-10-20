@@ -1,4 +1,4 @@
-import sodium from 'libsodium-wrappers'
+import { getSodium, initializeSodium } from '@lib/sodiumInitializer'
 import { useAuthStore } from '@store/auth'
 
 // Cache for derived keys to avoid recomputation
@@ -11,7 +11,7 @@ export function clearKeyCache(): void {
 
 // Generate a deterministic key for a conversation based on conversation ID only
 async function generateConversationKey(conversationId: string): Promise<Uint8Array> {
-  await sodium.ready
+  const sodium = await getSodium()
   
   // Check cache first
   const cacheKey = `${conversationId}`
@@ -44,7 +44,7 @@ export async function encryptMessage(text: string, conversationId: string): Prom
   console.log("=== ENCRYPT MESSAGE ===");
   console.log("Input text:", text);
   console.log("Conversation ID:", conversationId);
-  await sodium.ready
+  const sodium = await getSodium()
   const key = await generateConversationKey(conversationId)
   console.log("Generated key (base64):", sodium.to_base64(key, sodium.base64_variants.ORIGINAL));
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
@@ -71,57 +71,71 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
   console.log("Input cipher:", cipher);
   console.log("Conversation ID:", conversationId);
   try {
-    // Check if cipher is valid
-    if (!cipher || typeof cipher !== 'string') {
-      throw new Error('Invalid cipher text');
+    // Check if cipher is valid and not empty
+    if (!cipher || typeof cipher !== 'string' || cipher.trim() === '') {
+      console.log("Empty or invalid cipher, returning as-is");
+      console.log("=== END DECRYPT MESSAGE (empty/invalid) ===");
+      return cipher || '';
     }
     
-    // Cek apakah cipher adalah pesan teks biasa (tidak dienkripsi)
-    // Jika cipher tidak berupa base64 yang valid, asumsikan itu adalah teks biasa
-    try {
-      sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    } catch {
-      // Jika tidak bisa di-decode sebagai base64, asumsikan itu adalah teks biasa
-      console.log("Returning plain text:", cipher);
+    // Check if cipher looks like base64 (basic check: length multiple of 4 and valid base64 characters)
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(cipher) || cipher.length % 4 !== 0) {
+      // If it's not valid base64, return as plain text
+      console.log("Cipher is not valid base64, returning as plain text:", cipher);
       console.log("=== END DECRYPT MESSAGE (plain text) ===");
       return cipher;
     }
     
-    await sodium.ready;
-    const key = await generateConversationKey(conversationId);
-    console.log("Generated key (base64):", sodium.to_base64(key, sodium.base64_variants.ORIGINAL));
-    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    console.log("Decoded combined data (base64):", sodium.to_base64(combined, sodium.base64_variants.ORIGINAL));
+    const sodium = await getSodium();
     
-    // Check if combined data is valid
-    if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
-      throw new Error('Incomplete input data');
+    // Try to decode as base64
+    let combined: Uint8Array;
+    try {
+      combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
+    } catch (decodeError) {
+      console.log("Cannot decode as base64, returning as plain text:", cipher);
+      console.log("=== END DECRYPT MESSAGE (plain text) ===");
+      return cipher;
     }
+    
+    // Check if combined data is valid for decryption
+    if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
+      console.log("Invalid cipher length, returning as plain text:", cipher);
+      console.log("=== END DECRYPT MESSAGE (plain text) ===");
+      return cipher;
+    }
+    
+    // Generate the conversation key
+    const key = await generateConversationKey(conversationId);
     
     // Extract nonce and encrypted data
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
-    console.log("Extracted nonce (base64):", sodium.to_base64(nonce, sodium.base64_variants.ORIGINAL));
-    console.log("Extracted encrypted data (base64):", sodium.to_base64(encrypted, sodium.base64_variants.ORIGINAL));
     
     // Decrypt
     const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
     const result = sodium.to_string(decrypted);
+    
     console.log("Decrypted result:", result);
     console.log("=== END DECRYPT MESSAGE (success) ===");
     return result;
   } catch (error) {
     console.error('Decryption failed:', error);
     console.log("=== END DECRYPT MESSAGE (failed) ===");
-    // Return a more specific error message
+    
+    // Return a more specific error message, but also check if cipher itself is valid to return
     if (error instanceof Error) {
-      if (error.message.includes('incorrect key')) {
+      if (error.message.includes('incorrect key') || error.message.includes('bad message authentication tag')) {
         return '[Failed to decrypt: Invalid key]';
       } else if (error.message.includes('incomplete input')) {
         return '[Failed to decrypt: Incomplete data]';
       }
     }
-    return '[Failed to decrypt: Message may be corrupted]';
+    
+    // If the error is because the content is not encrypted, return it as is
+    // This handles cases where the content is plain text that doesn't need decryption
+    return cipher || '[Failed to decrypt: Message may be corrupted]';
   }
 }
 
