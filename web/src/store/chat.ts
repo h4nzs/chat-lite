@@ -296,29 +296,50 @@ export const useChatStore = create<State>((set, get) => ({
 
     // === Socket events ===
     socket.off("message:new");
-    socket.on("message:new", (msg) => {
-      if (!msg) return;
+    socket.on("message:new", async (msg: Message) => {
+      if (!msg || !msg.conversationId) return;
 
-      // Normalize message content
-      msg.content = normalizeMessageContent(msg.content);
-
-      // Skip only if ID truly missing
-      if (!msg.id) {
-        console.warn("Received message without ID:", msg);
-        return;
+      try {
+        msg.content = await decryptMessage(msg.content || "", msg.conversationId);
+      } catch (e) {
+        console.error("Failed to decrypt message:", e);
+        msg.content = "[Failed to decrypt message]";
       }
 
-      // Add message if it's for the current conversation
-      set((state) => {
-        const existing = state.messages[msg.conversationId] ?? [];
-        const merged = [...existing];
+      set((s) => {
+        const conversationId = msg.conversationId;
+        const messages = s.messages[conversationId] || [];
+        let messageExists = false;
 
-        for (const m of [msg]) {
-          if (!merged.find((x) => x.id === m.id)) merged.push(m);
+        const updatedMessages = messages.map((m) => {
+          if ((msg.tempId && m.tempId === msg.tempId) || (msg.id && m.id === msg.id)) {
+            messageExists = true;
+            return withPreview(msg);
+          }
+          return m;
+        });
+
+        if (!messageExists) {
+          updatedMessages.push(withPreview(msg));
         }
 
-        console.log("Messages updated:", existing.length, "→", merged.length);
-        return { messages: { ...state.messages, [msg.conversationId]: merged } };
+        const updatedConversations = s.conversations.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                lastMessage: withPreview(msg),
+                updatedAt: new Date().toISOString(),
+              }
+            : c
+        );
+
+        return {
+          messages: {
+            ...s.messages,
+            [conversationId]: updatedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+          },
+          conversations: sortConversations(updatedConversations),
+        };
       });
     });
 
@@ -445,90 +466,9 @@ export const useChatStore = create<State>((set, get) => ({
             { conversationId, content: encryptedContent, tempId },
             (ack: { ok: boolean; msg?: Message }) => {
               if (ack?.ok && ack.msg) {
-                // Add validation for message object
-                if (!ack.msg || typeof ack.msg !== 'object' || !ack.msg.id || !ack.msg.senderId) {
-                  console.warn('Received invalid message acknowledgment:', ack.msg);
-                  get().markMessageError(conversationId, tempId!);
-                  reject(new Error("Received invalid message from server"));
-                  return;
-                }
-                
-                decryptMessage(ack.msg.content || "", conversationId)
-                  .then((decryptedContent) => {
-                    const decryptedAck = withPreview({
-                      ...ack.msg,
-                      content: decryptedContent,
-                    });
-
-                    set((s) => {
-                      let updated = s.conversations.map((c) =>
-                        c.id === conversationId
-                          ? {
-                              ...c,
-                              lastMessage: decryptedAck,
-                              updatedAt: new Date().toISOString(),
-                            }
-                          : c
-                      );
-
-                      if (!updated.find((c) => c.id === conversationId)) {
-                        updated.push({
-                          id: conversationId,
-                          isGroup: false,
-                          title: null,
-                          participants: [],
-                          lastMessage: decryptedAck,
-                          updatedAt: new Date().toISOString(),
-                        });
-                      }
-
-                      updated = sortConversations(updated);
-
-                      return {
-                        messages: {
-                          ...s.messages,
-                          [conversationId]: (
-                            s.messages[conversationId] || []
-                          ).map((m) => {
-                            // Check if this message should be replaced
-                            const shouldReplace = m.tempId === tempId || m.id === `temp-${tempId}`;
-                            if (shouldReplace) {
-                              console.log("🔁 Replacing optimistic message:", { oldMessage: m, newMessage: decryptedAck });
-                              return decryptedAck;
-                            }
-                            return m;
-                          }),
-                        },
-                        conversations: updated,
-                      };
-                    });
-                    resolve();
-                  })
-                  .catch((error) => {
-                    console.error('Error in message acknowledgment decryption:', error);
-                    // Fallback to unencrypted content
-                    const decryptedAck = withPreview({
-                      ...ack.msg,
-                      content: ack.msg.content || "[Failed to decrypt]",
-                    });
-
-                    set((s) => ({
-                      messages: {
-                        ...s.messages,
-                        [conversationId]: (
-                          s.messages[conversationId] || []
-                        ).map((m) => {
-                          const shouldReplace = m.tempId === tempId || m.id === `temp-${tempId}`;
-                          if (shouldReplace) {
-                            console.log("🔁 Replacing optimistic message (fallback):", { oldMessage: m, newMessage: decryptedAck });
-                            return decryptedAck;
-                          }
-                          return m;
-                        }),
-                      },
-                    }));
-                    resolve();
-                  });
+                // The message:new handler will receive this and update the state
+                // The ack is just for confirmation and error handling
+                resolve();
               } else {
                 get().markMessageError(conversationId, tempId!);
                 reject(new Error("Send failed"));

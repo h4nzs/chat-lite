@@ -153,7 +153,7 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
     
     // If the error is because the content is not encrypted, return it as is
     // This handles cases where the content is plain text that doesn't need decryption
-    return cipher || '[Failed to decrypt: Message may be corrupted]';
+    return '[Failed to decrypt: Message may be corrupted]';
   }
 }
 
