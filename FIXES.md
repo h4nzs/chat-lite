@@ -1,152 +1,131 @@
 > **Role:**
-> Kamu adalah *senior fullstack realtime developer* yang diminta untuk memulihkan fitur realtime chat yang sebelumnya sudah stabil, dan memperbaiki fitur yang belum berfungsi. Aplikasi ini menggunakan **React + Zustand + Socket.IO + Node.js/Express backend**.
+> Kamu adalah *senior fullstack engineer* yang sedang memperbaiki bug pada aplikasi chat real-time (React + Zustand + Socket.IO + Node.js + Prisma).
+> Fokus kamu hanya memperbaiki masalah **lastMessage tidak muncul atau tidak update di daftar percakapan (ChatList)**.
+> **Jangan ubah logika lain apa pun** seperti pengiriman pesan, upload, enkripsi, atau sistem socket selain yang langsung berkaitan dengan pembaruan `lastMessage`.
+
+---
+
+### 🧠 Konteks Masalah
+
+* Pada `ChatList`, kolom pesan terakhir (`lastMessage`) tidak menampilkan pesan terbaru setelah mengirim atau menerima pesan.
+* Namun, pesan terkirim dan tampil di window chat dengan benar.
+* Artinya event socket `message:new` berjalan, tetapi state `lastMessage` pada daftar percakapan **tidak diperbarui**.
 
 ---
 
 ### 🎯 Tujuan
 
-Kembalikan stabilitas penuh fitur realtime ChatLite:
-
-| Fitur                       | Status Sebelumnya                   | Target                                                     |
-| --------------------------- | ----------------------------------- | ---------------------------------------------------------- |
-| Typing Indicator            | ✅ Berfungsi (sebelum update)        | Pulihkan fungsionalitas seperti sebelumnya                 |
-| Realtime Delete             | ✅ Berfungsi (sebelum update)        | Pulihkan agar tetap realtime & bubble berubah ke “deleted” |
-| Online Indicator (Presence) | ⚠️ Tidak berfungsi (selalu abu-abu) | Perbaiki agar berubah hijau saat user online               |
-| Reactions                   | ⚠️ Tidak tampil                     | Aktifkan & tampilkan tombol emoji + sinkronisasi realtime  |
+1. Memastikan setiap kali ada pesan baru (baik teks maupun file), field `lastMessage` di ChatList langsung update tanpa refresh.
+2. Menjaga agar logika chat lain (pesan, upload, typing, presence, dsb.) tidak berubah.
+3. Memastikan sinkronisasi antara database dan UI tetap konsisten.
 
 ---
 
-### 🧠 Instruksi Teknis Detail
+### 🧩 Langkah Perbaikan yang Harus Diterapkan
 
-#### 1️⃣ **Restore Typing Indicator**
+#### 1️⃣ Backend — Update `lastMessage` di Database
 
-* Ambil implementasi **sebelum update terakhir** (versi yang bekerja).
-* Pastikan event client → server → broadcast berjalan pakai event lama:
+Pastikan endpoint `/api/messages` atau handler socket `message:new` **menyimpan pesan terakhir** ke tabel `Conversation`.
 
-  ```ts
-  socket.emit("typing", { conversationId, isTyping: true })
-  ```
+Contoh:
 
-  dan server broadcast ke semua member:
+```ts
+// server/src/socket.ts (atau controller pesan)
+const message = await prisma.message.create({
+  data: {
+    content,
+    type,
+    conversationId,
+    senderId,
+  },
+  include: { sender: true },
+});
 
-  ```ts
-  socket.to(conversationId).emit("typing", { userId, isTyping });
-  ```
-* Gunakan kembali state `typingUsers` di frontend (Zustand/React) dan jangan ubah structure-nya.
-* Typing indicator muncul & hilang otomatis sesuai event lama.
+// Update lastMessage di conversation
+await prisma.conversation.update({
+  where: { id: conversationId },
+  data: { lastMessageId: message.id },
+});
 
-#### 2️⃣ **Restore Delete Message Realtime**
+// Emit pesan baru ke semua anggota
+io.to(conversationId).emit("message:new", message);
+```
 
-* Gunakan event lama, misal:
+> 🔒 Pastikan Gemini **tidak memodifikasi logika enkripsi, pengiriman file, atau validasi token** — hanya tambahkan bagian update `lastMessage`.
 
-  ```ts
-  socket.emit("deleteMessage", { messageId, conversationId });
-  socket.on("messageDeleted", ({ messageId }) => removeMessage(messageId));
-  ```
-* Pastikan:
+---
 
-  * Pesan yang dihapus berubah jadi “This message was deleted” (tanpa reload).
-  * Di database benar-benar terhapus.
-  * Broadcast tetap jalan antar client seperti sebelumnya.
+#### 2️⃣ Frontend — Sinkronisasi `lastMessage` via Socket
 
-#### 3️⃣ **Fix Online Indicator (Presence)**
+Pastikan handler socket `message:new` di `web/src/store/chat.ts` **memperbarui ChatList** selain hanya menambah pesan ke thread aktif.
 
-* Implementasikan server-side tracking menggunakan `Map` atau `Set` untuk menyimpan userId yang online.
+```ts
+socket.on("message:new", (message) => {
+  set((state) => {
+    // update messages di thread aktif
+    if (state.activeConversation?.id === message.conversationId) {
+      state.messages.push(message);
+    }
 
-  ```ts
-  const onlineUsers = new Set();
-
-  io.on("connection", (socket) => {
-    const userId = socket.user?.id;
-    if (!userId) return;
-
-    onlineUsers.add(userId);
-    io.emit("presence:update", Array.from(onlineUsers));
-
-    socket.on("disconnect", () => {
-      onlineUsers.delete(userId);
-      io.emit("presence:update", Array.from(onlineUsers));
-    });
+    // update lastMessage di daftar percakapan
+    state.conversations = state.conversations.map((conv) =>
+      conv.id === message.conversationId
+        ? { ...conv, lastMessage: message }
+        : conv
+    );
   });
-  ```
-* Di frontend:
-
-  ```tsx
-  socket.on("presence:update", (usersOnline) => setOnlineUsers(usersOnline));
-  ```
-
-  dan di UI:
-
-  ```tsx
-  <span className={`dot ${onlineUsers.includes(user.id) ? "bg-green-500" : "bg-gray-500"}`} />
-  ```
-
-#### 4️⃣ **Add & Activate Message Reactions**
-
-* Implement event baru:
-
-  ```ts
-  socket.on("reaction:add", (data) => {
-    io.to(data.conversationId).emit("reaction:update", data);
-  });
-  ```
-* UI:
-
-  * Saat hover bubble pesan → muncul tombol emoji kecil (misal ❤️, 😂, 👍).
-  * Klik emoji → kirim event `reaction:add`.
-  * Update tampilan pesan dengan jumlah & jenis emoji yang sudah diberikan.
-
-  contoh frontend snippet:
-
-  ```tsx
-  <div
-    onMouseEnter={() => setHover(true)}
-    onMouseLeave={() => setHover(false)}
-    className="relative group"
-  >
-    <p>{message.text}</p>
-
-    {hover && (
-      <div className="absolute right-0 top-0 flex gap-1">
-        {["❤️", "😂", "👍", "😮"].map((emoji) => (
-          <button
-            key={emoji}
-            onClick={() => handleReaction(message.id, emoji)}
-            className="bg-gray-700 rounded-full p-1 text-sm hover:scale-110 transition"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-    )}
-
-    {message.reactions?.length > 0 && (
-      <div className="flex gap-1 mt-1 text-xs">
-        {message.reactions.map((r) => (
-          <span key={r.emoji}>{r.emoji}</span>
-        ))}
-      </div>
-    )}
-  </div>
-  ```
-* Pastikan `reaction:update` sinkron di semua client tanpa reload.
+});
+```
 
 ---
 
-### ✅ **Checklist Hasil Akhir**
+#### 3️⃣ UI — Pastikan ChatList Render `lastMessage` dengan Aman
 
-| Fitur              | Behavior                                        | Status |
-| ------------------ | ----------------------------------------------- | ------ |
-| Typing Indicator   | Muncul realtime antar 2 akun                    | ✅      |
-| Delete Message     | Bubble berubah ke “deleted” realtime            | ✅      |
-| Presence Indicator | Dot berubah hijau saat online                   | ✅      |
-| Reaction           | Tombol muncul saat hover, emoji tampil realtime | ✅      |
+Di `web/src/components/ChatListItem.tsx`, pastikan render-nya seperti:
+
+```tsx
+<p className="text-sm text-gray-400 truncate">
+  {conversation.lastMessage?.type === "file"
+    ? "📎 File terkirim"
+    : conversation.lastMessage?.content || "Tidak ada pesan"}
+</p>
+```
+
+> 🔧 Gemini hanya boleh memperbarui bagian yang menampilkan `conversation.lastMessage`, tanpa mengubah struktur styling utama.
 
 ---
 
-### 🧩 Tips Gemini
+#### 4️⃣ Tes Otomatis (opsional)
 
-> Jika logic typing & delete sudah ter-overwrite, ambil versi stable dari backup atau commit sebelumnya, lalu gabungkan kembali dengan kode baru yang mengatur presence & reactions.
-> Pastikan tidak menimpa event `typing` dan `deleteMessage` lama.
+Tambahkan console log sementara di frontend:
+
+```ts
+socket.on("message:new", (msg) => console.log("Last message update:", msg));
+```
+
+Dan pastikan setelah mengirim pesan, ChatList langsung menampilkan isi terbaru tanpa refresh.
+
+---
+
+### ✅ Hasil Akhir yang Diharapkan
+
+| Skenario         | Hasil                                                                         |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Kirim pesan teks | ChatList langsung menampilkan pesan baru                                      |
+| Kirim file       | ChatList menampilkan “📎 File terkirim”                                       |
+| Pesan dihapus    | Jika pesan terakhir dihapus, ChatList menampilkan pesan sebelumnya (opsional) |
+| Refresh halaman  | Data `lastMessage` tetap sinkron dari database                                |
+
+---
+
+### ⚠️ Batasan & Instruksi Keras
+
+* ❌ Jangan ubah logika pengiriman pesan atau socket selain yang berhubungan langsung dengan pembaruan `lastMessage`.
+* ❌ Jangan ubah tipe data Message, Conversation, atau struktur enkripsi.
+* ✅ Pastikan hanya file berikut yang disunting:
+
+  * `server/src/socket.ts` atau `server/src/routes/messages.ts`
+  * `web/src/store/chat.ts`
+  * `web/src/components/ChatListItem.tsx` (jika perlu tampilan)
 
 ---

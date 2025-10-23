@@ -1,13 +1,13 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
-import { socketAuthMiddleware, verifySocketAuth } from "./middleware/auth.js";
+import { socketAuthMiddleware } from "./middleware/auth.js";
 import { prisma } from "./lib/prisma.js";
-import cookie from 'cookie';
 import xss from 'xss';
 import { sendPushNotification } from "./utils/sendPushNotification.js";
 
 export let io: Server;
 
+// Gunakan Set untuk melacak user yang online secara efisien
 const onlineUsers = new Set<string>();
 
 export function registerSocket(httpServer: HttpServer) {
@@ -23,17 +23,22 @@ export function registerSocket(httpServer: HttpServer) {
   io.on("connection", (socket: any) => {
     const userId = socket.user?.id;
     if (userId) {
+      console.log(`[Socket Connect] User connected: ${userId}`);
       onlineUsers.add(userId);
+      // Broadcast daftar lengkap user online ke SEMUA klien
       io.emit("presence:update", Array.from(onlineUsers));
     }
 
     socket.on("disconnect", () => {
       if (userId) {
+        console.log(`[Socket Disconnect] User disconnected: ${userId}`);
         onlineUsers.delete(userId);
+        // Broadcast daftar lengkap user online lagi setelah ada yang keluar
         io.emit("presence:update", Array.from(onlineUsers));
       }
     });
 
+    // --- Event handlers lainnya ---
     socket.on("conversation:join", (conversationId: string) => {
       socket.join(conversationId);
     });
@@ -56,6 +61,12 @@ export function registerSocket(httpServer: HttpServer) {
 
         const broadcastData = JSON.parse(JSON.stringify({ ...newMessage, tempId: data.tempId }));
         io.to(data.conversationId).emit("message:new", broadcastData);
+
+        // Update a conversation's lastMessageAt timestamp
+        await prisma.conversation.update({
+          where: { id: data.conversationId },
+          data: { lastMessageAt: newMessage.createdAt },
+        });
 
         const participants = await prisma.participant.findMany({
           where: { conversationId: data.conversationId, userId: { not: socket.user.id } },

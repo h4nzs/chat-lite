@@ -205,8 +205,9 @@ export const useChatStore = create<State>((set, get) => ({
 
     // Pasang listener baru
     socket.on("message:new", async (msg: Message) => {
+      // Update untuk penerima (pengirim sudah dihandle via ACK)
       const meId = useAuthStore.getState().user?.id;
-      if (msg.senderId === meId) return; // FIX: Abaikan pesan dari diri sendiri
+      if (msg.senderId === meId && !msg.optimistic) return;
 
       try {
         msg.content = await decryptMessage(msg.content || "", msg.conversationId);
@@ -215,8 +216,25 @@ export const useChatStore = create<State>((set, get) => ({
       }
 
       set((s) => {
-        const messages = [...(s.messages[msg.conversationId] || []), withPreview(msg)];
-        return { messages: { ...s.messages, [msg.conversationId]: messages } };
+        const conversationId = msg.conversationId;
+        const newMsg = withPreview(msg);
+
+        // 1. Tambahkan pesan ke thread yang aktif
+        const currentMessages = s.messages[conversationId] || [];
+        const updatedMessages = [...currentMessages, newMsg];
+
+        // 2. Update lastMessage di daftar percakapan
+        const updatedConversations = s.conversations.map(conv => {
+          if (conv.id === conversationId) {
+            return { ...conv, lastMessage: newMsg };
+          }
+          return conv;
+        });
+
+        return {
+          messages: { ...s.messages, [conversationId]: updatedMessages },
+          conversations: sortConversations(updatedConversations), // Urutkan ulang
+        };
       });
     });
 
