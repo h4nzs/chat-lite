@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import { io } from "../socket.js"; // Impor io
 
 const router = Router();
 
@@ -179,6 +180,11 @@ router.post("/group", requireAuth, async (req, res, next) => {
       lastMessage: null,
     };
 
+    // Broadcast ke semua anggota grup yang baru dibuat
+    const allParticipantIds = [userId, ...participantIds];
+      allParticipantIds.forEach(participantId => {
+        io.to(participantId).emit("conversation:new", transformed);
+      });
     res.status(201).json(transformed);
   } catch (e) {
     console.error("[Conversations Controller - Group Creation] Error:", e);

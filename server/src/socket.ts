@@ -23,6 +23,7 @@ export function registerSocket(httpServer: HttpServer) {
   io.on("connection", (socket: any) => {
     const userId = socket.user?.id;
     if (userId) {
+      socket.join(userId); // Join room personal
       console.log(`[Socket Connect] User connected: ${userId}`);
       onlineUsers.add(userId);
       // Broadcast daftar lengkap user online ke SEMUA klien
