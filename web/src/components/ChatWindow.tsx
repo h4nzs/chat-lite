@@ -112,7 +112,13 @@ export default function ChatWindow({ id }: { id: string | null }) {
           >
             📎
           </button>
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+          <input 
+            ref={fileInputRef} 
+            type="file" 
+            className="hidden" 
+            onChange={handleFileChange} 
+            accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,video/mp4,video/quicktime,video/x-msvideo,audio/mpeg,audio/wav,application/zip,application/x-rar-compressed"
+          />
 
           <input
             value={text}

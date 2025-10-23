@@ -316,7 +316,7 @@ export const useChatStore = create<State>((set, get) => ({
             fileName: fileData.filename,
             fileType: fileData.mimetype,
             fileSize: fileData.size,
-            content: file.name,
+            content: '', // FIX: Set content to empty
         } as Message);
 
         await get().sendMessage(conversationId, {
@@ -324,7 +324,7 @@ export const useChatStore = create<State>((set, get) => ({
             fileName: fileData.filename,
             fileType: fileData.mimetype,
             fileSize: fileData.size,
-            content: file.name,
+            content: '', // FIX: Ensure content is empty
         }, tempId);
 
     } catch (error: any) {

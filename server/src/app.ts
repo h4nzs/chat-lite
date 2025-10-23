@@ -27,7 +27,10 @@ import keysRouter from "./routes/keys.js";
 const app = express();
 
 // === SECURITY / CORS ===
+// Gunakan Helmet untuk header keamanan dasar
 app.use(helmet());
+// Hapus header X-Powered-By untuk menyembunyikan detail teknologi server
+app.disable('x-powered-by');
 
 app.use(
   cors({
@@ -50,46 +53,50 @@ app.use(
 // === MIDDLEWARE ===
 app.use(logger("dev"));
 app.use(cookieParser());
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "10mb" })); // Naikkan limit untuk payload JSON jika perlu
 app.use(express.urlencoded({ extended: true }));
 
 // === CSRF Protection ===
-app.use(csrf({
+const csrfProtection = csrf({
   cookie: { httpOnly: true, sameSite: "strict", secure: env.nodeEnv === "production" }
-}));
+});
+app.use(csrfProtection);
 
 // === ROUTE FOR CSRF TOKEN ===
-app.get("/api/csrf-token", (req: Request, res: Response, next) => {
-  try {
-    const token = req.csrfToken();
-    res.json({ csrfToken: token });
-  } catch (err) {
-    console.error("CSRF generation failed:", err);
-    next(err);
-  }
+app.get("/api/csrf-token", (req: Request, res: Response) => {
+  res.json({ csrfToken: req.csrfToken() });
 });
 
-// === STATIC FILES ===
+// === STATIC FILES (UPLOAD) - SECURE IMPLEMENTATION ===
+const uploadsPath = path.resolve(process.cwd(), env.uploadDir);
 app.use("/uploads", 
+  // Middleware untuk menambahkan header CORP & keamanan lainnya
   (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
-  cors({
-    origin: env.corsOrigin || "http://localhost:5173",
-    credentials: true
-  }), 
-  express.static(path.resolve(process.cwd(), env.uploadDir))
+  express.static(uploadsPath, {
+    // Nonaktifkan directory listing
+    index: false, 
+    // Jangan jalankan file secara otomatis, paksa download untuk tipe tertentu jika perlu
+    setHeaders: (res, filePath) => {
+      const mimeType = express.static.mime.lookup(filePath);
+      if (mimeType && !mimeType.startsWith('image/') && !mimeType.startsWith('video/') && !mimeType.startsWith('audio/')) {
+        // Paksa download untuk dokumen dan file lainnya
+        res.setHeader('Content-Disposition', 'attachment');
+      }
+    }
+  })
 );
+
 
 // === ROUTES ===
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/api/messages", messagesRouter);
-app.use("/api/uploads", uploadsRouter); // Changed from /api/conversations to /api/uploads
+app.use("/api/uploads", uploadsRouter);
 app.use("/api/keys", keysRouter);
 
 // === HEALTH CHECK ===
@@ -99,6 +106,9 @@ app.get("/health", (_req: Request, res: Response) => {
 
 // === ERROR HANDLING ===
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ error: "Invalid JSON" });
   }

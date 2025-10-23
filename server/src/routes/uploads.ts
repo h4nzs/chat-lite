@@ -53,6 +53,11 @@ router.post("/:conversationId/upload", requireAuth, (req: Request, res, next) =>
       message: "File uploaded successfully",
       file: {
         url: fileUrl, // Return absolute URL
+        filename: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+      },
+    });
 
 
     } catch (e) {
