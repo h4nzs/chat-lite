@@ -98,22 +98,23 @@ export function registerSocket(httpServer: HttpServer) {
       });
     });
 
-    socket.on("push:subscribe", async (data) => {
-      try {
-        const { endpoint, keys } = data;
-        const userId = (socket as any).user.id;
-        if (!userId || !endpoint || !keys?.p256dh || !keys?.auth) {
-          console.warn("Invalid push subscription data");
-          return;
-        }
-
-        await prisma.pushSubscription.upsert({
-          where: { endpoint },
-          update: { p256dh: keys.p256dh, auth: keys.auth },
-          create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, userId },
+    socket.on("typing:start", ({ conversationId }) => {
+      if (conversationId) {
+        socket.to(conversationId).emit("typing:update", {
+          userId: (socket as any).user.id,
+          conversationId,
+          isTyping: true,
         });
-      } catch (error) {
-        console.error("Failed to save push subscription:", error);
+      }
+    });
+
+    socket.on("typing:stop", ({ conversationId }) => {
+      if (conversationId) {
+        socket.to(conversationId).emit("typing:update", {
+          userId: (socket as any).user.id,
+          conversationId,
+          isTyping: false,
+        });
       }
     });
   });

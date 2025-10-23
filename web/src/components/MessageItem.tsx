@@ -1,8 +1,11 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Message } from "@store/chat";
+import { useAuthStore } from "@store/auth";
 import LazyImage from "./LazyImage";
+import Reactions from "./Reactions"; // Komponen baru untuk handle reaksi
 import { sanitizeText } from "@utils/sanitize";
+import { api } from "@lib/api";
 
 // --- Helper untuk File Bubble (non-gambar) ---
 const FileAttachment = ({ url, fileName, fileSize }: { url: string; fileName?: string | null; fileSize?: number }) => {
@@ -33,12 +36,13 @@ type MessageItemProps = {
   data: {
     messages: Message[];
     setSize: (index: number, size: number) => void;
-    meId?: string | null;
   };
 };
 
 function MessageItemComponent({ index, style, data }: MessageItemProps) {
-  const { messages, setSize, meId } = data;
+  const { messages, setSize } = data;
+  const meId = useAuthStore((s) => s.user?.id);
+  const [isHovered, setHovered] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
   const m = messages[index];
@@ -59,49 +63,65 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
   const isImage = m.fileType?.startsWith('image/');
   const hasFile = !!fullUrl;
 
+  const handleDelete = () => {
+    if (window.confirm("Are you sure you want to delete this message?")) {
+      api(`/api/messages/${m.id}`, { method: 'DELETE' });
+    }
+  }
+
+  const isDeleted = m.content === "[This message was deleted]";
+
   return (
-    // Kontainer dari react-window, HANYA berisi style posisi & dimensi.
-    // Jangan tambahkan padding/margin di sini.
     <div style={style}>
-      {/* Wrapper untuk spacing. Padding vertikal (py-2) di sini menciptakan jarak antar bubble. */}
       <div ref={itemRef} className="px-4 py-2">
-        <div className={`flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
-          <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-            
-            {/* Kontainer Bubble Pesan */}
-            <div
-              className={`flex flex-col max-w-xs md:max-w-md rounded-2xl shadow-md ${ 
-                isImage && !hasContent ? '' : 'p-2 ' + (mine 
-                  ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                  : 'bg-gray-700 text-white')
-              }`}
-            >
-              {hasContent && (
-                <p className="whitespace-pre-wrap break-words px-2 pb-1">{sanitizeText(m.content)}</p>
-              )}
-
-              {hasFile && (
-                isImage ? (
-                  <LazyImage 
-                    src={fullUrl!} 
-                    alt={m.fileName || "uploaded image"} 
-                    className="rounded-xl max-w-[250px] object-cover cursor-pointer" 
-                    onClick={() => window.open(fullUrl, "_blank")} 
-                  />
-                ) : (
-                  <FileAttachment url={fullUrl!} fileName={m.fileName} fileSize={m.fileSize} />
-                )
-              )}
-            </div>
-
-            {/* Timestamp dan Status */}
-            <div className={`text-xs text-gray-400 mt-1 px-2 ${mine ? "text-right" : "text-left"}`}>
-              {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              {m.error && <span className="text-red-500 ml-2">Failed</span>}
-              {m.optimistic && <span className="text-gray-500 ml-2">Sending...</span>}
+        {isDeleted ? (
+          <div className={`flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
+            <p className="text-xs italic text-gray-500">This message was deleted</p>
+          </div>
+        ) : (
+          <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`relative flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
+            {isHovered && (
+              <div className={`absolute top-0 flex items-center gap-2 ${mine ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2'}`}>
+                <Reactions message={m} />
+                {mine && (
+                  <button onClick={handleDelete} className="p-1.5 rounded-full bg-gray-600 hover:bg-red-500 text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" /></svg>
+                  </button>
+                )}
+              </div>
+            )}
+            <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+              <div
+                className={`flex flex-col max-w-xs md:max-w-md rounded-2xl shadow-md ${
+                  isImage && !hasContent ? '' : 'p-2 ' + (mine 
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'bg-gray-700 text-white')
+                }`}
+              >
+                {hasContent && (
+                  <p className="whitespace-pre-wrap break-words px-2 pb-1">{sanitizeText(m.content)}</p>
+                )}
+                {hasFile && (
+                  isImage ? (
+                    <LazyImage 
+                      src={fullUrl!} 
+                      alt={m.fileName || "uploaded image"} 
+                      className="rounded-xl max-w-[250px] object-cover cursor-pointer" 
+                      onClick={() => window.open(fullUrl, "_blank")} 
+                    />
+                  ) : (
+                    <FileAttachment url={fullUrl!} fileName={m.fileName} fileSize={m.fileSize} />
+                  )
+                )}
+              </div>
+              <div className={`text-xs text-gray-400 mt-1 px-2 ${mine ? 'text-right' : 'text-left'}`}>
+                {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {m.error && <span className="text-red-500 ml-2">Failed</span>}
+                {m.optimistic && <span className="text-gray-500 ml-2">Sending...</span>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

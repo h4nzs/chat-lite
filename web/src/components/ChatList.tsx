@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useRef, useMemo } from 'react'
-import { useChatStore } from '@store/chat'
-import { getSocket } from '@lib/socket'
-import { sanitizeText } from '@utils/sanitize'
+import { useChatStore } from '@store/chat';
+import { useAuthStore } from '@store/auth';
+import { getSocket } from '@lib/socket';
+import { sanitizeText } from '@utils/sanitize';
 
 interface ChatListProps {
   onOpen: (id: string) => void
@@ -9,12 +10,12 @@ interface ChatListProps {
 }
 
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const conversations = useChatStore((s) => s.conversations)
-  const loadConversations = useChatStore((s) => s.loadConversations)
-  const presence = useChatStore((s) => s.presence)
-  const storeActiveId = useChatStore((s) => s.activeId)
-  // There is no conversationCursor property in the store, removing this line
-  const listRef = useRef<HTMLDivElement>(null)
+  const conversations = useChatStore((s) => s.conversations);
+  const loadConversations = useChatStore((s) => s.loadConversations);
+  const presence = useChatStore((s) => s.presence);
+  const storeActiveId = useChatStore((s) => s.activeId);
+  const meId = useAuthStore((s) => s.user?.id); // Deklarasikan meId di sini
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Debug: log conversations to see if data is loaded
   useEffect(() => {
@@ -101,30 +102,23 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
         
         const isActive = c.id === activeConversationId
         const title = c.title || (Array.isArray(c.participants) ? c.participants.map((p) => p.name || p.username || 'Unknown').join(', ') : 'Unknown')
-        const peer = Array.isArray(c.participants) && c.participants.length > 0 ? c.participants[0] : null
-        const isOnline = peer ? presence[peer.id] : false
+        const peer = c.isGroup ? null : c.participants.find(p => p.id !== meId);
+        const isOnline = peer ? !!presence[peer.id] : c.participants.some(p => p.id !== meId && presence[p.id]);
 
         return (
           <button
             key={c.id}
             onClick={() => {
-              useChatStore.setState({ activeId: c.id })
-              onOpen(c.id)
+              useChatStore.setState({ activeId: c.id });
+              onOpen(c.id);
             }}
-            className={`w-full text-left p-4 transition flex items-center ${
-              isActive 
-                ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md' 
-                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            <div className="relative mr-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-400 to-blue-500 flex items-center justify-center text-white font-semibold">
+            className={`w-full text-left p-4 transition flex items-center gap-4 ${isActive ? 'bg-blue-500/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+            <div className="relative flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-400 to-blue-500 flex items-center justify-center text-white font-semibold text-xl">
                 {(title.charAt(0) || 'U').toUpperCase()}
               </div>
-              {peer && (
-                <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                  isOnline ? 'bg-green-500' : 'bg-gray-400'
-                }`} title={isOnline ? 'Online' : 'Offline'} />
+              {!c.isGroup && (
+                <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-gray-900 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} title={isOnline ? 'Online' : 'Offline'} />
               )}
             </div>
             

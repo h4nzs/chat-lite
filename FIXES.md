@@ -1,70 +1,169 @@
-> **Instruksi Lengkap:**
+> **Peran:**
+> Kamu adalah *Fullstack Realtime Engineer* yang bertugas memperbaiki integrasi **Socket.IO dan UI Realtime Update** di proyek ChatLite.
 >
-> Kamu adalah seorang *senior fullstack engineer* yang sedang melakukan **debug dan analisis sistem chat real-time ChatLite**.
-> Setelah integrasi beberapa fitur baru (delete message, emoji reactions, push notification), kini muncul bug baru:
+> Fokus utama: memperbaiki event socket `typing`, `presence`, `reaction`, dan `message:deleted` agar semuanya **sinkron secara real-time antar pengguna**, tanpa reload atau refresh manual.
 >
-> ---
+> Stack:
 >
-> 🧠 **Masalah:**
-> Saat pengguna mengirim pesan, status pesan di UI tetap `sending...` dan **tidak pernah berubah menjadi “sent”** atau dikonfirmasi berhasil, meskipun pesan sebenarnya mungkin sudah terkirim ke backend.
-> --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->
-> **Tugasmu adalah melakukan audit dan analisa mendalam pada keseluruhan alur pengiriman pesan**, lalu berikan *fix atau patch rekomendasi* yang spesifik.
->
-> Analisis meliputi:
->
-> 1. **Frontend (web/):**
->
->    * File utama terkait pengiriman pesan:
->      `ChatWindow.tsx`, `store/chat.ts`, dan `lib/socket.ts`
->    * Periksa apakah fungsi `sendMessage()` benar-benar menunggu respons server / event `message:new` sebelum mengubah status `sending → sent`.
->    * Cek apakah `socket.emit("message:new", messageData, callback)` masih memiliki callback acknowledgment dari server.
->    * Pastikan handler `socket.on("message:new")` di frontend masih aktif setelah implementasi fitur baru.
-> 2. **Backend (server/):**
->
->    * File utama terkait pesan:
->      `routes/messages.ts`, `socket.ts`
->    * Pastikan server-side event `socket.on("message:new", ...)` menerima payload dari frontend dan memanggil `io.to(conversationId).emit("message:new", message)` untuk broadcast balik.
->    * Cek apakah ada error di proses `prisma.message.create()` yang menyebabkan promise tidak pernah resolve, membuat frontend stuck.
->    * Verifikasi bahwa setelah `message` disimpan, server mengirimkan ACK balik ke pengirim (contoh: `callback(message)` atau `socket.emit("message:ack", message)`).
-> 3. **Middleware / Integrasi:**
->
->    * Pastikan middleware autentikasi socket tidak memblokir event `message:new` setelah perubahan di fitur push notification.
->    * Cek apakah ada konflik dengan event lain (`message:deleted`, `reaction:new`, dll.) yang override namespace `message:new`.
->
-> ---
->
-> 🧾 **Output yang Diharapkan:**
->
-> 1. Jelaskan *alur eksekusi pesan dari klik kirim hingga tampil di penerima*, lalu tandai di titik mana proses macet.
-> 2. Identifikasi baris kode (atau fungsi) yang menyebabkan status `sending` tidak berubah.
-> 3. Jika ada event socket yang tidak pernah di-emit / tidak match, tunjukkan perbedaannya (misal `message:new` vs `message:create`).
-> 4. Berikan **kode fix langsung**, misalnya:
->
->    ```ts
->    socket.emit("message:new", payload, (serverMessage) => {
->      updateMessageStatus(serverMessage.id, "sent");
->    });
->    ```
->
->    atau patch backend dengan:
->
->    ```ts
->    socket.on("message:new", async (data, callback) => {
->      const message = await prisma.message.create({ ... });
->      io.to(data.conversationId).emit("message:new", message);
->      callback(message); // <— ACK balik
->    });
->    ```
-> 5. Tambahkan rekomendasi pengujian untuk memverifikasi fix-nya.
->
-> ---
->
-> 💡 **Tujuan Akhir:**
-> Setelah audit dan perbaikan:
->
-> * Pesan baru langsung berubah status dari `sending` → `sent` setelah ACK server diterima.
-> * Pesan tampil di UI penerima secara real-time.
-> * Tidak ada error di console atau pending promise di `sendMessage()`.
+> * Frontend: React + Zustand + Socket.IO client
+> * Backend: Node.js (Express) + Prisma + Socket.IO server
+
+---
+
+### 🎯 **Tujuan Utama**
+
+Perbaiki dan sinkronkan:
+
+1. ✍️ **Typing Indicator** — Harus muncul di user lain saat seseorang mengetik, lalu hilang otomatis setelah delay.
+2. 🟢 **Presence Indicator** — Avatar user harus berubah dari abu-abu ke hijau ketika user online.
+3. 💬 **Reaction Button** — Tombol reaction muncul saat hover message, event `reaction:new` dan `reaction:remove` bekerja realtime.
+4. 🗑️ **Delete Message** — Ketika pesan dihapus:
+
+   * Bubble pesan langsung berubah jadi “message deleted” tanpa reload.
+   * Event socket broadcast ke semua klien.
+   * Pesan benar-benar dihapus di database Prisma.
+   * Tidak ada bug pada pagination atau infinite scroll setelah penghapusan.
+
+---
+
+### 🧩 **Langkah Perbaikan Terperinci**
+
+#### 1️⃣ **Perbaiki Typing Indicator**
+
+* **Backend (server/src/socket.ts):**
+
+  ```ts
+  socket.on("typing:start", ({ conversationId, userId }) => {
+    socket.to(conversationId).emit("typing:update", { userId, isTyping: true });
+  });
+
+  socket.on("typing:stop", ({ conversationId, userId }) => {
+    socket.to(conversationId).emit("typing:update", { userId, isTyping: false });
+  });
+  ```
+* **Frontend (web/src/store/chat.ts):**
+
+  * Pastikan `socket.emit("typing:start")` dijalankan saat user mengetik dan `typing:stop` saat berhenti (gunakan `debounce` 1 detik).
+  * Tambahkan listener:
+
+    ```ts
+    socket.on("typing:update", ({ userId, isTyping }) => {
+      updateUserTypingState(userId, isTyping);
+    });
+    ```
+  * Update komponen header/chat agar menampilkan indikator “Typing…” bila user tersebut aktif mengetik.
+
+---
+
+#### 2️⃣ **Perbaiki Presence Indicator**
+
+* **Backend:**
+
+  * Emit presence saat user connect/disconnect:
+
+    ```ts
+    io.emit("presence:update", { userId, status: "online" });
+    socket.on("disconnect", () => {
+      io.emit("presence:update", { userId, status: "offline" });
+    });
+    ```
+* **Frontend:**
+
+  * Listener:
+
+    ```ts
+    socket.on("presence:update", ({ userId, status }) => {
+      setUserPresence(userId, status === "online");
+    });
+    ```
+  * Update UI avatar agar otomatis berubah:
+
+    ```tsx
+    <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-500"}`} />
+    ```
+
+---
+
+#### 3️⃣ **Aktifkan Tombol Reaction**
+
+* Pastikan tombol reaction muncul di hover `MessageItem`.
+* **Backend:**
+
+  * Tambahkan event real-time:
+
+    ```ts
+    socket.on("reaction:add", async ({ messageId, emoji, userId, conversationId }) => {
+      await prisma.reaction.create({ data: { emoji, userId, messageId } });
+      io.to(conversationId).emit("reaction:new", { messageId, emoji, userId });
+    });
+    ```
+* **Frontend:**
+
+  * Emit saat user pilih emoji:
+
+    ```ts
+    socket.emit("reaction:add", { messageId, emoji, userId, conversationId });
+    ```
+  * Listener:
+
+    ```ts
+    socket.on("reaction:new", ({ messageId, emoji, userId }) => {
+      addReactionToMessage(messageId, { emoji, userId });
+    });
+    ```
+
+---
+
+#### 4️⃣ **Fix Delete Message Realtime**
+
+* **Backend:**
+
+  ```ts
+  app.delete("/api/messages/:conversationId/:messageId", async (req, res) => {
+    const { conversationId, messageId } = req.params;
+    await prisma.message.delete({ where: { id: messageId } });
+    io.to(conversationId).emit("message:deleted", { messageId });
+    res.sendStatus(200);
+  });
+  ```
+* **Frontend (web/src/store/chat.ts):**
+
+  * Listener:
+
+    ```ts
+    socket.on("message:deleted", ({ messageId }) => {
+      updateMessageState(messageId, { deleted: true });
+    });
+    ```
+  * UI:
+
+    ```tsx
+    {message.deleted ? (
+      <p className="italic text-gray-400">This message was deleted</p>
+    ) : (
+      <p>{message.text}</p>
+    )}
+    ```
+
+---
+
+### 🧪 **Checklist Testing**
+
+| Fitur          | Aksi                    | Expected Result                                          |
+| -------------- | ----------------------- | -------------------------------------------------------- |
+| Typing         | User A mengetik di chat | User B lihat "Typing..." muncul & hilang otomatis        |
+| Presence       | User A login/logout     | User B lihat indikator hijau/abu muncul/hilang           |
+| Reaction       | Hover + pilih emoji     | Emoji muncul realtime di bubble pesan semua user         |
+| Delete Message | User A hapus pesan      | Pesan berubah jadi “deleted” di semua klien tanpa reload |
+| DB Sync        | Cek database Prisma     | Pesan yang dihapus benar-benar hilang                    |
+
+---
+
+### 🧠 **Output yang Diharapkan**
+
+* Semua socket event (`typing:update`, `presence:update`, `reaction:new`, `message:deleted`) sinkron di dua akun berbeda.
+* Tidak perlu reload halaman untuk melihat perubahan.
+* Pesan pending dan pesan dihapus bekerja konsisten di UI dan database.
+* Log konsol `[SOCKET EVENT]` muncul untuk debugging tiap event.
 
 ---

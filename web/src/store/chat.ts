@@ -214,10 +214,24 @@ export const useChatStore = create<State>((set, get) => ({
       });
     });
 
-    socket.on("presence:update", ({ userId, online }) => {
-      set((s) => ({
-        presence: { ...s.presence, [userId]: online },
-      }));
+    socket.on("typing:update", ({ userId, conversationId, isTyping }) => {
+      if (conversationId !== get().activeId) return;
+
+      set((s) => {
+        const currentTyping = s.typing[conversationId] || [];
+        const userIndex = currentTyping.indexOf(userId);
+
+        if (isTyping && userIndex === -1) {
+          // Tambah user ke daftar typing
+          return { ...s, typing: { ...s.typing, [conversationId]: [...currentTyping, userId] } };
+        } else if (!isTyping && userIndex !== -1) {
+          // Hapus user dari daftar typing
+          const newTyping = [...currentTyping];
+          newTyping.splice(userIndex, 1);
+          return { ...s, typing: { ...s.typing, [conversationId]: newTyping } };
+        }
+        return s; // Tidak ada perubahan
+      });
     });
 
     socket.on("reaction:new", (reaction) => {
@@ -237,18 +251,26 @@ export const useChatStore = create<State>((set, get) => ({
       });
     });
 
-    socket.on("reaction:remove", ({ reactionId, messageId }) => {
+    socket.on("message:deleted", ({ messageId, conversationId }) => {
       set((s) => {
-        const conversationId = Object.keys(s.messages).find(cid => s.messages[cid].some(m => m.id === messageId));
-        if (!conversationId) return s;
+        if (!s.messages[conversationId]) return s;
 
         const updatedMessages = s.messages[conversationId].map(m => {
           if (m.id === messageId) {
-            const newReactions = (m.reactions || []).filter(r => r.id !== reactionId);
-            return { ...m, reactions: newReactions };
+            return {
+              ...m,
+              content: "[This message was deleted]",
+              imageUrl: null,
+              fileUrl: null,
+              fileName: null,
+              fileSize: null,
+              fileType: null,
+              reactions: [], // Hapus juga reaksi
+            };
           }
           return m;
         });
+
         return { ...s, messages: { ...s.messages, [conversationId]: updatedMessages } };
       });
     });
