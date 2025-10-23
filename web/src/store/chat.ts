@@ -95,6 +95,36 @@ function clearCachedMessages(conversationId: string): void {
   messageCache.delete(conversationId);
 }
 
+function mergeMessages(existing: Message[], incoming: Message[]): Message[] {
+  const merged = [...existing];
+  
+  for (const m of incoming ?? []) {
+    // Relaxed validation to prevent missing messages
+    if (!m?.id) continue;
+    // Use normalizeMessageContent to properly handle structured content
+    m.content = normalizeMessageContent(m.content);
+    
+    console.log("Merging message:", m);
+    
+    if (!merged.find((x) => x.id === m.id)) merged.push(m);
+  }
+  
+  // Sort if messages have timestamps
+  merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  
+  return merged;
+}
+
+function normalizeMessageForMerge(m: any) {
+  if (!m) return null
+  return {
+    id: m.id,
+    content: normalizeMessageContent(m.content),
+    senderId: m.senderId,
+    createdAt: m.createdAt ?? new Date().toISOString()
+  }
+}
+
 function normalizeMessageContent(raw: any): string {
   if (raw == null) return "";
   if (typeof raw === "string") return raw;
@@ -102,15 +132,13 @@ function normalizeMessageContent(raw: any): string {
     const val = raw.content;
     return typeof val === "string" ? val : "";
   }
-  return "";
+  return String(raw ?? "");
 }
 
 function normalizeMessage(m: any) {
   if (!m) return m;
-  if (typeof m.content === "object" && m.content !== null) {
-    if ("content" in m.content) m.content = m.content.content;
-  }
-  if (typeof m.content !== "string") m.content = String(m.content ?? "");
+  // Use normalizeMessageContent to properly handle structured content
+  m.content = normalizeMessageContent(m.content);
   return m;
 }
 
@@ -183,6 +211,12 @@ export const useChatStore = create<State>((set, get) => ({
           messages: { ...s.messages, [id]: cachedMessages },
         }));
       } else {
+        // Check if we already have messages for this conversation and preserve them
+        if (get().activeId === id && get().messages[id] && get().messages[id].length > 0) {
+          console.log("Preserving current messages for conversation:", id);
+          return; // Skip resetting messages
+        }
+        
         try {
           const res = await api<{ items: Message[]; nextCursor: string | null }>(
             `/api/messages/${id}`
@@ -199,7 +233,7 @@ export const useChatStore = create<State>((set, get) => ({
               // Normalize content before processing
               m.content = normalizeMessageContent(m.content);
               
-              if (!m.content) return withPreview({ ...m, content: null });
+              // Don't filter out messages with empty content - just process them normally
               try {
                 // Check if this is the new format with session keys
                 if (m.sessionId && m.encryptedSessionKey) {
@@ -226,11 +260,21 @@ export const useChatStore = create<State>((set, get) => ({
 
           // Don't reverse - keep chronological order (oldest first, newest last)
           const messages = validDecryptedItems;
-          set((s) => ({
-            messages: { ...s.messages, [id]: messages },
-            cursors: { ...s.cursors, [id]: res.nextCursor },
-          }));
-          setCachedMessages(id, messages);
+          set((s) => {
+            const existing = s.messages[id] ?? [];
+            const merged = [...existing];
+
+            for (const m of messages) {
+              if (!merged.find((x) => x.id === m.id)) merged.push(m);
+            }
+
+            console.log("Messages updated:", existing.length, "→", merged.length);
+            return { 
+              messages: { ...s.messages, [id]: merged },
+              cursors: { ...s.cursors, [id]: res.nextCursor },
+            };
+          });
+          setCachedMessages(id, get().messages[id] || []);
         } catch (error) {
           // Handle case where conversation doesn't exist
           if (error instanceof Error && (error.message.includes('404') || error.message.includes('Not Found'))) {
@@ -255,13 +299,30 @@ export const useChatStore = create<State>((set, get) => ({
 
     // === Socket events ===
     socket.off("message:new");
-    socket.on("message:new", (incomingMsg) => {
-      const msg = normalizeMessage(incomingMsg);
-      if (!msg?.id || !msg?.content) return;
+    socket.on("message:new", (msg) => {
+      if (!msg) return;
 
-      set((state) => ({
-        messages: [...state.messages.filter((m) => m.id !== msg.id), msg],
-      }));
+      // Normalize message content
+      msg.content = normalizeMessageContent(msg.content);
+
+      // Skip only if ID truly missing
+      if (!msg.id) {
+        console.warn("Received message without ID:", msg);
+        return;
+      }
+
+      // Add message if it's for the current conversation
+      set((state) => {
+        const existing = state.messages[msg.conversationId] ?? [];
+        const merged = [...existing];
+
+        for (const m of [msg]) {
+          if (!merged.find((x) => x.id === m.id)) merged.push(m);
+        }
+
+        console.log("Messages updated:", existing.length, "→", merged.length);
+        return { messages: { ...state.messages, [msg.conversationId]: merged } };
+      });
     });
 
     socket.off("message:deleted");
@@ -346,7 +407,7 @@ export const useChatStore = create<State>((set, get) => ({
         // Normalize content before processing
         m.content = normalizeMessageContent(m.content);
         
-        if (!m.content) return withPreview({ ...m, content: null });
+        // Don't filter out messages with empty content - just process them normally
         // Check if this is the new format with session keys
         if (m.sessionId && m.encryptedSessionKey) {
           const decryptedContent = await decryptMessage({
@@ -439,12 +500,15 @@ export const useChatStore = create<State>((set, get) => ({
                           ...s.messages,
                           [conversationId]: (
                             s.messages[conversationId] || []
-                          ).map((m) =>
-                            // replace by tempId if present
-                            m.tempId === tempId || m.id === `temp-${tempId}`
-                              ? decryptedAck
-                              : m
-                          ),
+                          ).map((m) => {
+                            // Check if this message should be replaced
+                            const shouldReplace = m.tempId === tempId || m.id === `temp-${tempId}`;
+                            if (shouldReplace) {
+                              console.log("🔁 Replacing optimistic message:", { oldMessage: m, newMessage: decryptedAck });
+                              return decryptedAck;
+                            }
+                            return m;
+                          }),
                         },
                         conversations: updated,
                       };
@@ -464,11 +528,14 @@ export const useChatStore = create<State>((set, get) => ({
                         ...s.messages,
                         [conversationId]: (
                           s.messages[conversationId] || []
-                        ).map((m) =>
-                          m.tempId === tempId || m.id === `temp-${tempId}`
-                            ? decryptedAck
-                            : m
-                        ),
+                        ).map((m) => {
+                          const shouldReplace = m.tempId === tempId || m.id === `temp-${tempId}`;
+                          if (shouldReplace) {
+                            console.log("🔁 Replacing optimistic message (fallback):", { oldMessage: m, newMessage: decryptedAck });
+                            return decryptedAck;
+                          }
+                          return m;
+                        }),
                       },
                     }));
                     resolve();
@@ -489,28 +556,34 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   addOptimisticMessage(conversationId, msg) {
-    // Validate message before adding
-    if (!msg || typeof msg !== 'object' || !msg.senderId) {
+    const normalizedMsg = normalizeMessageForMerge(msg);
+    if (!normalizedMsg || !normalizedMsg.senderId) {
       console.warn('Skipping invalid optimistic message:', msg);
       return;
     }
     
+    console.log("📥 Adding optimistic message:", { conversationId, msg: normalizedMsg });
+    
     // Ensure optimistic message has a stable temporary id & id
-    const tempId = msg.tempId ?? Date.now();
+    const tempId = normalizedMsg.tempId ?? Date.now();
     const optimistic: Message = withPreview({
-      ...msg,
+      ...normalizedMsg,
       tempId,
-      id: msg.id && msg.id.length > 0 ? msg.id : `temp-${tempId}`,
+      id: normalizedMsg.id && normalizedMsg.id.length > 0 ? normalizedMsg.id : `temp-${tempId}`,
       optimistic: true,
       error: false,
     });
 
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: [...(s.messages[conversationId] || []), optimistic],
-      },
-    }));
+    set((s) => {
+      const updatedMessages = [...(s.messages[conversationId] || []), optimistic];
+      console.log(`📤 Added optimistic message to conversation ${conversationId}. Total messages:`, updatedMessages.length, "Message:", optimistic);
+      return {
+        messages: {
+          ...s.messages,
+          [conversationId]: updatedMessages,
+        },
+      };
+    });
   },
 
   markMessageError(conversationId, tempId) {
@@ -526,34 +599,47 @@ export const useChatStore = create<State>((set, get) => ({
         return {}; // Return empty update if no message to mark
       }
       
+      console.log(`❌ Marking message as error in conversation ${conversationId}:`, { tempId });
+      
       return {
         messages: {
           ...s.messages,
-          [conversationId]: conversationMessages.map((m) =>
-            m.tempId === tempId || m.id === `temp-${tempId}`
-              ? { ...m, error: true }
-              : m
-          ),
+          [conversationId]: conversationMessages.map((m) => {
+            if (m.tempId === tempId || m.id === `temp-${tempId}`) {
+              console.log("🚫 Marking message as error:", m);
+              return { ...m, error: true };
+            }
+            return m;
+          }),
         },
       };
     });
   },
 
   replaceMessageTemp(conversationId, tempId, msg) {
-    // Validate replacement message before replacing
-    if (!msg || typeof msg !== 'object' || !msg.id || !msg.senderId) {
+    const normalizedMsg = normalizeMessageForMerge(msg);
+    if (!normalizedMsg || !normalizedMsg.id || !normalizedMsg.senderId) {
       console.warn('Skipping invalid replacement message:', msg);
       return;
     }
     
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: (s.messages[conversationId] || []).map((m) =>
-          m.tempId === tempId || m.id === `temp-${tempId}` ? { ...msg } : m
-        ),
-      },
-    }));
+    console.log("📥 Replacing temporary message:", { conversationId, tempId, msg: normalizedMsg });
+    
+    set((s) => {
+      const conversationMessages = s.messages[conversationId] || [];
+      const updatedMessages = conversationMessages.map((m) =>
+        m.tempId === tempId || m.id === `temp-${tempId}` ? { ...normalizedMsg } : m
+      );
+      
+      console.log(`📤 Replaced temporary message in conversation ${conversationId}. Total messages:`, updatedMessages.length);
+      
+      return {
+        messages: {
+          ...s.messages,
+          [conversationId]: updatedMessages,
+        },
+      };
+    });
   },
 
   async searchUsers(q) {

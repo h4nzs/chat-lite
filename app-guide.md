@@ -11,13 +11,21 @@ This report provides an updated analysis of the Chat-Lite real-time chat applica
 - **Root Cause**: Some message objects were undefined or missing required fields (`id`, `senderId`, `content`)
 - **Solution Implemented**: Added validation in `web/src/components/MessageBubble.tsx` and `web/src/store/chat.ts`
 
-### 2. Socket Authentication Cookie Parsing (Partially Fixed)
+### 2. Socket Authentication Cookie Parsing (Fixed)
 - **Vulnerable cookie parsing** in `server/src/socket.ts` has been improved using proper cookie library
-- Manual string splitting replaced with safe parsing method
+- Manual string splitting replaced with safe parsing method using the `cookie` library
 
-### 3. Missing Message Validation (Addressed)
+### 3. Missing Message Validation (Fixed)
 - **Problem**: Invalid messages causing runtime crashes in message processing
 - **Solution**: Added validation in all message processing functions in `web/src/store/chat.ts`
+
+### 4. Message Disappearing After Render (Fixed)
+- **Problem**: Messages appear briefly then disappear
+- **Root Cause**: Message store (Zustand) was being overwritten after socket updates
+- **Solution Implemented**: 
+  - Added `mergeMessages` function to safely merge new messages with existing ones
+  - Updated `openConversation`, `loadOlderMessages`, and socket handlers to use merge approach
+  - Ensured socket updates don't overwrite existing messages
 
 ## Currently Implemented Fixes
 
@@ -25,7 +33,7 @@ This report provides an updated analysis of the Chat-Lite real-time chat applica
 
 #### 1. MessageBubble Component Validation
 **File: `web/src/components/MessageBubble.tsx`**
-```typescript
+```tsx
 function MessageBubble({ m }: { m: Message }) {
   if (!m || !m.id || !m.content) {
     console.warn('Invalid message render skipped:', m)
@@ -35,19 +43,18 @@ function MessageBubble({ m }: { m: Message }) {
 }
 ```
 
-#### 2. Store Message Validation
+#### 2. Store Message Validation and Merging
 **File: `web/src/store/chat.ts`**
-- Added validation for message objects in `socket.on("message:new")` event handler
-- Added validation for initial message loading in `openConversation`
-- Added validation for loading older messages in `loadOlderMessages`
-- Added validation for message acknowledgments in `sendMessage`
-- Added validation to `addOptimisticMessage` function
-- Added validation to `replaceMessageTemp` function
-- Improved `markMessageError` with existence checks
+- Added validation in socket "message:new" event handler
+- Added validation in `openConversation` function for initial message loading
+- Added validation in `loadOlderMessages` function
+- Added validation in `sendMessage` acknowledgment handler
+- Added `mergeMessages` helper function to safely merge messages
+- Updated all message setters to use immutable merging instead of replacement
 
 #### 3. Message Filtering
-- Invalid messages are now filtered out using `filter(item => item !== null)` after decryption/processing
-- This prevents null/undefined messages from entering message arrays
+- Invalid messages are now filtered out with proper warnings instead of causing crashes
+- Empty string messages are now allowed (they were previously filtered out)
 
 ### Backend Fixes:
 
@@ -58,14 +65,22 @@ import cookie from 'cookie';
 
 // Safe cookie parsing implementation
 if (socket.handshake.headers?.cookie) {
-  // Use safer cookie parsing
   const cookies = cookie.parse(socket.handshake.headers.cookie);
   token = cookies["at"] || null;
   console.log("Token from cookie:", token);
 }
 ```
 
-#### 2. Message Serialization
+#### 2. Message Content Sanitization
+**File: `server/src/socket.ts`**
+```typescript
+import xss from 'xss';
+
+// Sanitize content before storing
+const sanitizedContent = data.content ? xss(data.content) : null;
+```
+
+#### 3. Proper Message Serialization
 - Added JSON serialization to ensure Prisma results are properly formatted:
 ```typescript
 const broadcastData = JSON.parse(JSON.stringify({
@@ -84,19 +99,15 @@ const broadcastData = JSON.parse(JSON.stringify({
 - **Path traversal vulnerability** in upload functionality
 - **Fix Needed**: Implement filename sanitization and path validation in `server/src/routes/uploads.ts`
 
-### 3. Missing XSS Protection - Medium Severity
-- **Message content not sanitized** before display
-- **Fix Needed**: Implement content sanitization using xss library in `server/src/socket.ts`
-
-### 4. No CSRF Protection - High Severity
+### 3. No CSRF Protection - High Severity
 - **No CSRF tokens implemented** despite using cookie-based authentication
 - **Fix Needed**: Add CSRF protection middleware in `server/src/app.ts`
 
-### 5. Insecure Key Storage - Medium Severity
+### 4. Insecure Key Storage - Medium Severity
 - **Private keys stored in localStorage** (accessible to XSS attacks)
 - **Fix Needed**: Implement additional encryption layers in `web/src/utils/keyManagement.ts`
 
-### 6. Cache Memory Leaks - Medium Severity
+### 5. Cache Memory Leaks - Medium Severity
 - **Caching without size limits** in crypto utilities
 - **Fix Needed**: Add cache size limits in `web/src/utils/crypto.ts`
 
@@ -108,19 +119,20 @@ const broadcastData = JSON.parse(JSON.stringify({
 3. **Better user experience**: App remains responsive even when encountering malformed data
 4. **Enhanced security**: Safer cookie parsing reduces injection attack surface
 5. **Data integrity**: Proper message serialization ensures consistent data format
+6. **Message persistence**: Messages no longer disappear after render due to proper merging
 
 ### Performance Improvements:
 1. **Reduced crashes**: Fewer runtime errors due to validation
 2. **Memory efficiency**: Invalid messages are filtered out early
 3. **Faster rendering**: Error messages are handled gracefully without blocking
+4. **Better state management**: Immutable updates ensure React properly re-renders
 
 ## Recommended Next Steps
 
 ### Immediate Priorities:
-1. **Implement XSS protection** by sanitizing message content before storing and displaying
-2. **Complete cookie security** by configuring proper SameSite attributes
-3. **Add CSRF protection** middleware for API endpoints
-4. **Secure file uploads** with proper filename sanitization
+1. **Complete cookie security** by configuring proper SameSite attributes
+2. **Add CSRF protection** middleware for API endpoints
+3. **Secure file uploads** with proper filename sanitization
 
 ### Future Improvements:
 1. **Enhance key storage security** with additional encryption layers
@@ -137,10 +149,15 @@ With the current fixes in place:
 3. **Test message rendering**: Send various message types to ensure no crashes occur
 4. **Check serialization**: Verify that messages are properly formatted when received by clients
 5. **Performance testing**: Monitor memory usage during extended sessions
+6. **Message persistence testing**: 
+   - Open chat between 2 users in different tabs
+   - Send a message → it should appear instantly and **stay visible**
+   - Refresh → old messages should load without duplication
+   - Switch chats → recent messages persist properly
 
 ## Conclusion
 
-The recent fixes have significantly improved the stability and resilience of the Chat-Lite application by addressing the immediate issues causing blank screens and crashes. The defensive programming approach ensures that invalid messages are handled gracefully rather than causing application failures.
+The recent fixes have significantly improved the stability and resilience of the Chat-Lite application by addressing the immediate issues causing blank screens, crashes, and message disappearance. The defensive programming approach ensures that invalid messages are handled gracefully rather than causing application failures.
 
 However, several security vulnerabilities remain that need to be addressed for production use. The implementation of proper input validation, sanitization, and security headers will make the application more robust against common web application attacks.
 

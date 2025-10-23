@@ -82,7 +82,7 @@ Proyek ini menggunakan PostgreSQL dengan Prisma sebagai ORM. Struktur database m
 
 Keamanan adalah prioritas utama dalam Chat-Lite:
 
-- **Enkripsi End-to-End**: Pesan dienkripsi menggunakan pustaka libsodium sebelum dikirim ke server dan hanya dapat didekripsi oleh penerima yang dituju
+- **Enkripsi End-to-End**: Pesan dienkripsi menggunakan pustaka libsodium sebelum dikirim dan hanya dapat didekripsi oleh penerima yang dituju
 - **Autentikasi JWT**: Menggunakan JSON Web Tokens dengan access token dan refresh token yang disimpan dalam cookie httpOnly untuk mencegah serangan XSS. Token diperbarui secara otomatis menggunakan mekanisme refresh token.
 - **Keamanan HTTP**: Menggunakan Helmet untuk melindungi aplikasi dari kerentanan web yang diketahui
 - **Rate Limiting**: Mencegah penyalahgunaan API dengan membatasi jumlah permintaan

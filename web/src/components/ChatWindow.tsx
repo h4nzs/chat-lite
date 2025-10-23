@@ -9,6 +9,7 @@ import MessageItem from "@components/MessageItem";
 import { useScrollToBottom } from "@hooks/useScrollToBottom";
 
 export default function ChatWindow({ id }: { id: string | null }) {
+  console.log("🔄 ChatWindow re-rendered:", { id });
   const [text, setText] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
 
@@ -16,7 +17,11 @@ export default function ChatWindow({ id }: { id: string | null }) {
   const conversations = useChatStore((s) => s.conversations);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const uploadFile = useChatStore((s) => (s as any).uploadFile);
-  const messages = useChatStore((s) => (id ? s.messages[id] || [] : []));
+  const messages = useChatStore((s) => {
+    const result = (id ? s.messages[id] || [] : []);
+    console.log("💬 Messages updated:", { conversationId: id, count: result.length, messages: result });
+    return result;
+  });
   const openConversation = useChatStore((s) => s.openConversation);
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
   const typingUsers = useChatStore((s) => (id ? s.typing[id] || [] : []));

@@ -103,7 +103,8 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
         </div>
       );
     }
-    if (!m.content) {
+    // Allow empty string messages but not null/undefined
+    if (m.content === null || m.content === undefined) {
       return null;
     }
     return (
@@ -176,26 +177,6 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
 
           {/* Error sending */}
           {m.error && <p className="text-xs text-red-500 mt-1">Failed to send</p>}
-
-          {/* Timestamp */}
-          <ErrorBoundary
-            fallback={
-              <div className="text-xs text-gray-500 mt-1 text-right">
-                {new Date(m.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-            }
-          >
-            <div
-              className={`text-xs text-gray-500 mt-1 ${
-                mine ? "text-right" : "text-left"
-              }`}
-            >
-              {formatTimestamp(m.createdAt)}
-            </div>
-          </ErrorBoundary>
         </div>
       </div>
     </div>
