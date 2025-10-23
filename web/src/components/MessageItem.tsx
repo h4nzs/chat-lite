@@ -1,3 +1,4 @@
+// chat-lite/web/src/components/MessageItem.tsx
 import { memo, useEffect, useRef } from "react";
 import ErrorBoundary from "./ErrorBoundary";
 import type { CSSProperties } from "react";
@@ -7,11 +8,8 @@ import Reactions from "./Reactions";
 import { getSocket } from "@lib/socket";
 import { isImageFile, isVideoFile, isAudioFile } from "@lib/fileUtils";
 
-// Simple function to sanitize HTML content to prevent XSS
 function sanitizeHtml(content: string): string {
   if (!content) return '';
-  
-  // Remove potentially dangerous tags and attributes
   let sanitized = content
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
@@ -19,34 +17,33 @@ function sanitizeHtml(content: string): string {
     .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
     .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
     .replace(/javascript:/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '');
-  
+    .replace(/on\w+="[^"]*"/gi, '');
   return sanitized;
 }
 
-type ItemData = {
-  messages: Message[];
-  conversationId: string;
-  setSize: (index: number, size: number) => void;
-  meId?: string | null;
-  formatTimestamp: (ts: string) => string;
-  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
+type MessageItemProps = {
+  index: number;
+  style?: CSSProperties;
+  data: {
+    messages: Message[];
+    setSize: (index: number, size: number) => void;
+    formatTimestamp: (ts: string) => string;
+    deleteMessage?: (id: string) => void;
+    conversationId?: string;
+    meId?: string | null;
+  };
 };
 
-interface MessageItemProps {
-  index: number;
-  style: CSSProperties;
-  data: ItemData;
+function areEqual(prev: any, next: any) {
+  return (
+    prev.index === next.index &&
+    prev.data.conversationId === next.data.conversationId &&
+    prev.data.messages[prev.index]?.id ===
+      next.data.messages[next.index]?.id &&
+    prev.data.messages[prev.index]?.content ===
+      next.data.messages[next.index]?.content
+  );
 }
-
-const areEqual = (prev: MessageItemProps, next: MessageItemProps) =>
-  prev.index === next.index &&
-  prev.data.conversationId === next.data.conversationId &&
-  prev.data.messages[prev.index]?.id ===
-    next.data.messages[next.index]?.id &&
-  prev.data.messages[prev.index]?.content ===
-    next.data.messages[next.index]?.content;
 
 function MessageItemComponent({ index, style, data }: MessageItemProps) {
   const { messages, setSize, formatTimestamp, deleteMessage, conversationId, meId } =
@@ -66,24 +63,15 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
         if (itemRef.current) setSize(index, itemRef.current.offsetHeight);
       });
     }
-  }, [index, setSize, m.content, m.imageUrl, m.fileUrl, m.reactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, m?.content, m?.imageUrl, m?.fileUrl]);
 
-  const socket = getSocket();
-
-  const handleAddReaction = (emoji: string) => {
-    socket.emit("message:react", { messageId: m.id, conversationId, emoji });
-  };
-  const handleRemoveReaction = (emoji: string) => {
-    socket.emit("message:unreact", { messageId: m.id, conversationId, emoji });
-  };
-
-  const fileUrl = m.imageUrl || m.fileUrl || "";
+  const fileUrl = (m as any).fileUrl || (m as any).imageUrl || null;
   const fullUrl =
     fileUrl && fileUrl.startsWith("http")
       ? fileUrl
       : `${import.meta.env.VITE_API_URL || "http://localhost:4000"}${fileUrl}`;
 
-  // === Error decrypt / deleted message styling ===
   const renderContent = () => {
     if (m.content?.startsWith("Decryption Error")) {
       return (
@@ -103,26 +91,33 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
         </div>
       );
     }
-    // Allow empty string messages but not null/undefined
     if (m.content === null || m.content === undefined) {
       return null;
     }
+
+    // Use whitespace-pre-wrap so normal words wrap, not letter-by-letter.
     return (
       <div
-        className={`px-3 py-2 rounded-2xl break-words max-w-[70%] shadow ${
+        className={`px-3 py-2 rounded-2xl break-words whitespace-pre-wrap max-w-[70%] shadow ${
           mine
             ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
             : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         }`}
       >
-        <p>{m.content}</p>
+        {/* sanitize output */}
+        <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.content) }} />
+        {m.error && <p className="text-xs text-red-500 mt-1">Failed to send</p>}
       </div>
     );
   };
 
   return (
-    <div style={style} className="px-4 py-1">
-      <div ref={itemRef} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    // IMPORTANT: keep style from react-window, but ensure the item uses full width of the row
+    <div style={style} className="w-full px-4 py-1">
+      <div
+        ref={itemRef}
+        className={`flex w-full ${mine ? "justify-end" : "justify-start"}`}
+      >
         <div className="flex flex-col max-w-full">
           {showName && (
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">
@@ -142,41 +137,31 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
               onClick={() => window.open(fullUrl, "_blank")}
             />
           )}
+
           {fileUrl && isVideoFile(fileUrl) && (
             <video
               src={fullUrl}
               controls
-              className="mt-2 max-w-[240px] max-h-[200px] rounded-md shadow-sm bg-black"
+              className="mt-2 max-w-[240px] max-h-[200px] rounded-md shadow-sm object-contain"
             />
           )}
+
           {fileUrl && isAudioFile(fileUrl) && (
-            <audio src={fullUrl} controls className="mt-2 w-[220px]" />
+            <audio src={fullUrl} controls className="mt-2" />
           )}
-          {fileUrl &&
-            !isImageFile(fileUrl) &&
-            !isVideoFile(fileUrl) &&
-            !isAudioFile(fileUrl) && (
-              <a
-                href={fullUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm underline mt-2 hover:opacity-80"
-              >
-                📎 {m.fileName || "Download file"}
-              </a>
+
+          {/* Timestamp & reactions */}
+          <div className={`flex items-center mt-1 ${mine ? "justify-end" : "justify-start"}`}>
+            <div className="text-xs text-gray-400 mr-2">{formatTimestamp(m.createdAt)}</div>
+            {m.reactions && m.reactions.length > 0 && (
+              <Reactions
+                message={m}
+                conversationId={conversationId}
+                onAddReaction={() => {}}
+                onRemoveReaction={() => {}}
+              />
             )}
-
-          {/* Reactions */}
-          {m.reactions && m.reactions.length > 0 && (
-            <Reactions
-              message={m}
-              onAddReaction={handleAddReaction}
-              onRemoveReaction={handleRemoveReaction}
-            />
-          )}
-
-          {/* Error sending */}
-          {m.error && <p className="text-xs text-red-500 mt-1">Failed to send</p>}
+          </div>
         </div>
       </div>
     </div>
