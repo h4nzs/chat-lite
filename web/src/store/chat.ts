@@ -3,6 +3,7 @@ import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
 import { encryptMessage, decryptMessage } from "@utils/crypto";
 import toast from "react-hot-toast";
+import { useAuthStore } from "./auth";
 
 export type Conversation = {
   id: string;
@@ -34,7 +35,7 @@ export type Message = {
   createdAt: string;
   error?: boolean;
   preview?: string;
-  reactions?: { emoji: string; userIds: string[] }[];
+  reactions?: { id: string; emoji: string; userId: string }[];
   readBy?: string[];
   // optional optimistic marker
   optimistic?: boolean;
@@ -190,52 +191,66 @@ export const useChatStore = create<State>((set, get) => ({
     const socket = getSocket();
     socket.emit("conversation:join", id);
 
+    // Hapus listener lama untuk mencegah duplikasi
     socket.off("message:new");
+    socket.off("presence:update");
+    socket.off("reaction:new");
+    socket.off("reaction:remove");
+
+    // Pasang listener baru
     socket.on("message:new", async (msg: Message) => {
-        if (!msg || !msg.conversationId) return;
+      const meId = useAuthStore.getState().user?.id;
+      if (msg.senderId === meId) return; // FIX: Abaikan pesan dari diri sendiri
 
-        try {
-            msg.content = await decryptMessage(msg.content || "", msg.conversationId);
-        } catch (e) {
-            console.error("Failed to decrypt message:", e);
-            msg.content = "[Failed to decrypt message]";
-        }
+      try {
+        msg.content = await decryptMessage(msg.content || "", msg.conversationId);
+      } catch (e) {
+        msg.content = "[Failed to decrypt message]";
+      }
 
-        set((s) => {
-            const conversationId = msg.conversationId;
-            const messages = s.messages[conversationId] || [];
-            let messageExists = false;
+      set((s) => {
+        const messages = [...(s.messages[msg.conversationId] || []), withPreview(msg)];
+        return { messages: { ...s.messages, [msg.conversationId]: messages } };
+      });
+    });
 
-            const updatedMessages = messages.map((m) => {
-                if ((msg.tempId && m.tempId === msg.tempId) || (msg.id && m.id === msg.id)) {
-                    messageExists = true;
-                    return withPreview(msg);
-                }
-                return m;
-            });
+    socket.on("presence:update", ({ userId, online }) => {
+      set((s) => ({
+        presence: { ...s.presence, [userId]: online },
+      }));
+    });
 
-            if (!messageExists) {
-                updatedMessages.push(withPreview(msg));
-            }
+    socket.on("reaction:new", (reaction) => {
+      set((s) => {
+        const { messageId } = reaction;
+        const conversationId = Object.keys(s.messages).find(cid => s.messages[cid].some(m => m.id === messageId));
+        if (!conversationId) return s;
 
-            const updatedConversations = s.conversations.map((c) =>
-                c.id === conversationId
-                    ? {
-                        ...c,
-                        lastMessage: withPreview(msg),
-                        updatedAt: new Date().toISOString(),
-                    }
-                    : c
-            );
-
-            return {
-                messages: {
-                    ...s.messages,
-                    [conversationId]: updatedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-                },
-                conversations: sortConversations(updatedConversations),
-            };
+        const updatedMessages = s.messages[conversationId].map(m => {
+          if (m.id === messageId) {
+            const newReactions = [...(m.reactions || []), { id: reaction.id, emoji: reaction.emoji, userId: reaction.userId }];
+            return { ...m, reactions: newReactions };
+          }
+          return m;
         });
+        return { ...s, messages: { ...s.messages, [conversationId]: updatedMessages } };
+      });
+    });
+
+    socket.on("reaction:remove", ({ reactionId, messageId }) => {
+      set((s) => {
+        const conversationId = Object.keys(s.messages).find(cid => s.messages[cid].some(m => m.id === messageId));
+        if (!conversationId) return s;
+
+        const updatedMessages = s.messages[conversationId].map(m => {
+          if (m.id === messageId) {
+            const newReactions = (m.reactions || []).filter(r => r.id !== reactionId);
+            return { ...m, reactions: newReactions };
+          }
+          return m;
+        });
+        return { ...s, messages: { ...s.messages, [conversationId]: updatedMessages } };
+      });
     });
   },
 
@@ -251,12 +266,27 @@ export const useChatStore = create<State>((set, get) => ({
         socket.emit(
             "message:send",
             { conversationId, ...finalData, tempId },
-            (ack: { ok: boolean; msg?: Message }) => {
-                if (ack?.ok) {
-                    resolve();
+            async (ack: { ok: boolean; msg?: Message }) => {
+                if (ack?.ok && ack.msg) {
+                    try {
+                        const decryptedContent = await decryptMessage(ack.msg.content || "", conversationId);
+                        const confirmedMsg = withPreview({ ...ack.msg, content: decryptedContent });
+
+                        set((s) => {
+                            const messages = (s.messages[conversationId] || []).map(m => 
+                                m.tempId === tempId ? confirmedMsg : m
+                            );
+                            return { messages: { ...s.messages, [conversationId]: messages } };
+                        });
+                        resolve();
+                    } catch (e) {
+                        console.error("Failed to handle message ack:", e);
+                        get().markMessageError(conversationId, tempId!);
+                        reject(e);
+                    }
                 } else {
                     get().markMessageError(conversationId, tempId!);
-                    reject(new Error("Send failed"));
+                    reject(new Error("Send failed: No ACK from server"));
                 }
             }
         );

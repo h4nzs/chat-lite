@@ -1,61 +1,70 @@
-### 💼 **Prompt (versi profesional)**
-
-> I’m currently developing a chat web application using **React + Tailwind CSS**, and I’m encountering a UI issue with the message preview layout.
+> **Instruksi Lengkap:**
 >
-> The problem:
+> Kamu adalah seorang *senior fullstack engineer* yang sedang melakukan **debug dan analisis sistem chat real-time ChatLite**.
+> Setelah integrasi beberapa fitur baru (delete message, emoji reactions, push notification), kini muncul bug baru:
 >
-> * Image preview (uploaded file) is appearing inside the **receiver’s message bubble** even when the image is sent by the **current user**.
-> * Non-image files (like `.txt`, `.pdf`) still render correctly inside file cards.
+> ---
 >
-> I want you to help me **fix the image preview alignment and styling**.
+> 🧠 **Masalah:**
+> Saat pengguna mengirim pesan, status pesan di UI tetap `sending...` dan **tidak pernah berubah menjadi “sent”** atau dikonfirmasi berhasil, meskipun pesan sebenarnya mungkin sudah terkirim ke backend.
+> --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 >
-> Requirements:
+> **Tugasmu adalah melakukan audit dan analisa mendalam pada keseluruhan alur pengiriman pesan**, lalu berikan *fix atau patch rekomendasi* yang spesifik.
 >
-> * If the message is sent by the **current user**, the image preview bubble should align **to the right**.
-> * If the message is sent by the **other user**, it should align **to the left**.
-> * Maintain consistent chat bubble styles (gradient colors for sender, dark gray for receiver).
-> * Image previews should have a **maximum width of 250px**, maintain aspect ratio, and have rounded corners.
-> * Non-image files should remain as small cards with file name and icon.
+> Analisis meliputi:
 >
-> The component that handles message rendering is something like `MessageBubble` or `MessageItem`.
-> Please rewrite the rendering logic to properly handle both image and file types, using a conditional layout like:
+> 1. **Frontend (web/):**
 >
-> ```jsx
-> const isOwn = message.senderId === currentUser.id;
+>    * File utama terkait pengiriman pesan:
+>      `ChatWindow.tsx`, `store/chat.ts`, dan `lib/socket.ts`
+>    * Periksa apakah fungsi `sendMessage()` benar-benar menunggu respons server / event `message:new` sebelum mengubah status `sending → sent`.
+>    * Cek apakah `socket.emit("message:new", messageData, callback)` masih memiliki callback acknowledgment dari server.
+>    * Pastikan handler `socket.on("message:new")` di frontend masih aktif setelah implementasi fitur baru.
+> 2. **Backend (server/):**
 >
-> return (
->   <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
->     <div
->       className={`max-w-xs ${
->         isOwn
->           ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-l-2xl rounded-tr-2xl'
->           : 'bg-gray-700 text-white rounded-r-2xl rounded-tl-2xl'
->       } p-2`}
->     >
->       {message.type === 'image' ? (
->         <img
->           src={message.fileUrl}
->           alt="uploaded"
->           className="rounded-2xl max-w-[250px] object-cover"
->         />
->       ) : message.type === 'file' ? (
->         <a
->           href={message.fileUrl}
->           target="_blank"
->           rel="noopener noreferrer"
->           className="flex items-center gap-2 bg-gray-800 rounded-lg p-2"
->         >
->           <FileIcon />
->           <span className="text-sm">{message.fileName}</span>
->         </a>
->       ) : (
->         <p>{message.text}</p>
->       )}
->     </div>
->   </div>
-> );
-> ```
+>    * File utama terkait pesan:
+>      `routes/messages.ts`, `socket.ts`
+>    * Pastikan server-side event `socket.on("message:new", ...)` menerima payload dari frontend dan memanggil `io.to(conversationId).emit("message:new", message)` untuk broadcast balik.
+>    * Cek apakah ada error di proses `prisma.message.create()` yang menyebabkan promise tidak pernah resolve, membuat frontend stuck.
+>    * Verifikasi bahwa setelah `message` disimpan, server mengirimkan ACK balik ke pengirim (contoh: `callback(message)` atau `socket.emit("message:ack", message)`).
+> 3. **Middleware / Integrasi:**
 >
-> Focus the fix specifically on ensuring the **image preview** is correctly positioned based on the sender, and that the overall chat UI layout remains visually balanced and consistent.
+>    * Pastikan middleware autentikasi socket tidak memblokir event `message:new` setelah perubahan di fitur push notification.
+>    * Cek apakah ada konflik dengan event lain (`message:deleted`, `reaction:new`, dll.) yang override namespace `message:new`.
+>
+> ---
+>
+> 🧾 **Output yang Diharapkan:**
+>
+> 1. Jelaskan *alur eksekusi pesan dari klik kirim hingga tampil di penerima*, lalu tandai di titik mana proses macet.
+> 2. Identifikasi baris kode (atau fungsi) yang menyebabkan status `sending` tidak berubah.
+> 3. Jika ada event socket yang tidak pernah di-emit / tidak match, tunjukkan perbedaannya (misal `message:new` vs `message:create`).
+> 4. Berikan **kode fix langsung**, misalnya:
+>
+>    ```ts
+>    socket.emit("message:new", payload, (serverMessage) => {
+>      updateMessageStatus(serverMessage.id, "sent");
+>    });
+>    ```
+>
+>    atau patch backend dengan:
+>
+>    ```ts
+>    socket.on("message:new", async (data, callback) => {
+>      const message = await prisma.message.create({ ... });
+>      io.to(data.conversationId).emit("message:new", message);
+>      callback(message); // <— ACK balik
+>    });
+>    ```
+> 5. Tambahkan rekomendasi pengujian untuk memverifikasi fix-nya.
+>
+> ---
+>
+> 💡 **Tujuan Akhir:**
+> Setelah audit dan perbaikan:
+>
+> * Pesan baru langsung berubah status dari `sending` → `sent` setelah ACK server diterima.
+> * Pesan tampil di UI penerima secara real-time.
+> * Tidak ada error di console atau pending promise di `sendMessage()`.
 
 ---
