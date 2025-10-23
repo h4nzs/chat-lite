@@ -24,7 +24,8 @@ model User {
   messageStatuses  MessageStatus[]
   refreshTokens    RefreshToken[]
   reactions        MessageReaction[]
-  pushSubscriptions PushSubscription[] // Relasi balik yang diperlukan
+  pushSubscriptions PushSubscription[]
+  hiddenConversations UserHiddenConversation[] // Relasi untuk soft delete
 
   @@index([email])
   @@index([username])
@@ -36,11 +37,13 @@ model Conversation {
   id            String         @id @default(cuid())
   isGroup       Boolean        @default(false)
   title         String?
+  creatorId     String?        // ID user yang membuat grup
   lastMessageAt DateTime?      @db.Timestamptz(6)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   participants  Participant[]
   messages      Message[]
+  hiddenBy      UserHiddenConversation[] // Relasi untuk soft delete
 
   @@index([lastMessageAt])
   @@index([createdAt])
@@ -171,4 +174,14 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserHiddenConversation {
+  id             String       @id @default(cuid())
+  userId         String
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
 }

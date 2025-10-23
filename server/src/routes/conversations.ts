@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
-import { io } from "../socket.js"; // Impor io
+import { io } from "../socket.js";
+import { ApiError } from "../utils/errors.js"; // Impor ApiError
 
 const router = Router();
 
@@ -15,6 +16,11 @@ router.get("/", requireAuth, async (req, res, next) => {
       where: {
         participants: {
           some: { userId },
+        },
+        NOT: {
+          hiddenBy: {
+            some: { userId },
+          },
         },
       },
       include: {
@@ -142,6 +148,7 @@ router.post("/group", requireAuth, async (req, res, next) => {
       data: {
         isGroup: true,
         title: title.trim(),
+        creatorId: userId, // Set creatorId
         participants: {
           create: [
             { userId }, // Add the creator
@@ -298,9 +305,73 @@ router.post("/start", requireAuth, async (req, res, next) => {
       lastMessage: null,
     };
 
-    res.status(201).json(transformed);
+      res.status(201).json(transformed);
+    } catch (e) {
+      console.error("[Conversations Controller - Start 1-on-1] Error:", e);
+      next(e);
+    }
+  });
+// Endpoint untuk menghapus grup (Hard Delete)
+router.delete("/group/:id", requireAuth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user.id;
+    const { id } = req.params;
+
+    const conversation = await prisma.conversation.findFirst({
+      where: { id, creatorId: userId, isGroup: true },
+      include: { participants: true },
+    });
+
+    if (!conversation) {
+      return next(new ApiError(403, "Group not found or you are not the creator."));
+    }
+
+    // Hapus semua relasi dan percakapan
+    await prisma.$transaction([
+      prisma.message.deleteMany({ where: { conversationId: id } }),
+      prisma.participant.deleteMany({ where: { conversationId: id } }),
+      prisma.userHiddenConversation.deleteMany({ where: { conversationId: id } }),
+      prisma.conversation.delete({ where: { id } }),
+    ]);
+
+    // Beri tahu semua anggota bahwa grup telah dihapus
+    conversation.participants.forEach(p => {
+      io.to(p.userId).emit("conversation:deleted", { id });
+    });
+
+    res.status(200).json({ message: "Group deleted successfully." });
   } catch (e) {
-    console.error("[Conversations Controller - Start 1-on-1] Error:", e);
+    next(e);
+  }
+});
+
+// Endpoint untuk menyembunyikan percakapan pribadi (Soft Delete)
+router.delete("/:id", requireAuth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user.id;
+    const { id } = req.params;
+
+    // Pastikan percakapan ada dan user adalah partisipan
+    const participant = await prisma.participant.findFirst({
+      where: { conversationId: id, userId },
+    });
+
+    if (!participant) {
+      return next(new ApiError(404, "Conversation not found or you are not a participant."));
+    }
+
+    // Tambahkan record untuk menyembunyikan percakapan bagi user ini
+    await prisma.userHiddenConversation.upsert({
+      where: { userId_conversationId: { userId, conversationId: id } },
+      update: {},
+      create: { userId, conversationId: id },
+    });
+
+    // Beri tahu hanya user yang menghapus untuk menghapus dari UI-nya
+    io.to(userId).emit("conversation:deleted", { id });
+
+    res.status(200).json({ message: "Conversation hidden successfully." });
+  } catch (e) {
     next(e);
   }
 });

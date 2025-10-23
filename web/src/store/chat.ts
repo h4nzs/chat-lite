@@ -9,6 +9,7 @@ export type Conversation = {
   id: string;
   isGroup: boolean;
   title?: string | null;
+  creatorId?: string | null; // Tambahkan ini
   participants: {
     id: string;
     username: string;
@@ -67,6 +68,9 @@ type State = {
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   searchUsers: (q: string) => Promise<{ id: string; username: string; name: string; avatarUrl?: string | null }[]>;
   startConversation: (peerId: string) => Promise<string>;
+
+  deleteGroup: (id: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
 
   setLoading: (id: string, val: boolean) => void;
 };
@@ -154,6 +158,14 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("presence:update");
     socket.on("presence:update", (onlineUserIds: string[]) => {
       set({ presence: onlineUserIds });
+    });
+
+    socket.on("conversation:deleted", ({ id }) => {
+      set(s => ({
+        conversations: s.conversations.filter(c => c.id !== id),
+        // Jika percakapan yang aktif dihapus, reset activeId
+        activeId: s.activeId === id ? null : s.activeId,
+      }));
     });
   },
 
@@ -421,6 +433,30 @@ export const useChatStore = create<State>((set, get) => ({
     });
     await get().loadConversations();
     return r.id;
+  },
+
+  async deleteGroup(id: string) {
+    try {
+      await api(`/api/conversations/group/${id}`, { method: 'DELETE' });
+      toast.success("Group deleted successfully");
+      // UI update will be handled by the socket event
+    } catch (error: any) {
+      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
+      toast.error(`Failed to delete group: ${errorMsg}`);
+      throw error;
+    }
+  },
+
+  async deleteConversation(id: string) {
+    try {
+      await api(`/api/conversations/${id}`, { method: 'DELETE' });
+      toast.success("Chat hidden successfully");
+      // UI update will be handled by the socket event
+    } catch (error: any) {
+      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
+      toast.error(`Failed to hide chat: ${errorMsg}`);
+      throw error;
+    }
   },
 
   async loadOlderMessages(conversationId) {

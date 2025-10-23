@@ -1,221 +1,303 @@
-# Prompt Gemini — Implement & Audit "Create Group" (ChatLite)
+# Prompt Gemini — Implement Group & Chat Deletion (ChatLite)
 
-You are a **senior fullstack engineer** and code auditor. Project: **ChatLite** (React + TypeScript frontend `web/`, Node/Express + Prisma backend `server/`, Socket.IO realtime).
-Task: **Implement the missing “Create Group” flow end-to-end, audit all related code, and apply best-practice fixes without touching unrelated logic.** Fix the current `invalid csrf token` on create attempts by ensuring proper CSRF usage and route wiring. Deliver code changes, tests, and a short report.
-
-> Important constraints:
->
-> * Only modify files that are relevant to the Create Group flow (backend route/controller, DB schema if needed, socket handlers, frontend modal + API call + store).
-> * Preserve existing authentication, encryption, and socket conventions.
-> * Use TypeScript and keep typings strict.
-> * Keep changes minimal and well-documented.
+You are a **senior fullstack developer** working on a realtime chat app called **ChatLite**
+(Stack: React + Zustand + Socket.IO frontend, Node.js + Express + Prisma + Socket.IO backend).
+Implement two new deletion features with full audit and minimal disturbance to existing logic.
 
 ---
 
-## Scope (what to implement & audit)
+## 🧱 Goals
 
-**Frontend**
+1. **Group Deletion**
 
-* Modal UI already exists. Tasks:
+   * Only the **creator (owner)** of the group can delete it.
+   * Deleting a group removes:
 
-  * Ensure Create Group form gathers: `name`, `memberIds[]`, optional `avatar`.
-  * Get CSRF token before POST (call `/api/csrf-token`) or reuse existing CSRF helper. Attach token header `X-CSRF-Token` and `credentials: 'include'`.
-  * Submit form to backend endpoint `POST /api/groups` (or `POST /api/conversations/groups`) with form data as JSON or multipart (if avatar).
-  * On success: close modal, add group to conversations list in store, navigate/open group chat, and show toast success.
-  * On failure: show appropriate toast with error details (401/403/validation).
-  * Ensure optimistic UI only if server ACK received (to avoid duplicate pending state).
+     * All messages in that group conversation.
+     * The conversation record itself.
+     * All member relationships (`ConversationMember`).
+   * When deleted:
 
-Files likely to edit:
+     * All group members are notified in realtime via Socket.IO (`conversation:deleted` event).
+     * The deleted group is removed from their chat list instantly.
 
-* `web/src/components/CreateGroupModal.tsx` (or existing modal file)
-* `web/src/store/chat.ts` (createGroup action + update conversations)
-* `web/src/lib/api.ts` or wherever HTTP helper exists (ensure CSRF header helper)
-* `web/src/lib/socket.ts` (emit socket event if needed)
+2. **Conversation Deletion (One-to-One Chat)**
 
-**Backend**
+   * A user can delete a private chat (via “...” menu on chat list).
+   * This should **only clear messages from that user’s view** (soft delete), *not delete the other user’s copy*.
+   * Add a new table or flag if necessary (`UserConversationHidden` or a “hiddenBy” column).
+   * Realtime updates: when user deletes a conversation, it disappears from *their* chatlist.
+   * Other user still keeps their messages unless they also delete it.
 
-* Implement endpoint(s):
+3. **Frontend UI**
 
-  * `GET /api/csrf-token` — returns `{ csrfToken }` and sets cookie (if not already present). (If exists already, ensure it's correct.)
-  * `POST /api/groups` — create group conversation:
+   * Add a **"..." menu (3 dots)** beside each chat (both user and group) in the chat list.
+   * Menu options:
 
-    * Request body: `{ name: string, memberIds: string[], avatar?: file }`
-    * Auth required (use existing auth middleware).
-    * Create Conversation record in DB (Prisma): conversation type `group`, add ConversationMembers linking creator + members.
-    * Optionally save avatar to `/uploads/groups` using existing upload/multer flow.
-    * Set `lastMessageId` null initially.
-    * Return created conversation object with members populated and socket room info.
-  * Emit socket event: `io.to(userId).emit('conversation:new', conversation)` for each member or `io.to(conversationId).emit('conversation:new', conversation)` after they join rooms. Use `io.emit` or targeted emits consistent with current server architecture.
-* Ensure CSRF middleware allows POST with `X-CSRF-Token` header. If multer used, ensure CSRF is checked properly (middleware order matters).
-* Update route wiring to register endpoint.
-
-Files likely to edit:
-
-* `server/src/routes/groups.ts` or `server/src/routes/conversations.ts`
-* `server/src/socket.ts` (make sure new conversation broadcast is emitted)
-* If DB needs a `Conversation` or `ConversationMember` change, update `prisma/schema.prisma` and create migration (only if missing)
-
-  * Example schema pieces (if missing):
-
-    ```prisma
-    model Conversation {
-      id String @id @default(cuid())
-      name String?
-      type String // 'direct' | 'group'
-      lastMessageId String?
-      members ConversationMember[]
-      createdAt DateTime @default(now())
-    }
-
-    model ConversationMember {
-      id String @id @default(cuid())
-      conversationId String
-      userId String
-      role String?
-      conversation Conversation @relation(fields:[conversationId], references:[id])
-      user User @relation(fields:[userId], references:[id])
-    }
-    ```
-  * ONLY add schema change if absolutely necessary and document migration steps.
-
-**Socket**
-
-* On group creation:
-
-  * Add new conversation to each member’s conversation list in realtime:
-
-    * For each `memberId`: `io.to(memberSocketId).emit('conversation:new', conversation)` or use `io.to(memberId).emit(...)` depending on how you map user→socket.
-  * Ensure server adds member sockets to conversation room so subsequent messages broadcast properly.
-
-**Tests & Verification**
-
-* Add integration test script or manual test steps:
-
-  1. With two different accounts in two browsers/clients:
-
-     * Open Create Group modal, select members (include the other client), submit.
-     * Verify no `invalid csrf token` error.
-     * Group appears in both clients’ conversation lists immediately (no refresh).
-     * Clicking group opens chat window (members present).
-     * Sending a message in group is delivered to all members.
-  2. Test avatar upload (if implemented): image saved to `uploads/groups/...` and served (CORP/CORS headers respected).
-  3. Permission test: only authorized users can create group. Validate 403/401 flows.
-  4. Edge cases: empty name, single member, invalid member IDs → return 400 with message.
+     * For group creator: `Delete Group`
+     * For private chat: `Delete Chat`
+   * Confirmation modal before delete (`Are you sure you want to delete this conversation?`)
+   * Toast success or error based on API response.
+   * After successful delete → remove item from UI immediately (Zustand state update).
 
 ---
 
-## Implementation details & suggested code patterns (examples Gemini should produce)
+## 🔒 Rules & Requirements
 
-**Frontend: CreateGroup flow**
+* Only the **group owner** can delete their group.
+* Deleting a **private chat** should not delete it for the other user (soft delete).
+* Preserve CSRF protection.
+* Keep **existing message send, receive, and typing** features untouched.
+* Use existing coding conventions (naming, store patterns, socket events, etc.)
+* Keep TypeScript strict.
+* Apply backend permission checks, validation, and use best practices.
 
-* Use existing API helper (axios/fetch). Example fetch:
+---
 
-```ts
-async function createGroup(payload: {name:string, memberIds:string[], avatar?:File}) {
-  const csrf = await api.getCsrfToken(); // or call /api/csrf-token
-  const form = new FormData();
-  form.append("name", payload.name);
-  payload.memberIds.forEach(id => form.append("memberIds[]", id));
-  if (payload.avatar) form.append("avatar", payload.avatar);
+## 🔧 Backend Tasks
 
-  const res = await fetch(`${API_URL}/api/groups`, {
-    method: "POST",
-    body: form,
-    headers: { "X-CSRF-Token": csrf, /* do not set Content-Type for formData */ },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return await res.json();
-}
-```
+### **1. Delete Group Endpoint**
 
-* Update store:
+**Route:**
+`DELETE /api/groups/:id`
+
+**Logic:**
 
 ```ts
-// on success
-set(state => ({
-  conversations: [newConv, ...state.conversations]
-}));
-```
+// Pseudocode
+router.delete('/groups/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const groupId = req.params.id;
 
-* Socket: after response, optionally `socket.emit('conversation:joined', { conversationId })` to join rooms.
-
-**Backend: Route skeleton**
-
-```ts
-import express from 'express';
-import { prisma } from '../prisma';
-import { authMiddleware } from '../middleware/auth';
-import multer from 'multer';
-const upload = multer({ dest: 'uploads/groups' });
-
-const router = express.Router();
-
-router.post('/groups', authMiddleware, upload.single('avatar'), async (req, res) => {
-  const { name, memberIds } = req.body; // parse memberIds array carefully
-  const creatorId = req.user.id;
-  // validate input, sanitize name
-  const conversation = await prisma.conversation.create({
-    data: {
-      name,
-      type: 'group',
-      members: {
-        create: [
-          ...memberIds.map((id: string) => ({ userId: id })),
-          { userId: creatorId }
-        ]
-      }
-    },
-    include: { members: true }
+  const group = await prisma.conversation.findUnique({
+    where: { id: groupId },
+    include: { members: true },
   });
-  // emit to members
-  memberIds.concat(creatorId).forEach(uid => {
-    const socketId = getSocketIdForUser(uid); // use existing mapping util
-    if (socketId) io.to(socketId).emit('conversation:new', conversation);
+
+  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (group.creatorId !== userId) return res.status(403).json({ error: 'Not allowed' });
+
+  await prisma.message.deleteMany({ where: { conversationId: groupId } });
+  await prisma.conversationMember.deleteMany({ where: { conversationId: groupId } });
+  await prisma.conversation.delete({ where: { id: groupId } });
+
+  // Notify members
+  group.members.forEach(m => {
+    io.to(m.userId).emit('conversation:deleted', { id: groupId });
   });
-  res.json(conversation);
+
+  res.json({ success: true, message: 'Group deleted' });
 });
 ```
 
-* Ensure `memberIds` parsed correctly if sent as form data (may be string or array).
+> Ensure `creatorId` exists on `Conversation` model (if not, add it in schema and migration).
 
-**CSRF**
+**Prisma Schema Update (if missing):**
 
-* If CSRF token invalid:
-
-  * Either implement `GET /api/csrf-token` that returns token and sets cookie, OR ensure front sends header `X-CSRF-Token` with token obtained from page or `/api/csrf-token`.
-  * If multer is used, ensure CSRF middleware runs before multer or validate token from header not body.
-
----
-
-## Audit instructions for Gemini (required)
-
-* Search repo for existing group/conversation code and reuse conventions (naming, response shape). Do not invent new endpoints unless necessary.
-* Verify CSRF middleware order vs multer; fix order to check token header before multipart parser if needed.
-* Confirm socket user→socket mapping function exists; if not, implement minimal helper used elsewhere (reuse `getSocketForUser` or `onlineUsers` map).
-* Validate permissions: only authenticated user can create group; members must exist.
-* Add small unit/integration tests or manual test scripts and list exact steps.
-* For any DB schema migration, include migration commands (`npx prisma migrate dev`) and backup note.
+```prisma
+model Conversation {
+  id            String   @id @default(cuid())
+  name          String?
+  type          String   // 'direct' | 'group'
+  creatorId     String?  // for groups
+  members       ConversationMember[]
+  messages      Message[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+```
 
 ---
 
-## Deliverables (what Gemini should return)
+### **2. Delete Conversation (User Chat)**
 
-1. Files changed with diffs and explanations.
-2. Full new/modified file content if changes non-trivial.
-3. Test instructions and sample cURL or fetch commands to reproduce.
-4. Short audit report: what was broken (CSRF flow or missing route), what was changed, why safe.
-5. Optional: small smoke tests (node script using `fetch` or `socket.io-client`) that create a group and verify broadcast.
+**Route:**
+`DELETE /api/conversations/:id`
+
+**Logic:**
+
+```ts
+router.delete('/conversations/:id', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const convId = req.params.id;
+
+  const conversation = await prisma.conversation.findUnique({ where: { id: convId } });
+  if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+  // Soft delete: only hide for current user
+  await prisma.userConversationHidden.upsert({
+    where: { userId_conversationId: { userId, conversationId: convId } },
+    update: {},
+    create: { userId, conversationId: convId },
+  });
+
+  io.to(userId).emit('conversation:deleted', { id: convId });
+  res.json({ success: true });
+});
+```
+
+**Schema (if needed):**
+
+```prisma
+model UserConversationHidden {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  createdAt      DateTime @default(now())
+  @@unique([userId, conversationId])
+}
+```
+
+> When fetching chat list, filter out any `Conversation` hidden by the user:
+
+```ts
+where: {
+  NOT: {
+    hiddenBy: {
+      some: { userId: currentUserId }
+    }
+  }
+}
+```
 
 ---
 
-## Acceptance Criteria (how you will validate)
+## 🖥️ Frontend Tasks
 
-* Creating a group no longer triggers `invalid csrf token`.
-* Form submission results in HTTP 200 + created conversation payload.
-* New group appears in both creator and selected members’ conversation lists in realtime (no page refresh).
-* Avatar (if implemented) saved in `uploads/groups` and served correctly.
-* No regressions to existing message sending, typing, presence logic.
-* Tests / manual flows pass.
+### **1. UI Menu**
+
+Add 3-dot menu beside each chat in chatlist.
+
+**Component**: `ChatListItem.tsx`
+
+```tsx
+<Menu>
+  <MenuTrigger>
+    <EllipsisVerticalIcon className="w-5 h-5 cursor-pointer text-gray-500" />
+  </MenuTrigger>
+  <MenuContent>
+    {chat.type === 'group' && chat.creatorId === currentUser.id && (
+      <MenuItem onClick={() => handleDeleteGroup(chat.id)}>Delete Group</MenuItem>
+    )}
+    {chat.type === 'direct' && (
+      <MenuItem onClick={() => handleDeleteChat(chat.id)}>Delete Chat</MenuItem>
+    )}
+  </MenuContent>
+</Menu>
+```
+
+---
+
+### **2. API Calls**
+
+**In `api.ts`:**
+
+```ts
+export async function deleteGroup(id: string) {
+  const csrf = await getCsrfToken();
+  const res = await fetch(`${API_URL}/api/groups/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRF-Token': csrf },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteConversation(id: string) {
+  const csrf = await getCsrfToken();
+  const res = await fetch(`${API_URL}/api/conversations/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRF-Token': csrf },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+```
+
+---
+
+### **3. Store Updates**
+
+**In `chat.ts` (Zustand store):**
+
+```ts
+socket.on('conversation:deleted', ({ id }) => {
+  set(state => ({
+    conversations: state.conversations.filter(c => c.id !== id)
+  }));
+});
+```
+
+**Actions:**
+
+```ts
+async function handleDeleteGroup(id: string) {
+  try {
+    await api.deleteGroup(id);
+    toast.success('Group deleted');
+    set(state => ({
+      conversations: state.conversations.filter(c => c.id !== id)
+    }));
+  } catch (e) {
+    toast.error('Failed to delete group');
+  }
+}
+
+async function handleDeleteChat(id: string) {
+  try {
+    await api.deleteConversation(id);
+    toast.success('Chat deleted');
+    set(state => ({
+      conversations: state.conversations.filter(c => c.id !== id)
+    }));
+  } catch (e) {
+    toast.error('Failed to delete chat');
+  }
+}
+```
+
+---
+
+## ⚡ Socket Events
+
+* `conversation:deleted`
+  Payload: `{ id: string }`
+  Triggered for all members (for groups) or just the deleting user (for private chat).
+  Client removes chat from list instantly.
+
+---
+
+## ✅ Acceptance Criteria
+
+* Only the **creator** can delete a group.
+* When deleted, group disappears from all members' lists in realtime.
+* Group messages + relations removed from DB.
+* Private chat deletion only affects the deleting user.
+* Both deletions are CSRF-protected and auth-required.
+* No other logic (typing indicator, online presence, lastMessage) affected.
+* Realtime sync via socket working properly.
+* All schema changes documented and safe for migration.
+
+---
+
+## 🧩 Deliverables
+
+Gemini should:
+
+1. Provide updated backend routes (with middleware + CSRF + Prisma logic).
+2. Add/update Prisma schema & migration commands (if needed).
+3. Provide frontend UI + store + API code updates.
+4. Add socket handling for `conversation:deleted`.
+5. Include brief audit + test plan.
+
+---
+
+> Optional enhancement (Gemini may add):
+>
+> * Confirmation modal component (`ConfirmDeleteDialog`)
+> * Toast success/error
+> * Reuse shared delete handlers for both chat + group deletions.
 
 ---
