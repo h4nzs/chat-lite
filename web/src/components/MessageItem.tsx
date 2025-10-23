@@ -1,15 +1,21 @@
-// chat-lite/web/src/components/MessageItem.tsx
 import { memo, useEffect, useRef } from "react";
-import ErrorBoundary from "./ErrorBoundary";
 import type { CSSProperties } from "react";
 import type { Message } from "@store/chat";
 import LazyImage from "./LazyImage";
-import Reactions from "./Reactions";
-import { getSocket } from "@lib/socket";
-import { isImageFile, isVideoFile, isAudioFile } from "@lib/fileUtils";
 import { sanitizeText } from "@utils/sanitize";
 
-
+// A simple component to render a generic file icon and link
+const FileAttachment = ({ url, fileName }: { url: string; fileName?: string | null }) => (
+  <a 
+    href={url} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="flex items-center gap-3 p-3 rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition max-w-xs"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+    <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{fileName || 'Download File'}</span>
+  </a>
+);
 
 type MessageItemProps = {
   index: number;
@@ -17,149 +23,71 @@ type MessageItemProps = {
   data: {
     messages: Message[];
     setSize: (index: number, size: number) => void;
-    formatTimestamp: (ts: string) => string;
-    deleteMessage?: (id: string) => void;
-    conversationId?: string;
     meId?: string | null;
   };
 };
 
-function areEqual(prev: any, next: any) {
-  return (
-    prev.index === next.index &&
-    prev.data.conversationId === next.data.conversationId &&
-    prev.data.messages[prev.index]?.id ===
-      next.data.messages[next.index]?.id &&
-    prev.data.messages[prev.index]?.content ===
-      next.data.messages[next.index]?.content &&
-    prev.data.messages[prev.index]?.imageUrl ===
-      next.data.messages[next.index]?.imageUrl &&
-    prev.data.messages[prev.index]?.fileUrl ===
-      next.data.messages[next.index]?.fileUrl
-  );
-}
-
 function MessageItemComponent({ index, style, data }: MessageItemProps) {
-  const { messages, setSize, formatTimestamp, deleteMessage, conversationId, meId } =
-    data;
+  const { messages, setSize, meId } = data;
   const itemRef = useRef<HTMLDivElement>(null);
 
   const m = messages[index];
   if (!m) return null;
 
   const mine = m.senderId === meId;
-  const prev = index > 0 ? messages[index - 1] : null;
-  const showName = !mine && prev?.senderId !== m.senderId && !m.imageUrl;
 
   useEffect(() => {
     if (itemRef.current) {
-      requestAnimationFrame(() => {
-        if (itemRef.current) setSize(index, itemRef.current.offsetHeight);
-      });
+      setSize(index, itemRef.current.offsetHeight);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, m?.content, m?.imageUrl, m?.fileUrl]);
+  }, [index, m?.content, m?.fileUrl, setSize]);
 
-  const fileUrl = (m as any).fileUrl || (m as any).imageUrl || null;
-  const fullUrl =
-    fileUrl && fileUrl.startsWith("http")
-      ? fileUrl
-      : `${import.meta.env.VITE_API_URL || "http://localhost:4000"}${fileUrl}`;
+  const fullUrl = m.fileUrl && !m.fileUrl.startsWith('http') 
+    ? `${import.meta.env.VITE_API_URL || "http://localhost:4000"}${m.fileUrl}` 
+    : m.fileUrl;
+
+  const renderAttachment = () => {
+    if (!fullUrl) return null;
+
+    if (m.fileType?.startsWith('image/')) {
+      return <LazyImage src={fullUrl} alt={m.fileName || "uploaded image"} className="mt-2 max-w-[250px] max-h-[250px] rounded-md shadow-sm object-contain cursor-pointer" onClick={() => window.open(fullUrl, "_blank")} />;
+    }
+    if (m.fileType?.startsWith('video/')) {
+      return <video src={fullUrl} controls className="mt-2 max-w-[300px] rounded-md shadow-sm" />;
+    }
+    if (m.fileType?.startsWith('audio/')) {
+      return <audio src={fullUrl} controls className="mt-2 w-full max-w-xs" />;
+    }
+    // Fallback for documents and other file types
+    return <FileAttachment url={fullUrl} fileName={m.fileName} />;
+  };
 
   const renderContent = () => {
-    if (m.content?.startsWith("Decryption Error")) {
-      return (
-        <div
-          className={`italic text-sm px-3 py-2 rounded-2xl max-w-[70%] ${
-            mine ? "bg-blue-500 text-white" : "bg-gray-600 text-red-200"
-          }`}
-        >
-          🔒 Message could not be decrypted
-        </div>
-      );
+    if (m.content === null || m.content === undefined || m.content.trim() === '') {
+      return null; // Don't render a bubble for file-only messages with no text content
     }
-    if (m.content === "[deleted]") {
-      return (
-        <div className="italic text-xs text-gray-400 px-3 py-1">
-          This message was deleted
-        </div>
-      );
-    }
-    if (m.content === null || m.content === undefined) {
-      return null;
-    }
-
-    // Use whitespace-pre-wrap so normal words wrap, not letter-by-letter.
     return (
-      <div
-        className={`px-3 py-2 rounded-2xl break-words whitespace-pre-wrap max-w-[70%] shadow ${
-          mine
-            ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
-            : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-        }`}
-      >
-        {/* Safely render content using textContent to prevent XSS */}
+      <div className={`px-4 py-2 rounded-2xl break-words whitespace-pre-wrap max-w-[70%] shadow ${mine ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
         <p>{sanitizeText(m.content)}</p>
-        {m.error && <p className="text-xs text-red-500 mt-1">Failed to send</p>}
       </div>
     );
   };
 
   return (
-    // IMPORTANT: keep style from react-window, but ensure the item uses full width of the row
     <div style={style} className="w-full px-4 py-1">
-      <div
-        ref={itemRef}
-        className={`flex w-full ${mine ? "justify-end" : "justify-start"}`}
-      >
-        <div className="flex flex-col max-w-full">
-          {showName && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">
-              Participant
-            </div>
-          )}
-
-          {/* Bubble */}
+      <div ref={itemRef} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+        <div className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
           {renderContent()}
-
-          {/* Media attachments */}
-          {fileUrl && isImageFile(fileUrl) && (
-            <LazyImage
-              src={fullUrl}
-              alt={m.fileName || "uploaded"}
-              className="mt-2 max-w-[220px] max-h-[200px] rounded-md shadow-sm object-contain cursor-pointer hover:opacity-90"
-              onClick={() => window.open(fullUrl, "_blank")}
-            />
-          )}
-
-          {fileUrl && isVideoFile(fileUrl) && (
-            <video
-              src={fullUrl}
-              controls
-              className="mt-2 max-w-[240px] max-h-[200px] rounded-md shadow-sm object-contain"
-            />
-          )}
-
-          {fileUrl && isAudioFile(fileUrl) && (
-            <audio src={fullUrl} controls className="mt-2" />
-          )}
-
-          {/* Timestamp & reactions */}
-          <div className={`flex items-center mt-1 ${mine ? "justify-end" : "justify-start"}`}>
-            <div className="text-xs text-gray-400 mr-2">{formatTimestamp(m.createdAt)}</div>
-            {m.reactions && m.reactions.length > 0 && (
-              <Reactions
-                message={m}
-                conversationId={conversationId}
-                onAddReaction={() => {}}
-                onRemoveReaction={() => {}}
-              />
-            )}
-          </div>
+          {renderAttachment()}
+        </div>
+        <div className={`text-xs text-gray-400 mt-1 px-2 ${mine ? "text-right" : "text-left"}`}>
+          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {m.error && <span className="text-red-500 ml-2">Failed</span>}
+          {m.optimistic && <span className="text-gray-500 ml-2">Sending...</span>}
         </div>
       </div>
     </div>
   );
 }
 
-export default memo(MessageItemComponent, areEqual);
+export default memo(MessageItemComponent);

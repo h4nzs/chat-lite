@@ -1,132 +1,131 @@
-You are a senior fullstack engineer specializing in scalable chat web apps using React, TypeScript, Tailwind CSS, Zustand, and WebSocket (Socket.io). 
-Your role is to act as a code reviewer and professional maintainer for the "ChatLite" project.
+## ⚙️ **Prompt Gemini CLI – Fix & Enhance File Upload System (Full Audit + Security + 10MB Limit)**
 
-The ChatLite project is a fullstack real-time chat application built with:
-- Frontend: React + TypeScript + Tailwind + react-window (for virtualization)
-- Backend: Node.js (Express or Nest-like structure)
-- Realtime: Socket.io
-- Store: Zustand or Redux Toolkit
-- Encryption layer: optional (end-to-end encryption toggle)
+You are a senior fullstack engineer specializing in secure real-time chat applications.
+Your task is to perform a **complete audit and rebuild** of the file upload system in the ChatLite project, ensuring it is fully functional, secure, and supports multiple file types.
 
-### Your main tasks:
-1. **Full Audit & Static Analysis**
-   - Analyze *all source code files* (frontend & backend) for:
-     - Syntax or runtime errors
-     - Type mismatches, missing typings, or unsafe any usage
-     - Inconsistent imports, unused variables, dead code
-     - Redundant states, props, or duplicated logic
-     - Performance bottlenecks in UI rendering or WebSocket updates
-     - Missing cleanup or memory leak risk in effects or listeners
-     - Any potential security issue (XSS, unsafe HTML rendering, etc.)
-   - Focus especially on UI message rendering (`MessageItem.tsx`, `ChatWindow.tsx`, etc.) where text bubbles show empty or misaligned content.
+---
 
-2. **Bug Fixes**
-   - Detect and fix the issue where message bubbles appear but text is missing or rendered incorrectly.
-   - Ensure all messages (text, images, files, audio/video) are displayed properly, and message wrapping behaves consistently.
-   - Verify that sanitizer logic does not remove valid message text.
-   - Keep all visual styling intact unless changes are necessary for correct rendering.
+### 🎯 GOAL
 
-3. **Code Quality & Best Practices**
-   - Refactor where necessary to follow professional patterns:
-     - Clean component structure (stateless vs stateful separation)
-     - Proper typing with TypeScript interfaces
-     - Maintain consistent naming (camelCase, PascalCase)
-     - Prefer functional updates and memoization to avoid re-renders
-     - Extract repetitive logic into utilities/hooks where needed
-   - Enforce consistent ESLint + Prettier style.
+Fix the current file upload feature which currently fails to store files on the server and does not display uploaded files in chat.  
+Then, enhance it to handle **image, document, video, and general file uploads** securely, with a **maximum size limit of 10MB**.
 
-4. **Security & Stability**
-   - Review `sanitizeHtml` usage to prevent XSS without removing valid content.
-   - Ensure WebSocket and API communication are safely handled (error catching, connection cleanup, etc.)
-   - Audit end-to-end encryption toggle flow; make sure “Enable encryption” banner logic is safe and consistent.
+The final implementation must work smoothly with existing chat message flow (both encrypted and unencrypted modes).
 
-5. **Testing & Validation**
-   - After implementing all changes, run a full validation:
-     - Messages sent and received display correctly.
-     - Text, emoji, and special characters render properly.
-     - Image/video/audio previews work.
-     - Scrolling virtualization behaves smoothly.
-     - No regressions introduced in login, chat list, or socket updates.
+---
 
-6. **Deliverables**
-   - Implement the fixes directly in the codebase.
-   - Provide a summary log/report of:
-     - Files modified
-     - Key bugs found and fixed
-     - Improvements made
-     - Any recommendations for future scaling or modularization
+### 1️⃣ Investigate Current Issue
 
-### Important constraints:
-- Maintain existing logic and structure wherever possible.
-- Do NOT rewrite large parts of the project unless strictly required.
-- Preserve compatibility with current backend API and Socket.io events.
-- Keep UI and design as is; only fix visual/layout or content issues.
-- Ensure that all refactors are backward compatible and pass build successfully (`npm run build` must work with zero warnings or errors).
+**Symptoms:**
+- Uploading files via chat UI does nothing.
+- No files are stored in the `/uploads` directory on the server.
+- No error message appears in frontend or backend logs.
 
-You are a senior fullstack engineer specializing in scalable chat web apps using React, TypeScript, Tailwind CSS, Zustand, and WebSocket (Socket.io). 
-Your role is to act as a code reviewer and professional maintainer for the "ChatLite" project.
+**Your tasks:**
+- Audit all upload-related code:
+  - Frontend: likely `MessageInput.tsx`, `api.ts`, `chat.ts` or any upload component.
+  - Backend: `server/src/routes`, `server/src/socket.ts`, `server/src/index.ts`, or `server/src/upload.ts`.
+- Identify missing or misconfigured handlers (e.g., missing `multer`, `busboy`, or `express.static` setup).
+- Ensure proper server route registration and static file serving for `/uploads`.
 
-The ChatLite project is a fullstack real-time chat application built with:
-- Frontend: React + TypeScript + Tailwind + react-window (for virtualization)
-- Backend: Node.js (Express or Nest-like structure)
-- Realtime: Socket.io
-- Store: Zustand or Redux Toolkit
-- Encryption layer: optional (end-to-end encryption toggle)
+---
 
-### Your main tasks:
-1. **Full Audit & Static Analysis**
-   - Analyze *all source code files* (frontend & backend) for:
-     - Syntax or runtime errors
-     - Type mismatches, missing typings, or unsafe any usage
-     - Inconsistent imports, unused variables, dead code
-     - Redundant states, props, or duplicated logic
-     - Performance bottlenecks in UI rendering or WebSocket updates
-     - Missing cleanup or memory leak risk in effects or listeners
-     - Any potential security issue (XSS, unsafe HTML rendering, etc.)
-   - Focus especially on UI message rendering (`MessageItem.tsx`, `ChatWindow.tsx`, etc.) where text bubbles show empty or misaligned content.
+### 2️⃣ Implement Secure File Upload System
 
-2. **Bug Fixes**
-   - Detect and fix the issue where message bubbles appear but text is missing or rendered incorrectly.
-   - Ensure all messages (text, images, files, audio/video) are displayed properly, and message wrapping behaves consistently.
-   - Verify that sanitizer logic does not remove valid message text.
-   - Keep all visual styling intact unless changes are necessary for correct rendering.
+**Requirements:**
+- Allow uploads for the following types:
+  - **Images:** `.png, .jpg, .jpeg, .gif, .webp`
+  - **Documents:** `.pdf, .doc, .docx, .ppt, .pptx, .xls, .xlsx, .txt`
+  - **Media:** `.mp3, .mp4, .mov, .wav, .avi`
+  - **Other safe file formats** (optional: `.zip, .rar`, etc.)
+- Enforce **maximum file size: 10MB**.
+- Store uploads in `/server/uploads/` with unique filenames (timestamp + random string).
+- Sanitize filenames to prevent path traversal or command injection.
+- Reject unknown or potentially dangerous file extensions.
+- Ensure upload directory auto-creates if not existing.
+- Return JSON response with file metadata (filename, size, type, URL).
 
-3. **Code Quality & Best Practices**
-   - Refactor where necessary to follow professional patterns:
-     - Clean component structure (stateless vs stateful separation)
-     - Proper typing with TypeScript interfaces
-     - Maintain consistent naming (camelCase, PascalCase)
-     - Prefer functional updates and memoization to avoid re-renders
-     - Extract repetitive logic into utilities/hooks where needed
-   - Enforce consistent ESLint + Prettier style.
+---
 
-4. **Security & Stability**
-   - Review `sanitizeHtml` usage to prevent XSS without removing valid content.
-   - Ensure WebSocket and API communication are safely handled (error catching, connection cleanup, etc.)
-   - Audit end-to-end encryption toggle flow; make sure “Enable encryption” banner logic is safe and consistent.
+### 3️⃣ Frontend Integration
 
-5. **Testing & Validation**
-   - After implementing all changes, run a full validation:
-     - Messages sent and received display correctly.
-     - Text, emoji, and special characters render properly.
-     - Image/video/audio previews work.
-     - Scrolling virtualization behaves smoothly.
-     - No regressions introduced in login, chat list, or socket updates.
+**Tasks:**
+- Update message input component (`MessageInput.tsx` or related file):
+  - Add a file input or drag-and-drop upload option.
+  - On upload success, automatically send the uploaded file as a chat message with a proper preview (image, doc, video icon, etc.).
+- Display previews:
+  - Images → inline thumbnail preview.
+  - Documents / media → clickable file link or embed (if possible).
+  - Unknown types → generic file icon with filename.
+- Ensure encryption compatibility:
+  - If encryption is enabled, encrypt file metadata (not the binary).
+  - File itself remains stored unencrypted but served via secure URL.
+  - Optional: add file signature or hash verification later.
 
-6. **Deliverables**
-   - Implement the fixes directly in the codebase.
-   - Provide a summary log/report of:
-     - Files modified
-     - Key bugs found and fixed
-     - Improvements made
-     - Any recommendations for future scaling or modularization
+---
 
-### Important constraints:
-- Maintain existing logic and structure wherever possible.
-- Do NOT rewrite large parts of the project unless strictly required.
-- Preserve compatibility with current backend API and Socket.io events.
-- Keep UI and design as is; only fix visual/layout or content issues.
-- Ensure that all refactors are backward compatible and pass build successfully (`npm run build` must work with zero warnings or errors).
+### 4️⃣ Backend Security Hardening
 
-Analyze both frontend (`web/src/`) and backend (`server/`) directories for consistent protocol communication and error handling.
-Log key issues, apply fixes, and summarize results professionally.
+- Use middleware such as `multer` for file handling.
+- Validate file types using MIME type inspection (not just extension).
+- Sanitize filenames before saving.
+- Serve `/uploads` via `express.static` with read-only access.
+- Disable directory listing and script execution.
+- Enforce CORS and authentication if necessary.
+- Prevent users from overwriting files with the same name.
+
+Example save path:
+```
+
+/server/uploads/
+        ├── images/
+        ├── documents/
+        ├── videos/
+        └── others/
+
+```
+Auto-detect and save file to the correct subfolder.
+
+---
+
+### 5️⃣ Validation & Error Handling
+
+- Return clear error messages if upload fails (size exceeded, invalid type, etc.).
+- Handle server errors gracefully.
+- Add frontend UI feedback (progress bar, upload success, upload failed).
+- Validate that uploaded files appear correctly in chat history.
+
+---
+
+### 6️⃣ Output and Verification
+
+After implementation, verify that:
+- File uploads successfully to `/uploads` and persists.
+- All file types listed above work and respect the 10MB limit.
+- Malicious files or oversize uploads are blocked safely.
+- Uploaded files appear correctly in chat (with proper icon or preview).
+- Server logs show upload success and handle errors gracefully.
+- No warnings or console errors appear in frontend or backend.
+
+---
+
+### 7️⃣ Deliverables
+
+When finished, provide:
+1. A summary of the root cause of the upload failure.
+2. Explanation of security improvements applied.
+3. List of modified or added files.
+4. Confirmation that the upload feature is tested and stable for production.
+
+---
+
+### 8️⃣ Constraints
+
+- Keep existing chat architecture and encryption logic intact.
+- Do not modify unrelated modules (auth, socket encryption, etc.).
+- Follow professional production standards for file handling and security.
+- Maintain full TypeScript type safety.
+- Preserve the existing folder structure and build scripts.
+
+Now, begin by analyzing the entire upload pipeline (frontend to backend) and implement a **secure, reliable, and production-grade upload feature** for ChatLite.
+```
