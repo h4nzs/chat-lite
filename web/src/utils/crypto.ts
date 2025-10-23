@@ -84,16 +84,16 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
   
   // Add safe guard for empty or invalid cipher
   if (!cipher || typeof cipher !== "string") {
-    console.warn("Empty or invalid cipher, returning plain text");
+    console.warn("Empty or invalid cipher, returning empty string");
     return "";
   }
   
   try {
     // Check if cipher is valid and not empty
     if (cipher.trim() === '') {
-      console.log("Empty cipher, returning as-is");
-      console.log("=== END DECRYPT MESSAGE (empty/invalid) ===");
-      return cipher || '';
+      console.log("Empty cipher, returning as empty string");
+      console.log("=== END DECRYPT MESSAGE (empty) ===");
+      return '';
     }
     
     // Check if cipher looks like base64 (basic check: length multiple of 4 and valid base64 characters)

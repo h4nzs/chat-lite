@@ -1,9 +1,19 @@
 import React from "react";
 import clsx from "clsx";
+import { sanitizeText } from "@utils/sanitize";
 
-export function MessageBubble({ m, isMine }: any) {
+type MessageBubbleProps = {
+  m: {
+    content?: string | null;
+    createdAt: string;
+    mine?: boolean;
+  };
+  isMine?: boolean;
+};
+
+export function MessageBubble({ m, isMine }: MessageBubbleProps) {
   // Allow empty string messages but not null/undefined
-  if (!m || typeof m.content !== "string") return null;
+  if (!m || (m.content !== undefined && m.content !== null && typeof m.content !== "string")) return null;
 
   const mine = isMine ?? m.mine ?? false;
 
@@ -22,7 +32,7 @@ export function MessageBubble({ m, isMine }: any) {
             : "bg-gray-700 text-gray-100"
         )}
       >
-        {m.content}
+        {sanitizeText(m.content ?? '')}
         <div className="text-[10px] text-gray-400 text-right mt-1">
           {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </div>

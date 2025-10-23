@@ -5,6 +5,7 @@ import type { Message } from '@store/chat'
 
 interface ReactionsProps {
   message: Message
+  conversationId?: string
   onAddReaction: (emoji: string) => void
   onRemoveReaction: (emoji: string) => void
 }

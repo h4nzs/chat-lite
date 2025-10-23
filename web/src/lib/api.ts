@@ -59,9 +59,9 @@ export async function api<T = any>(
     // Check if this is an auth request that needs CSRF token
     const needsCsrfToken = path.includes('/auth/') && (options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH' || options.method === 'DELETE');
     
-    let headers = {
+    let headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...(options.headers || {}),
+      ...(options.headers as Record<string, string> || {}),
     };
     
     // Add CSRF token for auth requests

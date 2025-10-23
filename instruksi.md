@@ -1,103 +1,67 @@
-## Analisis dan Perbaikan Lanjutan Aplikasi Chat-Lite
+You are a senior fullstack engineer specializing in scalable chat web apps using React, TypeScript, Tailwind CSS, Zustand, and WebSocket (Socket.io). 
+Your role is to act as a code reviewer and professional maintainer for the "ChatLite" project.
 
-Berdasarkan analisis lanjutan terhadap implementasi sistem enkripsi end-to-end dan masalah-masalah yang muncul, berikut adalah temuan-temuan penting yang perlu diperbaiki:
+The ChatLite project is a fullstack real-time chat application built with:
+- Frontend: React + TypeScript + Tailwind + react-window (for virtualization)
+- Backend: Node.js (Express or Nest-like structure)
+- Realtime: Socket.io
+- Store: Zustand or Redux Toolkit
+- Encryption layer: optional (end-to-end encryption toggle)
 
-### 1. Issue pada Proses Enkripsi/Pengiriman Pesan
-- **Deskripsi**: Terdapat error "Invalid cipher text" saat pengiriman pesan, menunjukkan bahwa fungsi dekripsi dipanggil dengan teks yang kosong atau tidak valid.
-- **Penyebab**: 
-  - Fungsi decryptMessage menerima input yang tidak valid sebelum enkripsi selesai
-  - Konflik antara sistem enkripsi lama (menggunakan conversation ID) dan sistem enkripsi baru (menggunakan session key)
-  - Fungsi sendMessage memanggil decryptMessage dengan data yang tidak lengkap
-- **Dampak**: Pesan tidak dapat terkirim secara benar karena proses enkripsi/gagal dan error terus muncul di konsol
+### Your main tasks:
+1. **Full Audit & Static Analysis**
+   - Analyze *all source code files* (frontend & backend) for:
+     - Syntax or runtime errors
+     - Type mismatches, missing typings, or unsafe any usage
+     - Inconsistent imports, unused variables, dead code
+     - Redundant states, props, or duplicated logic
+     - Performance bottlenecks in UI rendering or WebSocket updates
+     - Missing cleanup or memory leak risk in effects or listeners
+     - Any potential security issue (XSS, unsafe HTML rendering, etc.)
+   - Focus especially on UI message rendering (`MessageItem.tsx`, `ChatWindow.tsx`, etc.) where text bubbles show empty or misaligned content.
 
-### 2. Sistem Pengelolaan Kunci Belum Lengkap
-- **Deskripsi**: Tidak ada proses awal untuk membuat kunci enkripsi, menyebabkan indicator enkripsi menunjukkan status tidak aktif.
-- **Penyebab**:
-  - Fungsi setupUserEncryptionKeys hanya dipanggil saat login/register tapi tidak ada proses untuk pengguna yang sudah terdaftar sebelum implementasi enkripsi
-  - Tidak ada UI untuk memungkinkan pengguna membuat kunci enkripsi secara manual
-  - Proses pengambilan kunci saat decryptMessage bisa gagal karena kunci tidak ditemukan
-- **Dampak**: Fitur enkripsi tidak aktif dan semua pesan dikirim dalam bentuk teks biasa
+2. **Bug Fixes**
+   - Detect and fix the issue where message bubbles appear but text is missing or rendered incorrectly.
+   - Ensure all messages (text, images, files, audio/video) are displayed properly, and message wrapping behaves consistently.
+   - Verify that sanitizer logic does not remove valid message text.
+   - Keep all visual styling intact unless changes are necessary for correct rendering.
 
-### 3. Konflik Sistem Enkripsi Lama dan Baru
-- **Deskripsi**: Aplikasi memiliki dua sistem enkripsi (lama dan baru) yang bisa berkonflik satu sama lain.
-- **Penyebab**:
-  - Fungsi decryptMessage di crypto.ts masih aktif dan bisa dipanggil bersamaan dengan decryptMessage di advancedCrypto.ts
-  - Tidak ada pemilihan yang jelas antara sistem enkripsi berdasarkan format pesan
-- **Dampak**: Proses enkripsi/dekripsi bisa membaca format yang salah dan menghasilkan error
+3. **Code Quality & Best Practices**
+   - Refactor where necessary to follow professional patterns:
+     - Clean component structure (stateless vs stateful separation)
+     - Proper typing with TypeScript interfaces
+     - Maintain consistent naming (camelCase, PascalCase)
+     - Prefer functional updates and memoization to avoid re-renders
+     - Extract repetitive logic into utilities/hooks where needed
+   - Enforce consistent ESLint + Prettier style.
 
-### 4. Masalah Inisialisasi dan Pengelolaan Libsodium
-- **Deskripsi**: Meskipun sudah dibuat initializer, masih ada potensi race condition dalam inisialisasi libsodium.
-- **Penyebab**:
-  - Fungsi-fungsi enkripsi bisa dipanggil sebelum libsodium sepenuhnya siap
-  - Tidak ada penanganan error jika inisialisasi libsodium gagal
-- **Dampak**: Aplikasi bisa crash atau mengalami error ketika mencoba melakukan operasi kriptografi
+4. **Security & Stability**
+   - Review `sanitizeHtml` usage to prevent XSS without removing valid content.
+   - Ensure WebSocket and API communication are safely handled (error catching, connection cleanup, etc.)
+   - Audit end-to-end encryption toggle flow; make sure “Enable encryption” banner logic is safe and consistent.
 
-### 5. UI/UX untuk Pengelolaan Kunci Belum Selesai
-- **Deskripsi**: Tautan "Enable encryption" menavigasi ke #settings tetapi tidak membuka UI yang sesuai.
-- **Penyebab**:
-  - Tidak ada routing atau komponen untuk halaman pengaturan enkripsi
-  - Proses pembuatan kunci tidak terintegrasi dengan alur pengguna
-- **Dampak**: Pengguna tidak bisa mengaktifkan enkripsi secara visual melalui UI
+5. **Testing & Validation**
+   - After implementing all changes, run a full validation:
+     - Messages sent and received display correctly.
+     - Text, emoji, and special characters render properly.
+     - Image/video/audio previews work.
+     - Scrolling virtualization behaves smoothly.
+     - No regressions introduced in login, chat list, or socket updates.
 
----
+6. **Deliverables**
+   - Implement the fixes directly in the codebase.
+   - Provide a summary log/report of:
+     - Files modified
+     - Key bugs found and fixed
+     - Improvements made
+     - Any recommendations for future scaling or modularization
 
-## Rekomendasi dan Langkah-Langkah Perbaikan
+### Important constraints:
+- Maintain existing logic and structure wherever possible.
+- Do NOT rewrite large parts of the project unless strictly required.
+- Preserve compatibility with current backend API and Socket.io events.
+- Keep UI and design as is; only fix visual/layout or content issues.
+- Ensure that all refactors are backward compatible and pass build successfully (`npm run build` must work with zero warnings or errors).
 
-### Fase 1: Perbaikan Sistem Enkripsi
-1. **Lengkapi sistem enkripsi end-to-end**
-   - Pastikan bahwa semua pesan baru menggunakan sistem enkripsi session key
-   - Tambahkan fallback untuk pesan lama yang menggunakan sistem enkripsi lama
-   - Perbaiki konflik antara dua sistem enkripsi
-
-2. **Perbaiki proses pengiriman pesan**
-   - Pastikan fungsi decryptMessage tidak dipanggil sebelum proses enkripsi selesai
-   - Tambahkan penanganan error yang lebih baik untuk kasus cipher text kosong atau tidak valid
-
-3. **Implementasi sistem fallback**
-   - Buat sistem fallback untuk kembali ke pengiriman teks biasa jika enkripsi gagal
-   - Tambahkan logika untuk menandai pesan yang gagal dienkripsi
-
-### Fase 2: Implementasi Pengelolaan Kunci
-1. **Tambahkan UI untuk setup kunci**
-   - Buat halaman pengaturan yang menampilkan status kunci
-   - Tambahkan tombol untuk membuat kunci baru
-   - Implementasikan proses verifikasi bahwa kunci telah dibuat dengan benar
-
-2. **Perbaiki flow pembuatan kunci**
-   - Implementasikan pembuatan kunci untuk pengguna yang sudah ada
-   - Tambahkan notifikasi bahwa kunci harus dibuat sebelum enkripsi dapat digunakan
-   - Integrasi pembuatan kunci dengan alur pengguna
-
-3. **Tambahkan validasi kunci**
-   - Periksa apakah kunci publik dan private telah dibuat sebelum mengirim pesan terenkripsi
-   - Tambahkan mekanisme untuk menguji bahwa proses enkripsi dan dekripsi berfungsi dengan benar
-
-### Fase 3: Penanganan Error dan Keamanan
-1. **Perbaiki penanganan error libsodium**
-   - Tambahkan penanganan error jika inisialisasi libsodium gagal
-   - Tambahkan fallback ke pengiriman teks biasa jika kriptografi tidak tersedia
-
-2. **Tambahkan penanganan error dalam UI**
-   - Tampilkan notifikasi yang jelas saat enkripsi gagal
-   - Tambahkan indikator visual untuk status enkripsi pesan
-   - Tambahkan retry otomatis jika operasi enkripsi gagal karena race condition
-
-3. **Tingkatkan keamanan UI**
-   - Pastikan private key tidak pernah terekspos ke console atau jaringan
-   - Implementasikan penghapusan cache yang aman saat logout
-   - Tambahkan validasi bahwa password yang digunakan untuk enkripsi memenuhi standar keamanan
-
-### Fase 4: Integrasi dan Testing
-1. **Testing sistem enkripsi**
-   - Uji pengiriman pesan antar dua pengguna
-   - Verifikasi bahwa hanya pengirim dan penerima yang bisa membaca pesan
-   - Uji fallback untuk pesan lama dan sistem enkripsi lama
-
-2. **Testing UI dan UX**
-   - Uji alur pengguna dari membuat kunci hingga mengirim pesan terenkripsi
-   - Pastikan indicator enkripsi bekerja sebagaimana mestinya
-   - Uji pengalaman pengguna untuk alur setup enkripsi
-
-3. **Testing error handling**
-   - Uji kasus-kasus error dan pastikan aplikasi tetap fungsional
-   - Verifikasi bahwa pesan tetap bisa dikirim meskipun dengan enkripsi yang gagal
+Now, begin by scanning all project files, starting from `web/src/` and `server/` directories if available. 
+Log key issues, apply fixes, and summarize results professionally.

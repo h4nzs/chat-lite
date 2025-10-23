@@ -121,7 +121,8 @@ function normalizeMessageForMerge(m: any) {
     id: m.id,
     content: normalizeMessageContent(m.content),
     senderId: m.senderId,
-    createdAt: m.createdAt ?? new Date().toISOString()
+    createdAt: m.createdAt ?? new Date().toISOString(),
+    tempId: m.tempId
   }
 }
 
@@ -237,11 +238,7 @@ export const useChatStore = create<State>((set, get) => ({
               try {
                 // Check if this is the new format with session keys
                 if (m.sessionId && m.encryptedSessionKey) {
-                  const decryptedContent = await decryptMessage({
-                    content: m.content,
-                    sessionId: m.sessionId,
-                    encryptedSessionKey: m.encryptedSessionKey
-                  }, m.conversationId);
+                  const decryptedContent = await decryptMessage(m.content, m.conversationId);
                   return withPreview({ ...m, content: decryptedContent });
                 } else {
                   // This is an old message, might need legacy decryption
@@ -410,11 +407,7 @@ export const useChatStore = create<State>((set, get) => ({
         // Don't filter out messages with empty content - just process them normally
         // Check if this is the new format with session keys
         if (m.sessionId && m.encryptedSessionKey) {
-          const decryptedContent = await decryptMessage({
-            content: m.content,
-            sessionId: m.sessionId,
-            encryptedSessionKey: m.encryptedSessionKey
-          }, m.conversationId);
+          const decryptedContent = await decryptMessage(m.content, m.conversationId);
           return withPreview({ ...m, content: decryptedContent });
         } else {
           // This is an old message, might need legacy decryption
@@ -446,10 +439,10 @@ export const useChatStore = create<State>((set, get) => ({
     const socket = getSocket();
     return new Promise((resolve, reject) => {
       encryptMessage(content, conversationId)
-        .then(({ content: encryptedContent, sessionId, encryptedSessionKey }) => {
+        .then((encryptedContent) => {
           socket.emit(
             "message:send",
-            { conversationId, content: encryptedContent, sessionId, encryptedSessionKey, tempId },
+            { conversationId, content: encryptedContent, tempId },
             (ack: { ok: boolean; msg?: Message }) => {
               if (ack?.ok && ack.msg) {
                 // Add validation for message object
@@ -460,11 +453,7 @@ export const useChatStore = create<State>((set, get) => ({
                   return;
                 }
                 
-                decryptMessage({
-                  content: ack.msg.content || "",
-                  sessionId: ack.msg.sessionId,
-                  encryptedSessionKey: ack.msg.encryptedSessionKey
-                }, conversationId)
+                decryptMessage(ack.msg.content || "", conversationId)
                   .then((decryptedContent) => {
                     const decryptedAck = withPreview({
                       ...ack.msg,
@@ -568,6 +557,7 @@ export const useChatStore = create<State>((set, get) => ({
     const tempId = normalizedMsg.tempId ?? Date.now();
     const optimistic: Message = withPreview({
       ...normalizedMsg,
+      conversationId, // Ensure conversationId is present
       tempId,
       id: normalizedMsg.id && normalizedMsg.id.length > 0 ? normalizedMsg.id : `temp-${tempId}`,
       optimistic: true,
@@ -591,7 +581,7 @@ export const useChatStore = create<State>((set, get) => ({
       const conversationMessages = s.messages[conversationId] || [];
       // Check if there's actually a message to mark as error
       const hasMessageToMark = conversationMessages.some(m => 
-        m.tempId === tempId || m.id === `temp-${tempId}`
+        (m as any).tempId === tempId || m.id === `temp-${tempId}`
       );
       
       if (!hasMessageToMark) {
@@ -605,7 +595,7 @@ export const useChatStore = create<State>((set, get) => ({
         messages: {
           ...s.messages,
           [conversationId]: conversationMessages.map((m) => {
-            if (m.tempId === tempId || m.id === `temp-${tempId}`) {
+            if ((m as any).tempId === tempId || m.id === `temp-${tempId}`) {
               console.log("🚫 Marking message as error:", m);
               return { ...m, error: true };
             }
@@ -628,7 +618,11 @@ export const useChatStore = create<State>((set, get) => ({
     set((s) => {
       const conversationMessages = s.messages[conversationId] || [];
       const updatedMessages = conversationMessages.map((m) =>
-        m.tempId === tempId || m.id === `temp-${tempId}` ? { ...normalizedMsg } : m
+        (m as any).tempId === tempId || m.id === `temp-${tempId}` ? { 
+          ...normalizedMsg,
+          conversationId, // Ensure conversationId is present
+          tempId: normalizedMsg.tempId // Preserve tempId if it exists
+        } : m
       );
       
       console.log(`📤 Replaced temporary message in conversation ${conversationId}. Total messages:`, updatedMessages.length);
@@ -673,7 +667,7 @@ export const useChatStore = create<State>((set, get) => ({
       conversationId,
       imageUrl: data.imageUrl,
       preview: "📷 Photo",
-    });
+    }, () => {}); // Add empty callback to match expected signature
   },
 
   async uploadFile(conversationId, file) {
@@ -696,7 +690,7 @@ export const useChatStore = create<State>((set, get) => ({
       fileUrl: data.fileUrl,
       fileName: data.fileName,
       preview: `📎 ${data.fileName}`,
-    });
+    }, () => {}); // Add empty callback to match expected signature
   },
 
   async deleteMessage(conversationId, messageId) {

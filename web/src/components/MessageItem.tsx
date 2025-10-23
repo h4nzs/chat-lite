@@ -7,19 +7,9 @@ import LazyImage from "./LazyImage";
 import Reactions from "./Reactions";
 import { getSocket } from "@lib/socket";
 import { isImageFile, isVideoFile, isAudioFile } from "@lib/fileUtils";
+import { sanitizeText } from "@utils/sanitize";
 
-function sanitizeHtml(content: string): string {
-  if (!content) return '';
-  let sanitized = content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '');
-  return sanitized;
-}
+
 
 type MessageItemProps = {
   index: number;
@@ -41,7 +31,11 @@ function areEqual(prev: any, next: any) {
     prev.data.messages[prev.index]?.id ===
       next.data.messages[next.index]?.id &&
     prev.data.messages[prev.index]?.content ===
-      next.data.messages[next.index]?.content
+      next.data.messages[next.index]?.content &&
+    prev.data.messages[prev.index]?.imageUrl ===
+      next.data.messages[next.index]?.imageUrl &&
+    prev.data.messages[prev.index]?.fileUrl ===
+      next.data.messages[next.index]?.fileUrl
   );
 }
 
@@ -104,8 +98,8 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
             : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
         }`}
       >
-        {/* sanitize output */}
-        <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.content) }} />
+        {/* Safely render content using textContent to prevent XSS */}
+        <p>{sanitizeText(m.content)}</p>
         {m.error && <p className="text-xs text-red-500 mt-1">Failed to send</p>}
       </div>
     );

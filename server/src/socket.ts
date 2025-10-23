@@ -172,8 +172,13 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("message:send", async (data, cb) => {
       try {
+        // Validate required fields
+        if (!data.conversationId) {
+          return cb?.({ ok: false, error: "Conversation ID is required" });
+        }
+        
         // Sanitize content before storing
-        const sanitizedContent = data.content ? xss(data.content) : null;
+        const sanitizedContent = data.content != null ? xss(data.content) : null;
         
         // Save message to database with session key info
         const newMessage = await prisma.message.create({

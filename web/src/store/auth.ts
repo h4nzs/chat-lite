@@ -6,6 +6,7 @@ import { clearKeyCache } from "@utils/crypto";
 import { clearSessionKeyCache } from "@utils/advancedCrypto";
 import { useChatStore } from "./chat";
 import { generateKeyPair, exportPublicKey, exportPrivateKey, storePrivateKey } from "@utils/keyManagement";
+import { getSodium } from "@lib/sodiumInitializer";
 
 type User = {
   id: string;

@@ -1,19 +1,7 @@
 import { useEffect, useCallback, useRef, useMemo } from 'react'
 import { useChatStore } from '@store/chat'
 import { getSocket } from '@lib/socket'
-
-function sanitizeHtml(content: any): string {
-  const str = typeof content === "string" ? content : (content?.content ?? "");
-  return str
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
-    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, "")
-    .replace(/javascript:/gi, "")
-    .replace(/on\w+="[^"]*"/gi, "")
-    .replace(/on\w+='[^']*'/gi, "");
-}
+import { sanitizeText } from '@utils/sanitize'
 
 interface ChatListProps {
   onOpen: (id: string) => void
@@ -25,7 +13,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const loadConversations = useChatStore((s) => s.loadConversations)
   const presence = useChatStore((s) => s.presence)
   const storeActiveId = useChatStore((s) => s.activeId)
-  const conversationCursor = useChatStore((s) => s.conversationCursor)
+  // There is no conversationCursor property in the store, removing this line
   const listRef = useRef<HTMLDivElement>(null)
 
   // Debug: log conversations to see if data is loaded
@@ -34,10 +22,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   }, [conversations])
 
   const handleLoadMore = useCallback(() => {
-    if (conversationCursor) {
-      loadConversations(conversationCursor)
-    }
-  }, [conversationCursor, loadConversations])
+    // No pagination implemented for conversations in the current store
+  }, [])
 
   useEffect(() => {
     loadConversations()
@@ -66,7 +52,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
       const { scrollTop, scrollHeight, clientHeight } = listRef.current;
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
       
-      if (isNearBottom && conversationCursor) {
+      if (isNearBottom) { // Removed conversationCursor check since it doesn't exist
         handleLoadMore();
       }
     };
@@ -76,7 +62,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
       currentListRef.addEventListener('scroll', handleScroll);
       return () => currentListRef.removeEventListener('scroll', handleScroll);
     }
-  }, [conversationCursor, handleLoadMore]);
+  }, [handleLoadMore]);
 
   const formatConversationTime = useCallback((timestamp: string) => {
     const date = new Date(timestamp)
@@ -155,18 +141,13 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               <div className={`text-sm truncate mt-1 ${
                 isActive ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
               }`}>
-                {c.lastMessage?.preview || sanitizeHtml(c.lastMessage?.content || '') || 'No messages yet'}
+                {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
               </div>
             </div>
           </button>
         )
       })}
       
-      {conversationCursor && (
-        <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-          Loading more conversations...
-        </div>
-      )}
     </div>
   )
 }

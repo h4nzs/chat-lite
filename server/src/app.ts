@@ -1,4 +1,13 @@
 import express, { Request, Response, NextFunction } from "express";
+
+declare global {
+  namespace Express {
+    interface Request {
+      csrfToken(): string;
+    }
+  }
+}
+
 import cookieParser from "cookie-parser";
 import logger from "morgan";
 import cors from "cors";
