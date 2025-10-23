@@ -1,169 +1,152 @@
-> **Peran:**
-> Kamu adalah *Fullstack Realtime Engineer* yang bertugas memperbaiki integrasi **Socket.IO dan UI Realtime Update** di proyek ChatLite.
->
-> Fokus utama: memperbaiki event socket `typing`, `presence`, `reaction`, dan `message:deleted` agar semuanya **sinkron secara real-time antar pengguna**, tanpa reload atau refresh manual.
->
-> Stack:
->
-> * Frontend: React + Zustand + Socket.IO client
-> * Backend: Node.js (Express) + Prisma + Socket.IO server
+> **Role:**
+> Kamu adalah *senior fullstack realtime developer* yang diminta untuk memulihkan fitur realtime chat yang sebelumnya sudah stabil, dan memperbaiki fitur yang belum berfungsi. Aplikasi ini menggunakan **React + Zustand + Socket.IO + Node.js/Express backend**.
 
 ---
 
-### 🎯 **Tujuan Utama**
+### 🎯 Tujuan
 
-Perbaiki dan sinkronkan:
+Kembalikan stabilitas penuh fitur realtime ChatLite:
 
-1. ✍️ **Typing Indicator** — Harus muncul di user lain saat seseorang mengetik, lalu hilang otomatis setelah delay.
-2. 🟢 **Presence Indicator** — Avatar user harus berubah dari abu-abu ke hijau ketika user online.
-3. 💬 **Reaction Button** — Tombol reaction muncul saat hover message, event `reaction:new` dan `reaction:remove` bekerja realtime.
-4. 🗑️ **Delete Message** — Ketika pesan dihapus:
-
-   * Bubble pesan langsung berubah jadi “message deleted” tanpa reload.
-   * Event socket broadcast ke semua klien.
-   * Pesan benar-benar dihapus di database Prisma.
-   * Tidak ada bug pada pagination atau infinite scroll setelah penghapusan.
+| Fitur                       | Status Sebelumnya                   | Target                                                     |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| Typing Indicator            | ✅ Berfungsi (sebelum update)        | Pulihkan fungsionalitas seperti sebelumnya                 |
+| Realtime Delete             | ✅ Berfungsi (sebelum update)        | Pulihkan agar tetap realtime & bubble berubah ke “deleted” |
+| Online Indicator (Presence) | ⚠️ Tidak berfungsi (selalu abu-abu) | Perbaiki agar berubah hijau saat user online               |
+| Reactions                   | ⚠️ Tidak tampil                     | Aktifkan & tampilkan tombol emoji + sinkronisasi realtime  |
 
 ---
 
-### 🧩 **Langkah Perbaikan Terperinci**
+### 🧠 Instruksi Teknis Detail
 
-#### 1️⃣ **Perbaiki Typing Indicator**
+#### 1️⃣ **Restore Typing Indicator**
 
-* **Backend (server/src/socket.ts):**
+* Ambil implementasi **sebelum update terakhir** (versi yang bekerja).
+* Pastikan event client → server → broadcast berjalan pakai event lama:
 
   ```ts
-  socket.on("typing:start", ({ conversationId, userId }) => {
-    socket.to(conversationId).emit("typing:update", { userId, isTyping: true });
-  });
-
-  socket.on("typing:stop", ({ conversationId, userId }) => {
-    socket.to(conversationId).emit("typing:update", { userId, isTyping: false });
-  });
+  socket.emit("typing", { conversationId, isTyping: true })
   ```
-* **Frontend (web/src/store/chat.ts):**
 
-  * Pastikan `socket.emit("typing:start")` dijalankan saat user mengetik dan `typing:stop` saat berhenti (gunakan `debounce` 1 detik).
-  * Tambahkan listener:
+  dan server broadcast ke semua member:
 
-    ```ts
-    socket.on("typing:update", ({ userId, isTyping }) => {
-      updateUserTypingState(userId, isTyping);
-    });
-    ```
-  * Update komponen header/chat agar menampilkan indikator “Typing…” bila user tersebut aktif mengetik.
+  ```ts
+  socket.to(conversationId).emit("typing", { userId, isTyping });
+  ```
+* Gunakan kembali state `typingUsers` di frontend (Zustand/React) dan jangan ubah structure-nya.
+* Typing indicator muncul & hilang otomatis sesuai event lama.
 
----
+#### 2️⃣ **Restore Delete Message Realtime**
 
-#### 2️⃣ **Perbaiki Presence Indicator**
+* Gunakan event lama, misal:
 
-* **Backend:**
+  ```ts
+  socket.emit("deleteMessage", { messageId, conversationId });
+  socket.on("messageDeleted", ({ messageId }) => removeMessage(messageId));
+  ```
+* Pastikan:
 
-  * Emit presence saat user connect/disconnect:
+  * Pesan yang dihapus berubah jadi “This message was deleted” (tanpa reload).
+  * Di database benar-benar terhapus.
+  * Broadcast tetap jalan antar client seperti sebelumnya.
 
-    ```ts
-    io.emit("presence:update", { userId, status: "online" });
+#### 3️⃣ **Fix Online Indicator (Presence)**
+
+* Implementasikan server-side tracking menggunakan `Map` atau `Set` untuk menyimpan userId yang online.
+
+  ```ts
+  const onlineUsers = new Set();
+
+  io.on("connection", (socket) => {
+    const userId = socket.user?.id;
+    if (!userId) return;
+
+    onlineUsers.add(userId);
+    io.emit("presence:update", Array.from(onlineUsers));
+
     socket.on("disconnect", () => {
-      io.emit("presence:update", { userId, status: "offline" });
+      onlineUsers.delete(userId);
+      io.emit("presence:update", Array.from(onlineUsers));
     });
-    ```
-* **Frontend:**
-
-  * Listener:
-
-    ```ts
-    socket.on("presence:update", ({ userId, status }) => {
-      setUserPresence(userId, status === "online");
-    });
-    ```
-  * Update UI avatar agar otomatis berubah:
-
-    ```tsx
-    <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-500"}`} />
-    ```
-
----
-
-#### 3️⃣ **Aktifkan Tombol Reaction**
-
-* Pastikan tombol reaction muncul di hover `MessageItem`.
-* **Backend:**
-
-  * Tambahkan event real-time:
-
-    ```ts
-    socket.on("reaction:add", async ({ messageId, emoji, userId, conversationId }) => {
-      await prisma.reaction.create({ data: { emoji, userId, messageId } });
-      io.to(conversationId).emit("reaction:new", { messageId, emoji, userId });
-    });
-    ```
-* **Frontend:**
-
-  * Emit saat user pilih emoji:
-
-    ```ts
-    socket.emit("reaction:add", { messageId, emoji, userId, conversationId });
-    ```
-  * Listener:
-
-    ```ts
-    socket.on("reaction:new", ({ messageId, emoji, userId }) => {
-      addReactionToMessage(messageId, { emoji, userId });
-    });
-    ```
-
----
-
-#### 4️⃣ **Fix Delete Message Realtime**
-
-* **Backend:**
-
-  ```ts
-  app.delete("/api/messages/:conversationId/:messageId", async (req, res) => {
-    const { conversationId, messageId } = req.params;
-    await prisma.message.delete({ where: { id: messageId } });
-    io.to(conversationId).emit("message:deleted", { messageId });
-    res.sendStatus(200);
   });
   ```
-* **Frontend (web/src/store/chat.ts):**
+* Di frontend:
 
-  * Listener:
+  ```tsx
+  socket.on("presence:update", (usersOnline) => setOnlineUsers(usersOnline));
+  ```
 
-    ```ts
-    socket.on("message:deleted", ({ messageId }) => {
-      updateMessageState(messageId, { deleted: true });
-    });
-    ```
-  * UI:
+  dan di UI:
 
-    ```tsx
-    {message.deleted ? (
-      <p className="italic text-gray-400">This message was deleted</p>
-    ) : (
-      <p>{message.text}</p>
+  ```tsx
+  <span className={`dot ${onlineUsers.includes(user.id) ? "bg-green-500" : "bg-gray-500"}`} />
+  ```
+
+#### 4️⃣ **Add & Activate Message Reactions**
+
+* Implement event baru:
+
+  ```ts
+  socket.on("reaction:add", (data) => {
+    io.to(data.conversationId).emit("reaction:update", data);
+  });
+  ```
+* UI:
+
+  * Saat hover bubble pesan → muncul tombol emoji kecil (misal ❤️, 😂, 👍).
+  * Klik emoji → kirim event `reaction:add`.
+  * Update tampilan pesan dengan jumlah & jenis emoji yang sudah diberikan.
+
+  contoh frontend snippet:
+
+  ```tsx
+  <div
+    onMouseEnter={() => setHover(true)}
+    onMouseLeave={() => setHover(false)}
+    className="relative group"
+  >
+    <p>{message.text}</p>
+
+    {hover && (
+      <div className="absolute right-0 top-0 flex gap-1">
+        {["❤️", "😂", "👍", "😮"].map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => handleReaction(message.id, emoji)}
+            className="bg-gray-700 rounded-full p-1 text-sm hover:scale-110 transition"
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
     )}
-    ```
+
+    {message.reactions?.length > 0 && (
+      <div className="flex gap-1 mt-1 text-xs">
+        {message.reactions.map((r) => (
+          <span key={r.emoji}>{r.emoji}</span>
+        ))}
+      </div>
+    )}
+  </div>
+  ```
+* Pastikan `reaction:update` sinkron di semua client tanpa reload.
 
 ---
 
-### 🧪 **Checklist Testing**
+### ✅ **Checklist Hasil Akhir**
 
-| Fitur          | Aksi                    | Expected Result                                          |
-| -------------- | ----------------------- | -------------------------------------------------------- |
-| Typing         | User A mengetik di chat | User B lihat "Typing..." muncul & hilang otomatis        |
-| Presence       | User A login/logout     | User B lihat indikator hijau/abu muncul/hilang           |
-| Reaction       | Hover + pilih emoji     | Emoji muncul realtime di bubble pesan semua user         |
-| Delete Message | User A hapus pesan      | Pesan berubah jadi “deleted” di semua klien tanpa reload |
-| DB Sync        | Cek database Prisma     | Pesan yang dihapus benar-benar hilang                    |
+| Fitur              | Behavior                                        | Status |
+| ------------------ | ----------------------------------------------- | ------ |
+| Typing Indicator   | Muncul realtime antar 2 akun                    | ✅      |
+| Delete Message     | Bubble berubah ke “deleted” realtime            | ✅      |
+| Presence Indicator | Dot berubah hijau saat online                   | ✅      |
+| Reaction           | Tombol muncul saat hover, emoji tampil realtime | ✅      |
 
 ---
 
-### 🧠 **Output yang Diharapkan**
+### 🧩 Tips Gemini
 
-* Semua socket event (`typing:update`, `presence:update`, `reaction:new`, `message:deleted`) sinkron di dua akun berbeda.
-* Tidak perlu reload halaman untuk melihat perubahan.
-* Pesan pending dan pesan dihapus bekerja konsisten di UI dan database.
-* Log konsol `[SOCKET EVENT]` muncul untuk debugging tiap event.
+> Jika logic typing & delete sudah ter-overwrite, ambil versi stable dari backup atau commit sebelumnya, lalu gabungkan kembali dengan kode baru yang mengatur presence & reactions.
+> Pastikan tidak menimpa event `typing` dan `deleteMessage` lama.
 
 ---

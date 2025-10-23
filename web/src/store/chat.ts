@@ -48,7 +48,7 @@ type State = {
   messages: Record<string, Message[]>;
   cursors: Record<string, string | null>;
   typing: Record<string, string[]>;
-  presence: Record<string, boolean>;
+  presence: string[]; // Ganti menjadi array of userIds
   deleteLoading: Record<string, boolean>;
 
   loadConversations: () => Promise<void>;
@@ -124,7 +124,7 @@ export const useChatStore = create<State>((set, get) => ({
   cursors: {},
   typing: {},
   loading: {},
-  presence: {},
+  presence: [], // Inisialisasi sebagai array kosong
   deleteLoading: {},
 
   async loadConversations() {
@@ -148,6 +148,12 @@ export const useChatStore = create<State>((set, get) => ({
           conversations: sortConversations([...s.conversations, convSafe]),
         };
       });
+    });
+
+    // Listener global untuk presence
+    socket.off("presence:update");
+    socket.on("presence:update", (onlineUserIds: string[]) => {
+      set({ presence: onlineUserIds });
     });
   },
 

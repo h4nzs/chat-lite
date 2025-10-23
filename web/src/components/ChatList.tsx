@@ -103,7 +103,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
         const isActive = c.id === activeConversationId
         const title = c.title || (Array.isArray(c.participants) ? c.participants.map((p) => p.name || p.username || 'Unknown').join(', ') : 'Unknown')
         const peer = c.isGroup ? null : c.participants.find(p => p.id !== meId);
-        const isOnline = peer ? !!presence[peer.id] : c.participants.some(p => p.id !== meId && presence[p.id]);
+        const isOnline = peer ? presence.includes(peer.id) : c.participants.some(p => p.id !== meId && presence.includes(p.id));
 
         return (
           <button

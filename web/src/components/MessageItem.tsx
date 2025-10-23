@@ -42,7 +42,7 @@ type MessageItemProps = {
 function MessageItemComponent({ index, style, data }: MessageItemProps) {
   const { messages, setSize } = data;
   const meId = useAuthStore((s) => s.user?.id);
-  const [isHovered, setHovered] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
   const m = messages[index];
@@ -62,6 +62,7 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
   const hasContent = m.content && m.content.trim().length > 0;
   const isImage = m.fileType?.startsWith('image/');
   const hasFile = !!fullUrl;
+  const isDeleted = m.content === "[This message was deleted]";
 
   const handleDelete = () => {
     if (window.confirm("Are you sure you want to delete this message?")) {
@@ -69,18 +70,22 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
     }
   }
 
-  const isDeleted = m.content === "[This message was deleted]";
+  // Kelompokkan reaksi untuk tampilan
+  const groupedReactions = m.reactions?.reduce((acc, r) => {
+    acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
-    <div style={style}>
+    <div style={style} onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
       <div ref={itemRef} className="px-4 py-2">
         {isDeleted ? (
           <div className={`flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
             <p className="text-xs italic text-gray-500">This message was deleted</p>
           </div>
         ) : (
-          <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`relative flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
-            {isHovered && (
+          <div className={`relative flex w-full ${mine ? 'justify-end' : 'justify-start'}`}>
+            {showActions && (
               <div className={`absolute top-0 flex items-center gap-2 ${mine ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2'}`}>
                 <Reactions message={m} />
                 {mine && (
@@ -103,17 +108,22 @@ function MessageItemComponent({ index, style, data }: MessageItemProps) {
                 )}
                 {hasFile && (
                   isImage ? (
-                    <LazyImage 
-                      src={fullUrl!} 
-                      alt={m.fileName || "uploaded image"} 
-                      className="rounded-xl max-w-[250px] object-cover cursor-pointer" 
-                      onClick={() => window.open(fullUrl, "_blank")} 
-                    />
+                    <LazyImage src={fullUrl!} alt={m.fileName || "uploaded image"} className="rounded-xl max-w-[250px] object-cover cursor-pointer" onClick={() => window.open(fullUrl, "_blank")} />
                   ) : (
                     <FileAttachment url={fullUrl!} fileName={m.fileName} fileSize={m.fileSize} />
                   )
                 )}
               </div>
+              {/* Tampilkan reaksi yang ada */}
+              {groupedReactions && Object.keys(groupedReactions).length > 0 && (
+                <div className="flex gap-1 mt-1.5">
+                  {Object.entries(groupedReactions).map(([emoji, count]) => (
+                    <span key={emoji} className="px-2 py-0.5 rounded-full bg-gray-700/80 text-white text-xs cursor-default">
+                      {emoji} {count > 1 ? count : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className={`text-xs text-gray-400 mt-1 px-2 ${mine ? 'text-right' : 'text-left'}`}>
                 {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 {m.error && <span className="text-red-500 ml-2">Failed</span>}
