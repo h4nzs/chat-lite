@@ -70,10 +70,19 @@ app.get("/api/csrf-token", (req: Request, res: Response, next) => {
 });
 
 // === STATIC FILES ===
-app.use("/uploads", cors({
-  origin: env.corsOrigin || "http://localhost:5173",
-  credentials: true
-}), express.static(path.resolve(process.cwd(), env.uploadDir)));
+app.use("/uploads", 
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    next();
+  },
+  cors({
+    origin: env.corsOrigin || "http://localhost:5173",
+    credentials: true
+  }), 
+  express.static(path.resolve(process.cwd(), env.uploadDir))
+);
 
 // === ROUTES ===
 app.use("/api/auth", authRouter);

@@ -43,20 +43,17 @@ router.post("/:conversationId/upload", requireAuth, (req: Request, res, next) =>
         throw new ApiError(403, "Forbidden: You are not a participant of this conversation");
       }
 
-      // Buat URL yang bisa diakses client
-      const relativePath = path.relative(path.resolve(process.cwd(), 'uploads'), file.path);
-      const fileUrl = `/uploads/${relativePath.replace(/\\/g, '/')}`;
+    // Construct the absolute URL for the client
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const relativePath = path.relative(path.resolve(process.cwd(), 'uploads'), file.path);
+    const fileUrl = `${baseUrl}/uploads/${relativePath.replace(/\\/g, '/')}`;
 
-      // Kirim response sukses dengan metadata file
-      res.status(201).json({
-        message: "File uploaded successfully",
-        file: {
-          url: fileUrl,
-          filename: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-        },
-      });
+    // Respond with structured file information
+    res.status(201).json({
+      message: "File uploaded successfully",
+      file: {
+        url: fileUrl, // Return absolute URL
+
 
     } catch (e) {
       next(e);
