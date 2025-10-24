@@ -4,6 +4,7 @@ import { useAuthStore } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import StartNewChat from './StartNewChat';
+import CreateGroupChat from './CreateGroupChat'; // Impor komponen CreateGroupChat
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -34,6 +35,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const { conversations, presence, deleteGroup, deleteConversation } = useChatStore();
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showGroupModal, setShowGroupModal] = useState(false); // Kembalikan state untuk modal
 
   const formatConversationTime = useCallback((timestamp: string) => {
     const date = new Date(timestamp);
@@ -53,27 +55,33 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     <div className="h-full flex flex-col bg-surface">
       <UserProfile />
       <div className="p-4 border-b border-gray-800">
-        <div className="relative">
-          <input 
-            type="text" 
-            placeholder="Search or start new chat..." 
-            className="w-full p-2 pl-10 bg-primary border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input 
+              type="text" 
+              placeholder="Search or start new chat..." 
+              className="w-full p-2 pl-10 bg-primary border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
           </div>
+          {/* Kembalikan Tombol Buat Grup */}
+          <button onClick={() => setShowGroupModal(true)} className="p-2 bg-accent rounded-lg text-white hover:bg-accent-hover transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {searchQuery ? (
+        {searchQuery && (
           <div className="p-2">
             <p className="text-xs font-bold text-text-secondary px-2 mb-2">NEW CHAT</p>
             <StartNewChat query={searchQuery} onStarted={(id) => { onOpen(id); setSearchQuery(''); }} />
           </div>
-        ) : null}
+        )}
 
         <div className="p-2">
           {!searchQuery && <p className="text-xs font-bold text-text-secondary px-2 mb-2">CONVERSATIONS</p>}
@@ -138,6 +146,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
           )}
         </div>
       </div>
+      {/* Kembalikan rendering modal */}
+      {showGroupModal && <CreateGroupChat onClose={() => setShowGroupModal(false)} />}
     </div>
   );
 }

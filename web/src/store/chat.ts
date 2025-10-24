@@ -5,6 +5,7 @@ import { encryptMessage, decryptMessage } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./auth";
 
+// ... (Tipe data tetap sama)
 export type Conversation = {
   id: string;
   isGroup: boolean;
@@ -14,7 +15,6 @@ export type Conversation = {
   lastMessage: (Message & { preview?: string }) | null;
   updatedAt: string;
 };
-
 export type Message = {
   id: string;
   tempId?: number;
@@ -51,7 +51,7 @@ type State = {
   toggleSidebar: () => void;
   searchUsers: (q: string) => Promise<any[]>;
   startConversation: (peerId: string) => Promise<string>;
-  uploadFile: (conversationId: string, file: File) => Promise<void>; // Tambahkan ini
+  uploadFile: (conversationId: string, file: File) => Promise<void>;
   initSocketListeners: () => void;
   loadMessagesForConversation: (id: string) => Promise<void>;
 };
@@ -78,6 +78,7 @@ export const useChatStore = create<State>((set, get) => ({
   typing: {},
   isSidebarOpen: false,
 
+  // ... (fungsi-fungsi lain tetap sama)
   loadConversations: async () => {
     try {
       const conversations = await api<Conversation[]>("/api/conversations");
@@ -86,14 +87,12 @@ export const useChatStore = create<State>((set, get) => ({
       console.error("Failed to load conversations", error);
     }
   },
-
   openConversation: (id: string) => {
     const socket = getSocket();
     socket.emit("conversation:join", id);
     set({ activeId: id, isSidebarOpen: false });
     localStorage.setItem("activeId", id);
   },
-
   sendMessage: async (conversationId, data) => {
     const tempId = Date.now();
     const me = useAuthStore.getState().user;
@@ -107,14 +106,7 @@ export const useChatStore = create<State>((set, get) => ({
       optimistic: true,
       ...data,
     };
-
-    set(state => ({
-      messages: {
-        ...state.messages,
-        [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage],
-      },
-    }));
-
+    set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage] } }));
     const socket = getSocket();
     socket.emit("message:send", { conversationId, tempId, ...data }, (ack: { ok: boolean, msg: Message }) => {
       if (ack.ok) {
@@ -127,66 +119,32 @@ export const useChatStore = create<State>((set, get) => ({
       }
     });
   },
-
-  deleteConversation: async (id) => {
-    await api(`/api/conversations/${id}`, { method: 'DELETE' });
-  },
-
-  deleteGroup: async (id) => {
-    await api(`/api/conversations/group/${id}`, { method: 'DELETE' });
-  },
-
+  deleteConversation: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
+  deleteGroup: async (id) => { await api(`/api/conversations/group/${id}`, { method: 'DELETE' }); },
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
-
-  searchUsers: async (q) => {
-    return api(`/api/users/search?q=${q}`);
-  },
-
+  searchUsers: async (q) => { return api(`/api/users/search?q=${q}`); },
   startConversation: async (peerId) => {
-    const conv = await api<Conversation>("/api/conversations/start", {
-      method: 'POST',
-      body: JSON.stringify({ peerId }),
-    });
-    set(state => ({
-      conversations: sortConversations([conv, ...state.conversations.filter(c => c.id !== conv.id)]),
-      activeId: conv.id,
-      isSidebarOpen: false,
-    }));
+    const conv = await api<Conversation>("/api/conversations/start", { method: 'POST', body: JSON.stringify({ peerId }) });
+    set(state => ({ conversations: sortConversations([conv, ...state.conversations.filter(c => c.id !== conv.id)]), activeId: conv.id, isSidebarOpen: false }));
     return conv.id;
   },
-
   uploadFile: async (conversationId, file) => {
     const toastId = toast.loading(`Uploading ${file.name}...`);
     try {
       const form = new FormData();
       form.append("file", file);
-
-      const { file: fileData } = await api<{ file: any }>(
-        `/api/uploads/${conversationId}/upload`,
-        { method: "POST", body: form }
-      );
-
+      const { file: fileData } = await api<{ file: any }>(`/api/uploads/${conversationId}/upload`,{ method: "POST", body: form });
       toast.success("File uploaded!", { id: toastId });
-
-      get().sendMessage(conversationId, {
-        fileUrl: fileData.url,
-        fileName: fileData.filename,
-        fileType: fileData.mimetype,
-        fileSize: fileData.size,
-        content: '',
-      });
-
+      get().sendMessage(conversationId, { fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
     } catch (error: any) {
       const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
-      toast.error(`Upload failed: ${errorMsg}`, { id: toastId });
+      toast.error(`Upload failed: ${errorMsg}`);
     }
   },
-
   loadMessagesForConversation: async (id: string) => {
     try {
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
-      const decryptedItems = await Promise.all(
-        res.items.map(async (m) => {
+      const decryptedItems = await Promise.all(res.items.map(async (m) => {
           try {
             m.content = await decryptMessage(m.content || '', m.conversationId);
             return withPreview(m);
@@ -196,32 +154,31 @@ export const useChatStore = create<State>((set, get) => ({
           }
         })
       );
-      set(state => ({
-        messages: { ...state.messages, [id]: decryptedItems },
-      }));
+      set(state => ({ messages: { ...state.messages, [id]: decryptedItems } }));
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
-      set(state => ({ messages: { ...state.messages, [id]: [] } })); // Kosongkan jika error
+      set(state => ({ messages: { ...state.messages, [id]: [] } }));
     }
   },
 
   initSocketListeners: () => {
     const socket = getSocket();
+    // Bersihkan semua listener lama untuk mencegah duplikasi
     socket.off("presence:update");
     socket.off("typing:update");
     socket.off("message:new");
+    socket.off("conversation:new");
     socket.off("conversation:deleted");
     socket.off("reaction:new");
     socket.off("reaction:remove");
     socket.off("message:deleted");
 
+    // Daftarkan semua listener yang benar
     socket.on("presence:update", (onlineUserIds: string[]) => {
-      console.log("[Socket Event] presence:update", onlineUserIds);
       set({ presence: onlineUserIds });
     });
 
     socket.on("typing:update", ({ userId, conversationId, isTyping }) => {
-      console.log("[Socket Event] typing:update", { userId, isTyping });
       set(state => {
         const currentTyping = state.typing[conversationId] || [];
         if (isTyping && !currentTyping.includes(userId)) {
@@ -234,19 +191,14 @@ export const useChatStore = create<State>((set, get) => ({
     });
 
     socket.on("message:new", (newMessage: Message) => {
-      console.log("[Socket Event] message:new", newMessage);
       set(state => {
-        // FIX: Abaikan pesan dari diri sendiri untuk mencegah duplikasi
         if (newMessage.senderId === useAuthStore.getState().user?.id) return state;
-
         const conversationId = newMessage.conversationId;
         const messages = state.messages[conversationId] || [];
         if (messages.some(m => m.id === newMessage.id)) return state;
-
         const updatedConversations = state.conversations.map(c => 
           c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage) } : c
         );
-
         return {
           messages: { ...state.messages, [conversationId]: [...messages, newMessage] },
           conversations: sortConversations(updatedConversations),
@@ -255,21 +207,20 @@ export const useChatStore = create<State>((set, get) => ({
     });
 
     socket.on("conversation:new", (newConversation: Conversation) => {
-      console.log("[Socket Event] conversation:new", newConversation);
       set(state => {
-        const existingIndex = state.conversations.findIndex(c => c.id === newConversation.id);
-        let newConversations = [...state.conversations];
-        if (existingIndex !== -1) {
-          newConversations[existingIndex] = newConversation;
-        } else {
-          newConversations.push(newConversation);
-        }
-        return { conversations: sortConversations(newConversations) };
+        if (state.conversations.some(c => c.id === newConversation.id)) return state;
+        return { conversations: sortConversations([...state.conversations, newConversation]) };
       });
     });
 
+    socket.on("conversation:deleted", ({ id }) => {
+      set(state => ({
+        conversations: state.conversations.filter(c => c.id !== id),
+        activeId: state.activeId === id ? null : state.activeId,
+      }));
+    });
+
     socket.on("message:deleted", ({ messageId, conversationId }) => {
-      console.log("[Socket Event] message:deleted", { messageId, conversationId });
       set(state => {
         const messages = state.messages[conversationId] || [];
         return {
@@ -282,7 +233,6 @@ export const useChatStore = create<State>((set, get) => ({
     });
 
     socket.on("reaction:new", (reaction) => {
-      console.log("[Socket Event] reaction:new", reaction);
       set(state => {
         let conversationId: string | undefined;
         for (const cid in state.messages) {
@@ -292,21 +242,17 @@ export const useChatStore = create<State>((set, get) => ({
           }
         }
         if (!conversationId) return state;
-
         const updatedMessages = state.messages[conversationId].map(m => {
           if (m.id === reaction.messageId) {
-            const newReactions = [...(m.reactions || []), reaction];
-            return { ...m, reactions: newReactions };
+            return { ...m, reactions: [...(m.reactions || []), reaction] };
           }
           return m;
         });
-
         return { ...state, messages: { ...state.messages, [conversationId]: updatedMessages } };
       });
     });
 
     socket.on("reaction:remove", ({ reactionId, messageId }) => {
-      console.log("[Socket Event] reaction:remove", { reactionId, messageId });
       set(state => {
         let conversationId: string | undefined;
         for (const cid in state.messages) {
@@ -316,15 +262,12 @@ export const useChatStore = create<State>((set, get) => ({
           }
         }
         if (!conversationId) return state;
-
         const updatedMessages = state.messages[conversationId].map(m => {
           if (m.id === messageId) {
-            const newReactions = (m.reactions || []).filter(r => r.id !== reactionId);
-            return { ...m, reactions: newReactions };
+            return { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) };
           }
           return m;
         });
-
         return { ...state, messages: { ...state.messages, [conversationId]: updatedMessages } };
       });
     });
