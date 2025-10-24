@@ -197,7 +197,7 @@ export const useChatStore = create<State>((set, get) => ({
         const messages = state.messages[conversationId] || [];
         if (messages.some(m => m.id === newMessage.id)) return state;
         const updatedConversations = state.conversations.map(c => 
-          c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage) } : c
+          c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt } : c
         );
         return {
           messages: { ...state.messages, [conversationId]: [...messages, newMessage] },
