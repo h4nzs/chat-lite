@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useChatStore } from '@store/chat';
 import { useAuthStore } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
@@ -11,7 +12,6 @@ interface ChatListProps {
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const { conversations, loadConversations, presence, deleteGroup, deleteConversation } = useChatStore();
   const meId = useAuthStore((s) => s.user?.id);
-  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   }
 
   return (
-    <div ref={listRef} className="overflow-y-auto flex-1">
+    <div className="relative flex-1 overflow-y-auto">
       {conversations.map((c) => {
         const isActive = c.id === activeId;
         const title = c.title || c.participants.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
@@ -73,31 +73,39 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               </div>
             </button>
 
-            <div className="relative flex-shrink-0">
-              <button onClick={() => setMenuOpenFor(menuOpenFor === c.id ? null : c.id)} className="p-1 rounded-full hover:bg-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
-              </button>
-              {menuOpenFor === c.id && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-md shadow-lg z-10">
+            {/* Tombol Menu Radix UI */}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button onClick={(e) => e.stopPropagation()} className="p-1 rounded-full hover:bg-gray-700 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                </button>
+              </DropdownMenu.Trigger>
+
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content 
+                  sideOffset={5} 
+                  align="end"
+                  className="min-w-[180px] bg-gray-800 border border-gray-700 rounded-md shadow-lg z-50 p-1"
+                >
                   {c.isGroup && c.creatorId === meId && (
-                    <button 
-                      onClick={() => { if(window.confirm('Are you sure you want to permanently delete this group?')) deleteGroup(c.id); setMenuOpenFor(null); }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white"
+                    <DropdownMenu.Item 
+                      onClick={() => { if(window.confirm('Are you sure you want to permanently delete this group?')) deleteGroup(c.id); }}
+                      className="block w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded cursor-pointer outline-none"
                     >
                       Delete Group
-                    </button>
+                    </DropdownMenu.Item>
                   )}
                   {!c.isGroup && (
-                    <button 
-                      onClick={() => { if(window.confirm('Are you sure you want to hide this chat?')) deleteConversation(c.id); setMenuOpenFor(null); }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white"
+                    <DropdownMenu.Item 
+                      onClick={() => { if(window.confirm('Are you sure you want to hide this chat?')) deleteConversation(c.id); }}
+                      className="block w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded cursor-pointer outline-none"
                     >
                       Delete Chat
-                    </button>
+                    </DropdownMenu.Item>
                   )}
-                </div>
-              )}
-            </div>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         );
       })}

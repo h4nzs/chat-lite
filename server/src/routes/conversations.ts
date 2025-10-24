@@ -55,6 +55,7 @@ router.get("/", requireAuth, async (req, res, next) => {
         id: conv.id,
         isGroup: conv.isGroup,
         title: conv.title,
+        creatorId: conv.creatorId, // FIX: Tambahkan creatorId
         updatedAt: conv.updatedAt,
         participants: conv.participants.map((p) => ({
           id: p.user.id,

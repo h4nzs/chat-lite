@@ -1,284 +1,127 @@
-# Prompt Gemini — Implement Group & Chat Deletion (ChatLite)
+# Prompt Gemini — Refactor Delete Menu UI Using Radix UI (Portal-Based)
 
-You are a **senior fullstack developer** working on a realtime chat app called **ChatLite**
-(Stack: React + Zustand + Socket.IO frontend, Node.js + Express + Prisma + Socket.IO backend).
-Implement two new deletion features with full audit and minimal disturbance to existing logic.
-
----
-
-## 🧱 Goals
-
-1. **Group Deletion**
-
-   * Only the **creator (owner)** of the group can delete it.
-   * Deleting a group removes:
-
-     * All messages in that group conversation.
-     * The conversation record itself.
-     * All member relationships (`ConversationMember`).
-   * When deleted:
-
-     * All group members are notified in realtime via Socket.IO (`conversation:deleted` event).
-     * The deleted group is removed from their chat list instantly.
-
-2. **Conversation Deletion (One-to-One Chat)**
-
-   * A user can delete a private chat (via “...” menu on chat list).
-   * This should **only clear messages from that user’s view** (soft delete), *not delete the other user’s copy*.
-   * Add a new table or flag if necessary (`UserConversationHidden` or a “hiddenBy” column).
-   * Realtime updates: when user deletes a conversation, it disappears from *their* chatlist.
-   * Other user still keeps their messages unless they also delete it.
-
-3. **Frontend UI**
-
-   * Add a **"..." menu (3 dots)** beside each chat (both user and group) in the chat list.
-   * Menu options:
-
-     * For group creator: `Delete Group`
-     * For private chat: `Delete Chat`
-   * Confirmation modal before delete (`Are you sure you want to delete this conversation?`)
-   * Toast success or error based on API response.
-   * After successful delete → remove item from UI immediately (Zustand state update).
+You are a **senior frontend engineer** working on ChatLite (React + Tailwind + Zustand).
+The delete logic for **groups** and **private chats** already works correctly.
+Now, your task is to **refactor the delete menu UI** to use **Radix UI DropdownMenu** for proper portal rendering and clean UX.
 
 ---
 
-## 🔒 Rules & Requirements
+## 🎯 Goals
 
-* Only the **group owner** can delete their group.
-* Deleting a **private chat** should not delete it for the other user (soft delete).
-* Preserve CSRF protection.
-* Keep **existing message send, receive, and typing** features untouched.
-* Use existing coding conventions (naming, store patterns, socket events, etc.)
-* Keep TypeScript strict.
-* Apply backend permission checks, validation, and use best practices.
+* Replace the current 3-dot ("...") menu used in the chat list with **Radix UI DropdownMenu**.
+* Ensure the dropdown renders using a **portal**, so it’s **not clipped by parent containers** with `overflow: hidden` or `overflow: auto`.
+* Keep the **delete chat** and **delete group** logic exactly as it is (no refactoring needed there).
+* Keep all styling consistent with the current design (Tailwind-based).
+* Must support:
+
+  * “Delete Chat” for private conversations.
+  * “Delete Group” (visible only for the creator of the group).
 
 ---
 
-## 🔧 Backend Tasks
+## 🧱 Implementation Details
 
-### **1. Delete Group Endpoint**
+### 1. Install Radix UI (if not already installed)
 
-**Route:**
-`DELETE /api/groups/:id`
-
-**Logic:**
-
-```ts
-// Pseudocode
-router.delete('/groups/:id', authMiddleware, async (req, res) => {
-  const userId = req.user.id;
-  const groupId = req.params.id;
-
-  const group = await prisma.conversation.findUnique({
-    where: { id: groupId },
-    include: { members: true },
-  });
-
-  if (!group) return res.status(404).json({ error: 'Group not found' });
-  if (group.creatorId !== userId) return res.status(403).json({ error: 'Not allowed' });
-
-  await prisma.message.deleteMany({ where: { conversationId: groupId } });
-  await prisma.conversationMember.deleteMany({ where: { conversationId: groupId } });
-  await prisma.conversation.delete({ where: { id: groupId } });
-
-  // Notify members
-  group.members.forEach(m => {
-    io.to(m.userId).emit('conversation:deleted', { id: groupId });
-  });
-
-  res.json({ success: true, message: 'Group deleted' });
-});
-```
-
-> Ensure `creatorId` exists on `Conversation` model (if not, add it in schema and migration).
-
-**Prisma Schema Update (if missing):**
-
-```prisma
-model Conversation {
-  id            String   @id @default(cuid())
-  name          String?
-  type          String   // 'direct' | 'group'
-  creatorId     String?  // for groups
-  members       ConversationMember[]
-  messages      Message[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
+```bash
+npm install @radix-ui/react-dropdown-menu
 ```
 
 ---
 
-### **2. Delete Conversation (User Chat)**
+### 2. Refactor ChatListItem Menu Component
 
-**Route:**
-`DELETE /api/conversations/:id`
+Target component: `ChatListItem.tsx` (or wherever the 3-dot menu lives)
 
-**Logic:**
-
-```ts
-router.delete('/conversations/:id', authMiddleware, async (req, res) => {
-  const userId = req.user.id;
-  const convId = req.params.id;
-
-  const conversation = await prisma.conversation.findUnique({ where: { id: convId } });
-  if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
-
-  // Soft delete: only hide for current user
-  await prisma.userConversationHidden.upsert({
-    where: { userId_conversationId: { userId, conversationId: convId } },
-    update: {},
-    create: { userId, conversationId: convId },
-  });
-
-  io.to(userId).emit('conversation:deleted', { id: convId });
-  res.json({ success: true });
-});
-```
-
-**Schema (if needed):**
-
-```prisma
-model UserConversationHidden {
-  id             String   @id @default(cuid())
-  userId         String
-  conversationId String
-  createdAt      DateTime @default(now())
-  @@unique([userId, conversationId])
-}
-```
-
-> When fetching chat list, filter out any `Conversation` hidden by the user:
-
-```ts
-where: {
-  NOT: {
-    hiddenBy: {
-      some: { userId: currentUserId }
-    }
-  }
-}
-```
-
----
-
-## 🖥️ Frontend Tasks
-
-### **1. UI Menu**
-
-Add 3-dot menu beside each chat in chatlist.
-
-**Component**: `ChatListItem.tsx`
+Replace your current menu implementation with **Radix UI DropdownMenu** like this:
 
 ```tsx
-<Menu>
-  <MenuTrigger>
-    <EllipsisVerticalIcon className="w-5 h-5 cursor-pointer text-gray-500" />
-  </MenuTrigger>
-  <MenuContent>
-    {chat.type === 'group' && chat.creatorId === currentUser.id && (
-      <MenuItem onClick={() => handleDeleteGroup(chat.id)}>Delete Group</MenuItem>
-    )}
-    {chat.type === 'direct' && (
-      <MenuItem onClick={() => handleDeleteChat(chat.id)}>Delete Chat</MenuItem>
-    )}
-  </MenuContent>
-</Menu>
-```
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { EllipsisVerticalIcon } from 'lucide-react'
 
----
+export function ChatListItem({ chat, currentUser, handleDeleteChat, handleDeleteGroup }) {
+  return (
+    <div className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-xl transition">
+      <div className="flex items-center gap-3">
+        <img
+          src={chat.avatarUrl || '/default-avatar.png'}
+          className="w-10 h-10 rounded-full"
+        />
+        <div className="flex flex-col">
+          <span className="font-medium text-white">{chat.name}</span>
+          <span className="text-xs text-gray-400 truncate w-48">{chat.lastMessage}</span>
+        </div>
+      </div>
 
-### **2. API Calls**
+      {/* Radix UI Dropdown */}
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger asChild>
+          <button className="p-2 rounded-full hover:bg-neutral-700 transition">
+            <EllipsisVerticalIcon className="w-5 h-5 text-gray-400" />
+          </button>
+        </DropdownMenu.Trigger>
 
-**In `api.ts`:**
-
-```ts
-export async function deleteGroup(id: string) {
-  const csrf = await getCsrfToken();
-  const res = await fetch(`${API_URL}/api/groups/${id}`, {
-    method: 'DELETE',
-    headers: { 'X-CSRF-Token': csrf },
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function deleteConversation(id: string) {
-  const csrf = await getCsrfToken();
-  const res = await fetch(`${API_URL}/api/conversations/${id}`, {
-    method: 'DELETE',
-    headers: { 'X-CSRF-Token': csrf },
-    credentials: 'include',
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-```
-
----
-
-### **3. Store Updates**
-
-**In `chat.ts` (Zustand store):**
-
-```ts
-socket.on('conversation:deleted', ({ id }) => {
-  set(state => ({
-    conversations: state.conversations.filter(c => c.id !== id)
-  }));
-});
-```
-
-**Actions:**
-
-```ts
-async function handleDeleteGroup(id: string) {
-  try {
-    await api.deleteGroup(id);
-    toast.success('Group deleted');
-    set(state => ({
-      conversations: state.conversations.filter(c => c.id !== id)
-    }));
-  } catch (e) {
-    toast.error('Failed to delete group');
-  }
-}
-
-async function handleDeleteChat(id: string) {
-  try {
-    await api.deleteConversation(id);
-    toast.success('Chat deleted');
-    set(state => ({
-      conversations: state.conversations.filter(c => c.id !== id)
-    }));
-  } catch (e) {
-    toast.error('Failed to delete chat');
-  }
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            align="end"
+            sideOffset={6}
+            className="min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl p-1 z-[9999]"
+          >
+            {chat.type === 'group' && chat.creatorId === currentUser.id && (
+              <DropdownMenu.Item
+                onClick={() => handleDeleteGroup(chat.id)}
+                className="text-red-500 text-sm rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
+              >
+                Delete Group
+              </DropdownMenu.Item>
+            )}
+            {chat.type === 'direct' && (
+              <DropdownMenu.Item
+                onClick={() => handleDeleteChat(chat.id)}
+                className="text-red-400 text-sm rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
+              >
+                Delete Chat
+              </DropdownMenu.Item>
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+    </div>
+  )
 }
 ```
 
 ---
 
-## ⚡ Socket Events
+### 3. Behavior Requirements
 
-* `conversation:deleted`
-  Payload: `{ id: string }`
-  Triggered for all members (for groups) or just the deleting user (for private chat).
-  Client removes chat from list instantly.
+✅ The dropdown menu must:
+
+* Open smoothly and position correctly near the trigger.
+* Render inside a portal (not inside overflow containers).
+* Close automatically after clicking a menu item.
+* Maintain consistent theming (dark mode, rounded corners, subtle shadows).
+
+✅ The delete logic remains untouched:
+
+* `handleDeleteChat(chat.id)`
+* `handleDeleteGroup(chat.id)`
+
+✅ No layout reflow or console errors.
 
 ---
 
-## ✅ Acceptance Criteria
+### 4. Optional Enhancement
 
-* Only the **creator** can delete a group.
-* When deleted, group disappears from all members' lists in realtime.
-* Group messages + relations removed from DB.
-* Private chat deletion only affects the deleting user.
-* Both deletions are CSRF-protected and auth-required.
-* No other logic (typing indicator, online presence, lastMessage) affected.
-* Realtime sync via socket working properly.
-* All schema changes documented and safe for migration.
+Add small animations for the dropdown (Radix supports `motion` props or use Framer Motion if already included):
+
+```tsx
+<DropdownMenu.Content
+  align="end"
+  sideOffset={6}
+  className="min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl p-1 z-[9999] data-[state=open]:animate-in data-[state=closed]:animate-out"
+>
+```
 
 ---
 
@@ -286,18 +129,25 @@ async function handleDeleteChat(id: string) {
 
 Gemini should:
 
-1. Provide updated backend routes (with middleware + CSRF + Prisma logic).
-2. Add/update Prisma schema & migration commands (if needed).
-3. Provide frontend UI + store + API code updates.
-4. Add socket handling for `conversation:deleted`.
-5. Include brief audit + test plan.
+1. Install and configure Radix UI.
+2. Refactor the delete menu using `DropdownMenu.Root`, `Trigger`, `Portal`, and `Content`.
+3. Keep existing delete logic intact.
+4. Ensure full visual + functional consistency.
+5. Verify the dropdown never gets clipped and closes correctly after action.
 
 ---
 
-> Optional enhancement (Gemini may add):
->
-> * Confirmation modal component (`ConfirmDeleteDialog`)
-> * Toast success/error
-> * Reuse shared delete handlers for both chat + group deletions.
+## ✅ Acceptance Criteria
+
+* Menu shows correctly on click.
+* No visual clipping / overflow issues.
+* Menu closes properly after clicking.
+* Delete chat/group still works exactly the same.
+* Compatible with Tailwind dark theme.
+* No side effects on other components.
+
+---
+
+> 💡 Bonus (optional): If Gemini detects other dropdowns or action menus in the project, it can suggest migrating them to Radix UI for consistency and long-term maintainability.
 
 ---
