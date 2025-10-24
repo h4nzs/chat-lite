@@ -26,16 +26,20 @@ export function registerSocket(httpServer: HttpServer) {
       socket.join(userId); // Join room personal
       console.log(`[Socket Connect] User connected: ${userId}`);
       onlineUsers.add(userId);
-      // Broadcast daftar lengkap user online ke SEMUA klien
-      io.emit("presence:update", Array.from(onlineUsers));
+
+      // Kirim daftar lengkap hanya ke user yang baru connect
+      socket.emit("presence:init", Array.from(onlineUsers));
+      
+      // Broadcast ke semua user lain bahwa user ini telah bergabung
+      socket.broadcast.emit("presence:user_joined", userId);
     }
 
     socket.on("disconnect", () => {
       if (userId) {
         console.log(`[Socket Disconnect] User disconnected: ${userId}`);
         onlineUsers.delete(userId);
-        // Broadcast daftar lengkap user online lagi setelah ada yang keluar
-        io.emit("presence:update", Array.from(onlineUsers));
+        // Broadcast ke semua user bahwa user ini telah keluar
+        io.emit("presence:user_left", userId);
       }
     });
 

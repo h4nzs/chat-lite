@@ -108,12 +108,22 @@ export const useChatStore = create<State>((set, get) => ({
     };
     set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage] } }));
     const socket = getSocket();
-    socket.emit("message:send", { conversationId, tempId, ...data }, (ack: { ok: boolean, msg: Message }) => {
+    socket.emit("message:send", { conversationId, tempId, ...data }, (ack: { ok: boolean, msg: Message, error?: string }) => {
       if (ack.ok) {
         set(state => ({
           messages: {
             ...state.messages,
             [conversationId]: state.messages[conversationId].map(m => m.tempId === tempId ? ack.msg : m),
+          },
+        }));
+      } else {
+        toast.error(`Failed to send message: ${ack.error || 'Unknown error'}`);
+        set(state => ({
+          messages: {
+            ...state.messages,
+            [conversationId]: state.messages[conversationId].map(m =>
+              m.tempId === tempId ? { ...m, error: true, optimistic: false } : m
+            ),
           },
         }));
       }
@@ -164,7 +174,9 @@ export const useChatStore = create<State>((set, get) => ({
   initSocketListeners: () => {
     const socket = getSocket();
     // Bersihkan semua listener lama untuk mencegah duplikasi
-    socket.off("presence:update");
+    socket.off("presence:init");
+    socket.off("presence:user_joined");
+    socket.off("presence:user_left");
     socket.off("typing:update");
     socket.off("message:new");
     socket.off("conversation:new");
@@ -174,8 +186,16 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("message:deleted");
 
     // Daftarkan semua listener yang benar
-    socket.on("presence:update", (onlineUserIds: string[]) => {
+    socket.on("presence:init", (onlineUserIds: string[]) => {
       set({ presence: onlineUserIds });
+    });
+
+    socket.on("presence:user_joined", (userId: string) => {
+      set(state => ({ presence: [...state.presence, userId] }));
+    });
+
+    socket.on("presence:user_left", (userId: string) => {
+      set(state => ({ presence: state.presence.filter(id => id !== userId) }));
     });
 
     socket.on("typing:update", ({ userId, conversationId, isTyping }) => {

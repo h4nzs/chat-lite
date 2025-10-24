@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useCallback, ChangeEvent } from "react";
-import { useChatStore } from "@store/chat";
+import { useCallback, useRef, ChangeEvent, useState } from "react";
 import { useAuthStore } from "@store/auth";
 import { getSocket } from "@lib/socket";
-import { FixedSizeList as List } from "react-window";
-import AutoSizer from "react-virtualized-auto-sizer";
+import { Virtuoso } from "react-virtuoso";
 import MessageItem from "@components/MessageItem";
+import { useConversation } from "@hooks/useConversation";
+import { Spinner } from "./Spinner";
+import { useChatStore } from "@store/chat";
 
 // --- Komponen Terpisah --- 
 
@@ -72,35 +73,14 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
   );
 };
 
-
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
-  const {
-    messages,
-    sendMessage,
-    conversations,
-    typing,
-    loadMessagesForConversation,
-    uploadFile, // Ambil fungsi uploadFile dari store
-  } = useChatStore();
+  const { conversation, messages, isLoading, sendMessage, uploadFile } = useConversation(id);
+  const { typing } = useChatStore(); // Keep this for typing indicator
 
-  const conversation = conversations.find(c => c.id === id);
-  const activeMessages = messages[id] || [];
   const typingUsers = typing[id] || [];
   const filteredTypingUsers = typingUsers.filter(uid => uid !== meId);
-
-  const listRef = useRef<List>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (id) loadMessagesForConversation(id);
-  }, [id, loadMessagesForConversation]);
-
-  useEffect(() => {
-    if (activeMessages.length > 0) {
-      listRef.current?.scrollToItem(activeMessages.length - 1, 'end');
-    }
-  }, [activeMessages.length]);
 
   const handleTyping = useCallback(() => {
     const socket = getSocket();
@@ -112,44 +92,39 @@ export default function ChatWindow({ id }: { id: string }) {
   }, [id]);
 
   const handleSendMessage = (text: string) => {
-    sendMessage(id, { content: text });
+    sendMessage(text);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     getSocket().emit("typing:stop", { conversationId: id });
   };
 
-  // Kembalikan logika handleFileChange
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && id) {
-      const file = e.target.files[0];
-      uploadFile(id, file);
+    if (e.target.files?.[0]) {
+      uploadFile(e.target.files[0]);
     }
   };
 
-  if (!conversation) {
-    return <div className="flex-1 flex items-center justify-center text-text-secondary"><p>Loading conversation...</p></div>;
+  if (isLoading || !conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col h-full bg-background">
       <ChatHeader conversation={conversation} />
       <div className="flex-1 min-h-0 relative">
-        <AutoSizer>
-          {({ height, width }) => (
-            <List
-              ref={listRef}
-              height={height}
-              itemCount={activeMessages.length}
-              itemSize={120}
-              width={width}
-            >
-              {({ index, style }) => (
-                <div style={style}>
-                  <MessageItem message={activeMessages[index]} />
-                </div>
-              )}
-            </List>
+        <Virtuoso
+          initialTopMostItemIndex={messages.length - 1}
+          data={messages}
+          itemContent={(index, message) => (
+            <div className="px-4">
+              <MessageItem message={message} />
+            </div>
           )}
-        </AutoSizer>
+          followOutput="auto"
+        />
         {filteredTypingUsers.length > 0 && (
           <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
              <div className="flex gap-1 items-end h-4">
