@@ -254,12 +254,18 @@ export const useChatStore = create<State>((set, get) => ({
       });
     });
 
-    socket.on("conversation:deleted", ({ id }) => {
-      console.log("[Socket Event] conversation:deleted", id);
-      set(state => ({
-        conversations: state.conversations.filter(c => c.id !== id),
-        activeId: state.activeId === id ? null : state.activeId,
-      }));
+    socket.on("conversation:new", (newConversation: Conversation) => {
+      console.log("[Socket Event] conversation:new", newConversation);
+      set(state => {
+        const existingIndex = state.conversations.findIndex(c => c.id === newConversation.id);
+        let newConversations = [...state.conversations];
+        if (existingIndex !== -1) {
+          newConversations[existingIndex] = newConversation;
+        } else {
+          newConversations.push(newConversation);
+        }
+        return { conversations: sortConversations(newConversations) };
+      });
     });
 
     socket.on("message:deleted", ({ messageId, conversationId }) => {
