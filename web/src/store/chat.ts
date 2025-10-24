@@ -9,13 +9,8 @@ export type Conversation = {
   id: string;
   isGroup: boolean;
   title?: string | null;
-  creatorId?: string | null; // Tambahkan ini
-  participants: {
-    id: string;
-    username: string;
-    name: string;
-    avatarUrl?: string | null;
-  }[];
+  creatorId?: string | null;
+  participants: { id: string; username: string; name: string; avatarUrl?: string | null }[];
   lastMessage: (Message & { preview?: string }) | null;
   updatedAt: string;
 };
@@ -25,479 +20,258 @@ export type Message = {
   tempId?: number;
   conversationId: string;
   senderId: string;
+  sender?: { id: string; name: string; username: string; avatarUrl?: string | null };
   content?: string | null;
   imageUrl?: string | null;
   fileUrl?: string | null;
   fileName?: string | null;
   fileType?: string;
   fileSize?: number;
-  sessionId?: string | null; // New field for session key ID
-  encryptedSessionKey?: string | null; // New field for encrypted session key
+  sessionId?: string | null;
+  encryptedSessionKey?: string | null;
   createdAt: string;
   error?: boolean;
   preview?: string;
   reactions?: { id: string; emoji: string; userId: string }[];
-  readBy?: string[];
-  // optional optimistic marker
   optimistic?: boolean;
 };
 
 type State = {
-  loading: Record<string, boolean>;
   conversations: Conversation[];
   activeId: string | null;
+  isSidebarOpen: boolean;
   messages: Record<string, Message[]>;
-  cursors: Record<string, string | null>;
+  presence: string[];
   typing: Record<string, string[]>;
-  presence: string[]; // Ganti menjadi array of userIds
-  deleteLoading: Record<string, boolean>;
-
   loadConversations: () => Promise<void>;
-  openConversation: (id: string | null | undefined) => Promise<void>;
-  loadOlderMessages: (conversationId: string) => Promise<void>;
-
-  sendMessage: (
-    conversationId: string,
-    messageData: Partial<Message>,
-    tempId?: number
-  ) => Promise<void>;
-  addOptimisticMessage: (conversationId: string, msg: Message) => void;
-  markMessageError: (conversationId: string, tempId: number) => void;
-
-  uploadFile: (conversationId: string, file: File) => Promise<void>;
-  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
-  searchUsers: (q: string) => Promise<{ id: string; username: string; name: string; avatarUrl?: string | null }[]>;
-  startConversation: (peerId: string) => Promise<string>;
-
-  deleteGroup: (id: string) => Promise<void>;
+  openConversation: (id: string) => void;
+  sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
-
-  setLoading: (id: string, val: boolean) => void;
+  deleteGroup: (id: string) => Promise<void>;
+  toggleSidebar: () => void;
+  searchUsers: (q: string) => Promise<any[]>;
+  startConversation: (peerId: string) => Promise<string>;
+  initSocketListeners: () => void;
+  loadMessagesForConversation: (id: string) => Promise<void>;
 };
 
-// Helper to generate a preview string for different file types
-function getFilePreview(fileName?: string | null, fileType?: string): string {
-    if (!fileType) return '📎 File';
-    if (fileType.startsWith('image/')) return '📷 Image';
-    if (fileType.startsWith('video/')) return '🎥 Video';
-    if (fileType.startsWith('audio/')) return '🎵 Audio';
-    return `📎 ${fileName || 'File'}`;
-}
+const sortConversations = (list: Conversation[]) =>
+  [...list].sort((a, b) => new Date(b.lastMessage?.createdAt || b.updatedAt).getTime() - new Date(a.lastMessage?.createdAt || a.updatedAt).getTime());
 
-
-function normalizeMessageForMerge(m: any) {
-  if (!m) return null
-  return {
-    id: m.id,
-    content: normalizeMessageContent(m.content),
-    senderId: m.senderId,
-    createdAt: m.createdAt ?? new Date().toISOString(),
-    tempId: m.tempId
-  }
-}
-
-function normalizeMessageContent(raw: any): string {
-  if (raw == null) return "";
-  if (typeof raw === "string") return raw;
-  if (typeof raw === "object" && "content" in raw) {
-    const val = raw.content;
-    return typeof val === "string" ? val : "";
-  }
-  return String(raw ?? "");
-}
-
-function withPreview(msg: Message): Message {
-  if (msg.imageUrl || msg.fileUrl) {
-      return { ...msg, preview: getFilePreview(msg.fileName, msg.fileType) };
+const withPreview = (msg: Message): Message => {
+  if (msg.fileUrl) {
+    if (msg.fileType?.startsWith('image/')) return { ...msg, preview: "📷 Image" };
+    if (msg.fileType?.startsWith('video/')) return { ...msg, preview: "🎥 Video" };
+    return { ...msg, preview: `📎 ${msg.fileName || "File"}` };
   }
   return msg;
-}
+};
 
-function sortConversations(list: Conversation[]) {
-  return [...list].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-}
-
-const initialActiveId = localStorage.getItem("activeId");
+const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
 
 export const useChatStore = create<State>((set, get) => ({
   conversations: [],
   activeId: initialActiveId,
   messages: {},
-  cursors: {},
+  presence: [],
   typing: {},
-  loading: {},
-  presence: [], // Inisialisasi sebagai array kosong
-  deleteLoading: {},
+  isSidebarOpen: false,
 
-  async loadConversations() {
-    const items = await api<Conversation[]>("/api/conversations");
-    const safeItems = items.map((c) => ({
-      ...c,
-      lastMessage: c.lastMessage ? withPreview(c.lastMessage) : null,
+  loadConversations: async () => {
+    try {
+      const conversations = await api<Conversation[]>("/api/conversations");
+      set({ conversations: sortConversations(conversations) });
+    } catch (error) {
+      console.error("Failed to load conversations", error);
+    }
+  },
+
+  openConversation: (id: string) => {
+    const socket = getSocket();
+    socket.emit("conversation:join", id);
+    set({ activeId: id, isSidebarOpen: false });
+    localStorage.setItem("activeId", id);
+  },
+
+  sendMessage: async (conversationId, data) => {
+    const tempId = Date.now();
+    const me = useAuthStore.getState().user;
+    const optimisticMessage: Message = {
+      id: `temp-${tempId}`,
+      tempId,
+      conversationId,
+      senderId: me!.id,
+      sender: me!,
+      createdAt: new Date().toISOString(),
+      optimistic: true,
+      ...data,
+    };
+
+    set(state => ({
+      messages: {
+        ...state.messages,
+        [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage],
+      },
     }));
-    set({ conversations: sortConversations(safeItems) });
 
     const socket = getSocket();
-    socket.off("conversation:new");
-    socket.on("conversation:new", (conv: Conversation) => {
-      const convSafe = {
-        ...conv,
-        lastMessage: conv.lastMessage ? withPreview(conv.lastMessage) : null,
-      };
-      set((s) => {
-        if (s.conversations.some((c) => c.id === convSafe.id)) return {};
-        return {
-          conversations: sortConversations([...s.conversations, convSafe]),
-        };
-      });
-    });
-
-    // Listener global untuk presence
-    socket.off("presence:update");
-    socket.on("presence:update", (onlineUserIds: string[]) => {
-      set({ presence: onlineUserIds });
-    });
-
-    socket.on("conversation:deleted", ({ id }) => {
-      set(s => ({
-        conversations: s.conversations.filter(c => c.id !== id),
-        // Jika percakapan yang aktif dihapus, reset activeId
-        activeId: s.activeId === id ? null : s.activeId,
-      }));
+    socket.emit("message:send", { conversationId, tempId, ...data }, (ack: { ok: boolean, msg: Message }) => {
+      if (ack.ok) {
+        set(state => ({
+          messages: {
+            ...state.messages,
+            [conversationId]: state.messages[conversationId].map(m => m.tempId === tempId ? ack.msg : m),
+          },
+        }));
+      }
     });
   },
 
-  async openConversation(id) {
-    if (!id) {
-      console.warn("[ChatStore] openConversation called without id");
-      return;
-    }
-    localStorage.setItem("activeId", id);
-    get().setLoading(id, true);
+  deleteConversation: async (id) => {
+    await api(`/api/conversations/${id}`, { method: 'DELETE' });
+  },
+
+  deleteGroup: async (id) => {
+    await api(`/api/conversations/group/${id}`, { method: 'DELETE' });
+  },
+
+  toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
+
+  searchUsers: async (q) => {
+    return api(`/api/users/search?q=${q}`);
+  },
+
+  startConversation: async (peerId) => {
+    const conv = await api<Conversation>("/api/conversations/start", {
+      method: 'POST',
+      body: JSON.stringify({ peerId }),
+    });
+    set(state => ({
+      conversations: sortConversations([conv, ...state.conversations.filter(c => c.id !== conv.id)]),
+      activeId: conv.id,
+      isSidebarOpen: false,
+    }));
+    return conv.id;
+  },
+
+  loadMessagesForConversation: async (id: string) => {
     try {
-      const res = await api<{ items: Message[]; nextCursor: string | null }>(
-        `/api/messages/${id}`
-      );
+      const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const decryptedItems = await Promise.all(
         res.items.map(async (m) => {
-          if (!m || typeof m !== 'object' || !m.id || !m.senderId) {
-            console.warn('Skipping invalid message during load:', m);
-            return null;
-          }
           try {
             m.content = await decryptMessage(m.content || '', m.conversationId);
             return withPreview(m);
           } catch (err) {
-            console.error("Decrypt failed:", m.id, err);
             m.content = '[Failed to decrypt message]';
             return withPreview(m);
           }
         })
       );
-      const validDecryptedItems = decryptedItems.filter(Boolean) as Message[];
-      set((s) => ({
-        messages: { ...s.messages, [id]: validDecryptedItems },
-        cursors: { ...s.cursors, [id]: res.nextCursor },
+      set(state => ({
+        messages: { ...state.messages, [id]: decryptedItems },
       }));
-    } finally {
-      get().setLoading(id, false);
+    } catch (error) {
+      console.error(`Failed to load messages for ${id}`, error);
+      set(state => ({ messages: { ...state.messages, [id]: [] } })); // Kosongkan jika error
     }
+  },
 
-    set({ activeId: id });
+  initSocketListeners: () => {
     const socket = getSocket();
-    socket.emit("conversation:join", id);
-
-    // Hapus listener lama untuk mencegah duplikasi
-    socket.off("message:new");
     socket.off("presence:update");
+    socket.off("typing:update");
+    socket.off("message:new");
+    socket.off("conversation:deleted");
     socket.off("reaction:new");
     socket.off("reaction:remove");
+    socket.off("message:deleted");
 
-    // Pasang listener baru
-    socket.on("message:new", async (msg: Message) => {
-      // Update untuk penerima (pengirim sudah dihandle via ACK)
-      const meId = useAuthStore.getState().user?.id;
-      if (msg.senderId === meId && !msg.optimistic) return;
+    socket.on("presence:update", (onlineUserIds: string[]) => {
+      console.log("[Socket Event] presence:update", onlineUserIds);
+      set({ presence: onlineUserIds });
+    });
 
-      try {
-        msg.content = await decryptMessage(msg.content || "", msg.conversationId);
-      } catch (e) {
-        msg.content = "[Failed to decrypt message]";
-      }
+    socket.on("typing:update", ({ userId, conversationId, isTyping }) => {
+      console.log("[Socket Event] typing:update", { userId, isTyping });
+      set(state => {
+        const currentTyping = state.typing[conversationId] || [];
+        if (isTyping && !currentTyping.includes(userId)) {
+          return { typing: { ...state.typing, [conversationId]: [...currentTyping, userId] } };
+        } else if (!isTyping && currentTyping.includes(userId)) {
+          return { typing: { ...state.typing, [conversationId]: currentTyping.filter(id => id !== userId) } };
+        }
+        return state;
+      });
+    });
 
-      set((s) => {
-        const conversationId = msg.conversationId;
-        const newMsg = withPreview(msg);
+    socket.on("message:new", (newMessage: Message) => {
+      console.log("[Socket Event] message:new", newMessage);
+      set(state => {
+        // FIX: Abaikan pesan dari diri sendiri untuk mencegah duplikasi
+        if (newMessage.senderId === useAuthStore.getState().user?.id) return state;
 
-        // 1. Tambahkan pesan ke thread yang aktif
-        const currentMessages = s.messages[conversationId] || [];
-        const updatedMessages = [...currentMessages, newMsg];
+        const conversationId = newMessage.conversationId;
+        const messages = state.messages[conversationId] || [];
+        if (messages.some(m => m.id === newMessage.id)) return state;
 
-        // 2. Update lastMessage di daftar percakapan
-        const updatedConversations = s.conversations.map(conv => {
-          if (conv.id === conversationId) {
-            return { ...conv, lastMessage: newMsg };
-          }
-          return conv;
-        });
+        const updatedConversations = state.conversations.map(c => 
+          c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage) } : c
+        );
 
         return {
-          messages: { ...s.messages, [conversationId]: updatedMessages },
-          conversations: sortConversations(updatedConversations), // Urutkan ulang
+          messages: { ...state.messages, [conversationId]: [...messages, newMessage] },
+          conversations: sortConversations(updatedConversations),
         };
       });
     });
 
-    socket.on("typing:update", ({ userId, conversationId, isTyping }) => {
-      if (conversationId !== get().activeId) return;
+    socket.on("conversation:deleted", ({ id }) => {
+      console.log("[Socket Event] conversation:deleted", id);
+      set(state => ({
+        conversations: state.conversations.filter(c => c.id !== id),
+        activeId: state.activeId === id ? null : state.activeId,
+      }));
+    });
 
-      set((s) => {
-        const currentTyping = s.typing[conversationId] || [];
-        const userIndex = currentTyping.indexOf(userId);
-
-        if (isTyping && userIndex === -1) {
-          // Tambah user ke daftar typing
-          return { ...s, typing: { ...s.typing, [conversationId]: [...currentTyping, userId] } };
-        } else if (!isTyping && userIndex !== -1) {
-          // Hapus user dari daftar typing
-          const newTyping = [...currentTyping];
-          newTyping.splice(userIndex, 1);
-          return { ...s, typing: { ...s.typing, [conversationId]: newTyping } };
+    socket.on("message:deleted", ({ messageId, conversationId }) => {
+      console.log("[Socket Event] message:deleted", { messageId, conversationId });
+      set(state => {
+        const messages = state.messages[conversationId] || [];
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: messages.map(m => m.id === messageId ? { ...m, content: "[This message was deleted]", fileUrl: undefined, imageUrl: undefined, reactions: [] } : m)
+          }
         }
-        return s; // Tidak ada perubahan
       });
     });
 
     socket.on("reaction:new", (reaction) => {
-      set((s) => {
-        const { messageId } = reaction;
-        const conversationId = Object.keys(s.messages).find(cid => s.messages[cid].some(m => m.id === messageId));
-        if (!conversationId) return s;
-
-        const updatedMessages = s.messages[conversationId].map(m => {
-          if (m.id === messageId) {
-            const newReactions = [...(m.reactions || []), { id: reaction.id, emoji: reaction.emoji, userId: reaction.userId }];
-            return { ...m, reactions: newReactions };
+      console.log("[Socket Event] reaction:new", reaction);
+      set(state => {
+        const { messageId, conversationId } = reaction;
+        const messages = state.messages[conversationId] || [];
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: messages.map(m => m.id === messageId ? { ...m, reactions: [...(m.reactions || []), reaction] } : m)
           }
-          return m;
-        });
-        return { ...s, messages: { ...s.messages, [conversationId]: updatedMessages } };
+        }
       });
     });
 
-    socket.on("message:deleted", ({ messageId, conversationId }) => {
-      set((s) => {
-        if (!s.messages[conversationId]) return s;
-
-        const updatedMessages = s.messages[conversationId].map(m => {
-          if (m.id === messageId) {
-            return {
-              ...m,
-              content: "[This message was deleted]",
-              imageUrl: null,
-              fileUrl: null,
-              fileName: null,
-              fileSize: null,
-              fileType: null,
-              reactions: [], // Hapus juga reaksi
-            };
+    socket.on("reaction:remove", ({ reactionId, messageId, conversationId }) => {
+      console.log("[Socket Event] reaction:remove", { reactionId, messageId });
+      set(state => {
+        const messages = state.messages[conversationId] || [];
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: messages.map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m)
           }
-          return m;
-        });
-
-        return { ...s, messages: { ...s.messages, [conversationId]: updatedMessages } };
+        }
       });
     });
   },
-
-  async sendMessage(conversationId, messageData, tempId) {
-    const socket = getSocket();
-    const finalData = { ...messageData };
-
-    if (finalData.content) {
-        finalData.content = await encryptMessage(finalData.content, conversationId);
-    }
-
-    return new Promise((resolve, reject) => {
-        socket.emit(
-            "message:send",
-            { conversationId, ...finalData, tempId },
-            async (ack: { ok: boolean; msg?: Message }) => {
-                if (ack?.ok && ack.msg) {
-                    try {
-                        const decryptedContent = await decryptMessage(ack.msg.content || "", conversationId);
-                        const confirmedMsg = withPreview({ ...ack.msg, content: decryptedContent });
-
-                        set((s) => {
-                            const messages = (s.messages[conversationId] || []).map(m => 
-                                m.tempId === tempId ? confirmedMsg : m
-                            );
-                            return { messages: { ...s.messages, [conversationId]: messages } };
-                        });
-                        resolve();
-                    } catch (e) {
-                        console.error("Failed to handle message ack:", e);
-                        get().markMessageError(conversationId, tempId!);
-                        reject(e);
-                    }
-                } else {
-                    get().markMessageError(conversationId, tempId!);
-                    reject(new Error("Send failed: No ACK from server"));
-                }
-            }
-        );
-    });
-  },
-
-  addOptimisticMessage(conversationId, msg) {
-    const tempId = msg.tempId ?? Date.now();
-    const optimisticMsg: Message = withPreview({
-        ...msg,
-        id: `temp-${tempId}`,
-        tempId,
-        conversationId,
-        optimistic: true,
-        error: false,
-        createdAt: new Date().toISOString(),
-    });
-
-    set((s) => ({
-        messages: {
-            ...s.messages,
-            [conversationId]: [...(s.messages[conversationId] || []), optimisticMsg],
-        },
-    }));
-  },
-
-  markMessageError(conversationId, tempId) {
-    set((s) => ({
-        messages: {
-            ...s.messages,
-            [conversationId]: (s.messages[conversationId] || []).map((m) =>
-                m.tempId === tempId ? { ...m, error: true } : m
-            ),
-        },
-    }));
-  },
-
-  async uploadFile(conversationId, file) {
-    const toastId = toast.loading(`Uploading ${file.name}...`);
-    try {
-        const form = new FormData();
-        form.append("file", file);
-
-        // Gunakan api() wrapper yang sudah menangani CSRF
-        const { file: fileData } = await api<{ file: any }>(
-            `/api/uploads/${conversationId}/upload`,
-            { method: "POST", body: form }
-        );
-
-        toast.success("File uploaded!", { id: toastId });
-
-        // Kirim file sebagai pesan chat
-        const tempId = Date.now();
-        get().addOptimisticMessage(conversationId, {
-            senderId: "", // Akan diisi oleh server
-            fileUrl: fileData.url,
-            fileName: fileData.filename,
-            fileType: fileData.mimetype,
-            fileSize: fileData.size,
-            content: '', // FIX: Set content to empty
-        } as Message);
-
-        await get().sendMessage(conversationId, {
-            fileUrl: fileData.url,
-            fileName: fileData.filename,
-            fileType: fileData.mimetype,
-            fileSize: fileData.size,
-            content: '', // FIX: Ensure content is empty
-        }, tempId);
-
-    } catch (error: any) {
-        console.error("Upload failed:", error);
-        const errorMessage = error.details ? JSON.parse(error.details).error : error.message;
-        toast.error(`Upload failed: ${errorMessage}`, { id: toastId });
-    }
-  },
-
-  async searchUsers(q) {
-    return api(`/api/users/search?q=${encodeURIComponent(q)}`);
-  },
-
-  async startConversation(peerId) {
-    const r = await api<{ id: string }>("/api/conversations/start", {
-      method: "POST",
-      body: JSON.stringify({ peerId }),
-    });
-    await get().loadConversations();
-    return r.id;
-  },
-
-  async deleteGroup(id: string) {
-    try {
-      await api(`/api/conversations/group/${id}`, { method: 'DELETE' });
-      toast.success("Group deleted successfully");
-      // UI update will be handled by the socket event
-    } catch (error: any) {
-      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
-      toast.error(`Failed to delete group: ${errorMsg}`);
-      throw error;
-    }
-  },
-
-  async deleteConversation(id: string) {
-    try {
-      await api(`/api/conversations/${id}`, { method: 'DELETE' });
-      toast.success("Chat hidden successfully");
-      // UI update will be handled by the socket event
-    } catch (error: any) {
-      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
-      toast.error(`Failed to hide chat: ${errorMsg}`);
-      throw error;
-    }
-  },
-
-  async loadOlderMessages(conversationId) {
-    const cursor = get().cursors[conversationId];
-    if (!cursor) return;
-
-    const url = `/api/messages/${conversationId}?cursor=${encodeURIComponent(cursor)}`;
-    const res = await api<{ items: Message[]; nextCursor: string | null }>(url);
-
-    const decryptedItems = await Promise.all(
-      res.items.map(async (m) => {
-        if (!m || typeof m !== 'object' || !m.id || !m.senderId) {
-          return null;
-        }
-        try {
-          m.content = await decryptMessage(m.content || '', m.conversationId);
-          return withPreview(m);
-        } catch (err) {
-          m.content = '[Failed to decrypt message]';
-          return withPreview(m);
-        }
-      })
-    );
-    const validDecryptedItems = decryptedItems.filter(Boolean) as Message[];
-
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: [...validDecryptedItems, ...(s.messages[conversationId] || [])],
-      },
-      cursors: { ...s.cursors, [conversationId]: res.nextCursor },
-    }));
-  },
-
-  async deleteMessage(conversationId, messageId) {
-    await api(`/api/messages/${conversationId}/${messageId}`, { method: 'DELETE' });
-    // The socket event 'message:deleted' will handle the UI update
-  },
-
-  setLoading: (id, val) =>
-    set((s) => ({
-      loading: { ...s.loading, [id]: val },
-    })),
 }));

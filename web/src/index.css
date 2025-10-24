@@ -2,14 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light dark; }
-/* --- FIX LAYOUT ROOT --- */
-html, body, #root {
-  height: 100%;
-}
-body {
-  overflow: hidden;
-}
-.min-h-0 {
-  min-height: 0;
+@layer base {
+  html, body, #root {
+    @apply h-full bg-background text-text-primary;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
 }

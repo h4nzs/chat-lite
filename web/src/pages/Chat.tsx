@@ -1,136 +1,61 @@
-import ChatList from '@components/ChatList'
-import ChatWindow from '@components/ChatWindow'
-import { useChatStore } from '@store/chat'
-import { useAuthStore } from '@store/auth'
-import StartNewChat from '@components/StartNewChat'
-import { useEffect, useState } from 'react'
-import { usePushNotifications } from '@hooks/usePushNotifications'
+import ChatList from '@components/ChatList';
+import ChatWindow from '@components/ChatWindow';
+import { useChatStore } from '@store/chat';
+import { useAuthStore } from '@store/auth';
+import { useEffect } from 'react';
 
 export default function Chat() {
-  const activeId = useChatStore(s => s.activeId)
-  const conversations = useChatStore(s => s.conversations)
-  const loadConversations = useChatStore(s => s.loadConversations)
-  const logout = useAuthStore(s => s.logout)
-  const [showNewChat, setShowNewChat] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const {
+    activeId,
+    openConversation,
+    loadConversations,
+    isSidebarOpen,
+    conversations,
+  } = useChatStore();
+  const { user } = useAuthStore();
 
-  usePushNotifications()
-
-  // 📥 Load daftar percakapan
+  // Muat percakapan awal dan buka yang terakhir aktif
   useEffect(() => {
-    setLoading(true)
-    loadConversations().finally(() => setLoading(false))
-  }, [loadConversations])
-
-  // 🔄 Restore activeId dari localStorage
-  useEffect(() => {
-    if (!activeId) {
-      const saved = localStorage.getItem("activeId")
-      if (saved) {
-        useChatStore.setState({ activeId: saved })
-        useChatStore.getState().openConversation(saved)
-      }
+    if (user) {
+      loadConversations().then(() => {
+        const savedId = localStorage.getItem("activeId");
+        if (savedId) {
+          openConversation(savedId);
+        }
+      });
     }
-  }, [activeId])
+  }, [user, loadConversations, openConversation]);
 
-  // 🔥 Auto pilih conversation pertama setelah load selesai
-  useEffect(() => {
-    if (!loading) {
-      if ((!activeId || !conversations.find(c => c.id === activeId)) && conversations.length > 0) {
-        const firstId = conversations[0].id
-        useChatStore.setState({ activeId: firstId })
-        useChatStore.getState().openConversation(firstId)
-      }
+  const handleSelectConversation = (id: string) => {
+    openConversation(id);
+    if (window.innerWidth < 768) {
+      useChatStore.getState().toggleSidebar();
     }
-  }, [loading, activeId, conversations])
-
-  // ⬆️ Simpan activeId ke localStorage setiap berubah
-  useEffect(() => {
-    if (activeId) {
-      localStorage.setItem("activeId", activeId)
-    } else {
-      localStorage.removeItem("activeId")
-    }
-  }, [activeId])
+  };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* 🔝 Header */}
-      <div className="p-3 border-b flex items-center justify-between">
-        <h1 className="font-bold text-xl">💬 ChatLite</h1>
-        <button
-          onClick={() => {
-            localStorage.removeItem("activeId")
-            logout()
-          }}
-          className="text-sm text-red-500 hover:underline"
-        >
-          Logout
-        </button>
-      </div>
+    <div className="h-screen w-screen flex bg-background text-text-primary font-sans overflow-hidden">
+      {isSidebarOpen && (
+        <div onClick={() => useChatStore.getState().toggleSidebar()} className="fixed inset-0 bg-black/60 z-30 md:hidden" />
+      )}
 
-      {/* 🔽 Main Layout */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left sidebar */}
-        <div className={`border-r flex flex-col min-h-0 transition-all duration-300 ${activeId ? 'w-1/3' : 'w-full'}`}>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center gap-2 mb-3">
-              <div className="font-semibold text-lg">Chats</div>
-              <button
-                className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition"
-                onClick={() => setShowNewChat(prev => !prev)}
-                title="New Chat"
-              >
-                + New
-              </button>
-            </div>
+      <aside className={`absolute md:relative w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-surface flex flex-col border-r border-gray-800 transition-transform duration-300 ease-in-out z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <ChatList 
+          activeId={activeId} 
+          onOpen={handleSelectConversation}
+        />
+      </aside>
 
-            {showNewChat ? (
-              <StartNewChat
-                onStarted={id => {
-                  useChatStore.setState({ activeId: id })
-                  useChatStore.getState().openConversation(id)
-                  setShowNewChat(false)
-                }}
-              />
-            ) : (
-              <>
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onFocus={() => setShowNewChat(true)}
-                  />
-                </div>
-                <ChatList
-                  activeId={activeId}
-                  onOpen={(id) => {
-                    if (!id) return
-                    useChatStore.setState({ activeId: id })
-                    useChatStore.getState().openConversation(id)
-                  }}
-                />
-              </>
-            )}
+      <main className="flex-1 flex flex-col h-full">
+        {activeId && conversations.some(c => c.id === activeId) ? (
+          <ChatWindow key={activeId} id={activeId} />
+        ) : (
+          <div className="flex-1 flex-col gap-4 items-center justify-center text-text-secondary hidden md:flex">
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <p className="text-lg">Select a conversation to start messaging</p>
           </div>
-        </div>
-
-        {/* Right side */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              Loading chats...
-            </div>
-          ) : activeId ? (
-            <ChatWindow id={activeId} />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              {showNewChat ? null : 'Select a chat to start messaging'}
-            </div>
-          )}
-        </div>
-      </div>
+        )}
+      </main>
     </div>
-  )
+  );
 }

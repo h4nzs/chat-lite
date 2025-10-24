@@ -1,8 +1,43 @@
-import type { Config } from 'tailwindcss'
+import type { Config } from 'tailwindcss';
 
 export default {
-  darkMode: 'class',
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
-  theme: { extend: {} },
-  plugins: []
-} satisfies Config
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class', // Pastikan mode gelap diaktifkan
+  theme: {
+    extend: {
+      colors: {
+        background: '#181818', // Latar belakang utama
+        surface: '#1F1F1F',    // Latar belakang sidebar/panel
+        primary: '#2A2A2A',    // Latar belakang elemen sekunder (cth: bubble penerima)
+        accent: {
+          DEFAULT: '#8A2BE2', // Ungu
+          hover: '#9932CC', // Ungu lebih gelap
+        },
+        magenta: {
+          DEFAULT: '#E91E63', // Magenta
+          hover: '#C2185B', // Magenta lebih gelap
+        },
+        'text-primary': '#E0E0E0', // Teks utama
+        'text-secondary': '#A0A0A0', // Teks abu-abu (muted)
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'], // Set font default
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.3s ease-out',
+        'fade-in-up': 'fadeInUp 0.3s ease-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;
