@@ -1,153 +1,201 @@
-# Prompt Gemini — Refactor Delete Menu UI Using Radix UI (Portal-Based)
+# 🧠 Prompt Gemini — Refactor Message Action UI with Radix UI (Dropdown + Popover)
 
-You are a **senior frontend engineer** working on ChatLite (React + Tailwind + Zustand).
-The delete logic for **groups** and **private chats** already works correctly.
-Now, your task is to **refactor the delete menu UI** to use **Radix UI DropdownMenu** for proper portal rendering and clean UX.
+You are a **senior frontend developer** working on **ChatLite**, a modern chat web app built with React, Zustand, and TailwindCSS.
+
+The current in-message actions (like *Delete Message* and *React with Emoji*) sometimes get clipped by parent containers due to `overflow: hidden` or nested scrolling contexts.
+
+Your task is to refactor these interactive UI elements using **Radix UI** for better rendering, accessibility, and UX consistency.
 
 ---
 
 ## 🎯 Goals
 
-* Replace the current 3-dot ("...") menu used in the chat list with **Radix UI DropdownMenu**.
-* Ensure the dropdown renders using a **portal**, so it’s **not clipped by parent containers** with `overflow: hidden` or `overflow: auto`.
-* Keep the **delete chat** and **delete group** logic exactly as it is (no refactoring needed there).
-* Keep all styling consistent with the current design (Tailwind-based).
-* Must support:
+1. Replace current *Delete Message* and *Reaction* buttons/menus with **Radix UI components**:
 
-  * “Delete Chat” for private conversations.
-  * “Delete Group” (visible only for the creator of the group).
+   * **DropdownMenu** for message action menu (delete, reply, etc).
+   * **Popover** for emoji reaction selector.
+2. Ensure all menus are rendered in a **portal**, unaffected by container overflow.
+3. Keep all business logic (delete message, reaction events, etc.) **unchanged**.
+4. Maintain consistent styling (dark theme, rounded UI, Tailwind-based).
 
 ---
 
 ## 🧱 Implementation Details
 
-### 1. Install Radix UI (if not already installed)
+### 1. Install Radix UI (if not already)
 
 ```bash
-npm install @radix-ui/react-dropdown-menu
+npm install @radix-ui/react-dropdown-menu @radix-ui/react-popover
 ```
 
 ---
 
-### 2. Refactor ChatListItem Menu Component
+### 2. Refactor Message Action Menu (Delete Message)
 
-Target component: `ChatListItem.tsx` (or wherever the 3-dot menu lives)
+Target component: `MessageItem.tsx` (or wherever each chat bubble renders)
 
-Replace your current menu implementation with **Radix UI DropdownMenu** like this:
+Replace the existing action button or menu with a **Radix DropdownMenu**, like this:
 
 ```tsx
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { EllipsisVerticalIcon } from 'lucide-react'
+import { EllipsisVerticalIcon, TrashIcon, SmileIcon } from 'lucide-react'
 
-export function ChatListItem({ chat, currentUser, handleDeleteChat, handleDeleteGroup }) {
+export function MessageActions({ message, onDelete, onReact }) {
   return (
-    <div className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-xl transition">
-      <div className="flex items-center gap-3">
-        <img
-          src={chat.avatarUrl || '/default-avatar.png'}
-          className="w-10 h-10 rounded-full"
-        />
-        <div className="flex flex-col">
-          <span className="font-medium text-white">{chat.name}</span>
-          <span className="text-xs text-gray-400 truncate w-48">{chat.lastMessage}</span>
-        </div>
-      </div>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button className="p-1 rounded-full hover:bg-neutral-700 transition">
+          <EllipsisVerticalIcon className="w-4 h-4 text-gray-400" />
+        </button>
+      </DropdownMenu.Trigger>
 
-      {/* Radix UI Dropdown */}
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger asChild>
-          <button className="p-2 rounded-full hover:bg-neutral-700 transition">
-            <EllipsisVerticalIcon className="w-5 h-5 text-gray-400" />
-          </button>
-        </DropdownMenu.Trigger>
-
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            align="end"
-            sideOffset={6}
-            className="min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl p-1 z-[9999]"
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          className="min-w-[130px] bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl p-1 z-[9999]"
+        >
+          <DropdownMenu.Item
+            onClick={() => onReact(message.id)}
+            className="flex items-center gap-2 text-sm text-gray-300 rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
           >
-            {chat.type === 'group' && chat.creatorId === currentUser.id && (
-              <DropdownMenu.Item
-                onClick={() => handleDeleteGroup(chat.id)}
-                className="text-red-500 text-sm rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
-              >
-                Delete Group
-              </DropdownMenu.Item>
-            )}
-            {chat.type === 'direct' && (
-              <DropdownMenu.Item
-                onClick={() => handleDeleteChat(chat.id)}
-                className="text-red-400 text-sm rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
-              >
-                Delete Chat
-              </DropdownMenu.Item>
-            )}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
-    </div>
+            <SmileIcon className="w-4 h-4 text-yellow-400" /> React
+          </DropdownMenu.Item>
+
+          <DropdownMenu.Item
+            onClick={() => onDelete(message.id)}
+            className="flex items-center gap-2 text-sm text-red-400 rounded-md px-3 py-2 hover:bg-neutral-800 cursor-pointer"
+          >
+            <TrashIcon className="w-4 h-4" /> Delete
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  )
+}
+```
+
+Use this inside your `MessageItem`:
+
+```tsx
+<div className="group relative">
+  {/* message bubble */}
+  <div className="max-w-xs bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl px-3 py-2">
+    {message.content}
+  </div>
+
+  {/* show actions on hover */}
+  <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition">
+    <MessageActions message={message} onDelete={handleDelete} onReact={openReactionPicker} />
+  </div>
+</div>
+```
+
+---
+
+### 3. Refactor Reaction Picker with **Radix Popover**
+
+If you already have a reaction system (e.g. emoji picker modal or overlay), replace it with **Radix Popover**.
+
+Example:
+
+```tsx
+import * as Popover from '@radix-ui/react-popover'
+
+export function ReactionPopover({ message, onSelectReaction }) {
+  const reactions = ['👍', '❤️', '😂', '🔥', '😮', '😢']
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button className="p-1 rounded-full hover:bg-neutral-700 transition">
+          <SmileIcon className="w-4 h-4 text-gray-300" />
+        </button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          sideOffset={8}
+          className="flex gap-2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-2 shadow-lg z-[9999]"
+        >
+          {reactions.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => onSelectReaction(message.id, emoji)}
+              className="text-lg hover:scale-110 transition-transform"
+            >
+              {emoji}
+            </button>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }
 ```
 
 ---
 
-### 3. Behavior Requirements
+### 4. Behavior Requirements
 
-✅ The dropdown menu must:
+✅ Both Dropdown and Popover menus:
 
-* Open smoothly and position correctly near the trigger.
-* Render inside a portal (not inside overflow containers).
-* Close automatically after clicking a menu item.
-* Maintain consistent theming (dark mode, rounded corners, subtle shadows).
+* Render above all containers (portal behavior).
+* Have smooth open/close transitions.
+* Close automatically on action click.
+* No overflow clipping, no z-index conflicts.
+* Maintain dark theme and rounded Tailwind styling.
 
-✅ The delete logic remains untouched:
+✅ Reaction logic:
 
-* `handleDeleteChat(chat.id)`
-* `handleDeleteGroup(chat.id)`
+* Calls existing `onSelectReaction()` or socket event.
+* Emoji reactions should appear inline (below the message bubble) once added.
 
-✅ No layout reflow or console errors.
+✅ Delete message:
+
+* Calls existing delete logic.
+* If deleted, message should change to `"This message was deleted"` without needing a refresh.
 
 ---
 
-### 4. Optional Enhancement
+### 5. Optional Enhancement
 
-Add small animations for the dropdown (Radix supports `motion` props or use Framer Motion if already included):
+Add subtle fade/scale animations using Tailwind data attributes:
 
-```tsx
-<DropdownMenu.Content
-  align="end"
-  sideOffset={6}
-  className="min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl p-1 z-[9999] data-[state=open]:animate-in data-[state=closed]:animate-out"
->
+```css
+[data-state='open'] {
+  animation: fadeIn 0.15s ease;
+}
+[data-state='closed'] {
+  animation: fadeOut 0.1s ease;
+}
 ```
 
 ---
 
-## 🧩 Deliverables
+### 🧩 Deliverables
 
 Gemini should:
 
-1. Install and configure Radix UI.
-2. Refactor the delete menu using `DropdownMenu.Root`, `Trigger`, `Portal`, and `Content`.
-3. Keep existing delete logic intact.
-4. Ensure full visual + functional consistency.
-5. Verify the dropdown never gets clipped and closes correctly after action.
+1. Install and configure `@radix-ui/react-dropdown-menu` and `@radix-ui/react-popover`.
+2. Refactor message action menus and emoji reaction UI.
+3. Ensure proper portal rendering and no layout clipping.
+4. Keep delete and reaction logic unchanged.
+5. Maintain consistent dark-mode UI and minimal animation.
 
 ---
 
-## ✅ Acceptance Criteria
+### ✅ Acceptance Criteria
 
-* Menu shows correctly on click.
-* No visual clipping / overflow issues.
-* Menu closes properly after clicking.
-* Delete chat/group still works exactly the same.
-* Compatible with Tailwind dark theme.
-* No side effects on other components.
+* Message action menu (3 dots) and emoji picker render above overflow containers.
+* Delete message works normally and updates in real-time.
+* Emoji reaction menu appears in correct position, responsive, and intuitive.
+* No interference with chat scroll, message layout, or socket events.
+* Smooth UX with consistent design.
 
 ---
 
-> 💡 Bonus (optional): If Gemini detects other dropdowns or action menus in the project, it can suggest migrating them to Radix UI for consistency and long-term maintainability.
+> 💡 Bonus task: If Gemini detects other in-bubble context menus or attachment menus, it can also migrate them to Radix UI for full consistency.
 
 ---
