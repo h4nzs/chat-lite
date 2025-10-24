@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ApiError } from "../utils/errors.js";
 import { io } from "../socket.js";
+import fs from "fs/promises";
+import path from "path";
 
 const router = Router();
 
@@ -54,11 +56,24 @@ router.delete("/:messageId", requireAuth, async (req, res, next) => {
 
     const message = await prisma.message.findFirst({
       where: { id: messageId, senderId: userId },
-      select: { conversationId: true },
+      select: { conversationId: true, fileUrl: true, imageUrl: true },
     });
 
     if (!message) {
       throw new ApiError(404, "Message not found or you do not have permission to delete it");
+    }
+
+    // Hapus file fisik jika ada
+    const urlToDelete = message.fileUrl || message.imageUrl;
+    if (urlToDelete) {
+      try {
+        const filePath = path.join(process.cwd(), 'uploads', path.basename(urlToDelete));
+        await fs.unlink(filePath);
+      } catch (fileError: any) {
+        if (fileError.code !== 'ENOENT') {
+          console.error(`Failed to delete file: ${urlToDelete}`, fileError);
+        }
+      }
     }
 
     await prisma.message.delete({ where: { id: messageId } });

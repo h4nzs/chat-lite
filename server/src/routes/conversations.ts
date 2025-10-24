@@ -2,7 +2,9 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { io } from "../socket.js";
-import { ApiError } from "../utils/errors.js"; // Impor ApiError
+import { ApiError } from "../utils/errors.js";
+import fs from "fs/promises";
+import path from "path"; // Impor path // Impor ApiError
 
 const router = Router();
 
@@ -325,6 +327,28 @@ router.delete("/group/:id", requireAuth, async (req, res, next) => {
 
     if (!conversation) {
       return next(new ApiError(403, "Group not found or you are not the creator."));
+    }
+
+    // Ambil semua pesan untuk menghapus file terkait
+    const messagesToDelete = await prisma.message.findMany({
+      where: { conversationId: id },
+      select: { fileUrl: true, imageUrl: true },
+    });
+
+    // Hapus file fisik dari server
+    for (const msg of messagesToDelete) {
+      const url = msg.fileUrl || msg.imageUrl;
+      if (url) {
+        try {
+          const filePath = path.join(process.cwd(), 'uploads', path.basename(url));
+          await fs.unlink(filePath);
+        } catch (fileError: any) {
+          // Abaikan error jika file tidak ditemukan, tapi log error lainnya
+          if (fileError.code !== 'ENOENT') {
+            console.error(`Failed to delete file: ${url}`, fileError);
+          }
+        }
+      }
     }
 
     // Hapus semua relasi dan percakapan
