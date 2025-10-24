@@ -51,6 +51,7 @@ type State = {
   toggleSidebar: () => void;
   searchUsers: (q: string) => Promise<any[]>;
   startConversation: (peerId: string) => Promise<string>;
+  uploadFile: (conversationId: string, file: File) => Promise<void>; // Tambahkan ini
   initSocketListeners: () => void;
   loadMessagesForConversation: (id: string) => Promise<void>;
 };
@@ -152,6 +153,33 @@ export const useChatStore = create<State>((set, get) => ({
       isSidebarOpen: false,
     }));
     return conv.id;
+  },
+
+  uploadFile: async (conversationId, file) => {
+    const toastId = toast.loading(`Uploading ${file.name}...`);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const { file: fileData } = await api<{ file: any }>(
+        `/api/uploads/${conversationId}/upload`,
+        { method: "POST", body: form }
+      );
+
+      toast.success("File uploaded!", { id: toastId });
+
+      get().sendMessage(conversationId, {
+        fileUrl: fileData.url,
+        fileName: fileData.filename,
+        fileType: fileData.mimetype,
+        fileSize: fileData.size,
+        content: '',
+      });
+
+    } catch (error: any) {
+      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
+      toast.error(`Upload failed: ${errorMsg}`, { id: toastId });
+    }
   },
 
   loadMessagesForConversation: async (id: string) => {

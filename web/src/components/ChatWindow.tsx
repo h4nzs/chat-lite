@@ -6,7 +6,7 @@ import { FixedSizeList as List } from "react-window";
 import AutoSizer from "react-virtualized-auto-sizer";
 import MessageItem from "@components/MessageItem";
 
-// --- Komponen Terpisah untuk menjaga kebersihan --- 
+// --- Komponen Terpisah --- 
 
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
@@ -29,8 +29,9 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
   );
 };
 
-const MessageInput = ({ onSend, onTyping }: { onSend: (text: string) => void; onTyping: () => void; }) => {
+const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: string) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +48,15 @@ const MessageInput = ({ onSend, onTyping }: { onSend: (text: string) => void; on
   return (
     <div className="p-4 border-t border-gray-800">
       <form onSubmit={handleSubmit} className="flex items-center gap-3">
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <input 
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={onFileChange}
+        />
         <input 
           type="text" 
           value={text} 
@@ -62,7 +72,6 @@ const MessageInput = ({ onSend, onTyping }: { onSend: (text: string) => void; on
   );
 };
 
-// --- Komponen Utama --- 
 
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
@@ -72,6 +81,7 @@ export default function ChatWindow({ id }: { id: string }) {
     conversations,
     typing,
     loadMessagesForConversation,
+    uploadFile, // Ambil fungsi uploadFile dari store
   } = useChatStore();
 
   const conversation = conversations.find(c => c.id === id);
@@ -107,6 +117,14 @@ export default function ChatWindow({ id }: { id: string }) {
     getSocket().emit("typing:stop", { conversationId: id });
   };
 
+  // Kembalikan logika handleFileChange
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && id) {
+      const file = e.target.files[0];
+      uploadFile(id, file);
+    }
+  };
+
   if (!conversation) {
     return <div className="flex-1 flex items-center justify-center text-text-secondary"><p>Loading conversation...</p></div>;
   }
@@ -121,7 +139,7 @@ export default function ChatWindow({ id }: { id: string }) {
               ref={listRef}
               height={height}
               itemCount={activeMessages.length}
-              itemSize={120} // Estimasi tinggi, bisa disesuaikan
+              itemSize={120}
               width={width}
             >
               {({ index, style }) => (
@@ -143,7 +161,7 @@ export default function ChatWindow({ id }: { id: string }) {
            </div>
         )}
       </div>
-      <MessageInput onSend={handleSendMessage} onTyping={handleTyping} />
+      <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
     </div>
   );
 }
