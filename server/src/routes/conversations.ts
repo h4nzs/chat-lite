@@ -25,7 +25,12 @@ router.get("/", requireAuth, async (req, res, next) => {
           },
         },
       },
-      include: {
+      select: {
+        id: true,
+        isGroup: true,
+        title: true,
+        creatorId: true,
+        updatedAt: true,
         participants: {
           include: {
             user: {
@@ -40,7 +45,7 @@ router.get("/", requireAuth, async (req, res, next) => {
         },
         messages: {
           orderBy: { createdAt: "desc" },
-          take: 1, // hanya ambil pesan terakhir
+          take: 1,
         },
       },
     });
