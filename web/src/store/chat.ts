@@ -250,27 +250,48 @@ export const useChatStore = create<State>((set, get) => ({
     socket.on("reaction:new", (reaction) => {
       console.log("[Socket Event] reaction:new", reaction);
       set(state => {
-        const { messageId, conversationId } = reaction;
-        const messages = state.messages[conversationId] || [];
-        return {
-          messages: {
-            ...state.messages,
-            [conversationId]: messages.map(m => m.id === messageId ? { ...m, reactions: [...(m.reactions || []), reaction] } : m)
+        let conversationId: string | undefined;
+        for (const cid in state.messages) {
+          if (state.messages[cid].some(m => m.id === reaction.messageId)) {
+            conversationId = cid;
+            break;
           }
         }
+        if (!conversationId) return state;
+
+        const updatedMessages = state.messages[conversationId].map(m => {
+          if (m.id === reaction.messageId) {
+            const newReactions = [...(m.reactions || []), reaction];
+            return { ...m, reactions: newReactions };
+          }
+          return m;
+        });
+
+        return { ...state, messages: { ...state.messages, [conversationId]: updatedMessages } };
       });
     });
 
-    socket.on("reaction:remove", ({ reactionId, messageId, conversationId }) => {
+    socket.on("reaction:remove", ({ reactionId, messageId }) => {
       console.log("[Socket Event] reaction:remove", { reactionId, messageId });
       set(state => {
-        const messages = state.messages[conversationId] || [];
-        return {
-          messages: {
-            ...state.messages,
-            [conversationId]: messages.map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m)
+        let conversationId: string | undefined;
+        for (const cid in state.messages) {
+          if (state.messages[cid].some(m => m.id === messageId)) {
+            conversationId = cid;
+            break;
           }
         }
+        if (!conversationId) return state;
+
+        const updatedMessages = state.messages[conversationId].map(m => {
+          if (m.id === messageId) {
+            const newReactions = (m.reactions || []).filter(r => r.id !== reactionId);
+            return { ...m, reactions: newReactions };
+          }
+          return m;
+        });
+
+        return { ...state, messages: { ...state.messages, [conversationId]: updatedMessages } };
       });
     });
   },
