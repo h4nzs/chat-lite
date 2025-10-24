@@ -26,6 +26,17 @@ export default function Chat() {
     }
   }, [user, loadConversations, openConversation]);
 
+  // Cek jika activeId valid, jika tidak, reset dan buka sidebar
+  useEffect(() => {
+    if (activeId && conversations.length > 0) {
+      const conversationExists = conversations.some(c => c.id === activeId);
+      if (!conversationExists) {
+        useChatStore.setState({ activeId: null, isSidebarOpen: true });
+        localStorage.removeItem("activeId");
+      }
+    }
+  }, [activeId, conversations]);
+
   const handleSelectConversation = (id: string) => {
     openConversation(id);
     if (window.innerWidth < 768) {

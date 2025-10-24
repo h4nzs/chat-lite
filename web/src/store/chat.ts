@@ -214,10 +214,20 @@ export const useChatStore = create<State>((set, get) => ({
     });
 
     socket.on("conversation:deleted", ({ id }) => {
-      set(state => ({
-        conversations: state.conversations.filter(c => c.id !== id),
-        activeId: state.activeId === id ? null : state.activeId,
-      }));
+      set(state => {
+        const wasActive = state.activeId === id;
+        if (wasActive) {
+          localStorage.removeItem("activeId");
+          return {
+            conversations: state.conversations.filter(c => c.id !== id),
+            activeId: null,
+            isSidebarOpen: true // Force sidebar open
+          };
+        }
+        return {
+          conversations: state.conversations.filter(c => c.id !== id)
+        };
+      });
     });
 
     socket.on("message:deleted", ({ messageId, conversationId }) => {

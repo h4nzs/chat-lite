@@ -1,160 +1,176 @@
-# Chat-Lite Fixes Summary
+# Peta Alur Data & Analisis Logika Chat-Lite
 
-## Issues Addressed
+Dokumen ini adalah analisis mendalam mengenai alur data, event socket, dan interaksi komponen dalam aplikasi Chat-Lite, sesuai dengan instruksi lanjutan.
 
-### 1. Blank Screen and Invalid Message Rendering (Fixed)
-- **Problem**: Blank screen occurring when invalid message objects were processed
-- **Root Cause**: Some message objects were undefined or missing required fields (`id`, `senderId`, `content`)
-- **Solution Implemented**: 
-  - Added validation in `web/src/components/MessageBubble.tsx`
-  - Added validation in all message processing functions in `web/src/store/chat.ts`
+---
 
-### 2. Socket Authentication Cookie Parsing (Fixed)
-- **Problem**: Vulnerable cookie parsing in `server/src/socket.ts`
-- **Root Cause**: Manual string splitting was susceptible to injection attacks
-- **Solution Implemented**: 
-  - Used proper `cookie` library for safe parsing
-  - Replaced manual string splitting with `cookie.parse()`
+### 1. Peta Alur Data Utama (Data Flow)
 
-### 3. Missing Message Validation (Fixed)
-- **Problem**: Invalid messages causing runtime crashes in message processing
-- **Root Cause**: No validation before processing message objects
-- **Solution Implemented**: 
-  - Added validation in socket "message:new" handler
-  - Added validation in `openConversation`, `loadOlderMessages`, and `sendMessage` functions
-  - Messages with missing `id` or `senderId` are now skipped with warnings
+Berikut adalah pemetaan alur untuk setiap fitur utama, dari aksi pengguna hingga pembaruan UI.
 
-### 4. Message Disappearing After Render (Fixed)
-- **Problem**: Messages appear briefly then disappear
-- **Root Cause**: Message store (Zustand) was being overwritten after socket updates
-- **Solution Implemented**: 
-  - Added `mergeMessages` function to safely merge new messages with existing ones
-  - Updated `openConversation`, `loadOlderMessages`, and socket handlers to use merge approach
-  - Ensured socket updates don't overwrite existing messages
+**➡️ Autentikasi (Login/Register)**
+*   **Jenis:** REST API (Sinkron)
+*   **Alur:**
+    1.  `[User Action]` User mengisi form di `AuthForm.tsx`.
+    2.  `[Frontend Component]` Memanggil `login()` atau `register()` dari `useAuthStore`.
+    3.  `[API Event]` `authFetch` mengirim request `POST` ke `/api/auth/login` atau `/api/auth/register`.
+    4.  `[Backend Logic]` Server memvalidasi data, membuat/memeriksa user di DB, membuat JWT.
+    5.  `[Database]` `SELECT` atau `INSERT` ke tabel `User`.
+    6.  `[API Response]` Server mengirim kembali data user dan menyetel cookie `at` & `rt`.
+    7.  `[State Update]` `useAuthStore` menyimpan data user, memanggil `ensureSocket()` untuk memulai koneksi socket.
 
-### 5. XSS Protection (Fixed)
-- **Problem**: Message content not sanitized before storage/display
-- **Root Cause**: Potential stored XSS attacks through malicious message content
-- **Solution Implemented**: 
-  - Added content sanitization using `xss` library on the server side
-  - Updated `MessageBubble` component to prevent XSS in rendering
+**📨 Pengiriman & Penerimaan Pesan**
+*   **Jenis:** WebSocket (Asinkron) dengan UI Optimistis
+*   **Alur:**
+    1.  `[User Action]` User mengetik pesan dan menekan "kirim" di `ChatWindow.tsx`.
+    2.  `[Frontend Component]` Memanggil `sendMessage()` dari `useChatStore`.
+    3.  `[State Update (Optimistic)]` `useChatStore` langsung menambahkan pesan sementara ke state `messages`. UI langsung di-update.
+    4.  `[Socket Event]` `socket.emit('message:send', payload, ackCallback)`.
+    5.  `[Backend Logic]` Server menerima event `message:send`, membersihkan input (`xss`), dan menyimpan pesan.
+    6.  `[Database]` `INSERT` ke tabel `Message`.
+    7.  `[Socket Broadcast]` `io.to(conversationId).emit('message:new', messageData)`.
+    8.  `[Client Update]`
+        *   **Pengirim:** `ackCallback` dari server diterima, `useChatStore` mengganti pesan sementara dengan data pesan asli dari server.
+        *   **Penerima:** Event `message:new` diterima, `useChatStore` menambahkan pesan baru ke state `messages`, UI di-update.
 
-## Code Changes Summary
+**📎 File Attachment**
+*   **Jenis:** Hybrid (REST API untuk upload, WebSocket untuk pesan)
+*   **Alur:**
+    1.  `[User Action]` User memilih file di `ChatWindow.tsx`.
+    2.  `[Frontend Component]` Memanggil `uploadFile()` dari `useChatStore`.
+    3.  `[API Event]` `authFetch` mengirim `POST` request dengan `FormData` ke `/api/uploads/:conversationId/upload`.
+    4.  `[Backend Logic]` Middleware `multer` memproses dan menyimpan file di server.
+    5.  `[API Response]` Server mengembalikan URL dan metadata file.
+    6.  `[State Update]` Fungsi `uploadFile` kemudian memanggil `sendMessage()` dengan data file (URL, nama, tipe), yang mengikuti alur "Pengiriman Pesan" di atas.
 
-### Frontend (`web/src/store/chat.ts`):
-1. **Added `mergeMessages` helper function**:
-   ```typescript
-   function mergeMessages(existing: Message[], incoming: Message[]): Message[] {
-     const merged = [...existing];
-     
-     for (const m of incoming ?? []) {
-       if (!m?.id) continue;
-       m.content = normalizeMessageContent(m.content);
-       
-       if (!merged.find((x) => x.id === m.id)) merged.push(m);
-     }
-     
-     merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-     
-     return merged;
-   }
-   ```
+**⌨️ Typing Indicator**
+*   **Jenis:** WebSocket (Real-time)
+*   **Alur:**
+    1.  `[User Action]` User mulai mengetik di `ChatWindow.tsx`.
+    2.  `[Socket Event]` `socket.emit('typing:start', { conversationId })`.
+    3.  `[Backend Logic]` Server menerima `typing:start`.
+    4.  `[Socket Broadcast]` `socket.to(conversationId).emit('typing:update', { userId, isTyping: true })`.
+    5.  `[Client Update]` Semua klien di room menerima `typing:update`, `useChatStore` memperbarui state `typing`, `TypingIndicator.tsx` menampilkan notifikasi.
+    6.  Proses serupa terjadi untuk `typing:stop`.
 
-2. **Updated `openConversation` function**:
-   - Replaced message replacement with merge approach
-   - Added validation for message objects before processing
-   - Preserved existing messages when loading new data
+**🟢 Status Online/Offline**
+*   **Jenis:** WebSocket (Real-time)
+*   **Alur:**
+    1.  `[User Action]` User membuka aplikasi (terhubung) atau menutupnya (terputus).
+    2.  `[Socket Event]` Klien terhubung ke server socket.
+    3.  `[Backend Logic]` Server `io.on('connection')` aktif, `userId` ditambahkan ke `onlineUsers` (Set).
+    4.  `[Socket Broadcast]` `io.emit('presence:update', Array.from(onlineUsers))`. **Catatan: Seluruh daftar dikirim ke semua klien.**
+    5.  `[Client Update]` Semua klien menerima daftar `onlineUserIds`, `useChatStore` memperbarui state `presence`, UI (misalnya `OnlineDot.tsx`) di-update.
+    6.  Proses serupa terjadi saat `disconnect`.
 
-3. **Updated socket "message:new" handler**:
-   - Added validation for incoming messages
-   - Used merge approach instead of replacement
-   - Added proper error handling and logging
+---
 
-4. **Updated `loadOlderMessages` function**:
-   - Added validation for message objects
-   - Used merge approach for appending older messages
-   - Preserved existing messages when loading new data
+### 2. Peta Event Socket.IO
 
-5. **Updated `sendMessage` function**:
-   - Added validation for message acknowledgments
-   - Used merge approach for updating messages
-   - Improved error handling
+**Client → Server:**
+*   `conversation:join` (conversationId: string): Meminta untuk bergabung ke room percakapan agar bisa menerima pesan.
+*   `message:send` (data: object, cb: function): Mengirim pesan baru. Menggunakan callback untuk acknowledgment.
+*   `typing:start` ({ conversationId }): Memberi tahu server bahwa user mulai mengetik.
+*   `typing:stop` ({ conversationId }): Memberi tahu server bahwa user berhenti mengetik.
+*   `push:subscribe` (data: object): Mengirim detail langganan push notification untuk disimpan.
 
-### Frontend (`web/src/components/MessageBubble.tsx`):
-1. **Added validation at component level**:
-   ```typescript
-   if (!m || !m.id || typeof m.content !== "string") {
-     console.warn('Invalid message render skipped:', m)
-     return null
-   }
-   ```
+**Server → Client:**
+*   `presence:update` (onlineUserIds: string[]): Broadcast daftar lengkap ID user yang sedang online.
+*   `typing:update` ({ userId, conversationId, isTyping }): Broadcast status mengetik seorang user ke anggota percakapan lain.
+*   `message:new` (newMessage: Message): Broadcast pesan baru ke semua anggota percakapan.
+*   `conversation:new` (newConversation: Conversation): Broadcast saat percakapan baru dibuat (misalnya setelah `startConversation`).
+*   `conversation:deleted` ({ id }): Memberi tahu klien bahwa sebuah percakapan telah dihapus.
+*   `message:deleted` ({ messageId, conversationId }): Memberi tahu klien bahwa sebuah pesan telah dihapus (kontennya disembunyikan).
+*   `reaction:new` (reaction: object): Broadcast reaksi baru pada sebuah pesan.
+*   `reaction:remove` ({ reactionId, messageId }): Broadcast bahwa sebuah reaksi telah dihapus.
 
-2. **Removed `dangerouslySetInnerHTML`**:
-   - Replaced with safe content rendering
-   - Added proper XSS protection
+---
 
-### Backend (`server/src/socket.ts`):
-1. **Updated cookie parsing**:
-   ```typescript
-   import cookie from 'cookie';
-   
-   // Safe cookie parsing
-   if (socket.handshake.headers?.cookie) {
-     const cookies = cookie.parse(socket.handshake.headers.cookie);
-     token = cookies["at"] || null;
-   }
-   ```
+### 3. Hubungan Antar Komponen (Frontend)
 
-2. **Added message content sanitization**:
-   ```typescript
-   import xss from 'xss';
-   
-   // Sanitize content before storing
-   const sanitizedContent = data.content ? xss(data.content) : null;
-   ```
+```
+<App>
+ └── <BrowserRouter>
+      └── <Routes>
+           ├── <ProtectedRoute> → <Chat>
+           │    ├── <ChatList>
+           │    │    ├── <StartNewChat />
+           │    │    └── <ChatItem /> (dipetakan dari state.conversations)
+           │    └── <ChatWindow>
+           │         ├── (Header Percakapan)
+           │         ├── <Virtuoso (MessageList)>
+           │         │    └── <MessageItem /> (dipetakan dari state.messages)
+           │         ├── <TypingIndicator />
+           │         └── (Form Input Pesan)
+           ├── <Login />
+           │    └── <AuthForm />
+           └── <Register />
+                └── <AuthForm />
+```
 
-3. **Added JSON serialization**:
-   ```typescript
-   // Serialize to ensure Prisma result is properly formatted
-   const broadcastData = JSON.parse(JSON.stringify({
-     ...newMessage,
-     tempId: data.tempId,
-   }));
-   ```
+**Penjelasan:**
+*   **Komponen Kontainer:** `Chat.tsx` adalah komponen utama yang mengatur layout dan mengambil data awal.
+*   **Ketergantungan State Global (Zustand):**
+    *   Hampir semua komponen "pintar" bergantung pada `useChatStore` dan `useAuthStore`.
+    *   `ChatList` membaca `conversations` dan `presence`.
+    *   `ChatWindow` membaca `messages`, `typing`, dan `activeId`.
+    *   `ChatItem` dan `MessageItem` adalah komponen presentasional yang menerima data melalui props.
+*   **State Lokal:** Sebagian besar state dikelola secara global oleh Zustand. State lokal hanya digunakan untuk hal-hal sederhana seperti input form sebelum dikirim ke store (misalnya di `AuthForm` atau form input pesan).
+*   **Alur Interaksi:**
+    1.  `ChatList` → `useChatStore.openConversation(id)` → mengubah `activeId`.
+    2.  Perubahan `activeId` dideteksi oleh `ChatWindow`, yang kemudian memuat dan menampilkan pesan yang sesuai dari state.
 
-## Verification Steps Completed
+---
 
-1. ✅ **Messages appear instantly** when sent between users
-2. ✅ **Messages remain visible** after render without disappearing
-3. ✅ **No more blank screens** when encountering invalid messages
-4. ✅ **Socket authentication** works with safe cookie parsing
-5. ✅ **Message content** is properly sanitized to prevent XSS
-6. ✅ **Existing messages** are preserved when loading new data
-7. ✅ **Console shows warnings** for invalid messages instead of crashes
-8. ✅ **Application remains responsive** even with malformed data
+### 4. Integrasi API & Backend Logic
 
-## Remaining Security Issues
+Berikut adalah beberapa endpoint REST API utama:
 
-While the immediate message disappearance issue has been fixed, several security vulnerabilities still need to be addressed:
+*   `GET /api/csrf-token`:
+    *   **Tujuan:** Memberikan token CSRF ke klien. Penting untuk keamanan.
+    *   **Middleware:** `csrfProtection`.
+*   `POST /api/auth/login`:
+    *   **Tujuan:** Mengautentikasi pengguna, mengembalikan data user & set cookie JWT.
+*   `POST /api/auth/register`:
+    *   **Tujuan:** Mendaftarkan pengguna baru.
+*   `POST /api/auth/logout`:
+    *   **Tujuan:** Menghapus refresh token dari database.
+*   `GET /api/users/me`:
+    *   **Tujuan:** Mendapatkan data pengguna yang sedang login.
+    *   **Middleware:** `auth` (verifikasi JWT).
+*   `GET /api/conversations`:
+    *   **Tujuan:** Mengambil semua percakapan milik pengguna.
+    *   **Middleware:** `auth`.
+*   `POST /api/conversations/start`:
+    *   **Tujuan:** Memulai percakapan baru dengan pengguna lain.
+    *   **Middleware:** `auth`.
+*   `GET /api/messages/:conversationId`:
+    *   **Tujuan:** Mengambil riwayat pesan untuk sebuah percakapan.
+    *   **Middleware:** `auth`.
+*   `POST /api/uploads/:conversationId/upload`:
+    *   **Tujuan:** Mengunggah file.
+    *   **Middleware:** `auth`, `multer`.
+*   `POST /api/keys/public`:
+    *   **Tujuan:** Menyimpan kunci publik E2EE milik pengguna.
+    *   **Middleware:** `auth`.
 
-1. **Cookie Security Configuration** - SameSite attribute should be set to "strict"
-2. **CSRF Protection** - CSRF tokens should be implemented
-3. **File Upload Security** - Path traversal protection for uploads
-4. **Key Storage Security** - More secure storage for encryption keys
-5. **Cache Management** - Size limits to prevent memory leaks
+---
 
-These security improvements should be implemented in a subsequent phase to make the application production-ready.
+### 5. Temuan & Insight
 
-## Testing Results
+*   **Fitur Sinkron (✅):**
+    *   Pengiriman/penerimaan pesan, indikator pengetikan, dan status online berfungsi secara real-time dan sinkron.
+    *   Alur autentikasi dan manajemen sesi sudah solid.
+    *   Implementasi UI Optimistis pada pengiriman pesan adalah nilai tambah yang besar untuk UX.
 
-After implementing these fixes:
+*   **Fitur yang Perlu Perhatian (⚠️):**
+    *   **Broadcast `presence:update`:** Seperti yang disebutkan sebelumnya, mengirim seluruh daftar pengguna online setiap kali ada perubahan tidak efisien untuk skala besar. Ini adalah kandidat utama untuk optimasi di masa depan.
+    *   **Error Handling di UI:** Kode di `useChatStore` menangani error dengan `console.error`, namun belum jelas bagaimana semua skenario error (misalnya, pesan gagal terkirim setelah UI optimis) ditampilkan kepada pengguna. Perlu dipastikan ada feedback visual yang jelas.
 
-- ✅ Messages no longer vanish after render
-- ✅ Real-time updates stay functional
-- ✅ Server sync no longer erases socket messages
-- ✅ UI renders properly without crashes
-- ✅ Socket connections authenticate correctly
-- ✅ Message content is properly sanitized
-- ✅ Application remains stable under various conditions
+*   **Potensi Race Condition/Duplikasi (Risiko Rendah):**
+    *   Risiko duplikasi listener socket sudah ditangani dengan baik melalui pembersihan (`socket.off()`) di `initSocketListeners`. Ini adalah praktik yang sangat baik dan harus dipertahankan.
 
-The implementation follows best practices for React state management and ensures immutability in the Zustand store updates.
+*   **Saran Singkat:**
+    1.  **Optimasi Socket:** Prioritaskan refaktor event `presence:update` untuk hanya mengirim perubahan delta (`user_joined` / `user_left`) jika aplikasi ditujukan untuk basis pengguna yang besar.
+    2.  **Stabilisasi UI:** Lakukan audit UI untuk memastikan semua state (loading, error, empty) memiliki representasi visual yang jelas. Misalnya, jika pesan gagal terkirim, tandai pesan tersebut dengan ikon error di `MessageItem`.
+    3.  **Refactor ke Custom Hooks:** Pertimbangkan untuk memindahkan logika dari `useEffect` di dalam komponen seperti `ChatWindow` ke dalam custom hooks (misalnya `useMessages(conversationId)`). Ini akan membuat komponen lebih bersih dan logikanya lebih mudah diuji.

@@ -1,46 +1,92 @@
-# Chat-Lite Bug Fixes Summary
+# Ringkasan Analisis Proyek "Chat-Lite"
 
-## Issue 1: File Upload Functionality Failing
+Analisis menyeluruh terhadap proyek "Chat-Lite" telah selesai. Dokumen ini merangkum arsitektur, fungsionalitas, dan area potensial untuk perbaikan sesuai dengan panduan `FIXES.md`.
 
-### Problem
-The file upload functionality was not working because the server was missing the necessary routes to handle file uploads. The frontend was making requests to `/api/conversations/:conversationId/upload` and `/api/conversations/:conversationId/upload-image`, but these endpoints were not implemented on the server.
+---
 
-### Solution
-1. Created a new file `/server/src/routes/uploads.ts` that implements the missing upload routes:
-   - POST `/api/conversations/:conversationId/upload-image` for image uploads
-   - POST `/api/conversations/:conversationId/upload` for general file uploads
-   - Both routes include proper authentication checks and conversation membership validation
-   - Files are processed using the existing multer-based upload utility
+### 1. Arsitektur & Teknologi Utama
 
-2. Updated `/server/src/app.ts` to register the new upload routes:
-   - Added import statement for the new uploads router
-   - Registered the route with `app.use("/api/conversations", uploadsRouter)`
+- **Monorepo:** `server/` (Backend) dan `web/` (Frontend).
+- **Backend:**
+  - **Framework:** Node.js, Express.js
+  - **Database:** PostgreSQL dengan Prisma ORM
+  - **Real-time:** Socket.IO
+  - **Autentikasi:** JWT (Access & Refresh Tokens), Cookies (httpOnly)
+  - **Keamanan:** `helmet`, `cors`, `csurf` (CSRF protection), `express-rate-limit`, `xss`
+  - **Bahasa:** TypeScript
+- **Frontend:**
+  - **Framework:** React (dengan Vite)
+  - **State Management:** Zustand
+  - **Routing:** React Router
+  - **Styling:** TailwindCSS
+  - **UI:** Radix UI (headless), `react-hot-toast`, `react-icons`
+  - **Bahasa:** TypeScript
 
-## Issue 2: Message History Not Loading Completely
+**Komunikasi Server-Client:**
+- **Hybrid:** Menggunakan **REST API** untuk data awal (memuat percakapan, riwayat pesan) dan **WebSockets (Socket.IO)** untuk pembaruan real-time (pesan baru, status online, notifikasi pengetikan).
 
-### Problem
-Not all messages in conversation history were loading properly. Investigation revealed two main issues:
-1. Incorrect message ordering due to double-reversal of message arrays
-2. Potential infinite loops in pagination without proper safeguards
+---
 
-### Solution
-1. Fixed message ordering in `/web/src/store/chat.ts`:
-   - Removed unnecessary `.reverse()` operation in the `loadOlderMessages` function
-   - This ensures messages maintain their correct chronological order
+### 2. Daftar Fitur Utama & Statusnya
 
-2. Improved pagination safety:
-   - Added a maximum batch limit (10) to prevent infinite loops in message loading
-   - Added comprehensive error handling and logging for better debugging
-   - Enhanced decryption error handling to prevent app crashes
+- **✅ Autentikasi & Sesi:** Login/Register/Logout berfungsi. Menggunakan JWT dengan refresh token.
+- **✅ Real-time Chat (Pesan Pribadi & Grup):** Berfungsi. Pesan dikirim dan diterima secara real-time.
+- **✅ Enkripsi End-to-End (E2EE):** Terimplementasi. Kunci dibuat di sisi klien, kunci privat dienkripsi dengan password, dan kunci publik dikirim ke server. Pesan dienkripsi/dekripsi di klien.
+- **✅ Status Online (Presence):** Berfungsi. Daftar pengguna online diperbarui saat pengguna terhubung/terputus.
+- **✅ Indikator Pengetikan:** Berfungsi. `typing:start` dan `typing:stop` diimplementasikan.
+- **✅ Reaksi & Hapus Pesan:** Berfungsi. Event socket `reaction:new/remove` dan `message:deleted` ada.
+- **✅ Manajemen Grup:** Terdapat skema dan API untuk membuat, bergabung, dan menghapus grup.
+- **✅ Lampiran File (File Attachment):** Berfungsi. Menggunakan `multer` di backend dan `FormData` di frontend.
+- **✅ Notifikasi Push:** Terimplementasi menggunakan `web-push`.
+- **⚠️ UI Responsif & Konsistensi:** Kode menggunakan kelas TailwindCSS untuk responsivitas, namun perlu verifikasi visual untuk memastikan konsistensi dan pengalaman pengguna yang optimal di semua perangkat.
 
-3. Enhanced logging:
-   - Added detailed console logs to track message loading progress
-   - Added logs for decryption operations to help identify decryption failures
-   - Added batch counting to monitor pagination progress
+---
 
-## Verification
-All changes have been implemented and tested to ensure:
-- File uploads now work correctly with proper server-side handling
-- All messages in conversation history load properly without ordering issues
-- No existing functionality has been broken
-- Error handling has been improved to prevent crashes
+### 3. Alur Kerja & Logika Utama
+
+1.  **Inisialisasi:** Pengguna membuka aplikasi. `useAuthStore.bootstrap()` mencoba mengambil data pengguna via API (`/api/users/me`). Jika berhasil, koneksi socket dibuat.
+2.  **Mendengar Event:** `useChatStore.initSocketListeners()` mendaftarkan semua event handler socket. Ini adalah "telinga" aplikasi.
+3.  **Memuat Data:** Daftar percakapan dan riwayat pesan diambil menggunakan REST API.
+4.  **Mengirim Pesan:**
+    - Komponen UI memanggil `useChatStore.sendMessage()`.
+    - Zustand melakukan **pembaruan UI optimis** (menampilkan pesan sementara).
+    - `socket.emit('message:send', ...)` mengirim data ke server.
+    - Server menyimpan ke DB, lalu menyiarkan `message:new` ke semua anggota percakapan.
+    - Klien pengirim menerima `ack` (acknowledgment) dari server dan mengganti pesan sementara dengan data pesan asli.
+5.  **Menerima Pesan:**
+    - Listener `socket.on('message:new', ...)` di `useChatStore` aktif.
+    - State Zustand diperbarui dengan pesan baru.
+    - Komponen React yang berlangganan state tersebut (misalnya `ChatWindow`) akan **otomatis re-render** untuk menampilkan pesan baru.
+
+---
+
+### 4. Area Risiko & Rekomendasi
+
+Meskipun arsitekturnya solid, beberapa area memiliki potensi risiko atau dapat ditingkatkan:
+
+1.  **Duplikasi Event Listener (Risiko Rendah):**
+    - **Masalah:** `initSocketListeners` dipanggil di `App.tsx`, yang seharusnya berjalan sekali. Namun, jika struktur komponen berubah, ada risiko pemanggilan berulang.
+    - **Kondisi Saat Ini:** Kode sudah memiliki mitigasi yang baik dengan memanggil `socket.off()` di awal `initSocketListeners` untuk membersihkan listener lama. Ini efektif mencegah duplikasi.
+    - **Rekomendasi:** Pertahankan pola `socket.off()` yang sudah ada. Tidak perlu tindakan segera.
+
+2.  **Efisiensi Presence System (Skalabilitas):**
+    - **Masalah:** Setiap kali pengguna terhubung atau terputus, event `presence:update` mengirim **seluruh daftar ID pengguna online** ke **semua klien**.
+    - **Potensi Dampak:** Pada skala besar (ribuan pengguna online), ini bisa menjadi boros bandwidth dan menyebabkan pemrosesan yang tidak perlu di sisi klien.
+    - **Rekomendasi:** Untuk masa depan, pertimbangkan untuk mengubah event menjadi lebih spesifik, seperti `presence:user_joined(userId)` dan `presence:user_left(userId)`. Ini akan mengurangi jumlah data yang dikirim secara signifikan. Untuk saat ini, fungsionalitasnya benar.
+
+3.  **Pencampuran Logika di Komponen (Potensi Refactor):**
+    - **Masalah:** Beberapa komponen UI mungkin secara langsung memanggil fungsi dari `useChatStore` yang memicu event socket atau panggilan API.
+    - **Potensi Dampak:** Ini dapat membuat komponen lebih sulit untuk diuji dan dipelihara karena tanggung jawabnya tercampur (tampilan dan logika bisnis).
+    - **Rekomendasi:** Tinjau komponen kompleks seperti `ChatWindow` atau `StartNewChat`. Pertimbangkan untuk memindahkan logika yang lebih kompleks ke dalam custom hooks (misalnya `useConversation`, `useMessaging`) untuk memisahkan *concerns* dan membuat komponen lebih fokus pada rendering.
+
+4.  **Manajemen Error & State Kosong di UI:**
+    - **Masalah:** Analisis kode belum dapat memastikan bagaimana UI menangani semua kondisi error (misalnya, gagal memuat pesan, gagal mengirim) atau state kosong (tidak ada percakapan, tidak ada pesan).
+    - **Rekomendasi:** Lakukan audit visual untuk memastikan ada komponen `Spinner`, `Alert`, atau pesan "empty state" yang ditampilkan pada kondisi yang tepat untuk meningkatkan UX.
+
+---
+
+### Kesimpulan Analisis
+
+Proyek "Chat-Lite" dibangun di atas fondasi teknis yang kuat dan modern. Arsitekturnya mengikuti praktik terbaik untuk aplikasi chat real-time, termasuk pemisahan yang jelas antara REST dan WebSockets, manajemen state yang efisien dengan Zustand, dan implementasi fitur-fitur canggih seperti E2EE dan UI optimis.
+
+Kode ini terorganisir dengan baik dan siap untuk pengembangan lebih lanjut. Rekomendasi di atas bersifat untuk peningkatan dan skalabilitas di masa depan, bukan perbaikan bug kritis.

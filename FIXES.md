@@ -1,67 +1,130 @@
-Kamu adalah AI Coder yang membantu memperbaiki proyek web app bernama **Chat-Lite**.  
-Fokus tugasmu kali ini adalah memperbaiki UI pencarian dan pembaruan daftar grup, tanpa mengubah logika utama atau menghapus kode yang tidak berkaitan.
+## ⚙️ Prompt Lanjutan — Peta Alur Data & Socket Flow Chat-Lite
 
-🎯 Tujuan Perbaikan:
-1. **Kolom pencarian ganda**
-   - Di sidebar kiri (komponen daftar chat), saat membuka tampilan "Search or start new chat", muncul **dua kolom pencarian**.
-   - Kolom pertama di atas: “Search or start new chat…” (yang seharusnya dipakai).
-   - Kolom kedua: “Search users…” (yang tidak perlu ditampilkan lagi).
-   - Solusi:
-     - Gabungkan fungsionalitas keduanya menjadi satu kolom pencarian di bagian atas.
-     - Kolom ini harus bisa mencari:
-       - 🔹 User (individual chat)
-       - 🔹 Group (group chat)
-     - Saat mengetik, hasil pencarian ditampilkan dinamis (misal dropdown list atau langsung di daftar).
-     - Pastikan placeholder tetap: **“Search or start new chat…”**.
+```
+Sekarang kamu sudah menyelesaikan analisis arsitektur dan kondisi proyek Chat-Lite.
 
-2. **Grup tidak muncul setelah dibuat**
-   - Saat pengguna membuat grup baru (melalui tombol “+ Group”), grup berhasil dibuat di server tetapi tidak langsung muncul di daftar chat.
-   - Sekarang pengguna harus me-refresh halaman agar grup tampil.
-   - Solusi:
-     - Setelah `createGroup()` sukses (atau event socket `group:created` diterima), **otomatis tambahkan grup baru ke daftar chat secara real-time.**
-     - Jika socket sudah menyiarkan event `groupCreated` atau `group:created`, pastikan listener-nya aktif dan memicu re-render daftar chat.
-     - Jika belum ada listener, tambahkan di tempat yang sesuai (`ChatList`, `Sidebar`, atau `useChatStore`).
-     - Hindari re-fetch penuh; cukup tambahkan grup baru ke state lokal (`chats`, `groups`, atau sejenisnya).
+Lanjutkan dengan membuat **peta logika dan alur data menyeluruh sistem Chat-Lite**, agar kamu benar-benar memahami interaksi antar komponen, socket event, dan data flow di antara frontend ↔ backend ↔ database.
 
-🧩 Petunjuk Implementasi Teknis:
+---
 
-- Lokasi kemungkinan:
-  - `web/src/components/Sidebar.tsx`
-  - `web/src/components/SearchBar.tsx`
-  - `web/src/components/ChatList.tsx`
-  - `web/src/hooks/useChatStore.ts` atau `web/src/context/ChatContext.tsx`
+### 🎯 Tujuan
+Buat analisis visual (dalam bentuk teks terstruktur) yang menjelaskan seluruh:
+1. **Alur data utama (Data Flow)**
+2. **Event Socket.IO dan dependensinya**
+3. **Hubungan antar komponen dan state (Frontend Flow)**
+4. **Interaksi Client ↔ Server**
+5. **Keterkaitan antar fitur besar (Chat, Group, Typing, Auth, dsb)**
 
-- Untuk kolom pencarian:
-  - Hapus atau sembunyikan input kedua (`Search users…`), gabungkan logikanya ke input pertama.
-  - Tambahkan fungsi pencarian tunggal seperti:
-    ```tsx
-    const handleSearch = (query: string) => {
-      setSearchQuery(query);
-      const results = allChats.filter(chat =>
-        chat.name.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredChats(results);
-    };
-    ```
-  - Pastikan UI menggunakan `value={searchQuery}` dan `onChange={handleSearch}`.
+---
 
-- Untuk daftar grup:
-  - Pastikan listener socket aktif, contoh:
-    ```tsx
-    socket.on("group:created", (newGroup) => {
-      setChats(prev => [...prev, newGroup]);
-    });
-    ```
-  - Jika event bernama lain, sesuaikan dengan event yang digunakan di backend.
-  - Setelah ditambahkan, pastikan daftar otomatis ter-render ulang tanpa reload.
+### 🧩 Detail yang Harus Dijelaskan
 
-⚠️ Aturan:
-- Jangan menghapus kode lain yang tidak berkaitan.
-- Jangan ubah struktur logika socket, hanya tambahkan event handler bila perlu.
-- Jangan ubah styling utama (tema dark modern).
-- Pastikan kompatibilitas tetap dengan versi UI terbaru yang sudah responsif.
+#### 1. Peta Alur Data
+Tampilkan urutan proses dari awal:
+```
 
-✅ Hasil yang Diharapkan:
-- Sidebar hanya memiliki **satu kolom pencarian** yang berfungsi mencari user dan grup.
-- Setelah grup baru dibuat, langsung tampil di daftar chat tanpa reload.
-- Tidak ada regresi fungsi atau UI lain.
+[User Action] → [Frontend Component] → [State/Context] → [API/Socket Event] → [Backend Logic] → [Database] → [Socket Broadcast] → [Client Update]
+
+```
+
+Jelaskan untuk setiap fitur utama:
+- Login / Register
+- Chat pribadi
+- Chat grup
+- Pembuatan grup
+- Pengiriman & penerimaan pesan
+- File attachment
+- Reaction dan delete message
+- Typing indicator
+- Status online / offline
+
+Gunakan gaya seperti berikut:
+```
+
+📨 Message Flow:
+User kirim pesan → InputBar.jsx → messagesContext.addMessage() → socket.emit('sendMessage', payload)
+→ server on('sendMessage') → simpan ke database → io.emit('message:new', data) → client receive → re-render MessageList
+
+```
+
+---
+
+#### 2. Peta Event Socket.IO
+Buat daftar semua event Socket.IO yang ditemukan di client dan server, beserta arah dan fungsinya. Contoh:
+```
+
+Client → Server:
+
+* 'sendMessage': kirim pesan baru
+* 'typing:start': notifikasi sedang mengetik
+* 'group:create': buat grup baru
+
+Server → Client:
+
+* 'message:new': broadcast pesan baru
+* 'group:created': grup baru muncul
+* 'user:online': update status user
+
+```
+
+Tambahkan keterangan: event mana yang memiliki keterlambatan, error handler, atau potensi race condition.
+
+---
+
+#### 3. Hubungan Antar Komponen (Frontend)
+Buat diagram teks atau hierarki komponen seperti ini:
+```
+
+<App>
+ ├── <Sidebar>
+ │    ├── <SearchBar> 
+ │    ├── <UserList>
+ │    └── <GroupList>
+ ├── <ChatWindow>
+ │    ├── <MessageList>
+ │    ├── <MessageItem>
+ │    └── <InputBar>
+ └── <SettingsModal>
+```
+Tambahkan penjelasan:
+- Komponen mana yang menyimpan state lokal.
+- Komponen mana yang bergantung pada context global (user, chat, socket, dsb).
+- Event apa yang menghubungkan antar komponen.
+
+---
+
+#### 4. Integrasi API & Backend Logic
+
+Untuk setiap endpoint atau fungsi di `server/`, jelaskan:
+
+* Endpoint/path (mis. `/api/auth/login`, `/api/chat/send`)
+* Tujuan dan data yang dikirim/diterima
+* Middleware yang digunakan (mis. JWT auth)
+* Interaksi dengan database
+
+---
+
+#### 5. Pemetaan Group dan User System
+
+Jelaskan bagaimana sistem grup dan user saling berhubungan, misalnya:
+
+```
+User 1 ─┬─ Group A
+         ├─ Group B
+User 2 ──┘
+```
+
+dan bagaimana data ini dikirim melalui socket event `group:created`, `group:join`, dsb.
+
+---
+
+#### 6. Temuan & Insight
+
+Buat kesimpulan akhir yang berisi:
+
+* Fitur yang sudah sinkron sepenuhnya (✅)
+* Fitur yang belum realtime (⚠️ butuh refresh manual)
+* Fitur yang masih rawan race condition atau duplikasi listener
+* Saran singkat stabilisasi socket dan optimasi UI
+
+---
