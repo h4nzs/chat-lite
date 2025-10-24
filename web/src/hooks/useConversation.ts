@@ -11,10 +11,11 @@ export function useConversation(conversationId: string) {
   const store = useChatStore();
 
   // Select relevant data from the store
-  const { conversation, messages, isLoadingInitial } = useChatStore(state => ({
+  const { conversation, messages, isLoadingInitial, error } = useChatStore(state => ({
     conversation: state.conversations.find(c => c.id === conversationId),
     messages: state.messages[conversationId] || [],
     isLoadingInitial: !state.messages[conversationId], // Simple loading state
+    error: state.error,
   }), shallow);
 
   // Effect to load messages when the conversation ID changes
@@ -32,6 +33,7 @@ export function useConversation(conversationId: string) {
     conversation,
     messages,
     isLoading: isLoadingInitial,
+    error,
     sendMessage: (content: string) => sendMessage(conversationId, { content }),
     uploadFile: (file: File) => uploadFile(conversationId, file),
   };

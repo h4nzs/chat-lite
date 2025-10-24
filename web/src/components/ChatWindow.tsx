@@ -75,7 +75,7 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
 
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
-  const { conversation, messages, isLoading, sendMessage, uploadFile } = useConversation(id);
+  const { conversation, messages, isLoading, error, sendMessage, uploadFile } = useConversation(id);
   const { typing } = useChatStore(); // Keep this for typing indicator
 
   const typingUsers = typing[id] || [];
@@ -102,6 +102,15 @@ export default function ChatWindow({ id }: { id: string }) {
       uploadFile(e.target.files[0]);
     }
   };
+
+  if (error) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-background text-red-400">
+        <p>Error loading messages.</p>
+        <p className="text-sm text-text-secondary">{error}</p>
+      </div>
+    );
+  }
 
   if (isLoading || !conversation) {
     return (

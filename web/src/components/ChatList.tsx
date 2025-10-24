@@ -32,7 +32,7 @@ const UserProfile = () => {
 };
 
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const { conversations, presence, deleteGroup, deleteConversation } = useChatStore();
+  const { conversations, presence, deleteGroup, deleteConversation, error } = useChatStore();
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false); // Kembalikan state untuk modal
@@ -84,6 +84,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
         )}
 
         <div className="p-2">
+          {error && <div className="p-2 text-center text-red-400 bg-red-500/20 rounded-lg">{error}</div>}
           {!searchQuery && <p className="text-xs font-bold text-text-secondary px-2 mb-2">CONVERSATIONS</p>}
           {filteredConversations.length === 0 && !searchQuery ? (
             <div className="text-center p-4 text-text-secondary">No conversations yet.</div>

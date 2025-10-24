@@ -43,6 +43,7 @@ type State = {
   messages: Record<string, Message[]>;
   presence: string[];
   typing: Record<string, string[]>;
+  error: string | null; // Tambahkan state error
   loadConversations: () => Promise<void>;
   openConversation: (id: string) => void;
   sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
@@ -77,14 +78,17 @@ export const useChatStore = create<State>((set, get) => ({
   presence: [],
   typing: {},
   isSidebarOpen: false,
+  error: null,
 
   // ... (fungsi-fungsi lain tetap sama)
   loadConversations: async () => {
     try {
+      set({ error: null });
       const conversations = await api<Conversation[]>("/api/conversations");
       set({ conversations: sortConversations(conversations) });
     } catch (error) {
       console.error("Failed to load conversations", error);
+      set({ error: "Failed to load conversations." });
     }
   },
   openConversation: (id: string) => {
@@ -153,6 +157,7 @@ export const useChatStore = create<State>((set, get) => ({
   },
   loadMessagesForConversation: async (id: string) => {
     try {
+      set({ error: null });
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const decryptedItems = await Promise.all(res.items.map(async (m) => {
           try {
@@ -167,7 +172,10 @@ export const useChatStore = create<State>((set, get) => ({
       set(state => ({ messages: { ...state.messages, [id]: decryptedItems } }));
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
-      set(state => ({ messages: { ...state.messages, [id]: [] } }));
+      set(state => ({ 
+        messages: { ...state.messages, [id]: [] },
+        error: `Failed to load messages for conversation.`
+      }));
     }
   },
 
