@@ -6,7 +6,7 @@ import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
 import { useChatStore } from "@store/chat";
-import { toAbsoluteUrl } from "@utils/url"; // Impor utilitas URL
+import { toAbsoluteUrl } from "@utils/url";
 
 // --- Komponen Terpisah --- 
 
@@ -76,12 +76,30 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
 
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
+  const sendReadReceipts = useAuthStore(s => s.sendReadReceipts);
   const { conversation, messages, isLoading, error, sendMessage, uploadFile } = useConversation(id);
-  const { typing } = useChatStore(); // Keep this for typing indicator
+  const { typing } = useChatStore();
 
   const typingUsers = typing[id] || [];
   const filteredTypingUsers = typingUsers.filter(uid => uid !== meId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleRangeChanged = useCallback((range: { startIndex: number; endIndex: number }) => {
+    if (!sendReadReceipts || !messages) return;
+    const socket = getSocket();
+    for (let i = range.startIndex; i <= range.endIndex; i++) {
+      const msg = messages[i];
+      if (msg && msg.senderId !== meId) {
+        const alreadyRead = msg.statuses?.some(s => s.userId === meId && s.status === 'READ');
+        if (!alreadyRead) {
+          socket.emit('message:mark_as_read', { 
+            messageId: msg.id, 
+            conversationId: msg.conversationId 
+          });
+        }
+      }
+    }
+  }, [messages, meId, sendReadReceipts]);
 
   const handleTyping = useCallback(() => {
     const socket = getSocket();
@@ -128,6 +146,7 @@ export default function ChatWindow({ id }: { id: string }) {
         <Virtuoso
           initialTopMostItemIndex={messages.length - 1}
           data={messages}
+          rangeChanged={handleRangeChanged}
           itemContent={(index, message) => (
             <div className="px-4">
               <MessageItem message={message} conversation={conversation} />

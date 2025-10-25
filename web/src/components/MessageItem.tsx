@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo } from "react";
 import type { Message, Conversation } from "@store/chat";
 import { useAuthStore } from "@store/auth";
 import { useChatStore } from "@store/chat";
@@ -20,8 +20,7 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   }
 
   const otherParticipants = conversation?.participants.filter(p => p.id !== meId) || [];
-  // Jika tidak ada peserta lain (misalnya, chat dengan diri sendiri), anggap saja terkirim.
-  if (otherParticipants.length === 0) {
+  if (otherParticipants.length === 0) { // Chat dengan diri sendiri atau grup kosong
     return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
   }
 
@@ -82,30 +81,6 @@ interface MessageItemProps {
 const MessageItem = ({ message, conversation }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const mine = message.senderId === meId;
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!ref.current || mine) return;
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        const alreadyRead = message.statuses?.some(s => s.userId === meId && s.status === 'READ');
-        const shouldSendReceipt = useAuthStore.getState().sendReadReceipts;
-
-        if (!alreadyRead && shouldSendReceipt) {
-          getSocket().emit('message:mark_as_read', { 
-            messageId: message.id, 
-            conversationId: message.conversationId 
-          });
-        }
-        observer.disconnect();
-      }
-    }, { threshold: 0.8 });
-
-    observer.observe(ref.current);
-
-    return () => observer.disconnect();
-  }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
   const handleDelete = () => {
     if (window.confirm("Are you sure?")) {
@@ -115,14 +90,14 @@ const MessageItem = ({ message, conversation }: MessageItemProps) => {
 
   if (message.content === "[This message was deleted]") {
     return (
-      <div ref={ref} className={`flex items-center p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div className={`flex items-center p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
         <p className="text-xs italic text-text-secondary">This message was deleted</p>
       </div>
     );
   }
 
   return (
-    <div ref={ref} className={`group flex items-end gap-2 p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group flex items-end gap-2 p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
       {!mine && <img src={toAbsoluteUrl(message.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mb-6 object-cover" />}
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
