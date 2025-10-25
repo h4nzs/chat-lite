@@ -2,12 +2,14 @@ import { useState, useRef, ChangeEvent } from 'react';
 import { useAuthStore } from '@store/auth';
 import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
+import { toAbsoluteUrl } from '@utils/url'; // Impor fungsi utilitas
 
 export default function Settings() {
   const { user, updateProfile, updateAvatar } = useAuthStore();
   const [name, setName] = useState(user?.name || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl || null);
+  // Gunakan toAbsoluteUrl untuk URL awal dari user
+  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,7 +60,7 @@ export default function Settings() {
         <div className="flex items-center gap-6">
           <div className="relative">
             <img 
-              src={previewUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
+              src={toAbsoluteUrl(previewUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
               alt="Avatar Preview"
               className="w-24 h-24 rounded-full bg-gray-700 object-cover border-2 border-gray-600"
             />

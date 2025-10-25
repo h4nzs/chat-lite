@@ -4,7 +4,9 @@ import { useAuthStore } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import StartNewChat from './StartNewChat';
-import CreateGroupChat from './CreateGroupChat'; // Impor komponen CreateGroupChat
+import CreateGroupChat from './CreateGroupChat';
+import { Link } from 'react-router-dom';
+import { toAbsoluteUrl } from '@utils/url'; // Impor utilitas URL
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -18,15 +20,20 @@ const UserProfile = () => {
   return (
     <div className="p-4 flex items-center justify-between border-b border-gray-800">
       <div className="flex items-center gap-3">
-        <img src={user.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700" />
+        <img src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
         <div>
           <p className="font-semibold text-white">{user.name}</p>
           <p className="text-xs text-text-secondary">Available</p>
         </div>
       </div>
-      <button onClick={logout} className="p-2 rounded-full hover:bg-gray-700 text-text-secondary hover:text-white transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
+      <div className="flex items-center gap-1">
+        <Link to="/settings" className="p-2 rounded-full hover:bg-gray-700 text-text-secondary hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </Link>
+        <button onClick={logout} className="p-2 rounded-full hover:bg-gray-700 text-text-secondary hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
     </div>
   );
 };
@@ -99,7 +106,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent/20' : 'hover:bg-primary/50'}`}>
                   <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
-                      <img src={peer?.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700" />
+                      <img src={toAbsoluteUrl(peer?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
                       {peer && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
                     </div>
                     <div className="flex-1 min-w-0">

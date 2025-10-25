@@ -6,6 +6,7 @@ import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
 import { useChatStore } from "@store/chat";
+import { toAbsoluteUrl } from "@utils/url"; // Impor utilitas URL
 
 // --- Komponen Terpisah --- 
 
@@ -21,7 +22,7 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
       <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-white">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <img src={peer?.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700" />
+      <img src={toAbsoluteUrl(peer?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
       <div>
         <p className="font-bold text-white">{title}</p>
         <p className="text-xs text-text-secondary">{isOnline ? 'Active now' : 'Offline'}</p>
