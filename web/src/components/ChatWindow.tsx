@@ -130,7 +130,7 @@ export default function ChatWindow({ id }: { id: string }) {
           data={messages}
           itemContent={(index, message) => (
             <div className="px-4">
-              <MessageItem message={message} />
+              <MessageItem message={message} conversation={conversation} />
             </div>
           )}
           followOutput="auto"

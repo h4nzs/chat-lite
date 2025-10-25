@@ -110,6 +110,29 @@ export default function Settings() {
           />
         </div>
 
+        {/* Privacy Settings */}
+        <div className="space-y-4 pt-4 border-t border-gray-700">
+          <h3 className="text-lg font-semibold text-white">Privacy</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-text-primary">Send Read Receipts</p>
+              <p className="text-sm text-text-secondary">Let others know you have read their messages.</p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleReadReceipts}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface ${sendReadReceipts ? 'bg-accent' : 'bg-gray-600'}`}
+              role="switch"
+              aria-checked={sendReadReceipts}
+            >
+              <span
+                aria-hidden="true"
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${sendReadReceipts ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+        </div>
+
         {/* Save Button */}
         <div className="flex justify-end pt-4 border-t border-gray-700">
           <button 

@@ -25,20 +25,15 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
     }
 
-    const messages = await prisma.message.findMany({
-      where: {
-        conversationId,
-        ...(cursor ? { createdAt: { lt: new Date(cursor as string) } } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      include: { 
-        reactions: { 
-          include: { user: { select: { id: true, username: true } } } 
-        } 
-      },
-    });
-
+        const messages = await prisma.message.findMany({
+          where: { conversationId },
+          include: {
+            sender: true,
+            reactions: { include: { user: true } },
+            statuses: true, // Sertakan status pesan
+          },
+          orderBy: { createdAt: "asc" },
+        });
     const items = messages.map(m => ({ ...m })).reverse();
     const nextCursor = items.length > 0 ? items[0]?.createdAt.toISOString() : null;
 

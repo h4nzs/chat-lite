@@ -1,11 +1,44 @@
-import { memo } from "react";
-import type { Message } from "@store/chat";
+import { memo, useEffect, useRef } from "react";
+import type { Message, Conversation } from "@store/chat";
 import { useAuthStore } from "@store/auth";
+import { useChatStore } from "@store/chat";
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { api } from "@lib/api";
 import ReactionPopover from "./Reactions";
+import { getSocket } from "@lib/socket";
+import { toAbsoluteUrl } from "@utils/url";
 
-const MessageBubble = ({ message, mine }: { message: Message; mine: boolean }) => {
+const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
+  const meId = useAuthStore((s) => s.user?.id);
+
+  if (message.senderId !== meId) return null;
+  if (message.error) {
+    return <svg title="Failed to send" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
+  }
+  if (message.optimistic) {
+    return <svg title="Sending..." xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>;
+  }
+
+  const otherParticipants = conversation?.participants.filter(p => p.id !== meId) || [];
+  // Jika tidak ada peserta lain (misalnya, chat dengan diri sendiri), anggap saja terkirim.
+  if (otherParticipants.length === 0) {
+    return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+  }
+
+  const statuses = message.statuses || [];
+  const isReadAll = otherParticipants.every(p => 
+    statuses.some(s => s.userId === p.id && s.status === 'READ')
+  );
+
+  if (isReadAll) {
+    return <svg title="Read by all" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4F86F7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+  }
+
+  // Default: Tampilkan centang satu jika belum dibaca semua
+  return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+};
+
+const MessageBubble = ({ message, mine, conversation }: { message: Message; mine: boolean; conversation: Conversation | undefined }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
 
   return (
@@ -17,14 +50,7 @@ const MessageBubble = ({ message, mine }: { message: Message; mine: boolean }) =
       )}
       <div className="text-xs text-right mt-1 opacity-60 flex items-center justify-end gap-1.5">
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-        {mine && ( message.error ? (
-            <svg title="Failed to send" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-          ) : message.optimistic ? (
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          )
-        )}
+        <MessageStatusIcon message={message} conversation={conversation} />
       </div>
     </div>
   );
@@ -50,11 +76,36 @@ const ReactionsDisplay = ({ reactions }: { reactions: Message['reactions'] }) =>
 
 interface MessageItemProps {
   message: Message;
+  conversation: Conversation | undefined;
 }
 
-const MessageItem = ({ message }: MessageItemProps) => {
+const MessageItem = ({ message, conversation }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const mine = message.senderId === meId;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current || mine) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        const alreadyRead = message.statuses?.some(s => s.userId === meId && s.status === 'READ');
+        const shouldSendReceipt = useAuthStore.getState().sendReadReceipts;
+
+        if (!alreadyRead && shouldSendReceipt) {
+          getSocket().emit('message:mark_as_read', { 
+            messageId: message.id, 
+            conversationId: message.conversationId 
+          });
+        }
+        observer.disconnect();
+      }
+    }, { threshold: 0.8 });
+
+    observer.observe(ref.current);
+
+    return () => observer.disconnect();
+  }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
   const handleDelete = () => {
     if (window.confirm("Are you sure?")) {
@@ -64,19 +115,19 @@ const MessageItem = ({ message }: MessageItemProps) => {
 
   if (message.content === "[This message was deleted]") {
     return (
-      <div className={`flex items-center p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div ref={ref} className={`flex items-center p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
         <p className="text-xs italic text-text-secondary">This message was deleted</p>
       </div>
     );
   }
 
   return (
-    <div className={`group flex items-end gap-2 p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-      {!mine && <img src={`https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mb-6" />}
+    <div ref={ref} className={`group flex items-end gap-2 p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      {!mine && <img src={toAbsoluteUrl(message.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mb-6 object-cover" />}
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className="flex flex-col">
-          <MessageBubble message={message} mine={mine} />
+          <MessageBubble message={message} mine={mine} conversation={conversation} />
           <ReactionsDisplay reactions={message.reactions} />
         </div>
         <div className="opacity-0 group-hover:opacity-100 transition-opacity">

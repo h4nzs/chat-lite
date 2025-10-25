@@ -51,6 +51,14 @@ export function registerSocket(httpServer: HttpServer) {
     socket.on("message:send", async (data, cb) => {
       try {
         const sanitizedContent = data.content != null ? xss(data.content) : null;
+
+        // 1. Ambil semua partisipan
+        const participants = await prisma.participant.findMany({
+          where: { conversationId: data.conversationId },
+          select: { userId: true },
+        });
+
+        // 2. Buat pesan dan statusnya dalam satu transaksi
         const newMessage = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
@@ -60,8 +68,20 @@ export function registerSocket(httpServer: HttpServer) {
             fileName: data.fileName,
             fileType: data.fileType,
             fileSize: data.fileSize,
+            // Buat status untuk setiap partisipan
+            statuses: {
+              create: participants.map(p => ({
+                userId: p.userId,
+                // Status untuk pengirim langsung READ, untuk yang lain SENT
+                status: p.userId === socket.user.id ? 'READ' : 'SENT',
+              })),
+            },
           },
-          include: { sender: true, reactions: { include: { user: true } } },
+          include: { 
+            sender: true, 
+            reactions: { include: { user: true } },
+            statuses: true, // 3. Sertakan status saat mengambil pesan baru
+          }, 
         });
 
         const broadcastData = JSON.parse(JSON.stringify({ ...newMessage, tempId: data.tempId }));
@@ -73,12 +93,12 @@ export function registerSocket(httpServer: HttpServer) {
           data: { lastMessageAt: newMessage.createdAt },
         });
 
-        const participants = await prisma.participant.findMany({
+        const pushRecipients = await prisma.participant.findMany({
           where: { conversationId: data.conversationId, userId: { not: socket.user.id } },
           select: { userId: true },
         });
         const payload = { title: `New message from ${socket.user.username}`, body: sanitizedContent || 'File received' };
-        participants.forEach(p => sendPushNotification(p.userId, payload));
+        pushRecipients.forEach(p => sendPushNotification(p.userId, payload));
 
         cb?.({ ok: true, msg: newMessage });
       } catch (error) {
@@ -109,6 +129,37 @@ export function registerSocket(httpServer: HttpServer) {
         });
       } catch (error) {
         console.error("Failed to save push subscription:", error);
+      }
+    });
+
+    socket.on('message:mark_as_read', async ({ messageId, conversationId }) => {
+      try {
+        if (!userId || !messageId) return;
+
+        // Update status pesan menjadi READ
+        await prisma.messageStatus.upsert({
+          where: { messageId_userId: { messageId, userId } },
+          update: { status: 'READ' },
+          create: { messageId, userId, status: 'READ' },
+        });
+
+        // Dapatkan pengirim pesan asli untuk memberitahunya
+        const message = await prisma.message.findUnique({
+          where: { id: messageId },
+          select: { senderId: true, conversationId: true },
+        });
+
+        if (message && message.senderId !== userId) {
+          // Kirim event pembaruan status hanya ke pengirim
+          io.to(message.senderId).emit('message:status_updated', {
+            messageId,
+            conversationId: message.conversationId,
+            readBy: userId,
+            status: 'READ',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to mark message as read:', error);
       }
     });
   });

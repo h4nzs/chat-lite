@@ -193,6 +193,7 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("reaction:remove");
     socket.off("message:deleted");
     socket.off("user:updated"); // Bersihkan listener
+    socket.off("message:status_updated"); // Bersihkan listener
 
     // Daftarkan semua listener yang benar
     socket.on("presence:init", (onlineUserIds: string[]) => {
@@ -219,6 +220,38 @@ export const useChatStore = create<State>((set, get) => ({
           ),
         })),
       }));
+    });
+
+    socket.on('message:status_updated', ({ messageId, conversationId, readBy, status }) => {
+      set(state => {
+        const messages = state.messages[conversationId];
+        if (!messages) return state;
+
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: messages.map(msg => {
+              if (msg.id === messageId) {
+                const existingStatus = msg.statuses?.find(s => s.userId === readBy);
+                if (existingStatus) {
+                  // Update status yang ada
+                  return {
+                    ...msg,
+                    statuses: msg.statuses?.map(s => s.userId === readBy ? { ...s, status } : s)
+                  };
+                } else {
+                  // Tambahkan status baru
+                  return {
+                    ...msg,
+                    statuses: [...(msg.statuses || []), { userId: readBy, status, messageId, id: 'temp-status' }]
+                  };
+                }
+              }
+              return msg;
+            })
+          }
+        };
+      });
     });
 
     socket.on("typing:update", ({ userId, conversationId, isTyping }) => {

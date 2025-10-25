@@ -14,11 +14,13 @@ type User = {
   username: string;
   name: string;
   avatarUrl?: string | null;
+  sendReadReceipts?: boolean; // Tambahkan properti
 };
 
 type State = {
   user: User | null;
   theme: "light" | "dark";
+  sendReadReceipts: boolean; // Tambahkan state
   bootstrap: () => Promise<void>;
   login: (emailOrUsername: string, password: string) => Promise<void>;
   register: (data: {
@@ -32,6 +34,7 @@ type State = {
   setTheme: (t: "light" | "dark") => void;
   updateProfile: (data: { name: string }) => Promise<void>;
   updateAvatar: (file: File) => Promise<void>;
+  toggleReadReceipts: () => void; // Tambahkan fungsi
 };
 
 // Helper function to setup user encryption keys
@@ -71,6 +74,7 @@ const savedUser = localStorage.getItem("user");
 export const useAuthStore = create<State>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
   theme: (localStorage.getItem("theme") as "light" | "dark") || "light",
+  sendReadReceipts: localStorage.getItem('sendReadReceipts') === 'false' ? false : true,
 
   async bootstrap() {
     try {
@@ -195,5 +199,13 @@ export const useAuthStore = create<State>((set, get) => ({
 
     set({ user: updatedUser });
     localStorage.setItem("user", JSON.stringify(updatedUser));
+  },
+
+  toggleReadReceipts() {
+    const current = get().sendReadReceipts;
+    const next = !current;
+    set({ sendReadReceipts: next });
+    localStorage.setItem('sendReadReceipts', String(next));
+    toast.success(`Read receipts ${next ? 'enabled' : 'disabled'}`);
   },
 }));
