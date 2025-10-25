@@ -1,17 +1,24 @@
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { useAuthStore } from '@store/auth';
 import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
-import { toAbsoluteUrl } from '@utils/url'; // Impor fungsi utilitas
+import { toAbsoluteUrl } from '@utils/url';
 
 export default function Settings() {
   const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore();
   const [name, setName] = useState(user?.name || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  // Gunakan toAbsoluteUrl untuk URL awal dari user
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Efek untuk sinkronisasi state lokal dengan state global
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setPreviewUrl(user.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
+    }
+  }, [user]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
