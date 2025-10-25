@@ -192,6 +192,7 @@ export const useChatStore = create<State>((set, get) => ({
     socket.off("reaction:new");
     socket.off("reaction:remove");
     socket.off("message:deleted");
+    socket.off("user:updated"); // Bersihkan listener
 
     // Daftarkan semua listener yang benar
     socket.on("presence:init", (onlineUserIds: string[]) => {
@@ -204,6 +205,20 @@ export const useChatStore = create<State>((set, get) => ({
 
     socket.on("presence:user_left", (userId: string) => {
       set(state => ({ presence: state.presence.filter(id => id !== userId) }));
+    });
+
+    socket.on('user:updated', (updatedUser: any) => {
+      const meId = useAuthStore.getState().user?.id;
+      if (updatedUser.id === meId) return; // Abaikan update untuk diri sendiri
+
+      set(state => ({
+        conversations: state.conversations.map(conv => ({
+          ...conv,
+          participants: conv.participants.map(p =>
+            p.id === updatedUser.id ? { ...p, ...updatedUser } : p
+          ),
+        })),
+      }));
     });
 
     socket.on("typing:update", ({ userId, conversationId, isTyping }) => {

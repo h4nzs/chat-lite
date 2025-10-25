@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { io } from "../socket.js"; // Impor io
 
 const router = Router();
 
@@ -57,6 +58,7 @@ router.put("/me", requireAuth, async (req, res, next) => {
       select: { id: true, email: true, username: true, name: true, avatarUrl: true },
     });
 
+    io.emit('user:updated', updatedUser); // Siarkan pembaruan
     res.json(updatedUser);
   } catch (error) {
     next(error);
@@ -79,6 +81,7 @@ router.post("/me/avatar", requireAuth, uploadAvatar.single('avatar'), async (req
       select: { id: true, email: true, username: true, name: true, avatarUrl: true },
     });
 
+    io.emit('user:updated', updatedUser); // Siarkan pembaruan
     res.json(updatedUser);
   } catch (error) {
     next(error);
