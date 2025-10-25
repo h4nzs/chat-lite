@@ -5,7 +5,7 @@ import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url'; // Impor fungsi utilitas
 
 export default function Settings() {
-  const { user, updateProfile, updateAvatar } = useAuthStore();
+  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore();
   const [name, setName] = useState(user?.name || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   // Gunakan toAbsoluteUrl untuk URL awal dari user
