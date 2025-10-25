@@ -30,6 +30,8 @@ type State = {
   logout: () => Promise<void>;
   ensureSocket: () => void;
   setTheme: (t: "light" | "dark") => void;
+  updateProfile: (data: { name: string }) => Promise<void>;
+  updateAvatar: (file: File) => Promise<void>;
 };
 
 // Helper function to setup user encryption keys
@@ -171,5 +173,27 @@ export const useAuthStore = create<State>((set, get) => ({
   setTheme(t: "light" | "dark") {
     localStorage.setItem("theme", t);
     set({ theme: t });
+  },
+
+  async updateProfile(data) {
+    const updatedUser = await api<User>("/api/users/me", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    set({ user: updatedUser });
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+  },
+
+  async updateAvatar(file) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const updatedUser = await api<User>("/api/users/me/avatar", {
+      method: "POST",
+      body: formData,
+    });
+
+    set({ user: updatedUser });
+    localStorage.setItem("user", JSON.stringify(updatedUser));
   },
 }));

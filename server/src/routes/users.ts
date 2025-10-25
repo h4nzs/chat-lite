@@ -1,92 +1,123 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
 
-// === GET: User yang sedang login ===
-router.get("/me", requireAuth, async (req, res, next) => {
-  try {
+// Konfigurasi Multer untuk upload avatar
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(process.cwd(), "uploads", "avatars");
+    // Buat direktori jika belum ada
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
     const userId = (req as any).user.id;
-    console.log(`[Users Controller] Mencoba mengambil data user untuk userId: ${userId}`);
+    const extension = path.extname(file.originalname);
+    cb(null, `${userId}${extension}`);
+  },
+});
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        avatarUrl: true,
-      },
-    });
-
-    if (!user) {
-      console.error(`[Users Controller] User dengan ID ${userId} tidak ditemukan.`);
-      return res.status(404).json({ error: "User not found" });
+const uploadAvatar = multer({ 
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const mimeType = allowedTypes.test(file.mimetype);
+    const extName = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimeType && extName) {
+      return cb(null, true);
     }
-    
-    console.log(`[Users Controller] Data user ditemukan untuk userId: ${userId}`);
-    res.json(user); // Direct user object, consistent with frontend expectations
-  } catch (e) {
-    console.error("[Users Controller] Error:", e);
-    next(e);
+    cb(new Error('Only image files (jpeg, jpg, png, gif) are allowed!'));
   }
 });
 
-// === GET: Search users by query ===
+// === GET: User data diri ===
+router.get("/me", requireAuth, (req, res) => {
+  res.json((req as any).user);
+});
+
+// === PUT: Update user profile (e.g., name) ===
+router.put("/me", requireAuth, async (req, res, next) => {
+  try {
+    const userId = (req as any).user.id;
+    const { name } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { name: name.trim() },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// === POST: Update user avatar ===
+router.post("/me/avatar", requireAuth, uploadAvatar.single('avatar'), async (req, res, next) => {
+  try {
+    const userId = (req as any).user.id;
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// === GET: Cari user berdasarkan query ===
 router.get("/search", requireAuth, async (req, res, next) => {
   try {
-    const { q } = req.query as { q?: string };
-    console.log(`[Users Controller] Searching users with query: ${q}`);
+    const query = req.query.q as string;
+    const meId = (req as any).user.id;
 
-    if (!q || q.trim().length === 0) {
+    if (!query) {
       return res.json([]);
     }
 
     const users = await prisma.user.findMany({
       where: {
-        OR: [
-          { username: { contains: q, mode: "insensitive" } },
-          { name: { contains: q, mode: "insensitive" } },
-          { email: { contains: q, mode: "insensitive" } },
+        AND: [
+          { id: { not: meId } },
+          {
+            OR: [
+              { username: { contains: query, mode: "insensitive" } },
+              { name: { contains: query, mode: "insensitive" } },
+            ],
+          },
         ],
       },
+      take: 10,
       select: {
         id: true,
-        email: true,
         username: true,
         name: true,
         avatarUrl: true,
       },
-      take: 20, // Limit results
     });
 
-    console.log(`[Users Controller] Found ${users.length} users matching query: ${q}`);
     res.json(users);
   } catch (e) {
-    console.error("[Users Controller] Search Error:", e);
-    next(e);
-  }
-});
-
-// === GET: Semua user (public list) ===
-router.get("/", requireAuth, async (req, res, next) => {
-  try {
-    console.log(`[Users Controller] Mengambil daftar semua user (public)`);
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        avatarUrl: true,
-      },
-    });
-    console.log(`[Users Controller] Menemukan ${users.length} user`);
-    res.json({ users }); // 🔥 konsisten wrap array
-  } catch (e) {
-    console.error("[Users Controller] Error:", e);
     next(e);
   }
 });

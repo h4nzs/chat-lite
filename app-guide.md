@@ -1,164 +1,92 @@
-# Chat-Lite Application Analysis Report - Updated
+# Panduan Pengembangan & Peta Jalan Fitur Aplikasi Chat-Lite
 
-## Executive Summary
+Dokumen ini berisi ide, saran, dan rekomendasi untuk fitur-fitur baru yang dapat ditambahkan ke aplikasi Chat-Lite. Tujuannya adalah untuk memberikan peta jalan yang jelas untuk pengembangan selanjutnya, membangun di atas fondasi aplikasi yang sudah solid.
 
-This report provides an updated analysis of the Chat-Lite real-time chat application after implementing recent fixes for blank screen issues, message rendering problems, and security vulnerabilities. The application now includes improved defensive programming, better error handling, and enhanced security measures for both backend (Express.js, Prisma) and frontend (React, Socket.IO) components.
+---
 
-## Issues Previously Identified and Now Addressed
+### Konteks: Status Aplikasi Saat Ini
 
-### 1. Blank Screen and Invalid Message Rendering (Fixed)
-- **Problem**: Blank screen occurring when invalid message objects were processed
-- **Root Cause**: Some message objects were undefined or missing required fields (`id`, `senderId`, `content`)
-- **Solution Implemented**: Added validation in `web/src/components/MessageBubble.tsx` and `web/src/store/chat.ts`
+Aplikasi Chat-Lite telah mencapai tingkat stabilitas dan kualitas kode yang tinggi. Fondasi utamanya meliputi:
+- Chat pribadi dan grup yang fungsional.
+- Enkripsi End-to-End (E2EE).
+- Pengiriman file, status online, dan indikator pengetikan.
+- Penanganan error yang baik dan UI yang telah di-refactor.
 
-### 2. Socket Authentication Cookie Parsing (Fixed)
-- **Vulnerable cookie parsing** in `server/src/socket.ts` has been improved using proper cookie library
-- Manual string splitting replaced with safe parsing method using the `cookie` library
+Fitur-fitur berikut direkomendasikan untuk meningkatkan pengalaman pengguna, utilitas, dan daya saing aplikasi.
 
-### 3. Missing Message Validation (Fixed)
-- **Problem**: Invalid messages causing runtime crashes in message processing
-- **Solution**: Added validation in all message processing functions in `web/src/store/chat.ts`
+---
 
-### 4. Message Disappearing After Render (Fixed)
-- **Problem**: Messages appear briefly then disappear
-- **Root Cause**: Message store (Zustand) was being overwritten after socket updates
-- **Solution Implemented**: 
-  - Added `mergeMessages` function to safely merge new messages with existing ones
-  - Updated `openConversation`, `loadOlderMessages`, and socket handlers to use merge approach
-  - Ensured socket updates don't overwrite existing messages
+## 1. Fitur Prioritas Utama (Must-Have)
 
-## Currently Implemented Fixes
+Fitur-fitur ini dianggap esensial untuk aplikasi chat modern dan akan memberikan peningkatan nilai yang paling signifikan bagi pengguna.
 
-### Frontend Fixes:
+### a. Jumlah Pesan Belum Dibaca (Unread Message Count)
 
-#### 1. MessageBubble Component Validation
-**File: `web/src/components/MessageBubble.tsx`**
-```tsx
-function MessageBubble({ m }: { m: Message }) {
-  if (!m || !m.id || !m.content) {
-    console.warn('Invalid message render skipped:', m)
-    return null
-  }
-  // ... rest of component
-}
-```
+*   **Mengapa Ini Penting?**
+    Ini adalah standar UX fundamental. Pengguna perlu tahu secara sekilas percakapan mana yang memiliki pesan baru yang belum mereka lihat. Fitur ini secara drastis meningkatkan keterlibatan pengguna dan efisiensi komunikasi.
 
-#### 2. Store Message Validation and Merging
-**File: `web/src/store/chat.ts`**
-- Added validation in socket "message:new" event handler
-- Added validation in `openConversation` function for initial message loading
-- Added validation in `loadOlderMessages` function
-- Added validation in `sendMessage` acknowledgment handler
-- Added `mergeMessages` helper function to safely merge messages
-- Updated all message setters to use immutable merging instead of replacement
+*   **Rencana Implementasi:**
+    1.  **Backend:** Modifikasi endpoint `GET /api/conversations`. Untuk setiap percakapan, hitung jumlah pesan yang memiliki `createdAt` lebih baru dari `lastReadMsgId` milik pengguna saat ini (data `lastReadMsgId` sudah ada di model `Participant`). Sertakan `unreadCount` ini dalam data yang dikirim ke klien.
+    2.  **Frontend:** Di komponen `ChatList.tsx`, saat me-render setiap item percakapan, tampilkan `unreadCount` sebagai *badge* (lencana) notifikasi. Hilangkan badge ini saat pengguna membuka percakapan tersebut.
+    3.  **Real-time Update:** Saat pesan baru diterima melalui socket (`message:new`) di percakapan yang tidak aktif, `useChatStore` harus secara dinamis menambah `unreadCount` di state.
 
-#### 3. Message Filtering
-- Invalid messages are now filtered out with proper warnings instead of causing crashes
-- Empty string messages are now allowed (they were previously filtered out)
+### b. Pencarian Pesan (Message Search)
 
-### Backend Fixes:
+*   **Mengapa Ini Penting?**
+    Seiring waktu, percakapan akan berisi informasi penting. Tanpa fungsi pencarian, menemukan kembali informasi tersebut menjadi tidak mungkin. Ini adalah fitur utilitas murni yang sangat dibutuhkan.
 
-#### 1. Safe Cookie Parsing
-**File: `server/src/socket.ts`**
-```typescript
-import cookie from 'cookie';
+*   **Rencana Implementasi:**
+    1.  **Backend:** Buat endpoint baru, misalnya `GET /api/messages/search?q=<query>&conversationId=<id>`. Endpoint ini akan melakukan pencarian teks (misalnya menggunakan `contains` atau fitur Full-Text Search dari PostgreSQL) pada model `Message`, yang terbatas pada satu percakapan.
+    2.  **Frontend:** Tambahkan ikon dan input pencarian di dalam `ChatHeader.tsx`. Saat pengguna melakukan pencarian, panggil API baru tersebut. Hasilnya dapat ditampilkan dalam sebuah modal atau dengan menyorot pesan yang cocok di dalam `ChatWindow`.
 
-// Safe cookie parsing implementation
-if (socket.handshake.headers?.cookie) {
-  const cookies = cookie.parse(socket.handshake.headers.cookie);
-  token = cookies["at"] || null;
-  console.log("Token from cookie:", token);
-}
-```
+---
 
-#### 2. Message Content Sanitization
-**File: `server/src/socket.ts`**
-```typescript
-import xss from 'xss';
+## 2. Fitur Peningkatan Penting (Should-Have)
 
-// Sanitize content before storing
-const sanitizedContent = data.content ? xss(data.content) : null;
-```
+Fitur-fitur ini akan secara signifikan memperkaya pengalaman pengguna dan menambahkan lapisan personalisasi yang penting.
 
-#### 3. Proper Message Serialization
-- Added JSON serialization to ensure Prisma results are properly formatted:
-```typescript
-const broadcastData = JSON.parse(JSON.stringify({
-  ...newMessage,
-  tempId: data.tempId,
-}));
-```
+### a. Kustomisasi Profil Pengguna (Avatar & Status)
 
-## Outstanding Security Issues (Still Need Implementation)
+*   **Mengapa Ini Penting?**
+    Memberi pengguna kemampuan untuk mempersonalisasi profil mereka (terutama gambar profil) adalah kunci untuk menciptakan rasa memiliki dan identitas di dalam aplikasi. Saat ini, avatar dibuat secara otomatis.
 
-### 1. Cookie Security Configuration - High Severity
-- **SameSite attribute configuration** still uses default settings that may allow CSRF attacks
-- **Fix Needed**: Use "strict" for authentication cookies in `server/src/routes/auth.ts`
+*   **Rencana Implementasi:**
+    1.  **Backend:** Buat endpoint `POST /api/users/me/avatar` yang menerima unggahan gambar, memprosesnya (misalnya resize), dan menyimpan URL-nya di `avatarUrl` pada model `User`. Buat juga endpoint `PUT /api/users/me` untuk memperbarui detail lain seperti nama atau status.
+    2.  **Frontend:** Buat halaman atau modal `Settings` baru. Tambahkan komponen untuk memilih dan mengunggah gambar profil, serta form untuk mengubah nama. Perbarui `useAuthStore` untuk menangani logika ini.
 
-### 2. File Upload Path Traversal - Critical Severity
-- **Path traversal vulnerability** in upload functionality
-- **Fix Needed**: Implement filename sanitization and path validation in `server/src/routes/uploads.ts`
+### b. Pratinjau Gambar & Media (Image & Media Previews)
 
-### 3. No CSRF Protection - High Severity
-- **No CSRF tokens implemented** despite using cookie-based authentication
-- **Fix Needed**: Add CSRF protection middleware in `server/src/app.ts`
+*   **Mengapa Ini Penting?**
+    Saat ini, lampiran file hanya ditampilkan sebagai link. Menampilkan pratinjau gambar secara langsung di dalam chat adalah pengalaman yang jauh lebih baik dan sesuai dengan ekspektasi pengguna dari aplikasi chat modern.
 
-### 4. Insecure Key Storage - Medium Severity
-- **Private keys stored in localStorage** (accessible to XSS attacks)
-- **Fix Needed**: Implement additional encryption layers in `web/src/utils/keyManagement.ts`
+*   **Rencana Implementasi:**
+    1.  **Frontend:** Modifikasi komponen `MessageItem.tsx`. Jika objek pesan berisi `imageUrl` (atau `fileUrl` dengan `fileType` gambar), render komponen `LazyImage.tsx` (yang sudah ada di proyek) untuk menampilkan gambar tersebut, bukan hanya teks.
+    2.  **Lightbox:** Implementasikan *lightbox* sederhana. Saat pengguna mengklik pratinjau gambar, gambar tersebut akan ditampilkan dalam layar penuh (fullscreen overlay) untuk pengalaman melihat yang lebih baik.
 
-### 5. Cache Memory Leaks - Medium Severity
-- **Caching without size limits** in crypto utilities
-- **Fix Needed**: Add cache size limits in `web/src/utils/crypto.ts`
+---
 
-## Impact of Recent Fixes
+## 3. Fitur Jangka Panjang (Nice-to-Have)
 
-### Positive Changes:
-1. **Eliminated blank screens**: Application no longer crashes when receiving invalid messages
-2. **Improved error handling**: Invalid messages generate warnings instead of crashes
-3. **Better user experience**: App remains responsive even when encountering malformed data
-4. **Enhanced security**: Safer cookie parsing reduces injection attack surface
-5. **Data integrity**: Proper message serialization ensures consistent data format
-6. **Message persistence**: Messages no longer disappear after render due to proper merging
+Fitur-fitur ini lebih kompleks tetapi akan membedakan aplikasi Anda dan mempersiapkannya untuk masa depan.
 
-### Performance Improvements:
-1. **Reduced crashes**: Fewer runtime errors due to validation
-2. **Memory efficiency**: Invalid messages are filtered out early
-3. **Faster rendering**: Error messages are handled gracefully without blocking
-4. **Better state management**: Immutable updates ensure React properly re-renders
+### a. Status Pesan Terbaca (Read Receipts)
 
-## Recommended Next Steps
+*   **Mengapa Ini Penting?**
+    Memberikan kepastian kepada pengirim bahwa pesan mereka tidak hanya terkirim tetapi juga telah dilihat oleh penerima. Ini adalah fitur standar di aplikasi seperti WhatsApp dan Telegram.
 
-### Immediate Priorities:
-1. **Complete cookie security** by configuring proper SameSite attributes
-2. **Add CSRF protection** middleware for API endpoints
-3. **Secure file uploads** with proper filename sanitization
+*   **Rencana Implementasi:**
+    1.  **Database:** Model `MessageStatus` sudah ada dengan enum `READ`. Ini adalah fondasi yang bagus.
+    2.  **Backend:** Buat event socket baru dari klien, misalnya `message:mark_as_read`, yang membawa `messageId`.
+    3.  **Frontend:** Di `ChatWindow`, saat sebuah `MessageItem` masuk ke dalam viewport (bisa dideteksi dengan `Intersection Observer API`), panggil event `message:mark_as_read`.
+    4.  **UI:** Di `MessageItem.tsx`, tampilkan ikon centang yang berbeda (misalnya, dua centang biru) jika status pesan adalah `READ`.
+    5.  **Privasi:** Sebagai pengembangan lanjutan, tambahkan opsi di pengaturan bagi pengguna untuk menonaktifkan pengiriman *read receipts*.
 
-### Future Improvements:
-1. **Enhance key storage security** with additional encryption layers
-2. **Implement cache size limits** to prevent memory leaks
-3. **Add rate limiting** to prevent abuse
-4. **Implement proper error boundaries** in React components
+### b. Balas Pesan (Reply to Message)
 
-## Testing Recommendations
+*   **Mengapa Ini Penting?**
+    Dalam percakapan grup yang ramai, fitur balas sangat penting untuk menjaga konteks. Ini memungkinkan pengguna untuk merespons pesan tertentu secara langsung.
 
-With the current fixes in place:
-
-1. **Validate error handling**: Test the application with malformed message data
-2. **Verify cookie security**: Check that socket authentication works correctly
-3. **Test message rendering**: Send various message types to ensure no crashes occur
-4. **Check serialization**: Verify that messages are properly formatted when received by clients
-5. **Performance testing**: Monitor memory usage during extended sessions
-6. **Message persistence testing**: 
-   - Open chat between 2 users in different tabs
-   - Send a message → it should appear instantly and **stay visible**
-   - Refresh → old messages should load without duplication
-   - Switch chats → recent messages persist properly
-
-## Conclusion
-
-The recent fixes have significantly improved the stability and resilience of the Chat-Lite application by addressing the immediate issues causing blank screens, crashes, and message disappearance. The defensive programming approach ensures that invalid messages are handled gracefully rather than causing application failures.
-
-However, several security vulnerabilities remain that need to be addressed for production use. The implementation of proper input validation, sanitization, and security headers will make the application more robust against common web application attacks.
-
-The foundation is now in place for a more stable and secure application. The next priority should be implementing the remaining security measures to ensure the application is production-ready.
+*   **Rencana Implementasi:**
+    1.  **Database:** Tambahkan relasi opsional pada model `Message`, misalnya `repliedToId: String?` yang merujuk ke `id` pesan lain.
+    2.  **Frontend:** Di `MessageItem.tsx`, tambahkan tombol "Reply" (misalnya di menu dropdown). Saat diklik, UI di `MessageInput` akan menampilkan kutipan pesan yang akan dibalas. Saat mengirim, `repliedToId` disertakan dalam payload `message:send`.
+    3.  **UI:** Di `MessageItem.tsx`, jika sebuah pesan memiliki `repliedToId`, render kutipan kecil dari pesan asli di atas konten pesan balasan tersebut.

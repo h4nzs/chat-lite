@@ -1,92 +1,67 @@
-# Ringkasan Analisis Proyek "Chat-Lite"
+# Ringkasan Analisis Proyek "Chat-Lite" (Diperbarui)
 
-Analisis menyeluruh terhadap proyek "Chat-Lite" telah selesai. Dokumen ini merangkum arsitektur, fungsionalitas, dan area potensial untuk perbaikan sesuai dengan panduan `FIXES.md`.
+Analisis menyeluruh terhadap proyek "Chat-Lite" telah selesai. Dokumen ini merangkum arsitektur, fungsionalitas, dan status terbaru proyek setelah serangkaian perbaikan dan refactoring.
 
 ---
 
 ### 1. Arsitektur & Teknologi Utama
 
-- **Monorepo:** `server/` (Backend) dan `web/` (Frontend).
-- **Backend:**
-  - **Framework:** Node.js, Express.js
-  - **Database:** PostgreSQL dengan Prisma ORM
-  - **Real-time:** Socket.IO
-  - **Autentikasi:** JWT (Access & Refresh Tokens), Cookies (httpOnly)
-  - **Keamanan:** `helmet`, `cors`, `csurf` (CSRF protection), `express-rate-limit`, `xss`
-  - **Bahasa:** TypeScript
-- **Frontend:**
-  - **Framework:** React (dengan Vite)
-  - **State Management:** Zustand
-  - **Routing:** React Router
-  - **Styling:** TailwindCSS
-  - **UI:** Radix UI (headless), `react-hot-toast`, `react-icons`
-  - **Bahasa:** TypeScript
+Arsitektur tetap solid dan tidak berubah secara fundamental.
 
-**Komunikasi Server-Client:**
-- **Hybrid:** Menggunakan **REST API** untuk data awal (memuat percakapan, riwayat pesan) dan **WebSockets (Socket.IO)** untuk pembaruan real-time (pesan baru, status online, notifikasi pengetikan).
+- **Monorepo:** `server/` (Backend) dan `web/` (Frontend).
+- **Backend:** Node.js, Express.js, PostgreSQL dengan Prisma, Socket.IO.
+- **Frontend:** React (Vite), Zustand, React Router, TailwindCSS.
+- **Komunikasi:** Hybrid (REST API untuk data awal, WebSockets untuk pembaruan real-time).
 
 ---
 
 ### 2. Daftar Fitur Utama & Statusnya
 
-- **✅ Autentikasi & Sesi:** Login/Register/Logout berfungsi. Menggunakan JWT dengan refresh token.
-- **✅ Real-time Chat (Pesan Pribadi & Grup):** Berfungsi. Pesan dikirim dan diterima secara real-time.
-- **✅ Enkripsi End-to-End (E2EE):** Terimplementasi. Kunci dibuat di sisi klien, kunci privat dienkripsi dengan password, dan kunci publik dikirim ke server. Pesan dienkripsi/dekripsi di klien.
-- **✅ Status Online (Presence):** Berfungsi. Daftar pengguna online diperbarui saat pengguna terhubung/terputus.
-- **✅ Indikator Pengetikan:** Berfungsi. `typing:start` dan `typing:stop` diimplementasikan.
-- **✅ Reaksi & Hapus Pesan:** Berfungsi. Event socket `reaction:new/remove` dan `message:deleted` ada.
-- **✅ Manajemen Grup:** Terdapat skema dan API untuk membuat, bergabung, dan menghapus grup.
-- **✅ Lampiran File (File Attachment):** Berfungsi. Menggunakan `multer` di backend dan `FormData` di frontend.
-- **✅ Notifikasi Push:** Terimplementasi menggunakan `web-push`.
-- **⚠️ UI Responsif & Konsistensi:** Kode menggunakan kelas TailwindCSS untuk responsivitas, namun perlu verifikasi visual untuk memastikan konsistensi dan pengalaman pengguna yang optimal di semua perangkat.
+- **✅ Autentikasi & Sesi:** Berfungsi dengan baik.
+- **✅ Real-time Chat (Pesan Pribadi & Grup):** Berfungsi dengan baik.
+- **✅ Enkripsi End-to-End (E2EE):** Terimplementasi.
+- **✅ Status Online (Presence):** Berfungsi dan **telah dioptimalkan**. Tidak lagi mengirim seluruh daftar pengguna online ke semua klien.
+- **✅ Indikator Pengetikan:** Berfungsi.
+- **✅ Reaksi & Hapus Pesan:** Berfungsi.
+- **✅ Manajemen Grup:** Berfungsi. Inkonsistensi pada tombol hapus grup **telah diperbaiki**.
+- **✅ Lampiran File (File Attachment):** Berfungsi.
+- **✅ Notifikasi Push:** Terimplementasi.
+- **✅ UI Responsif & Konsistensi:** Logika untuk menangani percakapan yang tidak valid atau dihapus di layar kecil **telah ditambahkan**, memastikan sidebar selalu dapat diakses.
 
 ---
 
-### 3. Alur Kerja & Logika Utama
+### 3. Alur Kerja & Logika Utama (Setelah Perbaikan)
 
-1.  **Inisialisasi:** Pengguna membuka aplikasi. `useAuthStore.bootstrap()` mencoba mengambil data pengguna via API (`/api/users/me`). Jika berhasil, koneksi socket dibuat.
-2.  **Mendengar Event:** `useChatStore.initSocketListeners()` mendaftarkan semua event handler socket. Ini adalah "telinga" aplikasi.
-3.  **Memuat Data:** Daftar percakapan dan riwayat pesan diambil menggunakan REST API.
-4.  **Mengirim Pesan:**
-    - Komponen UI memanggil `useChatStore.sendMessage()`.
-    - Zustand melakukan **pembaruan UI optimis** (menampilkan pesan sementara).
-    - `socket.emit('message:send', ...)` mengirim data ke server.
-    - Server menyimpan ke DB, lalu menyiarkan `message:new` ke semua anggota percakapan.
-    - Klien pengirim menerima `ack` (acknowledgment) dari server dan mengganti pesan sementara dengan data pesan asli.
-5.  **Menerima Pesan:**
-    - Listener `socket.on('message:new', ...)` di `useChatStore` aktif.
-    - State Zustand diperbarui dengan pesan baru.
-    - Komponen React yang berlangganan state tersebut (misalnya `ChatWindow`) akan **otomatis re-render** untuk menampilkan pesan baru.
+Alur kerja inti tetap sama, namun dengan beberapa peningkatan penting:
+
+1.  **Refactor Komponen:** Logika bisnis yang kompleks dari `ChatWindow.tsx` telah dipindahkan ke dalam custom hook `useConversation.ts`. Ini membuat komponen `ChatWindow` lebih bersih, fokus pada UI, dan lebih mudah dikelola.
+2.  **Manajemen State yang Lebih Baik:**
+    - `useChatStore` sekarang memiliki state `error` untuk melacak kegagalan saat memuat data.
+    - Fungsi `sendMessage` sekarang menangani kasus kegagalan pengiriman, memperbarui state pesan dengan flag `error`.
+3.  **Penanganan Error di UI:**
+    - **Pesan Gagal Kirim:** `MessageItem.tsx` sekarang menampilkan ikon error di samping pesan yang gagal terkirim.
+    - **Gagal Memuat Data:** `ChatList.tsx` dan `ChatWindow.tsx` sekarang menampilkan pesan error jika gagal mengambil data percakapan atau riwayat pesan dari server.
 
 ---
 
-### 4. Area Risiko & Rekomendasi
+### 4. Ringkasan Perbaikan & Peningkatan
 
-Meskipun arsitekturnya solid, beberapa area memiliki potensi risiko atau dapat ditingkatkan:
+Berikut adalah daftar perbaikan yang telah berhasil diimplementasikan:
 
-1.  **Duplikasi Event Listener (Risiko Rendah):**
-    - **Masalah:** `initSocketListeners` dipanggil di `App.tsx`, yang seharusnya berjalan sekali. Namun, jika struktur komponen berubah, ada risiko pemanggilan berulang.
-    - **Kondisi Saat Ini:** Kode sudah memiliki mitigasi yang baik dengan memanggil `socket.off()` di awal `initSocketListeners` untuk membersihkan listener lama. Ini efektif mencegah duplikasi.
-    - **Rekomendasi:** Pertahankan pola `socket.off()` yang sudah ada. Tidak perlu tindakan segera.
+1.  **Optimasi Sistem Presence:** Event socket `presence:update` yang boros bandwidth telah diganti dengan event yang lebih spesifik (`presence:init`, `presence:user_joined`, `presence:user_left`), mengurangi lalu lintas jaringan secara signifikan.
 
-2.  **Efisiensi Presence System (Skalabilitas):**
-    - **Masalah:** Setiap kali pengguna terhubung atau terputus, event `presence:update` mengirim **seluruh daftar ID pengguna online** ke **semua klien**.
-    - **Potensi Dampak:** Pada skala besar (ribuan pengguna online), ini bisa menjadi boros bandwidth dan menyebabkan pemrosesan yang tidak perlu di sisi klien.
-    - **Rekomendasi:** Untuk masa depan, pertimbangkan untuk mengubah event menjadi lebih spesifik, seperti `presence:user_joined(userId)` dan `presence:user_left(userId)`. Ini akan mengurangi jumlah data yang dikirim secara signifikan. Untuk saat ini, fungsionalitasnya benar.
+2.  **Stabilisasi UI & UX:**
+    - **Indikator Error:** Pengguna sekarang mendapatkan feedback visual yang jelas jika sebuah pesan gagal terkirim atau jika data gagal dimuat, meningkatkan keandalan aplikasi.
+    - **Logika Sidebar:** Aplikasi sekarang secara cerdas menampilkan sidebar di layar kecil jika percakapan aktif menjadi tidak valid, mencegah pengguna terjebak di layar kosong.
 
-3.  **Pencampuran Logika di Komponen (Potensi Refactor):**
-    - **Masalah:** Beberapa komponen UI mungkin secara langsung memanggil fungsi dari `useChatStore` yang memicu event socket atau panggilan API.
-    - **Potensi Dampak:** Ini dapat membuat komponen lebih sulit untuk diuji dan dipelihara karena tanggung jawabnya tercampur (tampilan dan logika bisnis).
-    - **Rekomendasi:** Tinjau komponen kompleks seperti `ChatWindow` atau `StartNewChat`. Pertimbangkan untuk memindahkan logika yang lebih kompleks ke dalam custom hooks (misalnya `useConversation`, `useMessaging`) untuk memisahkan *concerns* dan membuat komponen lebih fokus pada rendering.
-
-4.  **Manajemen Error & State Kosong di UI:**
-    - **Masalah:** Analisis kode belum dapat memastikan bagaimana UI menangani semua kondisi error (misalnya, gagal memuat pesan, gagal mengirim) atau state kosong (tidak ada percakapan, tidak ada pesan).
-    - **Rekomendasi:** Lakukan audit visual untuk memastikan ada komponen `Spinner`, `Alert`, atau pesan "empty state" yang ditampilkan pada kondisi yang tepat untuk meningkatkan UX.
+3.  **Peningkatan Kualitas Kode (Refactoring):**
+    - **Pemisahan Logika:** Logika di `ChatWindow` telah diekstraksi ke hook `useConversation`, mengikuti prinsip *separation of concerns* dan membuat kode lebih bersih.
+    - **Perbaikan Bug:** Masalah inkonsistensi tombol "Delete Group" telah diidentifikasi dan diperbaiki dengan memastikan `creatorId` selalu disertakan oleh API.
 
 ---
 
-### Kesimpulan Analisis
+### Kesimpulan Analisis (Diperbarui)
 
-Proyek "Chat-Lite" dibangun di atas fondasi teknis yang kuat dan modern. Arsitekturnya mengikuti praktik terbaik untuk aplikasi chat real-time, termasuk pemisahan yang jelas antara REST dan WebSockets, manajemen state yang efisien dengan Zustand, dan implementasi fitur-fitur canggih seperti E2EE dan UI optimis.
+Proyek "Chat-Lite" sekarang berada dalam kondisi yang lebih stabil, efisien, dan tangguh. Perbaikan yang dilakukan tidak hanya mengoptimalkan performa jaringan tetapi juga secara signifikan meningkatkan pengalaman pengguna dengan memberikan feedback yang lebih baik pada kondisi error. Kualitas kode juga telah ditingkatkan melalui refactoring, membuat proyek lebih mudah untuk dipelihara dan dikembangkan di masa depan.
 
-Kode ini terorganisir dengan baik dan siap untuk pengembangan lebih lanjut. Rekomendasi di atas bersifat untuk peningkatan dan skalabilitas di masa depan, bukan perbaikan bug kritis.
+Proyek ini berada dalam kondisi yang sangat baik untuk pengembangan fitur baru atau rilis produksi.
