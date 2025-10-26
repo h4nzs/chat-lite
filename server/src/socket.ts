@@ -10,6 +10,13 @@ export let io: Server;
 // Gunakan Set untuk melacak user yang online secara efisien
 const onlineUsers = new Set<string>();
 
+export function getIo() {
+  if (!io) {
+    throw new Error("Socket.IO not initialized!");
+  }
+  return io;
+}
+
 export function registerSocket(httpServer: HttpServer) {
   io = new Server(httpServer, {
     cors: {

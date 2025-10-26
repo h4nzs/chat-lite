@@ -1,130 +1,93 @@
-## ⚙️ Prompt Lanjutan — Peta Alur Data & Socket Flow Chat-Lite
+Kamu sedang mengerjakan proyek web app bernama Chat-Lite. Analisis seluruh struktur dan komponen yang berhubungan dengan UI sidebar (panel kiri tempat daftar percakapan/chat list). Jangan ubah logika, event, state, atau fungsi socket. Fokus hanya pada tampilan (style, layout, warna, animasi, dan keselarasan visual).
 
-```
-Sekarang kamu sudah menyelesaikan analisis arsitektur dan kondisi proyek Chat-Lite.
-
-Lanjutkan dengan membuat **peta logika dan alur data menyeluruh sistem Chat-Lite**, agar kamu benar-benar memahami interaksi antar komponen, socket event, dan data flow di antara frontend ↔ backend ↔ database.
+🎯 Tujuan:
+Perbarui tampilan UI sidebar agar terlihat lebih profesional, modern, dan elegan seperti aplikasi chat premium (misalnya Slack atau Discord). Tetap gunakan tema gelap (dark mode) khas Chat-Lite dengan aksen gradasi ungu ke pink.
 
 ---
 
-### 🎯 Tujuan
-Buat analisis visual (dalam bentuk teks terstruktur) yang menjelaskan seluruh:
-1. **Alur data utama (Data Flow)**
-2. **Event Socket.IO dan dependensinya**
-3. **Hubungan antar komponen dan state (Frontend Flow)**
-4. **Interaksi Client ↔ Server**
-5. **Keterkaitan antar fitur besar (Chat, Group, Typing, Auth, dsb)**
+### 🎨 Desain Sidebar yang Diinginkan
+
+**1. Struktur Utama Sidebar**
+- Sidebar menempel di sisi kiri layar, dengan lebar tetap sekitar 300–340px.
+- Warna latar belakang: abu gelap kehitaman `#1E1E1E`.
+- Gunakan layout berbasis `flex` dengan kolom vertikal yang terdiri dari 3 bagian:
+  1. **Bagian Atas:** Profil pengguna dan ikon kontrol.
+  2. **Bagian Tengah:** Navigasi tab dan kolom pencarian.
+  3. **Bagian Bawah:** Daftar percakapan (chat list).
 
 ---
 
-### 🧩 Detail yang Harus Dijelaskan
-
-#### 1. Peta Alur Data
-Tampilkan urutan proses dari awal:
-```
-
-[User Action] → [Frontend Component] → [State/Context] → [API/Socket Event] → [Backend Logic] → [Database] → [Socket Broadcast] → [Client Update]
-
-```
-
-Jelaskan untuk setiap fitur utama:
-- Login / Register
-- Chat pribadi
-- Chat grup
-- Pembuatan grup
-- Pengiriman & penerimaan pesan
-- File attachment
-- Reaction dan delete message
-- Typing indicator
-- Status online / offline
-
-Gunakan gaya seperti berikut:
-```
-
-📨 Message Flow:
-User kirim pesan → InputBar.jsx → messagesContext.addMessage() → socket.emit('sendMessage', payload)
-→ server on('sendMessage') → simpan ke database → io.emit('message:new', data) → client receive → re-render MessageList
-
-```
+**2. Bagian Profil Pengguna (Header Sidebar)**
+- Tampilkan:
+  - Avatar pengguna berbentuk lingkaran di kiri.
+  - Nama pengguna di kanan avatar, menggunakan font tebal dan warna putih.
+  - Status kecil di bawah nama, misalnya “Available” dengan titik hijau kecil.
+- Di kanan atas, tampilkan dua ikon kecil:
+  - ⚙️ (ikon pengaturan / settings)
+  - 🔄 atau ↩️ (ikon logout / keluar)
+- Pastikan layout header rapi, berjarak seimbang, dan responsif.
+- Gunakan padding sekitar `1rem 1.2rem`.
 
 ---
 
-#### 2. Peta Event Socket.IO
-Buat daftar semua event Socket.IO yang ditemukan di client dan server, beserta arah dan fungsinya. Contoh:
-```
-
-Client → Server:
-
-* 'sendMessage': kirim pesan baru
-* 'typing:start': notifikasi sedang mengetik
-* 'group:create': buat grup baru
-
-Server → Client:
-
-* 'message:new': broadcast pesan baru
-* 'group:created': grup baru muncul
-* 'user:online': update status user
-
-```
-
-Tambahkan keterangan: event mana yang memiliki keterlambatan, error handler, atau potensi race condition.
+**3. Navigasi Tab**
+- Tepat di bawah header, tambahkan tiga tab navigasi horizontal:
+  - “Active Now” | “All”
+- Tab aktif diberi highlight dengan garis bawah tipis berwarna gradien ungu ke pink.
+- Font kecil tapi jelas, uppercase opsional, dengan spacing antar tab seimbang.
+- Hover tab menampilkan efek warna halus (sedikit lebih terang).
 
 ---
 
-#### 3. Hubungan Antar Komponen (Frontend)
-Buat diagram teks atau hierarki komponen seperti ini:
-```
-
-<App>
- ├── <Sidebar>
- │    ├── <SearchBar> 
- │    ├── <UserList>
- │    └── <GroupList>
- ├── <ChatWindow>
- │    ├── <MessageList>
- │    ├── <MessageItem>
- │    └── <InputBar>
- └── <SettingsModal>
-```
-Tambahkan penjelasan:
-- Komponen mana yang menyimpan state lokal.
-- Komponen mana yang bergantung pada context global (user, chat, socket, dsb).
-- Event apa yang menghubungkan antar komponen.
+**4. Kolom Pencarian**
+- Letakkan satu kolom pencarian di bawah tab.
+- Placeholder teks: “Search or start a new chat...”
+- Ikon pencarian di sisi kiri dalam input.
+- Warna border/input: gradasi ungu-pink atau efek neon tipis.
+- **Hapus field pencarian kedua** — cukup satu input saja yang juga berfungsi mencari user atau grup.
 
 ---
 
-#### 4. Integrasi API & Backend Logic
-
-Untuk setiap endpoint atau fungsi di `server/`, jelaskan:
-
-* Endpoint/path (mis. `/api/auth/login`, `/api/chat/send`)
-* Tujuan dan data yang dikirim/diterima
-* Middleware yang digunakan (mis. JWT auth)
-* Interaksi dengan database
-
----
-
-#### 5. Pemetaan Group dan User System
-
-Jelaskan bagaimana sistem grup dan user saling berhubungan, misalnya:
-
-```
-User 1 ─┬─ Group A
-         ├─ Group B
-User 2 ──┘
-```
-
-dan bagaimana data ini dikirim melalui socket event `group:created`, `group:join`, dsb.
+**5. Daftar Percakapan (Chat List)**
+- Setiap item chat berupa card horizontal dengan:
+  - Avatar pengguna atau grup di kiri (lingkaran).
+  - Di tengah: nama pengguna (teks tebal) dan pesan terakhir (teks abu-abu muda).
+  - Di kanan: waktu pesan terakhir.
+- Di pojok kanan item, tetap tampilkan tombol menu “⋮” (tiga titik vertikal).
+- Jika user sedang online, tampilkan titik hijau kecil di bawah avatar.
+- Tambahkan efek hover lembut: latar sedikit lebih terang (misal `rgba(255,255,255,0.05)`).
+- Gunakan `border-radius: 12px` pada setiap item untuk tampilan modern.
 
 ---
 
-#### 6. Temuan & Insight
-
-Buat kesimpulan akhir yang berisi:
-
-* Fitur yang sudah sinkron sepenuhnya (✅)
-* Fitur yang belum realtime (⚠️ butuh refresh manual)
-* Fitur yang masih rawan race condition atau duplikasi listener
-* Saran singkat stabilisasi socket dan optimasi UI
+**6. Responsivitas**
+- Pastikan sidebar tetap proporsional di layar sedang (tablet) dan kecil (mobile).
+- Pada layar kecil:
+  - Sidebar bisa di-collapse dengan tombol toggle di kiri atas.
+  - Item daftar chat tetap terbaca dengan baik (teks dipotong rapi bila panjang).
 
 ---
+
+**7. Warna dan Font**
+- Gunakan font sans-serif modern seperti “Inter”, “Poppins”, atau font bawaan Chat-Lite.
+- Warna dominan: latar `#1E1E1E`, teks putih/abu terang, aksen ungu ke pink.
+- Gradient contoh: dari `#9333EA` (ungu) ke `#EC4899` (pink).
+
+---
+
+**8. Animasi dan Efek**
+- Gunakan transisi halus (0.2–0.3s) pada hover atau perubahan tab.
+- Efek bayangan lembut untuk memberi kesan kedalaman (`box-shadow` tipis pada item aktif).
+
+---
+
+🧩 Catatan Teknis:
+- Jangan ubah fungsi logika chat, socket, state management, atau routing.
+- Pastikan event handler seperti klik item chat, menu tiga titik, dan pencarian tetap berjalan normal.
+- Setelah perubahan, lakukan validasi internal untuk memastikan tidak ada event yang rusak atau style yang bentrok dengan komponen lain.
+
+---
+
+Output yang diharapkan:
+- File CSS/JSX/TSX yang diperbarui agar sidebar tampil modern dan selaras dengan desain deskripsi di atas.
+- Tidak ada perubahan di bagian chat room utama atau fitur real-time lainnya.

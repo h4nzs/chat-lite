@@ -38,8 +38,16 @@ const uploadAvatar = multer({
 });
 
 // === GET: User data diri ===
-router.get("/me", requireAuth, (req, res) => {
-  res.json((req as any).user);
+router.get("/me", requireAuth, async (req: any, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: (req as any).user.id },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+    });
+    res.json(user);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // === PUT: Update user profile (e.g., name) ===

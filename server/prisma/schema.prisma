@@ -26,6 +26,7 @@ model User {
   reactions        MessageReaction[]
   pushSubscriptions PushSubscription[]
   hiddenConversations UserHiddenConversation[] // Relasi untuk soft delete
+  createdConversations Conversation[] @relation("CreatedConversations")
 
   @@index([email])
   @@index([username])
@@ -38,6 +39,7 @@ model Conversation {
   isGroup       Boolean        @default(false)
   title         String?
   creatorId     String?        // ID user yang membuat grup
+  creator       User?          @relation("CreatedConversations", fields: [creatorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   lastMessageAt DateTime?      @db.Timestamptz(6)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt

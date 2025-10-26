@@ -13,16 +13,16 @@ import { toAbsoluteUrl } from "@utils/url"; // Impor utilitas URL
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { presence, toggleSidebar } = useChatStore();
-  const peer = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
-  const title = conversation.title || peer?.name || 'Chat';
-  const isOnline = peer ? presence.includes(peer.id) : false;
+  const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.user.id !== meId)?.user : null;
+  const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
+  const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
   return (
     <div className="p-4 border-b border-gray-800 flex items-center gap-4 flex-shrink-0">
       <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-white">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <img src={toAbsoluteUrl(peer?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
+      <img src={toAbsoluteUrl(peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
       <div>
         <p className="font-bold text-white">{title}</p>
         <p className="text-xs text-text-secondary">{isOnline ? 'Active now' : 'Offline'}</p>

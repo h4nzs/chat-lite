@@ -167,7 +167,7 @@ export const useChatStore = create<State>((set, get) => ({
     });
   },
   deleteConversation: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
-  deleteGroup: async (id) => { await api(`/api/conversations/group/${id}`, { method: 'DELETE' }); },
+  deleteGroup: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
   searchUsers: async (q) => { return api(`/api/users/search?q=${q}`); },
   startConversation: async (peerId) => {

@@ -64,27 +64,26 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     <div className="h-full flex flex-col bg-surface">
       <UserProfile />
       <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <input 
-              type="text" 
-              placeholder="Search or start new chat..." 
-              className="w-full p-2 pl-10 bg-primary border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
+        <div className="relative flex items-center">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
-          {/* Kembalikan Tombol Buat Grup */}
-      <button onClick={openCreateGroupModal} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-text-secondary hover:bg-surface transition-colors">
-        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-        </div>
-        <span>New Group Chat</span>
-      </button>
-
+          <input 
+            type="text" 
+            placeholder="Search or start new chat..." 
+            className="w-full p-2.5 pl-10 pr-12 bg-primary border border-gray-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <button 
+              onClick={openCreateGroupModal} 
+              title="New Group Chat" // Tooltip on hover
+              className="p-2 rounded-full text-text-secondary hover:bg-gray-700 hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -104,16 +103,17 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
           ) : (
             filteredConversations.map((c) => {
               const isActive = c.id === activeId;
-              const title = c.title || c.participants.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
-              const peer = !c.isGroup ? c.participants.find(p => p.id !== meId) : null;
-              const isOnline = peer ? presence.includes(peer.id) : false;
+              // FIX: Access user data from the nested `user` object
+              const peerUser = !c.isGroup ? c.participants.find(p => p.user.id !== meId)?.user : null;
+              const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
+              const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
               return (
                 <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent/20' : 'hover:bg-primary/50'}`}>
                   <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
-                      <img src={toAbsoluteUrl(peer?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
-                      {peer && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
+                      <img src={toAbsoluteUrl(peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
+                      {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
@@ -134,18 +134,17 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                       </DropdownMenu.Trigger>
                       <DropdownMenu.Portal>
                         <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-gray-800 border border-gray-700 rounded-md shadow-lg z-50 p-1">
-                          {c.isGroup && c.creatorId === meId && (
+                          {c.isGroup ? (
                             <DropdownMenu.Item 
                               onSelect={() => { if(window.confirm('Are you sure you want to permanently delete this group?')) deleteGroup(c.id); }}
-                              className="block w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded cursor-pointer outline-none"
+                              className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded cursor-pointer outline-none hover:bg-red-500 hover:text-white"
                             >
                               Delete Group
                             </DropdownMenu.Item>
-                          )}
-                          {!c.isGroup && (
+                          ) : (
                             <DropdownMenu.Item 
                               onSelect={() => { if(window.confirm('Are you sure you want to hide this chat?')) deleteConversation(c.id); }}
-                              className="block w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded cursor-pointer outline-none"
+                              className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded cursor-pointer outline-none hover:bg-red-500 hover:text-white"
                             >
                               Delete Chat
                             </DropdownMenu.Item>
