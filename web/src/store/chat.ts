@@ -61,6 +61,11 @@ const sortConversations = (list: Conversation[]) =>
   [...list].sort((a, b) => new Date(b.lastMessage?.createdAt || b.updatedAt).getTime() - new Date(a.lastMessage?.createdAt || a.updatedAt).getTime());
 
 const withPreview = (msg: Message): Message => {
+  // Prioritaskan konten teks jika ada
+  if (msg.content) {
+    return { ...msg, preview: msg.content };
+  }
+  // Jika tidak ada konten teks, baru tampilkan pratinjau file
   if (msg.fileUrl) {
     if (msg.fileType?.startsWith('image/')) return { ...msg, preview: "📷 Image" };
     if (msg.fileType?.startsWith('video/')) return { ...msg, preview: "🎥 Video" };
@@ -100,6 +105,18 @@ export const useChatStore = create<State>((set, get) => ({
   sendMessage: async (conversationId, data) => {
     const tempId = Date.now();
     const me = useAuthStore.getState().user;
+
+    // Enkripsi konten sebelum dikirim
+    let encryptedContent = data.content;
+    if (data.content) {
+      try {
+        encryptedContent = await encryptMessage(data.content, conversationId);
+      } catch (error) {
+        toast.error("Failed to encrypt message.");
+        return;
+      }
+    }
+
     const optimisticMessage: Message = {
       id: `temp-${tempId}`,
       tempId,
@@ -108,19 +125,16 @@ export const useChatStore = create<State>((set, get) => ({
       sender: me!,
       createdAt: new Date().toISOString(),
       optimistic: true,
-      ...data,
+      ...data, // content di sini masih plain text untuk optimistic UI
     };
+
     set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage] } }));
+    
     const socket = getSocket();
-    socket.emit("message:send", { conversationId, tempId, ...data }, (ack: { ok: boolean, msg: Message, error?: string }) => {
-      if (ack.ok) {
-        set(state => ({
-          messages: {
-            ...state.messages,
-            [conversationId]: state.messages[conversationId].map(m => m.tempId === tempId ? ack.msg : m),
-          },
-        }));
-      } else {
+    const payload = { ...data, content: encryptedContent };
+
+    socket.emit("message:send", { conversationId, tempId, ...payload }, (ack: { ok: boolean, error?: string }) => {
+      if (!ack.ok) {
         toast.error(`Failed to send message: ${ack.error || 'Unknown error'}`);
         set(state => ({
           messages: {
@@ -131,6 +145,7 @@ export const useChatStore = create<State>((set, get) => ({
           },
         }));
       }
+      // Kasus sukses ditangani oleh listener 'message:new' untuk menjaga satu sumber kebenaran
     });
   },
   deleteConversation: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
@@ -159,9 +174,12 @@ export const useChatStore = create<State>((set, get) => ({
     try {
       set({ error: null });
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
-      const decryptedItems = await Promise.all(res.items.map(async (m) => {
+      const decryptedItems = await Promise.all(
+        (res.items || []).map(async (m) => {
           try {
-            m.content = await decryptMessage(m.content || '', m.conversationId);
+            if (m.content) {
+              m.content = await decryptMessage(m.content, m.conversationId);
+            }
             return withPreview(m);
           } catch (err) {
             m.content = '[Failed to decrypt message]';
@@ -169,7 +187,11 @@ export const useChatStore = create<State>((set, get) => ({
           }
         })
       );
-      set(state => ({ messages: { ...state.messages, [id]: decryptedItems } }));
+
+      // Sort messages by date ascending (oldest to newest)
+      decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      set((state) => ({ messages: { ...state.messages, [id]: decryptedItems } }));
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
       set(state => ({ 
@@ -266,17 +288,41 @@ export const useChatStore = create<State>((set, get) => ({
       });
     });
 
-    socket.on("message:new", (newMessage: Message) => {
+    socket.on("message:new", async (newMessage: Message) => {
+      // We need to decrypt the content of the new message
+      if (newMessage.content) {
+        try {
+          newMessage.content = await decryptMessage(newMessage.content, newMessage.conversationId);
+        } catch (error) {
+          newMessage.content = "[Failed to decrypt message]";
+        }
+      }
       set(state => {
-        if (newMessage.senderId === useAuthStore.getState().user?.id) return state;
+        // Prevent processing if the sender is the current user, as optimistic update is used
+        if (newMessage.senderId === useAuthStore.getState().user?.id) {
+            // find the optimistic message and update it
+            const optimisticMessageExists = (state.messages[newMessage.conversationId] || []).some(m => m.tempId === newMessage.tempId);
+            if(optimisticMessageExists) {
+                return {
+                    messages: {
+                        ...state.messages,
+                        [newMessage.conversationId]: state.messages[newMessage.conversationId].map(m => m.tempId === newMessage.tempId ? withPreview(newMessage) : m)
+                    }
+                }
+            }
+        };
+
         const conversationId = newMessage.conversationId;
         const messages = state.messages[conversationId] || [];
+        // Prevent duplicate messages
         if (messages.some(m => m.id === newMessage.id)) return state;
+
         const updatedConversations = state.conversations.map(c => 
           c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt } : c
         );
+
         return {
-          messages: { ...state.messages, [conversationId]: [...messages, newMessage] },
+          messages: { ...state.messages, [conversationId]: [...messages, withPreview(newMessage)] },
           conversations: sortConversations(updatedConversations),
         };
       });

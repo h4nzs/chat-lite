@@ -25,19 +25,35 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
     }
 
-        const messages = await prisma.message.findMany({
-          where: { conversationId },
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationId,
+      },
+      take: 50,
+      ...(cursor && {
+        skip: 1,
+        cursor: {
+          id: cursor,
+        },
+      }),
+      include: {
+        sender: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+        reactions: {
           include: {
-            sender: true,
-            reactions: { include: { user: true } },
-            statuses: true, // Sertakan status pesan
+            user: { select: { id: true, username: true } },
           },
-          orderBy: { createdAt: "asc" },
-        });
-    const items = messages.map(m => ({ ...m })).reverse();
-    const nextCursor = items.length > 0 ? items[0]?.createdAt.toISOString() : null;
+        },
+        statuses: true,
+      },
+      orderBy: {
+        createdAt: "desc", // Fetch newest messages first
+      },
+    });
 
-    res.json({ items, nextCursor });
+    // Reverse the array on the server to send them in ascending order (oldest to newest)
+    res.json({ items: messages.reverse() });
   } catch (e) {
     next(e);
   }

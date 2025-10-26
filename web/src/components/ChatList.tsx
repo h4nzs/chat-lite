@@ -44,6 +44,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false); // Kembalikan state untuk modal
 
+  const openCreateGroupModal = () => setShowGroupModal(true);
+
   const formatConversationTime = useCallback((timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -76,9 +78,13 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             </div>
           </div>
           {/* Kembalikan Tombol Buat Grup */}
-          <button onClick={() => setShowGroupModal(true)} className="p-2 bg-accent rounded-lg text-white hover:bg-accent-hover transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-          </button>
+      <button onClick={openCreateGroupModal} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-text-secondary hover:bg-surface transition-colors">
+        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+        </div>
+        <span>New Group Chat</span>
+      </button>
+
         </div>
       </div>
 

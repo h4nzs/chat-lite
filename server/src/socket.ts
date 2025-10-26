@@ -50,7 +50,7 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("message:send", async (data, cb) => {
       try {
-        const sanitizedContent = data.content != null ? xss(data.content) : null;
+        // const sanitizedContent = data.content != null ? xss(data.content) : null;
 
         // 1. Ambil semua partisipan
         const participants = await prisma.participant.findMany({
@@ -63,7 +63,7 @@ export function registerSocket(httpServer: HttpServer) {
           data: {
             conversationId: data.conversationId,
             senderId: socket.user.id,
-            content: sanitizedContent,
+            content: data.content, // Simpan konten terenkripsi langsung
             fileUrl: data.fileUrl,
             fileName: data.fileName,
             fileType: data.fileType,
@@ -84,8 +84,24 @@ export function registerSocket(httpServer: HttpServer) {
           }, 
         });
 
-        const broadcastData = JSON.parse(JSON.stringify({ ...newMessage, tempId: data.tempId }));
-        io.to(data.conversationId).emit("message:new", broadcastData);
+        // DO NOT spread the Prisma object. Create a plain DTO.
+        const messageToBroadcast = {
+          id: newMessage.id,
+          conversationId: newMessage.conversationId,
+          senderId: newMessage.senderId,
+          content: newMessage.content,
+          fileUrl: newMessage.fileUrl,
+          fileName: newMessage.fileName,
+          fileType: newMessage.fileType,
+          fileSize: newMessage.fileSize,
+          createdAt: newMessage.createdAt,
+          sender: newMessage.sender,
+          reactions: newMessage.reactions,
+          statuses: newMessage.statuses,
+          tempId: data.tempId, // Ensure tempId is included
+        };
+
+        io.to(data.conversationId).emit("message:new", messageToBroadcast);
 
         // Update a conversation's lastMessageAt timestamp
         await prisma.conversation.update({
@@ -97,7 +113,7 @@ export function registerSocket(httpServer: HttpServer) {
           where: { conversationId: data.conversationId, userId: { not: socket.user.id } },
           select: { userId: true },
         });
-        const payload = { title: `New message from ${socket.user.username}`, body: sanitizedContent || 'File received' };
+        const payload = { title: `New message from ${socket.user.username}`, body: data.content || 'File received' };
         pushRecipients.forEach(p => sendPushNotification(p.userId, payload));
 
         cb?.({ ok: true, msg: newMessage });
