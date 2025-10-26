@@ -90,7 +90,25 @@ export const useChatStore = create<State>((set, get) => ({
     try {
       set({ error: null });
       const conversations = await api<Conversation[]>("/api/conversations");
-      set({ conversations: sortConversations(conversations) });
+
+      // Decrypt the last message for each conversation
+      const decryptedConversations = await Promise.all(
+        conversations.map(async (c) => {
+          if (c.lastMessage?.content) {
+            try {
+              const decryptedContent = await decryptMessage(c.lastMessage.content, c.id);
+              c.lastMessage.content = decryptedContent;
+              c.lastMessage.preview = decryptedContent; // Update preview as well
+            } catch (e) {
+              c.lastMessage.content = "[Encrypted Message]";
+              c.lastMessage.preview = "[Encrypted Message]";
+            }
+          }
+          return c;
+        })
+      );
+
+      set({ conversations: sortConversations(decryptedConversations) });
     } catch (error) {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
