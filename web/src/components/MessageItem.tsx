@@ -77,9 +77,10 @@ const ReactionsDisplay = ({ reactions }: { reactions: Message['reactions'] }) =>
 interface MessageItemProps {
   message: Message;
   conversation: Conversation | undefined;
+  isHighlighted?: boolean;
 }
 
-const MessageItem = ({ message, conversation }: MessageItemProps) => {
+const MessageItem = ({ message, conversation, isHighlighted }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
@@ -122,7 +123,11 @@ const MessageItem = ({ message, conversation }: MessageItemProps) => {
   }
 
   return (
-    <div ref={ref} className={`group flex items-end gap-2 p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+    <div 
+      ref={ref} 
+      className={`group flex items-end gap-2 p-2 rounded-lg transition-colors duration-1000 ${isHighlighted ? 'bg-purple-500/20' : ''} ${
+        mine ? 'justify-end' : 'justify-start'
+      }`}>
       {!mine && <img src={toAbsoluteUrl(message.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 mb-6 object-cover" />}
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>

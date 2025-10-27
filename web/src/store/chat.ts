@@ -44,6 +44,9 @@ type State = {
   presence: string[];
   typing: Record<string, string[]>;
   error: string | null; // Tambahkan state error
+  searchResults: Message[];
+  highlightedMessageId: string | null;
+  searchQuery: string;
   loadConversations: () => Promise<void>;
   openConversation: (id: string) => void;
   sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
@@ -55,6 +58,9 @@ type State = {
   uploadFile: (conversationId: string, file: File) => Promise<void>;
   initSocketListeners: () => void;
   loadMessagesForConversation: (id: string) => Promise<void>;
+  searchMessages: (query: string, conversationId: string) => Promise<void>;
+  setHighlightedMessageId: (messageId: string | null) => void;
+  clearSearch: () => void;
 };
 
 const sortConversations = (list: Conversation[]) =>
@@ -84,6 +90,9 @@ export const useChatStore = create<State>((set, get) => ({
   typing: {},
   isSidebarOpen: false,
   error: null,
+  searchResults: [],
+  highlightedMessageId: null,
+  searchQuery: '',
 
   // ... (fungsi-fungsi lain tetap sama)
   loadConversations: async () => {
@@ -217,6 +226,47 @@ export const useChatStore = create<State>((set, get) => ({
         error: `Failed to load messages for conversation.`
       }));
     }
+  },
+
+  searchMessages: async (query, conversationId) => {
+    if (query.length < 2) {
+      set({ searchResults: [], searchQuery: query });
+      return;
+    }
+    try {
+      set({ searchQuery: query });
+      const { results } = await api<{ results: Message[] }>(
+        `/api/messages/search?q=${encodeURIComponent(query)}&conversationId=${conversationId}`
+      );
+
+      const decryptedResults = await Promise.all(
+        results.map(async (m) => {
+          try {
+            if (m.content) {
+              m.content = await decryptMessage(m.content, m.conversationId);
+            }
+            return m;
+          } catch (err) {
+            m.content = '[Failed to decrypt message]';
+            return m;
+          }
+        })
+      );
+
+      set({ searchResults: decryptedResults });
+    } catch (error) {
+      console.error("Failed to search messages", error);
+      toast.error("Failed to search messages.");
+      set({ searchResults: [] });
+    }
+  },
+
+  setHighlightedMessageId: (messageId) => {
+    set({ highlightedMessageId: messageId });
+  },
+
+  clearSearch: () => {
+    set({ searchResults: [], searchQuery: '', highlightedMessageId: null });
   },
 
   initSocketListeners: () => {

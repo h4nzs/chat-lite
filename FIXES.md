@@ -1,93 +1,144 @@
-Kamu sedang mengerjakan proyek web app bernama Chat-Lite. Analisis seluruh struktur dan komponen yang berhubungan dengan UI sidebar (panel kiri tempat daftar percakapan/chat list). Jangan ubah logika, event, state, atau fungsi socket. Fokus hanya pada tampilan (style, layout, warna, animasi, dan keselarasan visual).
-
-🎯 Tujuan:
-Perbarui tampilan UI sidebar agar terlihat lebih profesional, modern, dan elegan seperti aplikasi chat premium (misalnya Slack atau Discord). Tetap gunakan tema gelap (dark mode) khas Chat-Lite dengan aksen gradasi ungu ke pink.
-
----
-
-### 🎨 Desain Sidebar yang Diinginkan
-
-**1. Struktur Utama Sidebar**
-- Sidebar menempel di sisi kiri layar, dengan lebar tetap sekitar 300–340px.
-- Warna latar belakang: abu gelap kehitaman `#1E1E1E`.
-- Gunakan layout berbasis `flex` dengan kolom vertikal yang terdiri dari 3 bagian:
-  1. **Bagian Atas:** Profil pengguna dan ikon kontrol.
-  2. **Bagian Tengah:** Navigasi tab dan kolom pencarian.
-  3. **Bagian Bawah:** Daftar percakapan (chat list).
+Kamu sedang mengerjakan proyek full-stack bernama **Chat-Lite**, sebuah aplikasi web chat dengan arsitektur:
+- Frontend: React (Vite + TypeScript + Tailwind)
+- Backend: Node.js (Express + Prisma + PostgreSQL)
+- Realtime: Socket.io
+- Struktur kode sudah rapi dan UI sudah responsif, jangan ubah gaya visual inti yang sudah ada.
 
 ---
 
-**2. Bagian Profil Pengguna (Header Sidebar)**
-- Tampilkan:
-  - Avatar pengguna berbentuk lingkaran di kiri.
-  - Nama pengguna di kanan avatar, menggunakan font tebal dan warna putih.
-  - Status kecil di bawah nama, misalnya “Available” dengan titik hijau kecil.
-- Di kanan atas, tampilkan dua ikon kecil:
-  - ⚙️ (ikon pengaturan / settings)
-  - 🔄 atau ↩️ (ikon logout / keluar)
-- Pastikan layout header rapi, berjarak seimbang, dan responsif.
-- Gunakan padding sekitar `1rem 1.2rem`.
+## 🎯 Tujuan
+Tambahkan fitur **pencarian pesan (Search Message)** agar pengguna dapat mencari teks dalam percakapan tertentu dan menyorot hasilnya secara otomatis di tampilan chat (ChatWindow).
+
+Implementasi harus efisien, terintegrasi penuh dengan arsitektur yang ada, dan **tidak mengubah tampilan pesan (`MessageBubble`, `React`, atau menu titik tiga)**.
 
 ---
 
-**3. Navigasi Tab**
-- Tepat di bawah header, tambahkan tiga tab navigasi horizontal:
-  - “Active Now” | “All”
-- Tab aktif diberi highlight dengan garis bawah tipis berwarna gradien ungu ke pink.
-- Font kecil tapi jelas, uppercase opsional, dengan spacing antar tab seimbang.
-- Hover tab menampilkan efek warna halus (sedikit lebih terang).
+## ⚙️ Bagian Backend (Node.js / Express / Prisma / PostgreSQL)
+
+1. **Buat endpoint baru:**
+   - `GET /api/messages/search?q=<query>&conversationId=<id>`
+   - Parameter:
+     - `q`: teks pencarian (string, minimal 2 karakter)
+     - `conversationId`: ID percakapan tempat pencarian dilakukan
+
+2. **Logika pencarian:**
+   - Gunakan Prisma ORM untuk mencari pesan di tabel `Message`.
+   - Filter berdasarkan `conversationId`.
+   - Gunakan pencarian teks menggunakan:
+     - Prisma `contains` + `mode: 'insensitive'`
+     - atau PostgreSQL Full-Text Search (`to_tsvector`) jika sudah dikonfigurasi.
+   - Batasi hasil hingga 50 pesan.
+   - Urutkan hasil berdasarkan `createdAt ASC`.
+
+3. **Contoh respons JSON:**
+   ```json
+   {
+     "success": true,
+     "results": [
+       {
+         "id": "msg_203",
+         "senderId": "usr_11",
+         "content": "Hey, did you see the project update?",
+         "createdAt": "2025-10-27T13:22:00Z"
+       }
+     ]
+   }
+````
+
+4. **Keamanan dan validasi:**
+
+   * Gunakan middleware autentikasi (`requireAuth`).
+   * Pastikan pengguna adalah anggota dari percakapan tersebut.
+   * Jika bukan, kirim `403 Forbidden`.
 
 ---
 
-**4. Kolom Pencarian**
-- Letakkan satu kolom pencarian di bawah tab.
-- Placeholder teks: “Search or start a new chat...”
-- Ikon pencarian di sisi kiri dalam input.
-- Warna border/input: gradasi ungu-pink atau efek neon tipis.
-- **Hapus field pencarian kedua** — cukup satu input saja yang juga berfungsi mencari user atau grup.
+## 💻 Bagian Frontend (React / TypeScript / Tailwind)
+
+### 🔹 Lokasi: `ChatHeader.tsx`
+
+Tambahkan ikon dan input pencarian di header percakapan:
+
+1. **UI & UX:**
+
+   * Tambahkan ikon kaca pembesar (`🔍`) di sisi kanan `ChatHeader`.
+   * Saat diklik, tampilkan input text (`<input type="text">`) dengan placeholder `"Search messages..."`.
+   * Input dapat muncul sebagai:
+
+     * Dropdown kecil di bawah header, atau
+     * Modal overlay ringan (pilih yang sesuai dengan style Chat-Lite).
+   * Tambahkan tombol `X` kecil untuk menutup pencarian.
+
+2. **Interaksi pengguna:**
+
+   * Saat pengguna mengetik dan menekan Enter:
+
+     * Kirim request ke endpoint `/api/messages/search?q=<query>&conversationId=<id>`.
+     * Gunakan `axios` atau helper API internal proyek.
+   * Tampilkan hasil dalam:
+
+     * Modal hasil pencarian **atau**
+     * Highlight langsung di `ChatWindow`.
 
 ---
 
-**5. Daftar Percakapan (Chat List)**
-- Setiap item chat berupa card horizontal dengan:
-  - Avatar pengguna atau grup di kiri (lingkaran).
-  - Di tengah: nama pengguna (teks tebal) dan pesan terakhir (teks abu-abu muda).
-  - Di kanan: waktu pesan terakhir.
-- Di pojok kanan item, tetap tampilkan tombol menu “⋮” (tiga titik vertikal).
-- Jika user sedang online, tampilkan titik hijau kecil di bawah avatar.
-- Tambahkan efek hover lembut: latar sedikit lebih terang (misal `rgba(255,255,255,0.05)`).
-- Gunakan `border-radius: 12px` pada setiap item untuk tampilan modern.
+### 🔹 Lokasi: `ChatWindow.tsx`
+
+Implementasikan mekanisme **highlight otomatis** pada hasil pencarian:
+
+1. **Fungsi highlight:**
+
+   * Setelah hasil pencarian diterima:
+
+     * Scroll otomatis ke pesan pertama yang cocok menggunakan `scrollIntoView({ behavior: 'smooth' })`.
+     * Tambahkan efek highlight sementara (misalnya animasi background kuning/purple muda transparan selama 2 detik).
+   * Gunakan `useRef` dan `useEffect` untuk menangani scroll dan highlight.
+
+2. **Efek visual:**
+
+   * Tambahkan kelas Tailwind sementara, misalnya:
+
+     ```tsx
+     <div
+       ref={messageRef}
+       className={`transition-colors duration-700 ${
+         isHighlighted ? 'bg-purple-100/30' : ''
+       }`}
+     >
+       ...
+     </div>
+     ```
+   * Setelah 2 detik, hilangkan efek highlight.
+
+3. **State kontrol:**
+
+   * Gunakan `useState` atau `Zustand` store (tergantung struktur proyek) untuk menyimpan:
+
+     * `searchResults: Message[]`
+     * `highlightedMessageId: string | null`
+   * Saat user klik salah satu hasil pencarian di modal, set `highlightedMessageId` dan trigger scroll ke elemen tersebut.
 
 ---
 
-**6. Responsivitas**
-- Pastikan sidebar tetap proporsional di layar sedang (tablet) dan kecil (mobile).
-- Pada layar kecil:
-  - Sidebar bisa di-collapse dengan tombol toggle di kiri atas.
-  - Item daftar chat tetap terbaca dengan baik (teks dipotong rapi bila panjang).
+## 🧩 Integrasi dan Perhatian
+
+* **Jangan ubah tampilan atau komponen visual utama pesan**:
+
+  * Jangan ubah `MessageBubble.tsx`
+  * Jangan ubah struktur `React` (reaksi emoji)
+  * Jangan ubah menu titik tiga atau aksi pesan
+* Fokus hanya pada logika pencarian dan highlight.
+* Pastikan kompatibilitas penuh dengan sistem real-time (socket).
+* Jika pesan baru datang saat pencarian aktif, jangan reset hasil pencarian.
 
 ---
 
-**7. Warna dan Font**
-- Gunakan font sans-serif modern seperti “Inter”, “Poppins”, atau font bawaan Chat-Lite.
-- Warna dominan: latar `#1E1E1E`, teks putih/abu terang, aksen ungu ke pink.
-- Gradient contoh: dari `#9333EA` (ungu) ke `#EC4899` (pink).
+## ✅ Output yang Diharapkan
+
+* Endpoint baru `/api/messages/search` bekerja dengan benar dan aman.
+* UI pencarian tersedia dan konsisten di `ChatHeader.tsx`.
+* Hasil pencarian dapat di-scroll dan di-highlight di `ChatWindow.tsx`.
+* Tidak ada perubahan tampilan pada komponen `MessageBubble`, `React`, dan menu titik tiga.
+* Performa tetap optimal dan tidak ada error di konsol browser/backend.
 
 ---
-
-**8. Animasi dan Efek**
-- Gunakan transisi halus (0.2–0.3s) pada hover atau perubahan tab.
-- Efek bayangan lembut untuk memberi kesan kedalaman (`box-shadow` tipis pada item aktif).
-
----
-
-🧩 Catatan Teknis:
-- Jangan ubah fungsi logika chat, socket, state management, atau routing.
-- Pastikan event handler seperti klik item chat, menu tiga titik, dan pencarian tetap berjalan normal.
-- Setelah perubahan, lakukan validasi internal untuk memastikan tidak ada event yang rusak atau style yang bentrok dengan komponen lain.
-
----
-
-Output yang diharapkan:
-- File CSS/JSX/TSX yang diperbarui agar sidebar tampil modern dan selaras dengan desain deskripsi di atas.
-- Tidak ada perubahan di bagian chat room utama atau fitur real-time lainnya.

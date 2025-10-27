@@ -8,6 +8,54 @@ import path from "path";
 
 const router = Router();
 
+// === SEARCH: mencari pesan dalam percakapan ===
+router.get("/search", requireAuth, async (req: Request, res, next) => {
+  try {
+    const { q, conversationId } = req.query;
+    const userId = (req as any).user.id;
+
+    if (typeof q !== 'string' || q.length < 2) {
+      throw new ApiError(400, "Search query must be at least 2 characters long.");
+    }
+    if (typeof conversationId !== 'string') {
+      throw new ApiError(400, "Conversation ID is required.");
+    }
+
+    // 1. Verify user is a participant
+    const isParticipant = await prisma.participant.findFirst({
+      where: { userId, conversationId },
+    });
+    if (!isParticipant) {
+      throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
+    }
+
+    // 2. Search for messages
+    const results = await prisma.message.findMany({
+      where: {
+        conversationId,
+        content: {
+          contains: q,
+          mode: 'insensitive',
+        },
+      },
+      take: 50,
+      orderBy: {
+        createdAt: 'asc',
+      },
+      include: {
+        sender: {
+          select: { id: true, username: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    res.json({ success: true, results });
+  } catch (e) {
+    next(e);
+  }
+});
+
+
 // ... (GET and DELETE message routes remain the same)
 
 // === GET: semua pesan dalam conversation (user harus anggota) ===

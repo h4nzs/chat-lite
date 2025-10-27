@@ -1,4 +1,4 @@
-import { useCallback, useRef, ChangeEvent, useState } from "react";
+import { useCallback, useRef, ChangeEvent, useState, useEffect } from "react";
 import { useAuthStore } from "@store/auth";
 import { getSocket } from "@lib/socket";
 import { Virtuoso } from "react-virtuoso";
@@ -7,6 +7,7 @@ import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
 import { useChatStore } from "@store/chat";
 import { toAbsoluteUrl } from "@utils/url"; // Impor utilitas URL
+import SearchMessages from './SearchMessages';
 
 // --- Komponen Terpisah --- 
 
@@ -27,6 +28,8 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
         <p className="font-bold text-white">{title}</p>
         <p className="text-xs text-text-secondary">{isOnline ? 'Active now' : 'Offline'}</p>
       </div>
+      <div className="flex-grow" />
+      <SearchMessages conversationId={conversation.id} />
     </div>
   );
 };
@@ -77,9 +80,33 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
   const { conversation, messages, isLoading, error, sendMessage, uploadFile } = useConversation(id);
-  const { typing } = useChatStore(); // Keep this for typing indicator
+  const {
+    typing,
+    highlightedMessageId,
+    setHighlightedMessageId,
+  } = useChatStore();
+  const virtuosoRef = useRef<any>(null);
 
-  const typingUsers = typing[id] || [];
+  useEffect(() => {
+    if (highlightedMessageId && virtuosoRef.current && messages.length > 0) {
+      const index = messages.findIndex(m => m.id === highlightedMessageId);
+      if (index !== -1) {
+        virtuosoRef.current.scrollToIndex({
+          index,
+          align: 'center',
+          behavior: 'smooth',
+        });
+
+        // Debounce to remove highlight
+        setTimeout(() => {
+          setHighlightedMessageId(null);
+        }, 2000); // Highlight lasts for 2 seconds
+      }
+    }
+  }, [highlightedMessageId, messages, setHighlightedMessageId]);
+
+  const { typing: typingState } = useChatStore(); // Keep this for typing indicator
+  const typingUsers = typingState[id] || [];
   const filteredTypingUsers = typingUsers.filter(uid => uid !== meId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -126,11 +153,16 @@ export default function ChatWindow({ id }: { id: string }) {
       <ChatHeader conversation={conversation} />
       <div className="flex-1 min-h-0 relative">
         <Virtuoso
+          ref={virtuosoRef}
           initialTopMostItemIndex={messages.length - 1}
           data={messages}
           itemContent={(index, message) => (
             <div className="px-4">
-              <MessageItem message={message} conversation={conversation} />
+              <MessageItem 
+                message={message} 
+                conversation={conversation} 
+                isHighlighted={message.id === highlightedMessageId} 
+              />
             </div>
           )}
           followOutput="auto"

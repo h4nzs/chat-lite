@@ -1,106 +1,121 @@
-# Analisis Proyek "Chat-Lite"
+# Analisis Proyek Aplikasi "Chat-Lite"
 
-Dokumen ini berisi hasil analisis menyeluruh terhadap proyek "Chat-Lite". Tujuannya adalah untuk memetakan arsitektur, fungsionalitas, alur kerja, dan kondisi proyek secara keseluruhan.
-
----
-
-### 1. Arsitektur & Teknologi Utama
-
-Proyek ini menggunakan arsitektur monorepo dengan pemisahan yang jelas antara frontend dan backend.
-
--   **Struktur:**
-    -   `server/`: Backend (Node.js)
-    -   `web/`: Frontend (React)
-
--   **Tumpukan Teknologi (Tech Stack):**
-    -   **Backend:**
-        -   **Framework:** Express.js
-        -   **Bahasa:** TypeScript (dieksekusi dengan `tsx`)
-        -   **Database:** PostgreSQL dengan Prisma sebagai ORM.
-        -   **Real-time:** Socket.IO
-        -   **Autentikasi:** JSON Web Tokens (JWT) dengan `bcrypt` untuk hashing password.
-        -   **Lainnya:** `multer` untuk file upload, `helmet` & `cors` untuk keamanan, `zod` untuk validasi.
-    -   **Frontend:**
-        -   **Framework:** React 19
-        -   **Build Tool:** Vite
-        -   **Bahasa:** TypeScript
-        -   **State Management:** Zustand
-        -   **Routing:** React Router
-        -   **Styling:** TailwindCSS
-        -   **Real-time:** `socket.io-client`
-
--   **Arsitektur Komunikasi:**
-    -   **Hybrid:** Proyek ini secara efektif menggabungkan dua pola komunikasi:
-        1.  **REST API:** Digunakan untuk operasi data yang bersifat *request-response* seperti autentikasi, pengambilan data awal (daftar percakapan, riwayat pesan), pencarian pengguna, dan upload file.
-        2.  **WebSockets (Socket.IO):** Digunakan untuk semua komunikasi *real-time* yang membutuhkan latensi rendah, seperti pengiriman pesan baru, status online (presence), indikator pengetikan, dan pembaruan status pesan.
+Dokumen ini berisi hasil analisis menyeluruh terhadap proyek Chat-Lite, sesuai dengan arahan yang diberikan. Tujuannya adalah untuk mendapatkan pemahaman penuh terhadap arsitektur, fungsionalitas, dan kondisi proyek saat ini.
 
 ---
 
-### 2. Daftar Fitur Utama & Statusnya
+### 1. **Struktur dan Arsitektur**
 
--   **✅ Autentikasi & Sesi:** Berfungsi. Menggunakan JWT dengan mekanisme *access token* dan *refresh token* (disimpan di HttpOnly cookie) yang aman.
--   **✅ Real-time Chat (Pesan Pribadi & Grup):** Berfungsi. Alur pengiriman pesan menggunakan *optimistic updates* di frontend untuk UX yang responsif.
--   **✅ Status Online (Presence):** Berfungsi dan sudah dioptimalkan. Server mengirim daftar lengkap saat koneksi awal (`presence:init`) dan hanya mengirim pembaruan saat ada pengguna yang bergabung (`presence:user_joined`) atau keluar (`presence:user_left`), mengurangi beban jaringan.
--   **✅ Indikator Pengetikan:** Berfungsi. Menggunakan event `typing:start` dan `typing:stop`.
--   **✅ Reaksi & Hapus Pesan:** Fungsionalitas backend dan event socket (`reaction:new`, `message:deleted`) tersedia.
--   **✅ Manajemen Grup:** Berfungsi. API memungkinkan pembuatan dan penghapusan grup.
--   **✅ Lampiran File:** Berfungsi. Alur upload terpisah dari pengiriman pesan, di mana file diunggah terlebih dahulu, lalu URL-nya dikirim melalui socket.
--   **⚠️ Enkripsi End-to-End (E2EE):** Dalam pengembangan. Terdapat API untuk manajemen kunci (`/api/keys`) dan fungsi enkripsi/dekripsi di frontend, namun alur pertukaran kunci belum sepenuhnya terimplementasi.
--   **✅ Notifikasi Push:** Terimplementasi. Klien dapat mengirim *subscription* (`push:subscribe`) dan server akan mengirim notifikasi saat ada pesan baru.
-
----
-
-### 3. Alur Kerja & Logika Utama
-
-Alur kerja pengiriman pesan menjadi contoh utama dari arsitektur aplikasi ini:
-
-1.  **UI (`ChatWindow.tsx`):** Pengguna mengetik pesan dan menekan tombol kirim.
-2.  **Hook (`useConversation.ts`):** Logika UI memanggil fungsi `sendMessage` yang diekspos oleh hook ini. Hook ini berfungsi sebagai jembatan antara komponen dan state manager.
-3.  **State (`useChatStore.ts`):**
-    -   Fungsi `sendMessage` di dalam store membuat **pesan optimis** (pesan sementara) dan langsung menampilkannya di UI.
-    -   Store kemudian memancarkan (`emit`) event `message:send` ke server melalui Socket.IO, beserta *callback* untuk konfirmasi (ack).
-4.  **Server (`socket.ts`):**
-    -   Server menerima event `message:send`, membersihkan input menggunakan `xss`, dan menyimpan pesan ke database melalui Prisma.
-    -   Server memancarkan event `message:new` ke semua anggota percakapan (termasuk pengirim asli).
-    -   Server memanggil *callback* (ack) untuk memberitahu pengirim bahwa pesan telah berhasil disimpan.
-5.  **Pembaruan State:**
-    -   Saat *callback* diterima, store di frontend akan mengganti pesan optimis dengan data pesan asli dari server. Jika gagal, pesan akan ditandai sebagai error.
-    -   Klien lain yang menerima `message:new` akan langsung menambahkan pesan tersebut ke state mereka.
+- **Struktur Proyek**: Monorepo dengan dua direktori utama: `server/` (backend) dan `web/` (frontend).
+- **Backend (`server/`)**:
+    - **Framework**: Node.js dengan Express.js.
+    - **Komunikasi Real-time**: `socket.io`.
+    - **Database & ORM**: PostgreSQL dengan Prisma.
+    - **Autentikasi**: `jsonwebtoken` (JWT) untuk token, `bcrypt` untuk hashing password.
+    - **Keamanan**: `helmet` untuk header keamanan, `express-rate-limit` untuk pembatasan permintaan, dan `csurf` untuk proteksi CSRF.
+    - **File Upload**: `multer` untuk menangani unggahan file.
+    - **Lainnya**: `web-push` untuk notifikasi push, `zod` untuk validasi, `morgan` untuk logging.
+- **Frontend (`web/`)**:
+    - **Framework**: React 19 dengan Vite sebagai build tool.
+    - **State Management**: Zustand (`create` dari `zustand`).
+    - **Routing**: `react-router-dom`.
+    - **Styling**: TailwindCSS.
+    - **Komunikasi**: `socket.io-client` untuk koneksi WebSocket dan `fetch` (via wrapper `api.ts`) untuk API REST.
+    - **Enkripsi**: `libsodium-wrappers`, menandakan adanya implementasi E2EE (End-to-End Encryption).
+    - **UI Komponen**: Radix UI (`DropdownMenu`, `Popover`) dan `react-icons`.
+- **Arsitektur Komunikasi**:
+    - **API REST**: Digunakan untuk operasi CRUD utama seperti autentikasi (`/api/auth`), manajemen pengguna (`/api/users`), percakapan (`/api/conversations`), dan pengambilan riwayat pesan (`/api/messages`).
+    - **WebSocket (Socket.IO)**: Digunakan untuk semua komunikasi real-time, termasuk pengiriman dan penerimaan pesan baru, status kehadiran (`presence`), indikator pengetikan (`typing`), dan pembaruan lainnya.
 
 ---
 
-### 4. Kondisi UI & UX
+### 2. **Fungsi Utama Aplikasi**
 
--   **Komponen:** Kode terstruktur dengan baik ke dalam komponen yang dapat digunakan kembali (`MessageItem`, `ChatHeader`, `Spinner`).
--   **Styling:** Menggunakan TailwindCSS dengan tema gelap (`dark`) yang konsisten.
--   **Responsivitas:** Desain sudah responsif, terlihat dari adanya tombol *hamburger* untuk membuka/menutup sidebar di layar kecil.
--   **Pengalaman Pengguna:** Cukup baik. Menggunakan `react-virtuoso` untuk virtualisasi daftar pesan (efisien), `react-hot-toast` untuk notifikasi, dan indikator loading/error. Logika yang kompleks telah diekstraksi dari komponen ke dalam *custom hooks* (`useConversation`), yang merupakan praktik terbaik.
+Berdasarkan analisis file, berikut adalah daftar fitur utama dan statusnya:
 
----
-
-### 5. State Management
-
--   **Zustand:** Digunakan sebagai state manager global. `useChatStore` menjadi satu-satunya sumber kebenaran (*single source of truth*) untuk data terkait chat (percakapan, pesan, status online, dll).
--   **Sentralisasi Logika:** Semua listener event socket diinisialisasi dalam satu fungsi (`initSocketListeners`) di dalam store. Ini adalah praktik yang sangat baik untuk mencegah kebocoran memori dan duplikasi event listener.
-
----
-
-### 6. Keamanan
-
--   **Otorisasi:** Setiap request API dan koneksi socket dilindungi oleh middleware (`authenticateToken`, `socketAuthMiddleware`) yang memverifikasi JWT.
--   **CSRF Protection:** Implementasi `csurf` di backend dan pengiriman token via header di frontend memberikan perlindungan yang kuat terhadap serangan Cross-Site Request Forgery.
--   **Input Sanitization:** Penggunaan library `xss` di server untuk membersihkan konten pesan sebelum disimpan membantu mencegah serangan XSS.
--   **Keamanan Header:** `Helmet` digunakan untuk mengatur header HTTP yang aman.
+- **Autentikasi**: ✅ Berfungsi. Menggunakan JWT (access & refresh token) yang disimpan di cookies (HttpOnly). Terdapat endpoint untuk register, login, logout, dan refresh token.
+- **Real-time Chat**: ✅ Berfungsi. Pesan dikirim melalui event socket `message:send` dan diterima melalui `message:new`.
+- **Enkripsi End-to-End (E2EE)**: ✅ Berfungsi. `libsodium-wrappers` digunakan di frontend (`crypto.ts`) untuk mengenkripsi/dekripsi konten pesan sebelum dikirim dan setelah diterima. Kunci dikelola per percakapan.
+- **Pesan Pribadi dan Grup**: ✅ Berfungsi. Model `Conversation` memiliki flag `isGroup`. Logika untuk membuat grup dan percakapan pribadi ada.
+- **Indikator Pengetikan (`Typing Indicator`)**: ✅ Berfungsi. Menggunakan event socket `typing:start` dan `typing:stop`.
+- **Status Online (`Presence`)**: ✅ Berfungsi. Server melacak pengguna online (`onlineUsers`) dan menyiarkan status `presence:user_joined` dan `presence:user_left`.
+- **Reaksi Pesan**: ✅ Berfungsi. Model `MessageReaction` ada di skema Prisma. Event socket `reaction:new` dan `reaction:remove` diimplementasikan di frontend.
+- **Hapus Pesan**: ✅ Berfungsi. Event socket `message:deleted` ada.
+- **Manajemen Grup**: ⚠️ Perlu cek. Terdapat API untuk membuat grup, namun fungsionalitas seperti menambah/mengeluarkan anggota atau menghapus grup perlu diverifikasi lebih lanjut di UI.
+- **File Attachment**: ✅ Berfungsi. Menggunakan `multer` di backend dan `FormData` di frontend. File diunggah ke server, dan URL-nya dikirim sebagai pesan.
+- **Notifikasi Push**: ✅ Berfungsi. Menggunakan `web-push` di server dan Service Worker di client. Ada event `push:subscribe` untuk menyimpan data langganan.
 
 ---
 
-### 7. Area Risiko & Rekomendasi
+### 3. **Alur Kerja (Workflow)**
 
--   **Kompleksitas E2EE:** Fitur enkripsi end-to-end adalah yang paling kompleks dan berisiko. Perlu perhatian khusus pada manajemen dan pertukaran kunci agar aman dan andal.
--   **Penanganan Error UI:** Aplikasi sudah memiliki state `error`, namun bisa ditingkatkan. Misalnya, memberikan opsi "Coba lagi" untuk pesan yang gagal terkirim.
--   **Stabilitas Kode:** Kode secara umum ditulis dengan baik. Penggunaan custom hooks seperti `useConversation` sangat bagus untuk pemisahan logika (separation of concerns) dan harus dipertahankan atau diperluas untuk fitur lain.
--   **Sinkronisasi:** Tidak ada masalah sinkronisasi yang jelas terdeteksi dari analisis kode. Penggunaan socket untuk semua pembaruan real-time memastikan data tetap sinkron.
+1.  **Pengiriman Pesan**:
+    - User mengetik di UI (`ChatWindow.tsx`).
+    - `sendMessage` dari store Zustand (`useChatStore`) dipanggil.
+    - Pesan dienkripsi menggunakan `encryptMessage`.
+    - Pesan "optimistic" (belum dikonfirmasi server) langsung ditambahkan ke state UI.
+    - Event socket `message:send` dipancarkan ke server dengan payload terenkripsi.
+2.  **Proses di Server**:
+    - Middleware `socketAuthMiddleware` memverifikasi token user.
+    - Event `message:send` diterima di `server/src/socket.ts`.
+    - Pesan disimpan ke database menggunakan Prisma.
+    - Server memancarkan event `message:new` ke semua partisipan dalam percakapan tersebut (termasuk pengirim asli).
+3.  **Penerimaan Pesan**:
+    - Frontend menerima event `message:new` melalui listener di `useChatStore.initSocketListeners`.
+    - Jika pengirim adalah user saat ini, pesan "optimistic" digantikan dengan data dari server.
+    - Jika pengirim adalah user lain, pesan baru didekripsi menggunakan `decryptMessage` dan ditambahkan ke state.
+    - `useEffect` di komponen akan memicu re-render untuk menampilkan pesan baru.
 
-### Kesimpulan Analisis
+---
 
-Proyek "Chat-Lite" memiliki fondasi arsitektur yang solid, modern, dan aman. Pemisahan antara REST API untuk data statis dan WebSockets untuk data real-time sudah tepat. Kualitas kode baik, dengan penerapan praktik terbaik seperti sentralisasi logika state, penggunaan custom hooks, dan langkah-langkah keamanan yang kuat. Proyek ini berada dalam kondisi yang sangat baik untuk melanjutkan pengembangan, baik untuk menyelesaikan fitur yang ada (E2EE) maupun menambahkan fitur baru.
+### 4. **Kondisi UI & UX**
+
+- **Komponen Utama**: `ChatList` (sidebar), `ChatWindow` (area chat utama), `MessageBubble`, `MessageItem`, `CreateGroupChat`, `Settings`.
+- **Styling**: Menggunakan TailwindCSS secara ekstensif. Konfigurasi ada di `tailwind.config.ts`. Terdapat file `index.css` untuk gaya dasar.
+- **Responsivitas**: Terdapat logika untuk menangani tampilan mobile. `isSidebarOpen` di `useChatStore` digunakan untuk menampilkan/menyembunyikan sidebar di layar kecil.
+- **Konsistensi**: Struktur komponen terlihat modular dan konsisten.
+- **Interaktivitas**: Terdapat komponen untuk reaksi, menu, dan indikator status, menandakan UI yang cukup interaktif.
+
+---
+
+### 5. **State Management**
+
+- **Library**: Zustand.
+- **Stores**:
+    - `useAuthStore`: Mengelola state autentikasi, data pengguna, dan token.
+    - `useChatStore`: Sangat komprehensif. Mengelola daftar percakapan, pesan aktif, status kehadiran, indikator pengetikan, dan semua logika terkait socket (listener dan emitter).
+- **Update State**: State diperbarui sebagai respons terhadap aksi pengguna (misalnya, `sendMessage`) dan event socket yang masuk (misalnya, `message:new`). Logika pembaruan terpusat di dalam `useChatStore`, yang merupakan praktik yang baik.
+
+---
+
+### 6. **Keamanan & Koneksi**
+
+- **Autentikasi API**: Menggunakan middleware `auth.ts` untuk memverifikasi JWT dari header `Authorization`.
+- **Autentikasi Socket**: `socketAuthMiddleware` digunakan saat koneksi socket awal untuk memvalidasi token dari cookie. Ini adalah pendekatan yang aman.
+- **Proteksi**: CSRF, Helmet, dan rate limiting sudah diimplementasikan di level Express, memberikan lapisan keamanan yang solid.
+- **Enkripsi**: Implementasi E2EE dengan `libsodium-wrappers` adalah fitur keamanan yang kuat, melindungi konten pesan bahkan dari server itu sendiri.
+
+---
+
+### 7. **Masalah Potensial & Area Risiko**
+
+- **Duplikasi Event Listener**: `useChatStore.initSocketListeners` membersihkan listener lama (`socket.off`) sebelum mendaftarkan yang baru. Ini adalah praktik yang baik untuk mencegah duplikasi, namun perlu dipastikan fungsi ini dipanggil hanya sekali saat inisialisasi.
+- **Re-render**: Penggunaan Zustand umumnya efisien, tetapi komponen seperti `ChatWindow` yang di-`key`-kan dengan `activeId` akan di-remount sepenuhnya setiap kali percakapan diganti. Ini bisa jadi disengaja untuk mereset state, tetapi bisa juga tidak efisien jika state internalnya kompleks.
+- **Sinkronisasi Data**: Logika "optimistic updates" untuk pengiriman pesan adalah kompleks. Ada potensi ketidaksinkronan jika konfirmasi dari server gagal atau terlambat. Penanganan error (`ack` callback dan properti `error` pada pesan) sudah ada, tetapi perlu diuji secara menyeluruh.
+- **Manajemen Kunci Enkripsi**: Keamanan E2EE sangat bergantung pada bagaimana kunci dikelola. Kesalahan dalam penyimpanan atau pertukaran kunci dapat mengkompromikan seluruh sistem. Kode di `utils/crypto.ts` dan `utils/keyManagement.ts` menjadi area kritis.
+- **Kompleksitas `useChatStore`**: File `web/src/store/chat.ts` sangat besar dan menangani banyak logika (API calls, socket listeners, state updates). Ini bisa menjadi area risiko tinggi untuk bug dan sulit untuk dipelihara. Memecahnya menjadi beberapa store atau custom hooks yang lebih kecil bisa dipertimbangkan di masa depan.
+
+---
+
+### 8. **Output Analisis & Ringkasan**
+
+- **Dependensi Penting**: React, Node.js, Socket.IO, Prisma, Zustand, TailwindCSS, libsodium-wrappers.
+- **Struktur Logika Utama**: UI (React Components) → State (Zustand Store) → Komunikasi (Socket.IO & Fetch) → Server (Express, Prisma).
+- **Area Risiko Tinggi**:
+    1.  **`web/src/store/chat.ts`**: Titik pusat dari hampir semua logika sisi klien. Kompleksitasnya tinggi.
+    2.  **`web/src/utils/crypto.ts` & `keyManagement.ts`**: Inti dari fitur keamanan E2EE. Kesalahan di sini berdampak kritis.
+    3.  **Alur Optimistic Update**: Logika untuk mengganti pesan sementara dengan pesan dari server di `message:new` listener.
+- **Rekomendasi Singkat**:
+    - Aplikasi ini memiliki fondasi yang solid dan modern.
+    - Fokus utama untuk perbaikan di masa depan adalah **refactoring `useChatStore`** untuk mengurangi kompleksitasnya.
+    - Pengujian menyeluruh pada alur E2EE dan penanganan error pada optimistic updates sangat disarankan.

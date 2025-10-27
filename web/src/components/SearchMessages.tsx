@@ -1,0 +1,78 @@
+import { useState, useEffect, useRef } from 'react';
+import { useChatStore, Message } from '@store/chat';
+import { FiSearch, FiX } from 'react-icons/fi';
+
+interface SearchMessagesProps {
+  conversationId: string;
+}
+
+export default function SearchMessages({ conversationId }: SearchMessagesProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { 
+    searchQuery, 
+    searchResults, 
+    searchMessages, 
+    clearSearch, 
+    setHighlightedMessageId 
+  } = useChatStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+    } else {
+      clearSearch();
+    }
+  }, [isOpen, clearSearch]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      searchMessages(searchQuery, conversationId);
+    }
+  };
+
+  const handleResultClick = (messageId: string) => {
+    setHighlightedMessageId(messageId);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-text-secondary hover:text-white">
+        {isOpen ? <FiX /> : <FiSearch />}
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-12 right-0 w-72 bg-surface-dark rounded-lg shadow-lg border border-gray-700 z-50">
+          <form onSubmit={handleSearch} className="p-2 border-b border-gray-700">
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => useChatStore.setState({ searchQuery: e.target.value })}
+              placeholder="Search messages..."
+              className="w-full bg-primary px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </form>
+          <div className="max-h-80 overflow-y-auto">
+            {searchResults.length > 0 ? (
+              searchResults.map((msg) => (
+                <div 
+                  key={msg.id} 
+                  onClick={() => handleResultClick(msg.id)}
+                  className="p-3 hover:bg-primary cursor-pointer border-b border-gray-800 last:border-b-0"
+                >
+                  <p className="text-sm text-text-primary truncate">{msg.content}</p>
+                  <p className="text-xs text-text-secondary mt-1">{new Date(msg.createdAt).toLocaleString()}</p>
+                </div>
+              ))
+            ) : (
+              searchQuery && <p className="p-4 text-sm text-text-secondary text-center">No results found.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
