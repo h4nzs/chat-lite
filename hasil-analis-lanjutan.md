@@ -12,13 +12,14 @@ Berikut adalah pemetaan alur data untuk setiap fitur utama dari aksi pengguna hi
 `[User Action: Isi & Submit Form]` → `[Component: <Login>]` → `[State: useAuthStore.login(email, pass)]` → `[API: POST /api/auth/login]` → `[Backend: auth.ts]` → `[DB: Validasi user & passwordHash]` → `[Backend: Buat JWT & set cookie]` → `[API Response: User data]` → `[State: set({ user })]` → `[Client: Redirect ke /]`
 
 **📨 Pengiriman & Penerimaan Pesan**
-`[User Action: Ketik & Kirim]` → `[Component: <MessageInput>]` → `[State: useChatStore.sendMessage(msg)]` → `(Client Side) [Encrypt Message]` → `[Socket: emit('message:send', payload)]` → `[Backend: on('message:send')]` → `[DB: prisma.message.create()]` → `[Socket: broadcast('message:new', data)]` → `[Client: on('message:new')]` → `(Client Side) [Decrypt Message]` → `[State: set(messages)]` → `[UI: <MessageList> re-render]`
+`[User Action: Ketik & Kirim]` → `[Component: <MessageInput>]` → `[State: useChatStore.sendMessage(msg)]` → `(Client Side) [Encrypt Message]` & `[Optimistic UI Update]` → `[Socket: emit('message:send', payload)]` → `[Backend: on('message:send')]` → `[DB: prisma.message.create()]` → `[Socket: broadcast('message:new', data)]` → `[Client: on('message:new')]` → `(Client Side) [Decrypt Message]` → `[State: Update/replace optimistic message]` → `[UI: <MessageList> re-render]`
 
 **📎 Pengiriman File (Attachment)**
 `[User Action: Pilih File]` → `[Component: <MessageInput>]` → `[State: useChatStore.uploadFile(file)]` → `[API: POST /api/uploads/:convId/upload]` → `[Backend: upload.ts (multer)]` → `[File System: Simpan file]` → `[API Response: File URL & metadata]` → `[State: useChatStore.sendMessage({ fileUrl, ... })]` → *(Alur berlanjut seperti pengiriman pesan biasa)*
 
-**👨‍👩‍👧‍👦 Pembuatan Grup Baru**
-`[User Action: Buka modal & pilih user]` → `[Component: <CreateGroupChat>]` → `[API: POST /api/conversations]` → `[Backend: conversations.ts]` → `[DB: prisma.conversation.create() & prisma.participant.createMany()]` → `[API Response: Data grup baru]` → `[Socket: broadcast('conversation:new', data)]` → `[Client: on('conversation:new')]` → `[State: set(conversations)]` → `[UI: <ChatList> re-render]`
+**👨‍👩‍👧‍👦 Pembuatan Grup Baru (⚠️ Tidak Real-time untuk Anggota Lain)**
+`[User Action: Buka modal & pilih user]` → `[Component: <CreateGroupChat>]` → `[API: POST /api/conversations]` → `[Backend: conversations.ts]` → `[DB: prisma.conversation.create() & prisma.participant.createMany()]` → `[API Response: Data grup baru ke **pembuat**]` → `[State (Pembuat): Menambahkan grup baru ke list]` → `[UI (Pembuat): <ChatList> re-render]`
+*Catatan: Anggota lain yang ditambahkan ke grup **tidak** menerima notifikasi real-time dan harus me-refresh aplikasi untuk melihat grup baru tersebut.*
 
 **👍 Reaksi pada Pesan**
 `[User Action: Klik emoji di pesan]` → `[Component: <MessageItem>]` → `[API: POST /api/messages/:msgId/reactions]` → `[Backend: messages.ts]` → `[DB: prisma.messageReaction.create()]` → `[Socket: broadcast('reaction:new', data)]` → `[Client: on('reaction:new')]` → `[State: set(messages)]` → `[UI: <MessageItem> re-render]`
@@ -28,7 +29,7 @@ Berikut adalah pemetaan alur data untuk setiap fitur utama dari aksi pengguna hi
 
 **✍️ Indikator Pengetikan (Typing Indicator)**
 `[User Action: Mulai mengetik]` → `[Component: <MessageInput>]` → `[Socket: emit('typing:start')]` → `[Backend: on('typing:start')]` → `[Socket: broadcast('typing:update', { isTyping: true })]` → `[Client: on('typing:update')]` → `[State: set(typing)]` → `[UI: <ChatWindow> tampilkan indikator]`
-*(Proses serupa terjadi untuk `typing:stop` setelah jeda waktu tertentu)*
+*(Proses serupa terjadi untuk `typing:stop`)*
 
 **🟢 Status Online/Offline**
 `[User Action: Buka/Tutup Aplikasi]` → `[Client: Socket 'connect'/'disconnect']` → `[Backend: on('connection')]` → `[Backend: onlineUsers.add(userId)]` → `[Socket: broadcast('presence:user_joined', userId)]` → `[Client: on('presence:user_joined')]` → `[State: set(presence)]` → `[UI: <ChatList> & <ChatHeader> update dot status]`
@@ -50,10 +51,11 @@ Berikut adalah pemetaan alur data untuk setiap fitur utama dari aksi pengguna hi
 - `presence:user_joined` / `presence:user_left` (payload: `userId`): Memberi tahu semua klien bahwa seorang pengguna telah terhubung atau terputus.
 - `typing:update` (payload: `{ userId, conversationId, isTyping }`): Meneruskan status pengetikan ke anggota percakapan lain.
 - `message:new` (payload: `Message`): Meneruskan pesan baru yang telah disimpan ke semua anggota percakapan.
-- `conversation:new` / `conversation:deleted` (payload: `data`): Memberi tahu klien tentang percakapan yang baru dibuat atau dihapus.
+- `conversation:deleted` (payload: `data`): Memberi tahu klien tentang percakapan yang dihapus (baik grup oleh admin, atau chat 1-on-1 yang disembunyikan).
 - `message:deleted` (payload: `{ messageId, conversationId }`): Memberi tahu klien bahwa sebuah pesan telah dihapus.
 - `reaction:new` / `reaction:remove` (payload: `data`): Memberi tahu klien tentang reaksi yang ditambahkan atau dihapus.
 - `message:status_updated` (payload: `data`): Memberi tahu pengirim asli bahwa status pesannya telah diperbarui (misalnya, menjadi 'READ').
+- `user:updated` (payload: `User`): Memberi tahu klien lain jika ada pengguna yang memperbarui profilnya (nama/avatar).
 
 ---
 
@@ -64,15 +66,15 @@ Struktur komponen utama pada halaman chat adalah sebagai berikut:
 ```
 <Chat> (Page)
  ├── <ChatList> (Sidebar)
- │    ├── <UserProfile>
- │    ├── <SearchBar>
- │    ├── <StartNewChat> (muncul saat mencari)
- │    └── <CreateGroupChat> (modal)
+ │    ├── (Header dengan User Profile & Settings)
+ │    ├── (Search Bar)
+ │    └── (List of Conversations)
  └── <ChatWindow> (Main Content)
       ├── <ChatHeader>
       ├── <Virtuoso> (Virtual List untuk Pesan)
       │    └── <MessageItem> (Setiap pesan)
       │         └── <Reactions>
+      ├── <TypingIndicator>
       └── <MessageInput>
 ```
 
@@ -81,7 +83,7 @@ Struktur komponen utama pada halaman chat adalah sebagai berikut:
   - `<ChatWindow>` menggunakan `messages`, `typing`, dan `activeId`.
   - `<MessageItem>` menggunakan data pesan dari `messages`.
 - **State Lokal**: Komponen seperti `<MessageInput>` (untuk teks input) dan `<ChatList>` (untuk query pencarian) memiliki state lokal sendiri untuk mengelola input pengguna sebelum dikirim ke state global.
-- **Props & Callbacks**: Komponen induk seperti `<Chat>` dan `<ChatList>` meneruskan fungsi callback (misalnya `onOpen`) ke komponen anak untuk menangani event klik.
+- **Props & Callbacks**: Komponen induk seperti `<Chat>` dan `<ChatList>` meneruskan fungsi callback (misalnya `onOpen`) ke komponen anak untuk menangani event klik dan navigasi.
 
 ---
 
@@ -106,28 +108,27 @@ Hubungan data dimodelkan dalam `schema.prisma`:
 - **User ↔ Conversation**: Hubungan Many-to-Many melalui model perantara `Participant`.
 - **Satu `User`** dapat menjadi bagian dari **banyak `Conversation`**.
 - **Satu `Conversation`** dapat memiliki **banyak `User`** (peserta).
-- Jika `Conversation.isGroup = false`, itu adalah chat 1-on-1.
-- Jika `Conversation.isGroup = true`, itu adalah chat grup dan memiliki `creatorId` yang menunjuk ke `User` yang membuatnya.
+- Jika `Conversation.isGroup = true`, ia memiliki `creatorId` yang menunjuk ke `User` yang membuatnya.
 
-Alur data grup:
-1.  Client membuat grup melalui `POST /api/conversations`.
-2.  Server membuat entri `Conversation` dan beberapa entri `Participant`.
-3.  Server kemudian mem-broadcast event `conversation:new` ke semua user ID yang terlibat dalam grup tersebut.
-4.  Client yang menerima event ini akan menambahkan percakapan baru ke state `conversations` mereka.
+**Alur data pembuatan grup (yang sebenarnya terjadi):**
+1.  Client (pembuat) mengirim request `POST /api/conversations`.
+2.  Server membuat entri `Conversation` dan beberapa entri `Participant` di database.
+3.  Server **hanya mengembalikan data grup baru** dalam respons API kepada si pembuat.
+4.  **Tidak ada event socket yang disiarkan.** Akibatnya, anggota lain tidak secara otomatis melihat grup baru di daftar percakapan mereka sampai mereka me-refresh aplikasi.
 
 ---
 
 ### 6. Temuan & Insight
 
-- **✅ Fitur Sinkron Penuh**: Sebagian besar fitur inti (pengiriman pesan, reaksi, status online, typing) sudah sepenuhnya sinkron dan real-time berkat arsitektur hybrid yang solid.
-- **⚠️ Potensi Peningkatan**: 
-  - **Initial Load**: Saat membuka aplikasi, client melakukan beberapa request REST (untuk user, lalu percakapan, lalu pesan). Ini dapat dioptimalkan dengan menggabungkan beberapa data dalam satu panggilan awal atau menggunakan data yang dikirim saat koneksi socket awal.
-  - **Error Handling di UI**: Meskipun ada state `error` di `useChatStore`, implementasinya di beberapa komponen bisa lebih konsisten untuk memberi tahu pengguna jika ada masalah (misalnya, gagal memuat riwayat pesan).
+- **✅ Fitur Sinkron Penuh**: Sebagian besar fitur interaktif (pengiriman pesan, reaksi, status online, typing, hapus pesan) sudah sepenuhnya sinkron dan real-time berkat arsitektur hybrid yang solid.
+- **⚠️ Fitur Belum Real-time**: 
+  - **Pembuatan Grup**: Seperti yang teridentifikasi di atas, pembuatan grup baru tidak disiarkan ke anggota lain secara real-time. Ini adalah kesenjangan fungsionalitas yang signifikan.
 - **❌ Kerawanan (Minor)**:
   - **Race Condition**: Tidak ada race condition yang jelas terdeteksi pada alur utama. Penggunaan *optimistic UI* di client dan *single source of truth* dari server setelah broadcast adalah pola yang baik untuk menghindarinya.
   - **Duplikasi Listener**: Masalah ini sudah ditangani dengan baik di `useChatStore` dengan membersihkan listener lama sebelum mendaftarkan yang baru. Ini menunjukkan kesadaran akan potensi masalah tersebut.
 
 **Saran Singkat Stabilisasi:**
-1.  **Refactor `useChatStore`**: Seperti yang disebutkan sebelumnya, memecah `useChatStore` menjadi beberapa *slice* atau *custom hooks* (misalnya, `useMessages`, `usePresence`) akan sangat meningkatkan keterbacaan dan pemeliharaan.
-2.  **Optimasi Pengambilan Data**: Pertimbangkan untuk mengirim batch data awal (misalnya, 10 percakapan teratas beserta pesan terakhirnya) langsung setelah koneksi socket berhasil untuk mengurangi jumlah request HTTP awal.
-3.  **UI Feedback**: Tingkatkan umpan balik UI untuk status loading dan error di seluruh aplikasi secara konsisten.
+1.  **Implementasikan Real-time Group Creation**: Modifikasi endpoint `POST /api/conversations` di backend untuk menyiarkan event `conversation:new` ke semua ID pengguna yang ditambahkan ke grup. Ini akan membuat fitur grup menjadi sepenuhnya real-time.
+2.  **Refactor `useChatStore`**: Seperti yang disebutkan sebelumnya, memecah `useChatStore` menjadi beberapa *slice* atau *custom hooks* (misalnya, `useMessages`, `usePresence`) akan sangat meningkatkan keterbacaan dan pemeliharaan.
+3.  **Optimasi Pengambilan Data**: Pertimbangkan untuk mengirim batch data awal (misalnya, 10 percakapan teratas beserta pesan terakhirnya) langsung setelah koneksi socket berhasil untuk mengurangi jumlah request HTTP awal.
+4.  **UI Feedback**: Tingkatkan umpan balik UI untuk status loading dan error di seluruh aplikasi secara konsisten.

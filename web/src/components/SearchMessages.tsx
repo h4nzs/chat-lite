@@ -44,7 +44,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
       </button>
 
       {isOpen && (
-        <div className="absolute top-12 right-0 w-72 bg-surface-dark rounded-lg shadow-lg border border-gray-700 z-50">
+        <div className="absolute top-12 right-0 w-72 rounded-lg border border-white/10 bg-black/30 backdrop-blur-lg shadow-lg z-50">
           <form onSubmit={handleSearch} className="p-2 border-b border-gray-700">
             <input
               ref={inputRef}

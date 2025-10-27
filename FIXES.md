@@ -1,144 +1,123 @@
-Kamu sedang mengerjakan proyek full-stack bernama **Chat-Lite**, sebuah aplikasi web chat dengan arsitektur:
+Kamu sedang mengerjakan proyek web app **Chat-Lite**, dibangun dengan:
 - Frontend: React (Vite + TypeScript + Tailwind)
 - Backend: Node.js (Express + Prisma + PostgreSQL)
 - Realtime: Socket.io
-- Struktur kode sudah rapi dan UI sudah responsif, jangan ubah gaya visual inti yang sudah ada.
+
+Fitur **Search Message** sudah berhasil diimplementasikan dan berfungsi dengan benar secara logika.  
+Sekarang tugasmu adalah **memperbaiki tampilan UI** agar tampil profesional, bersih, dan konsisten dengan gaya desain Chat-Lite — tanpa mengubah UI utama percakapan.
 
 ---
 
-## 🎯 Tujuan
-Tambahkan fitur **pencarian pesan (Search Message)** agar pengguna dapat mencari teks dalam percakapan tertentu dan menyorot hasilnya secara otomatis di tampilan chat (ChatWindow).
-
-Implementasi harus efisien, terintegrasi penuh dengan arsitektur yang ada, dan **tidak mengubah tampilan pesan (`MessageBubble`, `React`, atau menu titik tiga)**.
+## 🧩 Tujuan
+Perbaiki tampilan **komponen pencarian pesan (search message)** yang saat ini terlihat tidak sejajar dan tumpang tindih (buggy).  
+Pastikan UI-nya menyatu secara visual dengan komponen chat dan sidebar yang sudah ada.
 
 ---
 
-## ⚙️ Bagian Backend (Node.js / Express / Prisma / PostgreSQL)
+## ⚙️ Area Fokus
 
-1. **Buat endpoint baru:**
-   - `GET /api/messages/search?q=<query>&conversationId=<id>`
-   - Parameter:
-     - `q`: teks pencarian (string, minimal 2 karakter)
-     - `conversationId`: ID percakapan tempat pencarian dilakukan
-
-2. **Logika pencarian:**
-   - Gunakan Prisma ORM untuk mencari pesan di tabel `Message`.
-   - Filter berdasarkan `conversationId`.
-   - Gunakan pencarian teks menggunakan:
-     - Prisma `contains` + `mode: 'insensitive'`
-     - atau PostgreSQL Full-Text Search (`to_tsvector`) jika sudah dikonfigurasi.
-   - Batasi hasil hingga 50 pesan.
-   - Urutkan hasil berdasarkan `createdAt ASC`.
-
-3. **Contoh respons JSON:**
-   ```json
-   {
-     "success": true,
-     "results": [
-       {
-         "id": "msg_203",
-         "senderId": "usr_11",
-         "content": "Hey, did you see the project update?",
-         "createdAt": "2025-10-27T13:22:00Z"
-       }
-     ]
-   }
+### 🔹 1. Komponen `ChatHeader.tsx`
+- Saat pengguna klik ikon search:
+  - Input pencarian (`<input type="text">`) muncul dengan **animasi fade/slide lembut**, sejajar di area header.
+  - Jangan sampai input menindih nama pengguna atau tombol lain.
+  - Gunakan container fleksibel dengan `flex items-center gap-2 justify-between`.
+- Pastikan tampilan tetap responsif di semua ukuran layar.
+- Contoh gaya Tailwind:
+  ```tsx
+  <div className="relative flex items-center gap-2">
+    <input
+      type="text"
+      placeholder="Search messages..."
+      className="bg-neutral-800 text-sm text-gray-100 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-56 transition-all duration-300"
+    />
+    <button className="text-gray-400 hover:text-white">
+      <XIcon size={16} />
+    </button>
+  </div>
 ````
 
-4. **Keamanan dan validasi:**
+---
 
-   * Gunakan middleware autentikasi (`requireAuth`).
-   * Pastikan pengguna adalah anggota dari percakapan tersebut.
-   * Jika bukan, kirim `403 Forbidden`.
+### 🔹 2. Komponen hasil pencarian (`SearchResultsList` atau setara)
+
+Jika hasil pencarian ditampilkan di panel kanan (seperti saat ini), ubah tata letaknya agar:
+
+* Tidak menimpa bubble pesan utama.
+* Memiliki batas jelas antara area hasil pencarian dan area chat aktif.
+
+Gunakan gaya berikut:
+
+```tsx
+<div className="absolute right-4 top-16 w-80 max-h-[60vh] overflow-y-auto bg-neutral-900 border border-neutral-700 rounded-lg shadow-lg p-2 z-50">
+  {results.length > 0 ? (
+    results.map((msg) => (
+      <div
+        key={msg.id}
+        className="p-2 rounded-md hover:bg-neutral-800 cursor-pointer transition-colors duration-150"
+        onClick={() => handleSelect(msg.id)}
+      >
+        <p className="text-sm text-gray-200 truncate">{msg.content}</p>
+        <span className="text-xs text-gray-500">
+          {formatDate(msg.createdAt)}
+        </span>
+      </div>
+    ))
+  ) : (
+    <p className="text-center text-gray-500 py-2 text-sm">No messages found</p>
+  )}
+</div>
+```
+
+**Catatan:**
+
+* Pastikan panel hasil pencarian **mengambang (floating)** dan tidak menggeser layout utama.
+* Gunakan `absolute` dengan posisi `top` yang sejajar di bawah header aktif.
+* Tambahkan `z-index` tinggi agar tidak tertimpa bubble.
 
 ---
 
-## 💻 Bagian Frontend (React / TypeScript / Tailwind)
+### 🔹 3. Animasi & UX
 
-### 🔹 Lokasi: `ChatHeader.tsx`
+* Tambahkan animasi lembut saat input search muncul/menghilang menggunakan `framer-motion` atau `transition-opacity` Tailwind.
+* Saat user membuka panel hasil pencarian, beri efek blur ringan pada latar belakang chat (gunakan backdrop-filter).
+* Pastikan panel dapat ditutup dengan:
 
-Tambahkan ikon dan input pencarian di header percakapan:
-
-1. **UI & UX:**
-
-   * Tambahkan ikon kaca pembesar (`🔍`) di sisi kanan `ChatHeader`.
-   * Saat diklik, tampilkan input text (`<input type="text">`) dengan placeholder `"Search messages..."`.
-   * Input dapat muncul sebagai:
-
-     * Dropdown kecil di bawah header, atau
-     * Modal overlay ringan (pilih yang sesuai dengan style Chat-Lite).
-   * Tambahkan tombol `X` kecil untuk menutup pencarian.
-
-2. **Interaksi pengguna:**
-
-   * Saat pengguna mengetik dan menekan Enter:
-
-     * Kirim request ke endpoint `/api/messages/search?q=<query>&conversationId=<id>`.
-     * Gunakan `axios` atau helper API internal proyek.
-   * Tampilkan hasil dalam:
-
-     * Modal hasil pencarian **atau**
-     * Highlight langsung di `ChatWindow`.
+  * Menekan tombol `X`
+  * Klik di luar area panel
 
 ---
 
-### 🔹 Lokasi: `ChatWindow.tsx`
+### 🔹 4. Konsistensi Visual
 
-Implementasikan mekanisme **highlight otomatis** pada hasil pencarian:
+Gunakan warna dan radius yang seragam dengan tema Chat-Lite:
 
-1. **Fungsi highlight:**
-
-   * Setelah hasil pencarian diterima:
-
-     * Scroll otomatis ke pesan pertama yang cocok menggunakan `scrollIntoView({ behavior: 'smooth' })`.
-     * Tambahkan efek highlight sementara (misalnya animasi background kuning/purple muda transparan selama 2 detik).
-   * Gunakan `useRef` dan `useEffect` untuk menangani scroll dan highlight.
-
-2. **Efek visual:**
-
-   * Tambahkan kelas Tailwind sementara, misalnya:
-
-     ```tsx
-     <div
-       ref={messageRef}
-       className={`transition-colors duration-700 ${
-         isHighlighted ? 'bg-purple-100/30' : ''
-       }`}
-     >
-       ...
-     </div>
-     ```
-   * Setelah 2 detik, hilangkan efek highlight.
-
-3. **State kontrol:**
-
-   * Gunakan `useState` atau `Zustand` store (tergantung struktur proyek) untuk menyimpan:
-
-     * `searchResults: Message[]`
-     * `highlightedMessageId: string | null`
-   * Saat user klik salah satu hasil pencarian di modal, set `highlightedMessageId` dan trigger scroll ke elemen tersebut.
+* Warna latar belakang: `bg-neutral-900`
+* Warna border: `border-neutral-700`
+* Warna teks: `text-gray-200`
+* Radius: `rounded-lg`
+* Shadow: `shadow-lg shadow-black/30`
+* Hover: `hover:bg-neutral-800`
 
 ---
 
-## 🧩 Integrasi dan Perhatian
+## ⚠️ Batasan Penting
 
-* **Jangan ubah tampilan atau komponen visual utama pesan**:
-
-  * Jangan ubah `MessageBubble.tsx`
-  * Jangan ubah struktur `React` (reaksi emoji)
-  * Jangan ubah menu titik tiga atau aksi pesan
-* Fokus hanya pada logika pencarian dan highlight.
-* Pastikan kompatibilitas penuh dengan sistem real-time (socket).
-* Jika pesan baru datang saat pencarian aktif, jangan reset hasil pencarian.
+> ⚠️ Jangan ubah atau ganggu tampilan komponen berikut:
+>
+> * `MessageBubble.tsx` (tampilan pesan)
+> * `React` (fitur emoji/reaksi)
+> * Menu titik tiga (`⋯`) pada pesan
+>
+> Semua styling perubahan hanya berlaku untuk area pencarian pesan (search input dan daftar hasil).
 
 ---
 
-## ✅ Output yang Diharapkan
+## ✅ Output Diharapkan
 
-* Endpoint baru `/api/messages/search` bekerja dengan benar dan aman.
-* UI pencarian tersedia dan konsisten di `ChatHeader.tsx`.
-* Hasil pencarian dapat di-scroll dan di-highlight di `ChatWindow.tsx`.
-* Tidak ada perubahan tampilan pada komponen `MessageBubble`, `React`, dan menu titik tiga.
-* Performa tetap optimal dan tidak ada error di konsol browser/backend.
+* UI pencarian rapi, sejajar dengan header, tidak menutupi pesan.
+* Hasil pencarian tampil elegan dan konsisten dengan tema gelap Chat-Lite.
+* Tidak ada perubahan pada tampilan atau perilaku pesan utama.
+* Responsif dan tidak mengganggu layout chat saat resize jendela.
+* Animasi transisi lembut untuk input dan panel hasil.
 
 ---
