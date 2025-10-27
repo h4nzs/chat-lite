@@ -98,20 +98,30 @@ export const useChatStore = create<State>((set, get) => ({
   loadConversations: async () => {
     try {
       set({ error: null });
-      const conversations = await api<Conversation[]>("/api/conversations");
+      // Fetch raw conversations from the API
+      const rawConversations = await api<any[]>("/api/conversations");
 
-      // Decrypt the last message for each conversation
+      // 1. Map server response to client-side Conversation type
+      const conversations: Conversation[] = rawConversations.map(c => ({
+        ...c,
+        lastMessage: c.messages?.[0] || null, // Move messages[0] to lastMessage
+        participants: c.participants.map((p: any) => p.user), // Flatten participants
+      }));
+
+      // 2. Decrypt the last message for each conversation
       const decryptedConversations = await Promise.all(
         conversations.map(async (c) => {
           if (c.lastMessage?.content) {
             try {
               const decryptedContent = await decryptMessage(c.lastMessage.content, c.id);
               c.lastMessage.content = decryptedContent;
-              c.lastMessage.preview = decryptedContent; // Update preview as well
             } catch (e) {
               c.lastMessage.content = "[Encrypted Message]";
-              c.lastMessage.preview = "[Encrypted Message]";
             }
+          }
+          // 3. Generate preview after potential decryption
+          if (c.lastMessage) {
+            c.lastMessage = withPreview(c.lastMessage);
           }
           return c;
         })
@@ -365,33 +375,44 @@ export const useChatStore = create<State>((set, get) => ({
           newMessage.content = "[Failed to decrypt message]";
         }
       }
+      
       set(state => {
-        // Prevent processing if the sender is the current user, as optimistic update is used
+        const conversationId = newMessage.conversationId;
+
+        // Unify the update logic for both optimistic and new messages
+        const updateConversationList = (currentState: State): Conversation[] => {
+          const conversationExists = currentState.conversations.some(c => c.id === conversationId);
+          if (!conversationExists) return currentState.conversations; // Should not happen, but as a safeguard
+
+          const updatedConversations = currentState.conversations.map(c => 
+            c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt } : c
+          );
+          return sortConversations(updatedConversations);
+        };
+
+        // Handle optimistic message replacement for the sender
         if (newMessage.senderId === useAuthStore.getState().user?.id) {
-            // find the optimistic message and update it
-            const optimisticMessageExists = (state.messages[newMessage.conversationId] || []).some(m => m.tempId === newMessage.tempId);
+            const optimisticMessageExists = (state.messages[conversationId] || []).some(m => m.tempId === newMessage.tempId);
             if(optimisticMessageExists) {
                 return {
+                    ...state,
                     messages: {
                         ...state.messages,
-                        [newMessage.conversationId]: state.messages[newMessage.conversationId].map(m => m.tempId === newMessage.tempId ? withPreview(newMessage) : m)
-                    }
+                        [conversationId]: state.messages[conversationId].map(m => m.tempId === newMessage.tempId ? withPreview(newMessage) : m)
+                    },
+                    conversations: updateConversationList(state),
                 }
             }
         };
 
-        const conversationId = newMessage.conversationId;
+        // Handle new message from other users
         const messages = state.messages[conversationId] || [];
-        // Prevent duplicate messages
-        if (messages.some(m => m.id === newMessage.id)) return state;
-
-        const updatedConversations = state.conversations.map(c => 
-          c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt } : c
-        );
+        if (messages.some(m => m.id === newMessage.id)) return state; // Prevent duplicate messages
 
         return {
+          ...state,
           messages: { ...state.messages, [conversationId]: [...messages, withPreview(newMessage)] },
-          conversations: sortConversations(updatedConversations),
+          conversations: updateConversationList(state),
         };
       });
     });

@@ -14,7 +14,7 @@ import SearchMessages from './SearchMessages';
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { presence, toggleSidebar } = useChatStore();
-  const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.user.id !== meId)?.user : null;
+  const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 

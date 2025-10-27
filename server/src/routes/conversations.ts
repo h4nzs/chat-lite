@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import { getIo } from "../socket.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -88,7 +89,7 @@ router.get("/:id", async (req: any, res, next) => {
 // CREATE a new conversation (private or group)
 router.post("/", async (req: any, res, next) => {
   try {
-    const { name, userIds, isGroup } = req.body;
+    const { title, userIds, isGroup } = req.body;
     const creatorId = req.user.id;
 
     if (!isGroup) {
@@ -118,7 +119,7 @@ router.post("/", async (req: any, res, next) => {
 
     const newConversation = await prisma.conversation.create({
       data: {
-        name: isGroup ? name : null,
+        title: isGroup ? title : null,
         isGroup,
         creatorId: isGroup ? creatorId : null,
         participants: {
@@ -128,10 +129,21 @@ router.post("/", async (req: any, res, next) => {
         },
       },
       include: {
-        participants: { include: { user: { select: { id: true, username: true, avatarUrl: true } } } },
+        participants: { include: { user: { select: { id: true, username: true, avatarUrl: true, name: true } } } },
         creator: true,
       },
     });
+
+    // Broadcast the new conversation to all participants
+    if (isGroup) {
+      const io = getIo();
+      allUserIds.forEach(userId => {
+        // Exclude the creator from the real-time event to avoid duplicates on their end
+        if (userId !== creatorId) {
+          io.to(userId).emit("conversation:new", newConversation);
+        }
+      });
+    }
 
     res.status(201).json(newConversation);
   } catch (error) {
@@ -139,7 +151,6 @@ router.post("/", async (req: any, res, next) => {
   }
 });
 
-import { getIo } from "../socket.js";
 
 // DELETE a conversation (group or 1-on-1)
 router.delete("/:id", async (req: any, res, next) => {

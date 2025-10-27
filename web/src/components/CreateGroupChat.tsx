@@ -44,15 +44,21 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     }
     setLoading(true);
     try {
-      const newConversation = await api<any>("/api/conversations/group", {
+      const newConversation = await api<any>("/api/conversations", {
         method: "POST",
         body: JSON.stringify({
           title: title.trim(),
-          participantIds: selectedUsers.map(u => u.id),
+          userIds: selectedUsers.map(u => u.id),
+          isGroup: true,
         }),
       });
 
-      useChatStore.setState({ activeId: newConversation.id });
+      // Add the new conversation to the store and set it as active
+      useChatStore.setState(state => ({
+        conversations: [newConversation, ...state.conversations],
+        activeId: newConversation.id,
+      }));
+
       toast.success(`Group "${newConversation.title}" created!`);
       onClose();
 

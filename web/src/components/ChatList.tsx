@@ -104,7 +104,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             filteredConversations.map((c) => {
               const isActive = c.id === activeId;
               // FIX: Access user data from the nested `user` object
-              const peerUser = !c.isGroup ? c.participants.find(p => p.user.id !== meId)?.user : null;
+              const peerUser = !c.isGroup ? c.participants.find(p => p.id !== meId) : null;
               const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
               const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
