@@ -30,13 +30,8 @@ export async function importPrivateKey(privateKeyStr: string): Promise<Uint8Arra
   return sodium.from_base64(privateKeyStr, sodium.base64_variants.ORIGINAL);
 }
 
-export async function storePrivateKey(privateKey: Uint8Array | null, password: string): Promise<string> {
+export async function storePrivateKey(privateKey: Uint8Array, password: string): Promise<string> {
   const sodium = await getSodium();
-
-  if (!privateKey || !(privateKey instanceof Uint8Array)) {
-    console.error("storePrivateKey: invalid privateKey", privateKey);
-    throw new TypeError("Invalid private key — must be Uint8Array");
-  }
 
   if (!password || typeof password !== "string") {
     throw new TypeError("Invalid password — must be string");
@@ -58,6 +53,11 @@ export async function storePrivateKey(privateKey: Uint8Array | null, password: s
     );
 
     const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+    console.log('DEBUG: storePrivateKey', { 
+      privateKey_type: typeof privateKey, privateKey_length: privateKey?.length, 
+      nonce_type: typeof nonce, nonce_length: nonce?.length, 
+      key_type: typeof key, key_length: key?.length 
+    });
     const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
 
     const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);

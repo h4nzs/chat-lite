@@ -43,7 +43,7 @@ const setupUserEncryptionKeys = async (password: string): Promise<void> => {
   try {
     // Ensure sodium is initialized before generating keys
     const sodium = await getSodium();
-    const { publicKey, privateKey } = sodium.crypto_box_keypair();
+    const { publicKey, privateKey } = sodium.crypto_kx_keypair();
     
     // Export public and private keys to base64 strings
     const publicKeyStr = await exportPublicKey(publicKey);
