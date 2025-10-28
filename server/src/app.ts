@@ -23,6 +23,14 @@ import conversationsRouter from "./routes/conversations.js";
 import messagesRouter from "./routes/messages.js";
 import uploadsRouter from "./routes/uploads.js";
 import keysRouter from "./routes/keys.js";
+import webpush from "web-push";
+
+// Set VAPID keys for web-push notifications
+webpush.setVapidDetails(
+  process.env.VAPID_SUBJECT,
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
 
 const app = express();
 

@@ -49,6 +49,8 @@ export async function requestPushPermission() {
     applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY
   });
 
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
   // Send subscription to server
   const socket = getSocket();
   socket.emit('push:subscribe', { subscription });
