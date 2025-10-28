@@ -94,6 +94,13 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
           },
         },
         statuses: true,
+        repliedTo: { // Include the message being replied to
+          include: {
+            sender: { // And the sender of that original message
+              select: { id: true, name: true, username: true }
+            }
+          }
+        }
       },
       orderBy: {
         createdAt: "desc", // Fetch newest messages first

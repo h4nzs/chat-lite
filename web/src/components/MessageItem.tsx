@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import type { Message, Conversation } from "@store/chat";
 import { useAuthStore } from "@store/auth";
+import { useChatStore } from "@store/chat";
 import { getSocket } from "@lib/socket";
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { api } from "@lib/api";
@@ -36,11 +37,22 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 };
 
+const ReplyQuote = ({ message }: { message: Message }) => {
+  const authorName = message.sender?.name || 'User';
+  const contentPreview = message.content || (message.fileUrl ? 'File' : '...');
+
+  return (
+    <div className="mb-1.5 p-2 rounded-lg bg-black/20 border-l-4 border-accent/50">
+      <p className="text-xs font-bold text-accent/80">{authorName}</p>
+      <p className="text-sm text-white/70 truncate">{contentPreview}</p>
+    </div>
+  );
+};
+
 const MessageBubble = ({ message, mine, conversation, onImageClick }: { message: Message; mine: boolean; conversation: Conversation | undefined; onImageClick: (src: string) => void; }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
   const imageUrl = message.imageUrl || (message.fileType?.startsWith('image/') ? message.fileUrl : null);
 
-  // Case 1: Image only (no text content)
   if (imageUrl && !hasContent) {
     const fullSrc = toAbsoluteUrl(imageUrl);
     return (
@@ -60,11 +72,11 @@ const MessageBubble = ({ message, mine, conversation, onImageClick }: { message:
     );
   }
 
-  // Case 2: Text content (with or without an image)
   return (
     <div className={`relative max-w-md md:max-w-lg px-4 py-2.5 rounded-2xl shadow-sm ${mine ? 'bg-gradient-to-r from-accent to-magenta text-white' : 'bg-primary text-text-primary'}`}>
+      {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
       {imageUrl && (
-        <button onClick={() => onImageClick(toAbsoluteUrl(imageUrl))} className="block w-full mb-2">
+        <button onClick={() => onImageClick(toAbsoluteUrl(imageUrl))} className="block w-full my-2">
           <LazyImage 
             src={toAbsoluteUrl(imageUrl)} 
             alt={message.fileName || 'Image attachment'}
@@ -75,8 +87,7 @@ const MessageBubble = ({ message, mine, conversation, onImageClick }: { message:
       {hasContent ? (
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
       ) : (
-        // Fallback for non-image files
-        <p className="italic text-gray-400">📎 {message.fileName || 'File attachment'}</p>
+        !imageUrl && <p className="italic text-gray-400">📎 {message.fileName || 'File attachment'}</p>
       )}
       <div className="text-xs text-right mt-1 opacity-60 flex items-center justify-end gap-1.5">
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -113,6 +124,7 @@ interface MessageItemProps {
 
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
+  const { setReplyingTo } = useChatStore();
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 
@@ -156,6 +168,7 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: Mes
   return (
     <div 
       ref={ref} 
+      id={message.id}
       className={`group flex items-end gap-2 p-2 rounded-lg transition-colors duration-1000 ${isHighlighted ? 'bg-purple-500/20' : ''} ${
         mine ? 'justify-end' : 'justify-start'
       }`}>
@@ -175,6 +188,10 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: Mes
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content sideOffset={5} align="center" className="min-w-[150px] bg-surface border border-gray-700 rounded-md shadow-lg z-50 p-1">
+                <DropdownMenu.Item onSelect={() => setReplyingTo(message)} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded cursor-pointer outline-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                  Reply
+                </DropdownMenu.Item>
                 <ReactionPopover message={message}>
                   <div className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded cursor-pointer outline-none">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a.75.75 0 01.028.022l.028.027a.75.75 0 01.027.028l.027.028a.75.75 0 01.022.028l.022.028a.75.75 0 01.016.023l.016.023a.75.75 0 01.01.016l.01.016c.004.005.007.01.01.015l.004.005a.75.75 0 01.005.004l.005.004a.75.75 0 01.002.002l.002.002a.75.75 0 010 .004c0 .001 0 .002 0 .002a.75.75 0 01-.004 0l-.002-.002a.75.75 0 01-.005-.004l-.005-.004a.75.75 0 01-.01-.015l-.01-.016a.75.75 0 01-.016-.023l-.016-.023a.75.75 0 01-.022-.028l-.022-.028a.75.75 0 01-.027-.028l-.027-.028a.75.75 0 01-.028-.022l-.028-.027a.75.75 0 01-.022-.028l-.022-.028a.75.75 0 01-.016-.023l-.016-.023a.75.75 0 01-.01-.016l-.01-.016a.75.75 0 01-.005-.004l-.005-.004a.75.75 0 01-.002-.002l-.002-.002a.75.75 0 010-.004c.09.34.26.65.49.93a.75.75 0 01-1.06 1.06 5.25 5.25 0 00-1.5 3.75.75.75 0 01-1.5 0 6.75 6.75 0 011.94-4.71.75.75 0 011.06-1.06z" clipRule="evenodd" /></svg>

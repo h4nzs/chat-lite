@@ -75,6 +75,7 @@ export function registerSocket(httpServer: HttpServer) {
             fileName: data.fileName,
             fileType: data.fileType,
             fileSize: data.fileSize,
+            repliedToId: data.repliedToId, // Handle the reply
             // Buat status untuk setiap partisipan
             statuses: {
               create: participants.map(p => ({
@@ -87,7 +88,12 @@ export function registerSocket(httpServer: HttpServer) {
           include: { 
             sender: true, 
             reactions: { include: { user: true } },
-            statuses: true, // 3. Sertakan status saat mengambil pesan baru
+            statuses: true, // Sertakan status saat mengambil pesan baru
+            repliedTo: {  // Sertakan pesan yang dibalas
+              include: {
+                sender: { select: { id: true, name: true, username: true } }
+              }
+            }
           }, 
         });
 
@@ -105,6 +111,7 @@ export function registerSocket(httpServer: HttpServer) {
           sender: newMessage.sender,
           reactions: newMessage.reactions,
           statuses: newMessage.statuses,
+          repliedTo: newMessage.repliedTo, // Sertakan data balasan
           tempId: data.tempId, // Ensure tempId is included
         };
 

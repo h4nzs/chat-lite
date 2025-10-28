@@ -90,3 +90,26 @@ Fitur-fitur ini lebih kompleks tetapi akan membedakan aplikasi Anda dan mempersi
     1.  **Database:** Tambahkan relasi opsional pada model `Message`, misalnya `repliedToId: String?` yang merujuk ke `id` pesan lain.
     2.  **Frontend:** Di `MessageItem.tsx`, tambahkan tombol "Reply" (misalnya di menu dropdown). Saat diklik, UI di `MessageInput` akan menampilkan kutipan pesan yang akan dibalas. Saat mengirim, `repliedToId` disertakan dalam payload `message:send`.
     3.  **UI:** Di `MessageItem.tsx`, jika sebuah pesan memiliki `repliedToId`, render kutipan kecil dari pesan asli di atas konten pesan balasan tersebut.
+
+Rencana Eksekusi:
+
+  Fase 1: Backend & Database
+   1. Skema Database: Saya akan memodifikasi prisma/schema.prisma
+      untuk menambahkan relasi repliedTo pada model Message.
+   2. Membuat Migrasi: Saya akan membuat dan menjalankan file
+      migrasi database baru untuk menerapkan perubahan skema.
+   3. Logika Backend: Saya akan memperbarui logika pengiriman dan
+      pengambilan pesan di backend untuk menyertakan data balasan.
+
+  Fase 2: Frontend (State & Logika)
+   4. State Management: Saya akan menambahkan state replyingTo ke
+      useChatStore untuk melacak pesan mana yang sedang dibalas.
+   5. Pengiriman Pesan: Fungsi sendMessage akan diperbarui untuk
+      menyertakan repliedToId saat mengirim balasan.
+
+  Fase 3: Frontend (UI)
+   6. Tampilan Input: Komponen MessageInput akan menampilkan
+      pratinjau dari pesan yang sedang dibalas.
+   7. Tampilan Pesan: MessageItem.tsx akan menampilkan kutipan pen
+       asli di atas pesan balasan dan menambahkan tombol "Reply" i
+      menu.

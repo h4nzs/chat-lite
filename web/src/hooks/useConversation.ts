@@ -34,10 +34,9 @@ export function useConversation(conversationId: string) {
     }
   }, [conversationId, store.loadMessagesForConversation]);
 
-  // Memoize actions to prevent unnecessary re-renders
-  const sendMessage = useMemo(() => store.sendMessage, [store.sendMessage]);
-  const uploadFile = useMemo(() => store.uploadFile, [store.uploadFile]);
-  const loadPreviousMessages = useMemo(() => store.loadPreviousMessages, [store.loadPreviousMessages]);
+  const storeSendMessage = useMemo(() => store.sendMessage, [store.sendMessage]);
+  const storeUploadFile = useMemo(() => store.uploadFile, [store.uploadFile]);
+  const storeLoadPreviousMessages = useMemo(() => store.loadPreviousMessages, [store.loadPreviousMessages]);
 
   return {
     conversation,
@@ -46,8 +45,8 @@ export function useConversation(conversationId: string) {
     error,
     isFetchingMore,
     hasMore,
-    sendMessage: (content: string) => sendMessage(conversationId, { content }),
-    uploadFile: (file: File) => uploadFile(conversationId, file),
-    loadPreviousMessages: () => loadPreviousMessages(conversationId),
+    sendMessage: (data: Partial<Message>) => storeSendMessage(conversationId, data),
+    uploadFile: (file: File) => storeUploadFile(conversationId, file),
+    loadPreviousMessages: () => storeLoadPreviousMessages(conversationId),
   };
 }

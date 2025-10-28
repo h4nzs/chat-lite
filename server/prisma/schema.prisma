@@ -89,10 +89,16 @@ model Message {
   statuses            MessageStatus[]
   reactions           MessageReaction[]
 
+  // Fields for replies
+  repliedToId         String?         @map("replied_to_id")
+  repliedTo           Message?        @relation("Replies", fields: [repliedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies             Message[]       @relation("Replies")
+
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@index([sessionId])
   @@index([createdAt])
+  @@index([repliedToId]) // Index for faster reply lookups
 }
 
 

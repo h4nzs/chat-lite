@@ -8,9 +8,9 @@ import { Spinner } from "./Spinner";
 import { useChatStore } from "@store/chat";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
-import Lightbox from "./Lightbox"; // Import Lightbox
+import Lightbox from "./Lightbox";
 
-// --- Komponen Terpisah --- 
+// --- Komponen Terpisah ---
 
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
@@ -35,6 +35,30 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
   );
 };
 
+const ReplyPreview = () => {
+  const { replyingTo, setReplyingTo } = useChatStore();
+
+  if (!replyingTo) return null;
+
+  const authorName = replyingTo.sender?.name || 'User';
+  const contentPreview = replyingTo.content || (replyingTo.fileUrl ? 'File' : '...');
+
+  return (
+    <div className="px-4 pt-3">
+      <div className="relative bg-primary p-2 rounded-lg border-l-4 border-accent">
+        <p className="text-xs font-bold text-accent">Replying to {authorName}</p>
+        <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
+        <button 
+          onClick={() => setReplyingTo(null)} 
+          className="absolute top-1 right-1 p-1 rounded-full hover:bg-gray-600"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: string) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,28 +76,31 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
   }
 
   return (
-    <div className="p-4 border-t border-gray-800">
-      <form onSubmit={handleSubmit} className="flex items-center gap-3">
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-        </button>
-        <input 
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={onFileChange}
-        />
-        <input 
-          type="text" 
-          value={text} 
-          onChange={handleTextChange}
-          placeholder="Type a message..."
-          className="flex-1 bg-primary px-4 py-2.5 rounded-full text-white placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <button type="submit" className="p-3 rounded-full bg-accent hover:bg-accent-hover transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </form>
+    <div className="border-t border-gray-800 bg-background">
+      <ReplyPreview />
+      <div className="p-4">
+        <form onSubmit={handleSubmit} className="flex items-center gap-3">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input 
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={onFileChange}
+          />
+          <input 
+            type="text" 
+            value={text} 
+            onChange={handleTextChange}
+            placeholder="Type a message..."
+            className="flex-1 bg-primary px-4 py-2.5 rounded-full text-white placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <button type="submit" className="p-3 rounded-full bg-accent hover:bg-accent-hover transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </div>
     </div>
   );
 };
@@ -97,7 +124,6 @@ export default function ChatWindow({ id }: { id: string }) {
     loadPreviousMessages 
   } = useConversation(id);
   const {
-    typing,
     highlightedMessageId,
     setHighlightedMessageId,
   } = useChatStore();
@@ -124,7 +150,7 @@ export default function ChatWindow({ id }: { id: string }) {
     }
   }, [highlightedMessageId, messages, setHighlightedMessageId]);
 
-  const { typing: typingState } = useChatStore(); // Keep this for typing indicator
+  const { typing: typingState } = useChatStore();
   const typingUsers = typingState[id] || [];
   const filteredTypingUsers = typingUsers.filter(uid => uid !== meId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -139,7 +165,7 @@ export default function ChatWindow({ id }: { id: string }) {
   }, [id]);
 
   const handleSendMessage = (text: string) => {
-    sendMessage(text);
+    sendMessage({ content: text });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     getSocket().emit("typing:stop", { conversationId: id });
   };
