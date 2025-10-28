@@ -20,7 +20,7 @@ Fitur-fitur berikut direkomendasikan untuk meningkatkan pengalaman pengguna, uti
 
 Fitur-fitur ini dianggap esensial untuk aplikasi chat modern dan akan memberikan peningkatan nilai yang paling signifikan bagi pengguna.
 
-### a. Jumlah Pesan Belum Dibaca (Unread Message Count)
+### a. **done** Jumlah Pesan Belum Dibaca (Unread Message Count)
 
 *   **Mengapa Ini Penting?**
     Ini adalah standar UX fundamental. Pengguna perlu tahu secara sekilas percakapan mana yang memiliki pesan baru yang belum mereka lihat. Fitur ini secara drastis meningkatkan keterlibatan pengguna dan efisiensi komunikasi.
@@ -30,7 +30,7 @@ Fitur-fitur ini dianggap esensial untuk aplikasi chat modern dan akan memberikan
     2.  **Frontend:** Di komponen `ChatList.tsx`, saat me-render setiap item percakapan, tampilkan `unreadCount` sebagai *badge* (lencana) notifikasi. Hilangkan badge ini saat pengguna membuka percakapan tersebut.
     3.  **Real-time Update:** Saat pesan baru diterima melalui socket (`message:new`) di percakapan yang tidak aktif, `useChatStore` harus secara dinamis menambah `unreadCount` di state.
 
-### b. Pencarian Pesan (Message Search)
+### b. **done** Pencarian Pesan (Message Search)
 
 *   **Mengapa Ini Penting?**
     Seiring waktu, percakapan akan berisi informasi penting. Tanpa fungsi pencarian, menemukan kembali informasi tersebut menjadi tidak mungkin. Ini adalah fitur utilitas murni yang sangat dibutuhkan.
@@ -45,7 +45,7 @@ Fitur-fitur ini dianggap esensial untuk aplikasi chat modern dan akan memberikan
 
 Fitur-fitur ini akan secara signifikan memperkaya pengalaman pengguna dan menambahkan lapisan personalisasi yang penting.
 
-### a. Kustomisasi Profil Pengguna (Avatar & Status)
+### a. **done** Kustomisasi Profil Pengguna (Avatar & Status)
 
 *   **Mengapa Ini Penting?**
     Memberi pengguna kemampuan untuk mempersonalisasi profil mereka (terutama gambar profil) adalah kunci untuk menciptakan rasa memiliki dan identitas di dalam aplikasi. Saat ini, avatar dibuat secara otomatis.
@@ -69,7 +69,7 @@ Fitur-fitur ini akan secara signifikan memperkaya pengalaman pengguna dan menamb
 
 Fitur-fitur ini lebih kompleks tetapi akan membedakan aplikasi Anda dan mempersiapkannya untuk masa depan.
 
-### a. Status Pesan Terbaca (Read Receipts)
+### a. **done** Status Pesan Terbaca (Read Receipts)
 
 *   **Mengapa Ini Penting?**
     Memberikan kepastian kepada pengirim bahwa pesan mereka tidak hanya terkirim tetapi juga telah dilihat oleh penerima. Ini adalah fitur standar di aplikasi seperti WhatsApp dan Telegram.

@@ -303,36 +303,20 @@ export const useChatStore = create<State>((set, get) => ({
   },
 
   searchMessages: async (query, conversationId) => {
-    if (query.length < 2) {
-      set({ searchResults: [], searchQuery: query });
+    set({ searchQuery: query });
+
+    if (!query.trim()) {
+      set({ searchResults: [] });
       return;
     }
-    try {
-      set({ searchQuery: query });
-      const { results } = await api<{ results: Message[] }>(
-        `/api/messages/search?q=${encodeURIComponent(query)}&conversationId=${conversationId}`
-      );
 
-      const decryptedResults = await Promise.all(
-        results.map(async (m) => {
-          try {
-            if (m.content) {
-              m.content = await decryptMessage(m.content, m.conversationId);
-            }
-            return m;
-          } catch (err) {
-            m.content = '[Failed to decrypt message]';
-            return m;
-          }
-        })
-      );
+    const allMessages = get().messages[conversationId] || [];
+    
+    const results = allMessages.filter(m => 
+      m.content && m.content.toLowerCase().includes(query.toLowerCase())
+    );
 
-      set({ searchResults: decryptedResults });
-    } catch (error) {
-      console.error("Failed to search messages", error);
-      toast.error("Failed to search messages.");
-      set({ searchResults: [] });
-    }
+    set({ searchResults: results });
   },
 
   setHighlightedMessageId: (messageId) => {

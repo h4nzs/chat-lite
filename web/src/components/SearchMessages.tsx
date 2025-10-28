@@ -8,12 +8,12 @@ interface SearchMessagesProps {
 
 export default function SearchMessages({ conversationId }: SearchMessagesProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { 
-    searchQuery, 
-    searchResults, 
-    searchMessages, 
-    clearSearch, 
-    setHighlightedMessageId 
+  const {
+    searchQuery,
+    searchResults,
+    searchMessages,
+    clearSearch,
+    setHighlightedMessageId
   } = useChatStore();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -25,11 +25,10 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
     }
   }, [isOpen, clearSearch]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      searchMessages(searchQuery, conversationId);
-    }
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    // Immediately update the input and trigger the search
+    searchMessages(query, conversationId);
   };
 
   const handleResultClick = (messageId: string) => {
@@ -45,12 +44,12 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
 
       {isOpen && (
         <div className="absolute top-12 right-0 w-72 rounded-lg border border-white/10 bg-black/30 backdrop-blur-lg shadow-lg z-50">
-          <form onSubmit={handleSearch} className="p-2 border-b border-gray-700">
+          <form onSubmit={(e) => e.preventDefault()} className="p-2 border-b border-gray-700">
             <input
               ref={inputRef}
               type="text"
               value={searchQuery}
-              onChange={(e) => useChatStore.setState({ searchQuery: e.target.value })}
+              onChange={handleSearchChange}
               placeholder="Search messages..."
               className="w-full bg-primary px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
@@ -58,8 +57,8 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
           <div className="max-h-80 overflow-y-auto">
             {searchResults.length > 0 ? (
               searchResults.map((msg) => (
-                <div 
-                  key={msg.id} 
+                <div
+                  key={msg.id}
                   onClick={() => handleResultClick(msg.id)}
                   className="p-3 hover:bg-primary cursor-pointer border-b border-gray-800 last:border-b-0"
                 >
