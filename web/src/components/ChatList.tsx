@@ -110,7 +110,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
 
               return (
                 <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent/20' : 'hover:bg-primary/50'}`}>
-                  <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 flex items-center gap-3">
+                  <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                       <img src={toAbsoluteUrl(peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
                       {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
@@ -120,9 +120,16 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         <p className="font-semibold text-white truncate">{title}</p>
                         {c.lastMessage && <p className="text-xs text-text-secondary flex-shrink-0 ml-2">{formatConversationTime(c.lastMessage.createdAt)}</p>}
                       </div>
-                      <p className="text-sm text-text-secondary truncate mt-1">
-                        {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
-                      </p>
+                      <div className="flex justify-between items-center mt-1">
+                        <p className="text-sm text-text-secondary truncate">
+                          {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
+                        </p>
+                        {c.unreadCount > 0 && (
+                          <span className="bg-accent text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">
+                            {c.unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                   <div className="absolute right-2 top-1/2 -translate-y-1/2">

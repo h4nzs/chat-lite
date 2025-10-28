@@ -80,7 +80,7 @@ Ringkasan Keseluruhan
          useMessageStore, usePresenceStore. Ini akan membuat kode
          lebih mudah dikelola dan dites di masa depan.
 
-   2. Prioritas Menengah (Performa & UX): Optimalkan Initial Load.
+   2. **done**Prioritas Menengah (Performa & UX): Optimalkan Initial Load.
        - Pertimbangkan untuk mengirim batch data awal (misalnya, 5
           percakapan teratas beserta pesan terakhirnya) langsung
          setelah koneksi socket berhasil untuk mengurangi jumlah

@@ -9,7 +9,7 @@ router.use(requireAuth);
 // GET all conversations for the current user
 router.get("/", async (req: any, res, next) => {
   try {
-    const conversations = await prisma.conversation.findMany({
+    const conversationsData = await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
@@ -44,6 +44,47 @@ router.get("/", async (req: any, res, next) => {
         lastMessageAt: "desc",
       },
     });
+
+    // Manually fetch unread counts
+    const conversations = await Promise.all(
+      conversationsData.map(async (convo) => {
+        const participant = convo.participants.find(p => p.userId === req.user.id);
+        let unreadCount = 0;
+
+        if (participant) {
+          let lastReadTimestamp: Date | null = null;
+
+          if (participant.lastReadMsgId) {
+            const lastReadMessage = await prisma.message.findUnique({
+              where: { id: participant.lastReadMsgId },
+              select: { createdAt: true },
+            });
+            lastReadTimestamp = lastReadMessage?.createdAt ?? null;
+          }
+
+          // If there's no last read message, all messages since the user joined are unread
+          const sinceDate = lastReadTimestamp || participant.joinedAt;
+
+          unreadCount = await prisma.message.count({
+            where: {
+              conversationId: convo.id,
+              createdAt: {
+                gt: sinceDate,
+              },
+              senderId: {
+                not: req.user.id,
+              },
+            },
+          });
+        }
+
+        return {
+          ...convo,
+          unreadCount,
+        };
+      })
+    );
+
     res.json(conversations);
   } catch (error) {
     next(error);

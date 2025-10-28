@@ -14,6 +14,7 @@ export type Conversation = {
   participants: { id: string; username: string; name: string; avatarUrl?: string | null }[];
   lastMessage: (Message & { preview?: string }) | null;
   updatedAt: string;
+  unreadCount: number; // Tambahkan ini
 };
 export type Message = {
   id: string;
@@ -61,6 +62,7 @@ type State = {
   searchMessages: (query: string, conversationId: string) => Promise<void>;
   setHighlightedMessageId: (messageId: string | null) => void;
   clearSearch: () => void;
+  markConversationAsRead: (id: string) => void; // Tambahkan ini
 };
 
 const sortConversations = (list: Conversation[]) =>
@@ -93,6 +95,14 @@ export const useChatStore = create<State>((set, get) => ({
   searchResults: [],
   highlightedMessageId: null,
   searchQuery: '',
+
+  markConversationAsRead: (id: string) => {
+    set(state => ({
+      conversations: state.conversations.map(c =>
+        c.id === id ? { ...c, unreadCount: 0 } : c
+      ),
+    }));
+  },
 
   // ... (fungsi-fungsi lain tetap sama)
   loadConversations: async () => {
@@ -136,6 +146,7 @@ export const useChatStore = create<State>((set, get) => ({
   openConversation: (id: string) => {
     const socket = getSocket();
     socket.emit("conversation:join", id);
+    get().markConversationAsRead(id); // Reset unread count on open
     set({ activeId: id, isSidebarOpen: false });
     localStorage.setItem("activeId", id);
   },
@@ -431,15 +442,22 @@ export const useChatStore = create<State>((set, get) => ({
       
       set(state => {
         const conversationId = newMessage.conversationId;
+        const isActive = state.activeId === conversationId;
 
         // Unify the update logic for both optimistic and new messages
         const updateConversationList = (currentState: State): Conversation[] => {
           const conversationExists = currentState.conversations.some(c => c.id === conversationId);
           if (!conversationExists) return currentState.conversations; // Should not happen, but as a safeguard
 
-          const updatedConversations = currentState.conversations.map(c => 
-            c.id === conversationId ? { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt } : c
-          );
+          const updatedConversations = currentState.conversations.map(c => {
+            if (c.id === conversationId) {
+              const newUnreadCount = !isActive && newMessage.senderId !== useAuthStore.getState().user?.id
+                ? (c.unreadCount || 0) + 1
+                : c.unreadCount;
+              return { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt, unreadCount: newUnreadCount };
+            }
+            return c;
+          });
           return sortConversations(updatedConversations);
         };
 
