@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
+import KeyManagementPage from './pages/KeyManagementPage'; // Import the new page
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useChatStore } from './store/chat';
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} /> {/* Add the new route */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

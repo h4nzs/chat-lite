@@ -35,6 +35,7 @@ type State = {
   updateProfile: (data: { name: string }) => Promise<void>;
   updateAvatar: (file: File) => Promise<void>;
   toggleReadReceipts: () => void; // Tambahkan fungsi
+  regenerateKeys: (password: string) => Promise<void>; // Fungsi untuk regenerasi kunci
 };
 
 // Helper function to setup user encryption keys
@@ -207,5 +208,19 @@ export const useAuthStore = create<State>((set, get) => ({
     set({ sendReadReceipts: next });
     localStorage.setItem('sendReadReceipts', String(next));
     toast.success(`Read receipts ${next ? 'enabled' : 'disabled'}`);
+  },
+
+  async regenerateKeys(password: string) {
+    // 1. Hapus kunci lama dari cache dan storage
+    clearKeyCache();
+    clearSessionKeyCache();
+    localStorage.removeItem('publicKey');
+    localStorage.removeItem('encryptedPrivateKey');
+
+    // 2. Gunakan logika yang ada untuk membuat dan menyimpan kunci baru
+    await setupUserEncryptionKeys(password);
+
+    // 3. Hapus semua state percakapan untuk memaksa sinkronisasi ulang
+    useChatStore.setState({ conversations: [], messages: {} }, true);
   },
 }));

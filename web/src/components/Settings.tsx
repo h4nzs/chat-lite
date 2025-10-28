@@ -1,4 +1,5 @@
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '@store/auth';
 import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
@@ -115,6 +116,18 @@ export default function Settings() {
             readOnly
             className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-text-secondary cursor-not-allowed"
           />
+        </div>
+
+        {/* Security Settings */}
+        <div className="space-y-4 pt-4 border-t border-gray-700">
+          <h3 className="text-lg font-semibold text-white">Security</h3>
+          <Link to="/settings/keys" className="flex items-center justify-between p-4 rounded-lg bg-primary hover:bg-primary/70 transition-colors w-full text-left">
+            <div>
+              <p className="font-medium text-text-primary">Encryption Keys</p>
+              <p className="text-sm text-text-secondary">Manage your end-to-end encryption keys.</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </Link>
         </div>
 
         {/* Privacy Settings */}

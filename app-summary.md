@@ -45,7 +45,7 @@ Ringkasan Keseluruhan
       masih bergantung pada penambahan manual di sisi klien. Ini
       bisa disederhanakan di backend agar semua partisipan, termak
        pembuat, menerima event yang sama.
-   3. Pengambilan Data Awal (Initial Load): Saat aplikasi dimuat,
+   3. **done** Pengambilan Data Awal (Initial Load): Saat aplikasi dimuat,
       klien melakukan beberapa panggilan API secara berurutan (unk
        user, lalu percakapan, lalu pesan). Ini bisa dioptimalkan
       untuk mengurangi waktu muat awal.
