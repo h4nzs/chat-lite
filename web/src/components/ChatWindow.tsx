@@ -77,9 +77,24 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: strin
   );
 };
 
+const ChatSpinner = () => (
+  <div className="py-4 flex justify-center items-center">
+    <Spinner />
+  </div>
+);
+
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
-  const { conversation, messages, isLoading, error, sendMessage, uploadFile } = useConversation(id);
+  const { 
+    conversation, 
+    messages, 
+    isLoading, 
+    error, 
+    sendMessage, 
+    uploadFile, 
+    isFetchingMore, 
+    loadPreviousMessages 
+  } = useConversation(id);
   const {
     typing,
     highlightedMessageId,
@@ -156,6 +171,10 @@ export default function ChatWindow({ id }: { id: string }) {
           ref={virtuosoRef}
           initialTopMostItemIndex={messages.length - 1}
           data={messages}
+          startReached={loadPreviousMessages}
+          components={{ 
+            Header: () => isFetchingMore ? <ChatSpinner /> : null 
+          }}
           itemContent={(index, message) => (
             <div className="px-4">
               <MessageItem 

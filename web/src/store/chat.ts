@@ -207,9 +207,19 @@ export const useChatStore = create<State>((set, get) => ({
       toast.error(`Upload failed: ${errorMsg}`);
     }
   },
+  isFetchingMore: {} as Record<string, boolean>,
+  hasMore: {} as Record<string, boolean>,
+
   loadMessagesForConversation: async (id: string) => {
+    // Only fetch if messages aren't loaded yet
+    if (get().messages[id]) return;
+
     try {
-      set({ error: null });
+      set(state => ({ 
+        error: null,
+        hasMore: { ...state.hasMore, [id]: true },
+        isFetchingMore: { ...state.isFetchingMore, [id]: false },
+      }));
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const decryptedItems = await Promise.all(
         (res.items || []).map(async (m) => {
@@ -224,10 +234,7 @@ export const useChatStore = create<State>((set, get) => ({
           }
         })
       );
-
-      // Sort messages by date ascending (oldest to newest)
       decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
       set((state) => ({ messages: { ...state.messages, [id]: decryptedItems } }));
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
@@ -235,6 +242,52 @@ export const useChatStore = create<State>((set, get) => ({
         messages: { ...state.messages, [id]: [] },
         error: `Failed to load messages for conversation.`
       }));
+    }
+  },
+
+  loadPreviousMessages: async (conversationId: string) => {
+    const { isFetchingMore, hasMore, messages } = get();
+    if (isFetchingMore[conversationId] || !hasMore[conversationId]) {
+      return;
+    }
+
+    const currentMessages = messages[conversationId] || [];
+    const oldestMessage = currentMessages[0];
+    if (!oldestMessage) return;
+
+    set(state => ({ isFetchingMore: { ...state.isFetchingMore, [conversationId]: true } }));
+
+    try {
+      const res = await api<{ items: Message[] }>(`/api/messages/${conversationId}?cursor=${oldestMessage.id}`);
+      const decryptedItems = await Promise.all(
+        (res.items || []).map(async (m) => {
+          try {
+            if (m.content) {
+              m.content = await decryptMessage(m.content, m.conversationId);
+            }
+            return withPreview(m);
+          } catch (err) {
+            m.content = '[Failed to decrypt message]';
+            return withPreview(m);
+          }
+        })
+      );
+      decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      if (decryptedItems.length < 50) {
+        set(state => ({ hasMore: { ...state.hasMore, [conversationId]: false } }));
+      }
+
+      set(state => ({
+        messages: {
+          ...state.messages,
+          [conversationId]: [...decryptedItems, ...currentMessages],
+        },
+      }));
+    } catch (error) {
+      console.error("Failed to load previous messages", error);
+    } finally {
+      set(state => ({ isFetchingMore: { ...state.isFetchingMore, [conversationId]: false } }));
     }
   },
 
