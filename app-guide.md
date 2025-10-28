@@ -54,7 +54,7 @@ Fitur-fitur ini akan secara signifikan memperkaya pengalaman pengguna dan menamb
     1.  **Backend:** Buat endpoint `POST /api/users/me/avatar` yang menerima unggahan gambar, memprosesnya (misalnya resize), dan menyimpan URL-nya di `avatarUrl` pada model `User`. Buat juga endpoint `PUT /api/users/me` untuk memperbarui detail lain seperti nama atau status.
     2.  **Frontend:** Buat halaman atau modal `Settings` baru. Tambahkan komponen untuk memilih dan mengunggah gambar profil, serta form untuk mengubah nama. Perbarui `useAuthStore` untuk menangani logika ini.
 
-### b. Pratinjau Gambar & Media (Image & Media Previews)
+### b. **done** Pratinjau Gambar & Media (Image & Media Previews)
 
 *   **Mengapa Ini Penting?**
     Saat ini, lampiran file hanya ditampilkan sebagai link. Menampilkan pratinjau gambar secara langsung di dalam chat adalah pengalaman yang jauh lebih baik dan sesuai dengan ekspektasi pengguna dari aplikasi chat modern.

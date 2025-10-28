@@ -40,14 +40,13 @@ app.use(helmet());
 // Hapus header X-Powered-By untuk menyembunyikan detail teknologi server
 app.disable('x-powered-by');
 
-app.use(
-  cors({
-    origin: env.corsOrigin || "http://localhost:5173",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],
-  })
-);
+const corsMiddleware = cors({
+  origin: env.corsOrigin || "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],
+});
+app.use(corsMiddleware);
 
 app.use(
   rateLimit({
@@ -78,6 +77,7 @@ app.get("/api/csrf-token", (req: Request, res: Response) => {
 // === STATIC FILES (UPLOAD) - SECURE IMPLEMENTATION ===
 const uploadsPath = path.resolve(process.cwd(), env.uploadDir);
 app.use("/uploads", 
+  corsMiddleware, // Apply the CORS middleware here as well
   // Middleware untuk menambahkan header CORP & keamanan lainnya
   (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');

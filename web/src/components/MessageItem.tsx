@@ -1,12 +1,12 @@
 import { memo, useEffect, useRef } from "react";
 import type { Message, Conversation } from "@store/chat";
 import { useAuthStore } from "@store/auth";
-import { useChatStore } from "@store/chat";
+import { getSocket } from "@lib/socket";
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { api } from "@lib/api";
 import ReactionPopover from "./Reactions";
-import { getSocket } from "@lib/socket";
 import { toAbsoluteUrl } from "@utils/url";
+import LazyImage from "./LazyImage";
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -20,7 +20,6 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   }
 
   const otherParticipants = conversation?.participants.filter(p => p.id !== meId) || [];
-  // Jika tidak ada peserta lain (misalnya, chat dengan diri sendiri), anggap saja terkirim.
   if (otherParticipants.length === 0) {
     return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
   }
@@ -34,19 +33,50 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
     return <svg title="Read by all" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4F86F7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
   }
 
-  // Default: Tampilkan centang satu jika belum dibaca semua
   return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 };
 
-const MessageBubble = ({ message, mine, conversation }: { message: Message; mine: boolean; conversation: Conversation | undefined }) => {
+const MessageBubble = ({ message, mine, conversation, onImageClick }: { message: Message; mine: boolean; conversation: Conversation | undefined; onImageClick: (src: string) => void; }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
+  const imageUrl = message.imageUrl || (message.fileType?.startsWith('image/') ? message.fileUrl : null);
 
+  // Case 1: Image only (no text content)
+  if (imageUrl && !hasContent) {
+    const fullSrc = toAbsoluteUrl(imageUrl);
+    return (
+      <div className="relative max-w-xs md:max-w-sm">
+        <button onClick={() => onImageClick(fullSrc)} className="block w-full">
+          <LazyImage 
+            src={fullSrc} 
+            alt={message.fileName || 'Image attachment'}
+            className="rounded-xl max-h-80 w-full object-cover cursor-pointer"
+          />
+        </button>
+        <div className="absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 text-xs flex items-center gap-1.5 pointer-events-none">
+          <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <MessageStatusIcon message={message} conversation={conversation} />
+        </div>
+      </div>
+    );
+  }
+
+  // Case 2: Text content (with or without an image)
   return (
     <div className={`relative max-w-md md:max-w-lg px-4 py-2.5 rounded-2xl shadow-sm ${mine ? 'bg-gradient-to-r from-accent to-magenta text-white' : 'bg-primary text-text-primary'}`}>
+      {imageUrl && (
+        <button onClick={() => onImageClick(toAbsoluteUrl(imageUrl))} className="block w-full mb-2">
+          <LazyImage 
+            src={toAbsoluteUrl(imageUrl)} 
+            alt={message.fileName || 'Image attachment'}
+            className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
+          />
+        </button>
+      )}
       {hasContent ? (
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
       ) : (
-        <p className="italic text-gray-400">File attachment</p>
+        // Fallback for non-image files
+        <p className="italic text-gray-400">📎 {message.fileName || 'File attachment'}</p>
       )}
       <div className="text-xs text-right mt-1 opacity-60 flex items-center justify-end gap-1.5">
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -78,9 +108,10 @@ interface MessageItemProps {
   message: Message;
   conversation: Conversation | undefined;
   isHighlighted?: boolean;
+  onImageClick: (src: string) => void;
 }
 
-const MessageItem = ({ message, conversation, isHighlighted }: MessageItemProps) => {
+const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
@@ -132,7 +163,7 @@ const MessageItem = ({ message, conversation, isHighlighted }: MessageItemProps)
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className="flex flex-col">
-          <MessageBubble message={message} mine={mine} conversation={conversation} />
+          <MessageBubble message={message} mine={mine} conversation={conversation} onImageClick={onImageClick} />
           <ReactionsDisplay reactions={message.reactions} />
         </div>
         <div className="opacity-0 group-hover:opacity-100 transition-opacity">

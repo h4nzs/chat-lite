@@ -6,8 +6,9 @@ import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
 import { useChatStore } from "@store/chat";
-import { toAbsoluteUrl } from "@utils/url"; // Impor utilitas URL
+import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
+import Lightbox from "./Lightbox"; // Import Lightbox
 
 // --- Komponen Terpisah --- 
 
@@ -101,6 +102,9 @@ export default function ChatWindow({ id }: { id: string }) {
     setHighlightedMessageId,
   } = useChatStore();
   const virtuosoRef = useRef<any>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
+  const handleImageClick = (src: string) => setLightboxSrc(src);
 
   useEffect(() => {
     if (highlightedMessageId && virtuosoRef.current && messages.length > 0) {
@@ -180,7 +184,8 @@ export default function ChatWindow({ id }: { id: string }) {
               <MessageItem 
                 message={message} 
                 conversation={conversation} 
-                isHighlighted={message.id === highlightedMessageId} 
+                isHighlighted={message.id === highlightedMessageId}
+                onImageClick={handleImageClick}
               />
             </div>
           )}
@@ -198,6 +203,7 @@ export default function ChatWindow({ id }: { id: string }) {
         )}
       </div>
       <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }
