@@ -5,7 +5,6 @@ import { useAuthStore } from '@store/auth';
 import { retrievePrivateKey } from '@utils/keyManagement';
 import toast from 'react-hot-toast';
 import { Spinner } from '@components/Spinner';
-import { shallow } from 'zustand/shallow';
 
 export default function KeyManagementPage() {
   const { regenerateKeys, logout } = useAuthStore(state => ({

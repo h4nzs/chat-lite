@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMessageStore } from '@store/message';
 import { FiSearch, FiX } from 'react-icons/fi';
-import { shallow } from 'zustand/shallow';
 
 interface SearchMessagesProps {
   conversationId: string;

@@ -3,7 +3,6 @@ import ChatWindow from '@components/ChatWindow';
 import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { useEffect } from 'react';
-import { shallow } from 'zustand/shallow';
 
 export default function Chat() {
   const {
@@ -20,7 +19,7 @@ export default function Chat() {
     isSidebarOpen: state.isSidebarOpen,
     conversations: state.conversations,
     toggleSidebar: state.toggleSidebar,
-  }), shallow);
+  }));
   const { user } = useAuthStore(state => ({ user: state.user }));
 
   // Muat percakapan awal dan buka yang terakhir aktif

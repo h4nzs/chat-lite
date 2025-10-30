@@ -3,7 +3,6 @@ import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
-import { shallow } from 'zustand/shallow';
 
 export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');

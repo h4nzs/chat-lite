@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useConversationStore, type Message } from '@store/conversation';
 import { useMessageStore } from '@store/message';
-import { shallow } from 'zustand/shallow';
 
 export function useConversation(conversationId: string) {
   const { conversation, error: convoError } = useConversationStore(state => ({

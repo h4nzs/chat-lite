@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useConversationStore } from '@store/conversation';
 import toast from 'react-hot-toast';
-import { shallow } from 'zustand/shallow';
 
 export default function StartNewChat({ query, onStarted }: { query: string; onStarted: (id: string) => void }) {
   const [list, setList] = useState<{ id: string; username: string; name: string; avatarUrl?: string | null }[]>([]);

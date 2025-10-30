@@ -11,7 +11,6 @@ import { usePresenceStore } from "@store/presence";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
-import { shallow } from "zustand/shallow";
 
 // --- Sub-Components ---
 

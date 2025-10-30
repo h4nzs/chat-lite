@@ -5,8 +5,6 @@ import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url';
 
-import { shallow } from 'zustand/shallow';
-
 export default function Settings() {
   const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore(state => ({
     user: state.user,
