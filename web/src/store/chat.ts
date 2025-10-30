@@ -72,6 +72,8 @@ type State = {
   setReplyingTo: (message: Message | null) => void;
 };
 
+// --- Helper Functions ---
+
 const sortConversations = (list: Conversation[]) =>
   [...list].sort((a, b) => new Date(b.lastMessage?.createdAt || b.updatedAt).getTime() - new Date(a.lastMessage?.createdAt || a.updatedAt).getTime());
 
@@ -87,7 +89,24 @@ const withPreview = (msg: Message): Message => {
   return msg;
 };
 
+async function decryptMessageObject(message: Message): Promise<Message> {
+  try {
+    if (message.content) {
+      message.content = await decryptMessage(message.content, message.conversationId);
+    }
+    if (message.repliedTo?.content) {
+      message.repliedTo.content = await decryptMessage(message.repliedTo.content, message.conversationId);
+    }
+    return withPreview(message);
+  } catch {
+    message.content = '[Failed to decrypt message]';
+    return withPreview(message);
+  }
+}
+
 const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
+
+// --- Zustand Store --- 
 
 export const useChatStore = create<State>((set, get) => ({
   conversations: [],
@@ -128,8 +147,7 @@ export const useChatStore = create<State>((set, get) => ({
         conversations.map(async (c) => {
           if (c.lastMessage?.content) {
             try {
-              const decryptedContent = await decryptMessage(c.lastMessage.content, c.id);
-              c.lastMessage.content = decryptedContent;
+              c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id);
             } catch {
               c.lastMessage.content = "[Encrypted Message]";
             }
@@ -142,7 +160,7 @@ export const useChatStore = create<State>((set, get) => ({
       );
 
       set({ conversations: sortConversations(decryptedConversations) });
-    } catch {
+    } catch (error) {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
     }
@@ -243,18 +261,7 @@ export const useChatStore = create<State>((set, get) => ({
         isFetchingMore: { ...state.isFetchingMore, [id]: false },
       }));
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
-      const decryptedItems = await Promise.all(
-        (res.items || []).map(async (m) => {
-          try {
-            if (m.content) m.content = await decryptMessage(m.content, m.conversationId);
-            if (m.repliedTo?.content) m.repliedTo.content = await decryptMessage(m.repliedTo.content, m.conversationId);
-            return withPreview(m);
-          } catch {
-            m.content = '[Failed to decrypt message]';
-            return withPreview(m);
-          }
-        })
-      );
+      const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
       decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       set((state) => ({ messages: { ...state.messages, [id]: decryptedItems } }));
     } catch (error) {
@@ -277,18 +284,7 @@ export const useChatStore = create<State>((set, get) => ({
 
     try {
       const res = await api<{ items: Message[] }>(`/api/messages/${conversationId}?cursor=${oldestMessage.id}`);
-      const decryptedItems = await Promise.all(
-        (res.items || []).map(async (m) => {
-          try {
-            if (m.content) m.content = await decryptMessage(m.content, m.conversationId);
-            if (m.repliedTo?.content) m.repliedTo.content = await decryptMessage(m.repliedTo.content, m.conversationId);
-            return withPreview(m);
-          } catch {
-            m.content = '[Failed to decrypt message]';
-            return withPreview(m);
-          }
-        })
-      );
+      const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
       decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
       if (decryptedItems.length < 50) {
@@ -368,23 +364,10 @@ export const useChatStore = create<State>((set, get) => ({
     });
 
     socket.on("message:new", async (newMessage: Message) => {
-      if (newMessage.content) {
-        try {
-          newMessage.content = await decryptMessage(newMessage.content, newMessage.conversationId);
-        } catch {
-          newMessage.content = "[Failed to decrypt message]";
-        }
-      }
-      if (newMessage.repliedTo?.content) {
-        try {
-          newMessage.repliedTo.content = await decryptMessage(newMessage.repliedTo.content, newMessage.conversationId);
-        } catch {
-          newMessage.repliedTo.content = "[Failed to decrypt message]";
-        }
-      }
+      const decryptedMessage = await decryptMessageObject(newMessage);
       
       set(state => {
-        const conversationId = newMessage.conversationId;
+        const conversationId = decryptedMessage.conversationId;
         const isActive = state.activeId === conversationId;
 
         const updateConversationList = (currentState: State): Conversation[] => {
@@ -393,24 +376,24 @@ export const useChatStore = create<State>((set, get) => ({
 
           const updatedConversations = currentState.conversations.map(c => {
             if (c.id === conversationId) {
-              const newUnreadCount = !isActive && newMessage.senderId !== useAuthStore.getState().user?.id
+              const newUnreadCount = !isActive && decryptedMessage.senderId !== useAuthStore.getState().user?.id
                 ? (c.unreadCount || 0) + 1
                 : c.unreadCount;
-              return { ...c, lastMessage: withPreview(newMessage), updatedAt: newMessage.createdAt, unreadCount: newUnreadCount };
+              return { ...c, lastMessage: withPreview(decryptedMessage), updatedAt: decryptedMessage.createdAt, unreadCount: newUnreadCount };
             }
             return c;
           });
           return sortConversations(updatedConversations);
         };
 
-        if (newMessage.senderId === useAuthStore.getState().user?.id) {
-            const optimisticMessageExists = (state.messages[conversationId] || []).some(m => m.tempId === newMessage.tempId);
+        if (decryptedMessage.senderId === useAuthStore.getState().user?.id) {
+            const optimisticMessageExists = (state.messages[conversationId] || []).some(m => m.tempId === decryptedMessage.tempId);
             if(optimisticMessageExists) {
                 return {
                     ...state,
                     messages: {
                         ...state.messages,
-                        [conversationId]: state.messages[conversationId].map(m => m.tempId === newMessage.tempId ? withPreview(newMessage) : m)
+                        [conversationId]: state.messages[conversationId].map(m => m.tempId === decryptedMessage.tempId ? withPreview(decryptedMessage) : m)
                     },
                     conversations: updateConversationList(state),
                 }
@@ -418,11 +401,11 @@ export const useChatStore = create<State>((set, get) => ({
         };
 
         const messages = state.messages[conversationId] || [];
-        if (messages.some(m => m.id === newMessage.id)) return state;
+        if (messages.some(m => m.id === decryptedMessage.id)) return state;
 
         return {
           ...state,
-          messages: { ...state.messages, [conversationId]: [...messages, withPreview(newMessage)] },
+          messages: { ...state.messages, [conversationId]: [...messages, withPreview(decryptedMessage)] },
           conversations: updateConversationList(state),
         };
       });
