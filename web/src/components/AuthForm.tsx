@@ -18,7 +18,13 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
         try { 
           await onSubmit({ a: emailOrUsername, b: password, c: email, d: username, name }) 
         }
-        catch (ex: any) { setErr(ex?.message || 'Failed') }
+        catch (ex: unknown) { 
+          if (ex instanceof Error) {
+            setErr(ex.message || 'Failed');
+          } else {
+            setErr('An unknown error occurred');
+          }
+        }
       }}
     >
       {err ? <Alert message={err} /> : null}

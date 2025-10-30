@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useConversationStore } from '@store/conversation';
+import { useConversationStore, type Conversation } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
 
+type UserSearchResult = {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl?: string | null;
+};
+
 export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<UserSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [userList, setUserList] = useState<any[]>([]);
+  const [userList, setUserList] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const me = useAuthStore(s => s.user);
   const { addOrUpdateConversation, openConversation } = useConversationStore(state => ({
@@ -23,7 +30,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     }
     const timer = setTimeout(async () => {
       try {
-        const results = await api<any[]>(`/api/users/search?q=${searchQuery}`);
+        const results = await api<UserSearchResult[]>(`/api/users/search?q=${searchQuery}`);
         const selectedIds = selectedUsers.map(u => u.id);
         setUserList(results.filter(u => u.id !== me?.id && !selectedIds.includes(u.id)));
       } catch {
@@ -33,7 +40,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(timer);
   }, [searchQuery, me?.id, selectedUsers]);
 
-  const handleSelectUser = (user: any) => {
+  const handleSelectUser = (user: UserSearchResult) => {
     setSelectedUsers(prev => [...prev, user]);
     setSearchQuery('');
   };
@@ -48,7 +55,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     }
     setLoading(true);
     try {
-      const newConversation = await api<any>("/api/conversations", {
+      const newConversation = await api<Conversation>("/api/conversations", {
         method: "POST",
         body: JSON.stringify({
           title: title.trim(),
@@ -63,9 +70,12 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
       toast.success(`Group "${newConversation.title}" created!`);
       onClose();
 
-    } catch (error: any) {
-      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
-      toast.error(`Failed to create group: ${errorMsg}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast.error(`Failed to create group: ${error.message}`);
+      } else {
+        toast.error("An unknown error occurred while creating the group.");
+      }
     } finally {
       setLoading(false);
     }

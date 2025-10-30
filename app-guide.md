@@ -54,7 +54,7 @@ Semua masalah yang diidentifikasi dalam laporan audit awal telah berhasil diperb
 
 Meskipun semua masalah kritis telah teratasi, ada beberapa area yang dapat lebih ditingkatkan di masa depan untuk kualitas kode yang lebih tinggi:
 
-- **Menghilangkan `any` Sepenuhnya:**
+- *done* **Menghilangkan `any` Sepenuhnya:**
   - **Masalah:** Laporan linting masih menunjukkan beberapa peringatan `no-explicit-any`. Ini sebagian besar ada di *handler* error atau pada data yang diterima dari API sebelum divalidasi.
   - **Rekomendasi:** Buat tipe data yang lebih spesifik untuk *payload* API dan objek error. Gunakan `unknown` di dalam blok `catch` dan lakukan pemeriksaan tipe sebelum menggunakannya, alih-alih langsung menggunakan `any`.
 
@@ -62,7 +62,7 @@ Meskipun semua masalah kritis telah teratasi, ada beberapa area yang dapat lebih
   - **Masalah:** Mirip dengan `useChatStore` sebelumnya, `useAuthStore` saat ini menangani banyak logika, termasuk otentikasi, manajemen profil, tema, dan kunci enkripsi.
   - **Rekomendasi:** Pertimbangkan untuk memecah `useAuthStore` menjadi *store* yang lebih kecil, misalnya `useAuthStore` (hanya untuk login/logout/register) dan `useProfileStore` atau `useSettingsStore` untuk sisanya.
 
-- **Meningkatkan Tipe pada Komponen:**
+- *done* **Meningkatkan Tipe pada Komponen:**
   - **Masalah:** Beberapa komponen masih menggunakan `any` untuk *props* (misalnya, `ChatHeader` menerima `conversation: any`).
   - **Rekomendasi:** Manfaatkan tipe `Conversation` dan `Message` yang sudah diekspor dari `conversation.ts` untuk memberikan tipe yang kuat pada *props* komponen, sehingga meningkatkan keamanan tipe di seluruh UI.
 

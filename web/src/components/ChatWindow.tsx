@@ -5,7 +5,7 @@ import { Virtuoso } from "react-virtuoso";
 import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
-import { useConversationStore } from "@store/conversation";
+import { useConversationStore, type Conversation } from "@store/conversation";
 import { useMessageStore } from "@store/message";
 import { usePresenceStore } from "@store/presence";
 import { toAbsoluteUrl } from "@utils/url";
@@ -14,11 +14,11 @@ import Lightbox from "./Lightbox";
 
 // --- Sub-Components ---
 
-const ChatHeader = ({ conversation }: { conversation: any }) => {
+const ChatHeader = ({ conversation }: { conversation: Conversation }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
   const presence = usePresenceStore(state => state.presence);
-  const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
+  const peerUser = !conversation.isGroup ? conversation.participants.find(p => p.id !== meId) : null;
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
