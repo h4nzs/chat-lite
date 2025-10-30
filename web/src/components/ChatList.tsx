@@ -8,7 +8,6 @@ import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
-import { shallow } from 'zustand/shallow';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -19,7 +18,7 @@ const UserProfile = () => {
   const { user, logout } = useAuthStore(state => ({ 
     user: state.user, 
     logout: state.logout 
-  }), shallow);
+  }));
   if (!user) return null;
 
   return (

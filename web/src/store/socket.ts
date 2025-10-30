@@ -1,5 +1,4 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { shallow } from "zustand/shallow";
 import { getSocket } from "@lib/socket";
 import { useAuthStore } from "./auth";
 import { useConversationStore, Message, Conversation } from "./conversation";

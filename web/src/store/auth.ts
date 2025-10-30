@@ -1,5 +1,4 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { shallow } from "zustand/shallow";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";

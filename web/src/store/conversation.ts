@@ -1,5 +1,4 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { shallow } from "zustand/shallow";
 import { api } from "@lib/api";
 import { decryptMessage } from "@utils/crypto";
 
