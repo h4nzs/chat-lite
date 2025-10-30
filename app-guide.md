@@ -81,7 +81,7 @@ Fitur-fitur ini lebih kompleks tetapi akan membedakan aplikasi Anda dan mempersi
     4.  **UI:** Di `MessageItem.tsx`, tampilkan ikon centang yang berbeda (misalnya, dua centang biru) jika status pesan adalah `READ`.
     5.  **Privasi:** Sebagai pengembangan lanjutan, tambahkan opsi di pengaturan bagi pengguna untuk menonaktifkan pengiriman *read receipts*.
 
-### b. Balas Pesan (Reply to Message)
+### b. **done** Balas Pesan (Reply to Message)
 
 *   **Mengapa Ini Penting?**
     Dalam percakapan grup yang ramai, fitur balas sangat penting untuk menjaga konteks. Ini memungkinkan pengguna untuk merespons pesan tertentu secara langsung.

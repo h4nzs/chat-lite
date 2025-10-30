@@ -185,7 +185,7 @@ export const useChatStore = create<State>((set, get) => ({
       repliedTo: replyingTo || undefined,
     };
 
-    set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), optimisticMessage] } }));
+    set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), withPreview(optimisticMessage)] } }));
     
     const socket = getSocket();
     const payload = { 
@@ -227,7 +227,7 @@ export const useChatStore = create<State>((set, get) => ({
       form.append("file", file);
       const { file: fileData } = await api<{ file: any }>(`/api/uploads/${conversationId}/upload`,{ method: "POST", body: form });
       toast.success("File uploaded!", { id: toastId });
-      get().sendMessage({ fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
+      get().sendMessage(conversationId, { fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
     } catch (error: any) {
       const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
       toast.error(`Upload failed: ${errorMsg}`);

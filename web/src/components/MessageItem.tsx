@@ -8,6 +8,7 @@ import { api } from "@lib/api";
 import ReactionPopover from "./Reactions";
 import { toAbsoluteUrl } from "@utils/url";
 import LazyImage from "./LazyImage";
+import FileAttachment from "./FileAttachment"; // Import FileAttachment
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -51,45 +52,34 @@ const ReplyQuote = ({ message }: { message: Message }) => {
 
 const MessageBubble = ({ message, mine, conversation, onImageClick }: { message: Message; mine: boolean; conversation: Conversation | undefined; onImageClick: (src: string) => void; }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
-  const imageUrl = message.imageUrl || (message.fileType?.startsWith('image/') ? message.fileUrl : null);
+  const isImage = message.fileType?.startsWith('image/');
 
-  if (imageUrl && !hasContent) {
-    const fullSrc = toAbsoluteUrl(imageUrl);
-    return (
-      <div className="relative max-w-xs md:max-w-sm">
-        <button onClick={() => onImageClick(fullSrc)} className="block w-full">
-          <LazyImage 
-            src={fullSrc} 
-            alt={message.fileName || 'Image attachment'}
-            className="rounded-xl max-h-80 w-full object-cover cursor-pointer"
-          />
-        </button>
-        <div className="absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 text-xs flex items-center gap-1.5 pointer-events-none">
-          <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          <MessageStatusIcon message={message} conversation={conversation} />
-        </div>
-      </div>
-    );
-  }
+  // Determine if the bubble should have padding and standard styling
+  const hasBubbleStyle = hasContent || (message.fileUrl && !isImage);
 
   return (
-    <div className={`relative max-w-md md:max-w-lg px-4 py-2.5 rounded-2xl shadow-sm ${mine ? 'bg-gradient-to-r from-accent to-magenta text-white' : 'bg-primary text-text-primary'}`}>
+    <div className={`relative max-w-md md:max-w-lg ${hasBubbleStyle ? `px-4 py-2.5 rounded-2xl shadow-sm ${mine ? 'bg-gradient-to-r from-accent to-magenta text-white' : 'bg-primary text-text-primary'}` : ''}`}>
       {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
-      {imageUrl && (
-        <button onClick={() => onImageClick(toAbsoluteUrl(imageUrl))} className="block w-full my-2">
+      
+      {message.fileUrl && isImage && (
+        <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className={`block w-full ${hasContent ? 'my-2' : ''}`}>
           <LazyImage 
-            src={toAbsoluteUrl(imageUrl)} 
+            src={toAbsoluteUrl(message.fileUrl!)} 
             alt={message.fileName || 'Image attachment'}
-            className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
+            className={`rounded-lg max-h-80 w-full object-cover cursor-pointer ${hasContent ? '' : 'rounded-xl'}`}
           />
         </button>
       )}
-      {hasContent ? (
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
-      ) : (
-        !imageUrl && <p className="italic text-gray-400">📎 {message.fileName || 'File attachment'}</p>
+
+      {message.fileUrl && !isImage && (
+        <FileAttachment message={message} />
       )}
-      <div className="text-xs text-right mt-1 opacity-60 flex items-center justify-end gap-1.5">
+
+      {hasContent && (
+        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      )}
+
+      <div className={`text-xs mt-1 flex items-center gap-1.5 ${isImage && !hasContent ? 'absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 pointer-events-none' : `justify-end opacity-60`}`}>
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         <MessageStatusIcon message={message} conversation={conversation} />
       </div>
