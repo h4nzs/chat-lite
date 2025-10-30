@@ -3,7 +3,6 @@ import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
-import { useChatStore } from "./chat";
 import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
 import { getSodium } from "@lib/sodiumInitializer";
 
@@ -161,7 +160,6 @@ export const useAuthStore = create<State>((set, get) => ({
     localStorage.removeItem("user");
     localStorage.removeItem("activeId");
     set({ user: null });
-    useChatStore.setState({ activeId: null });
 
     disconnectSocket();
   },

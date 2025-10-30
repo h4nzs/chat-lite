@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from "react";
-import type { Message, Conversation } from "@store/chat";
+import type { Message, Conversation } from "@store/conversation";
 import { useAuthStore } from "@store/auth";
-import { useChatStore } from "@store/chat";
+import { useMessageStore } from "@store/message";
 import { getSocket } from "@lib/socket";
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { api } from "@lib/api";
@@ -114,7 +114,7 @@ interface MessageItemProps {
 
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
-  const { setReplyingTo } = useChatStore();
+  const { setReplyingTo } = useMessageStore();
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 

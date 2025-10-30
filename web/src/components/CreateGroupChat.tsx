@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useChatStore } from '@store/chat';
+import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
 
 export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<any[]>([]); // Simpan objek user, bukan hanya ID
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [userList, setUserList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const me = useAuthStore(s => s.user);
+  const { addOrUpdateConversation, openConversation } = useConversationStore();
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -31,7 +32,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
 
   const handleSelectUser = (user: any) => {
     setSelectedUsers(prev => [...prev, user]);
-    setSearchQuery(''); // Kosongkan pencarian setelah memilih
+    setSearchQuery('');
   };
 
   const handleRemoveUser = (userId: string) => {
@@ -53,11 +54,8 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
         }),
       });
 
-      // Add the new conversation to the store and set it as active
-      useChatStore.setState(state => ({
-        conversations: [newConversation, ...state.conversations],
-        activeId: newConversation.id,
-      }));
+      addOrUpdateConversation(newConversation);
+      openConversation(newConversation.id);
 
       toast.success(`Group "${newConversation.title}" created!`);
       onClose();

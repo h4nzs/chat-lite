@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
-import { useChatStore } from '@store/chat';
+import { useConversationStore } from '@store/conversation';
+import { usePresenceStore } from '@store/presence';
 import { useAuthStore } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
-import { toAbsoluteUrl } from '@utils/url'; // Impor utilitas URL
+import { toAbsoluteUrl } from '@utils/url';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -39,10 +40,11 @@ const UserProfile = () => {
 };
 
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const { conversations, presence, deleteGroup, deleteConversation, error } = useChatStore();
+  const { conversations, deleteGroup, deleteConversation, error } = useConversationStore();
+  const { presence } = usePresenceStore();
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showGroupModal, setShowGroupModal] = useState(false); // Kembalikan state untuk modal
+  const [showGroupModal, setShowGroupModal] = useState(false);
 
   const openCreateGroupModal = () => setShowGroupModal(true);
 

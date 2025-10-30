@@ -1,52 +1,51 @@
 import { useEffect, useMemo } from 'react';
-import { useChatStore } from '@store/chat';
+import { useConversationStore, type Message } from '@store/conversation';
+import { useMessageStore } from '@store/message';
 import { shallow } from 'zustand/shallow';
 
-/**
- * Custom hook to manage all logic for a single conversation.
- * Encapsulates message loading, sending, and provides filtered data from the store.
- * @param conversationId The ID of the conversation to manage.
- */
 export function useConversation(conversationId: string) {
-  const store = useChatStore();
+  const { conversation, error: convoError } = useConversationStore(state => ({
+    conversation: state.conversations.find(c => c.id === conversationId),
+    error: state.error,
+  }), shallow);
 
-  // Select relevant data from the store
   const { 
-    conversation, 
     messages, 
     isLoadingInitial, 
-    error, 
+    error: msgError, 
     isFetchingMore, 
-    hasMore 
-  } = useChatStore(state => ({
-    conversation: state.conversations.find(c => c.id === conversationId),
+    hasMore,
+    loadMessagesForConversation,
+    sendMessage,
+    uploadFile,
+    loadPreviousMessages
+  } = useMessageStore(state => ({
     messages: state.messages[conversationId] || [],
-    isLoadingInitial: state.messages[conversationId] === undefined, // More precise loading state
+    isLoadingInitial: state.messages[conversationId] === undefined,
     error: state.error,
     isFetchingMore: state.isFetchingMore[conversationId] || false,
     hasMore: state.hasMore[conversationId] ?? true,
+    loadMessagesForConversation: state.loadMessagesForConversation,
+    sendMessage: state.sendMessage,
+    uploadFile: state.uploadFile,
+    loadPreviousMessages: state.loadPreviousMessages,
   }), shallow);
 
-  // Effect to load initial messages when the conversation ID changes
   useEffect(() => {
     if (conversationId) {
-      store.loadMessagesForConversation(conversationId);
+      loadMessagesForConversation(conversationId);
     }
-  }, [conversationId, store.loadMessagesForConversation]);
-
-  const storeSendMessage = useMemo(() => store.sendMessage, [store.sendMessage]);
-  const storeUploadFile = useMemo(() => store.uploadFile, [store.uploadFile]);
-  const storeLoadPreviousMessages = useMemo(() => store.loadPreviousMessages, [store.loadPreviousMessages]);
+  }, [conversationId, loadMessagesForConversation]);
 
   return {
     conversation,
     messages,
     isLoading: isLoadingInitial,
-    error,
+    error: convoError || msgError,
     isFetchingMore,
     hasMore,
-    sendMessage: (data: Partial<Message>) => storeSendMessage(conversationId, data),
-    uploadFile: (file: File) => storeUploadFile(conversationId, file),
-    loadPreviousMessages: () => storeLoadPreviousMessages(conversationId),
+    sendMessage: (data: Partial<Message>) => sendMessage(conversationId, data),
+    uploadFile: (file: File) => uploadFile(conversationId, file),
+    loadPreviousMessages: () => loadPreviousMessages(conversationId),
   };
 }

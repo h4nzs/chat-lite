@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useChatStore } from '@store/chat';
+import { useMessageStore } from '@store/message';
 import { FiSearch, FiX } from 'react-icons/fi';
 
 interface SearchMessagesProps {
@@ -13,10 +13,10 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
     searchResults,
     searchMessages,
     clearSearch,
-    setHighlightedMessageId
-  } = useChatStore();
+    setHighlightedMessageId,
+    setState
+  } = useMessageStore();
   const inputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus();

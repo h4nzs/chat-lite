@@ -27,7 +27,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 
 ### Tingkat Kritis
 
-**1. Konfigurasi ESLint Usang di Frontend**
+**1. *done* Konfigurasi ESLint Usang di Frontend**
 - **Masalah:** Perintah `pnpm lint` di direktori `web` gagal total karena versi ESLint yang terpasang (v9+) mengharapkan file konfigurasi `eslint.config.js`, sementara proyek masih menggunakan `.eslintrc.cjs`.
 - **Lokasi:** `web/package.json`, `web/.eslintrc.cjs`
 - **Dampak:** Alat bantu kualitas kode statis tidak dapat berjalan, yang berarti potensi error dan inkonsistensi gaya tidak terdeteksi secara otomatis.
@@ -77,7 +77,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 - **Dampak:** Membuat perubahan pada logika dekripsi menjadi sulit dan rawan kesalahan karena harus diubah di banyak tempat.
 - **Rekomendasi:** Buat fungsi utilitas tunggal, misalnya `decryptMessageObject(message: Message): Promise<Message>`, yang menangani dekripsi secara rekursif dan panggil fungsi ini di semua tempat yang relevan.
 
-**3. Potensi Duplikasi Socket Listener**
+**3. *done* Potensi Duplikasi Socket Listener**
 - **Masalah:** `initSocketListeners` dipanggil di `App.tsx`. Jika terjadi koneksi ulang pada socket, ada kemungkinan listener lama tidak sepenuhnya bersih, yang berpotensi menyebabkan event ditangani beberapa kali.
 - **Lokasi:** `web/src/store/chat.ts`, `web/src/App.tsx`
 - **Dampak:** Perilaku aplikasi yang tidak terduga, seperti pesan yang muncul dua kali.

@@ -5,16 +5,19 @@ import { Virtuoso } from "react-virtuoso";
 import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
-import { useChatStore } from "@store/chat";
+import { useConversationStore } from "@store/conversation";
+import { useMessageStore } from "@store/message";
+import { usePresenceStore } from "@store/presence";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 
-// --- Komponen Terpisah ---
+// --- Sub-Components ---
 
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
-  const { presence, toggleSidebar } = useChatStore();
+  const { toggleSidebar } = useConversationStore();
+  const { presence } = usePresenceStore();
   const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
@@ -36,7 +39,7 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
 };
 
 const ReplyPreview = () => {
-  const { replyingTo, setReplyingTo } = useChatStore();
+  const { replyingTo, setReplyingTo } = useMessageStore();
 
   if (!replyingTo) return null;
 
@@ -59,14 +62,14 @@ const ReplyPreview = () => {
   );
 };
 
-const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (text: string) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
+const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onSend(text);
+    onSend({ content: text });
     setText('');
   };
 
@@ -111,6 +114,8 @@ const ChatSpinner = () => (
   </div>
 );
 
+// --- Main Component ---
+
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
   const { 
@@ -123,10 +128,10 @@ export default function ChatWindow({ id }: { id: string }) {
     isFetchingMore, 
     loadPreviousMessages 
   } = useConversation(id);
-  const {
-    highlightedMessageId,
-    setHighlightedMessageId,
-  } = useChatStore();
+  
+  const { highlightedMessageId, setHighlightedMessageId } = useMessageStore();
+  const { typing } = usePresenceStore();
+  
   const virtuosoRef = useRef<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
@@ -141,17 +146,12 @@ export default function ChatWindow({ id }: { id: string }) {
           align: 'center',
           behavior: 'smooth',
         });
-
-        // Debounce to remove highlight
-        setTimeout(() => {
-          setHighlightedMessageId(null);
-        }, 2000); // Highlight lasts for 2 seconds
+        setTimeout(() => setHighlightedMessageId(null), 2000);
       }
     }
   }, [highlightedMessageId, messages, setHighlightedMessageId]);
 
-  const { typing: typingState } = useChatStore();
-  const typingUsers = typingState[id] || [];
+  const typingUsers = typing[id] || [];
   const filteredTypingUsers = typingUsers.filter(uid => uid !== meId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -164,8 +164,8 @@ export default function ChatWindow({ id }: { id: string }) {
     }, 1500);
   }, [id]);
 
-  const handleSendMessage = (text: string) => {
-    sendMessage({ content: text });
+  const handleSendMessage = (data: { content: string }) => {
+    sendMessage(data);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     getSocket().emit("typing:stop", { conversationId: id });
   };
@@ -202,9 +202,7 @@ export default function ChatWindow({ id }: { id: string }) {
           initialTopMostItemIndex={messages.length - 1}
           data={messages}
           startReached={loadPreviousMessages}
-          components={{ 
-            Header: () => isFetchingMore ? <ChatSpinner /> : null 
-          }}
+          components={{ Header: () => isFetchingMore ? <ChatSpinner /> : null }}
           itemContent={(index, message) => (
             <div className="px-4">
               <MessageItem 

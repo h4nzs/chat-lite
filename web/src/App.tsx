@@ -3,15 +3,15 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
-import KeyManagementPage from './pages/KeyManagementPage'; // Import the new page
+import KeyManagementPage from './pages/KeyManagementPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
-import { useChatStore } from './store/chat';
+import { useSocketStore } from './store/socket';
 import { useEffect } from 'react';
 
 export default function App() {
   useEffect(() => {
-    const cleanup = useChatStore.getState().initSocketListeners();
+    const cleanup = useSocketStore.getState().initSocketListeners();
     return cleanup; // Return the cleanup function to be called on unmount
   }, []);
   return (

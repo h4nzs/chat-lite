@@ -1,6 +1,6 @@
 import ChatList from '@components/ChatList';
 import ChatWindow from '@components/ChatWindow';
-import { useChatStore } from '@store/chat';
+import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { useEffect } from 'react';
 
@@ -11,7 +11,8 @@ export default function Chat() {
     loadConversations,
     isSidebarOpen,
     conversations,
-  } = useChatStore();
+    toggleSidebar,
+  } = useConversationStore();
   const { user } = useAuthStore();
 
   // Muat percakapan awal dan buka yang terakhir aktif
@@ -31,7 +32,7 @@ export default function Chat() {
     if (activeId && conversations.length > 0) {
       const conversationExists = conversations.some(c => c.id === activeId);
       if (!conversationExists) {
-        useChatStore.setState({ activeId: null, isSidebarOpen: true });
+        useConversationStore.setState({ activeId: null, isSidebarOpen: true });
         localStorage.removeItem("activeId");
       }
     }
@@ -40,14 +41,14 @@ export default function Chat() {
   const handleSelectConversation = (id: string) => {
     openConversation(id);
     if (window.innerWidth < 768) {
-      useChatStore.getState().toggleSidebar();
+      toggleSidebar();
     }
   };
 
   return (
     <div className="h-screen w-screen flex bg-background text-text-primary font-sans overflow-hidden">
       {isSidebarOpen && (
-        <div onClick={() => useChatStore.getState().toggleSidebar()} className="fixed inset-0 bg-black/60 z-30 md:hidden" />
+        <div onClick={toggleSidebar} className="fixed inset-0 bg-black/60 z-30 md:hidden" />
       )}
 
       <aside className={`absolute md:relative w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-surface flex flex-col border-r border-gray-800 transition-transform duration-300 ease-in-out z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>

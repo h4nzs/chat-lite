@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
-import { useChatStore } from "@store/chat";
 import { toast } from "react-hot-toast";
 import { useAuthStore } from "@store/auth";
+import { useConversationStore } from "@store/conversation";
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;
@@ -25,12 +25,11 @@ export function getSocket() {
         connectionTimeout = null;
       }
 
-      const activeId = useChatStore.getState().activeId;
+      const activeId = useConversationStore.getState().activeId;
       if (activeId) {
         socket?.emit("conversation:join", activeId);
       }
       
-      // Update presence status to online when connected
       const userId = useAuthStore.getState().user?.id;
       if (userId) {
         socket?.emit("presence:update", { userId, online: true });
@@ -60,10 +59,10 @@ export function getSocket() {
       toast.success("Reconnected");
       if (connectionTimeout) clearTimeout(connectionTimeout);
 
-      const activeId = useChatStore.getState().activeId;
+      const { activeId, openConversation } = useConversationStore.getState();
       if (activeId) {
         socket?.emit("conversation:join", activeId);
-        useChatStore.getState().openConversation(activeId);
+        openConversation(activeId);
       }
     });
 
