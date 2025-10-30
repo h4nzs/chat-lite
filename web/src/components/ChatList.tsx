@@ -8,6 +8,7 @@ import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
+import { shallow } from 'zustand/shallow';
 
 interface ChatListProps {
   onOpen: (id: string) => void;

@@ -4,7 +4,7 @@ import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
 import { encryptMessage, decryptMessage } from "@utils/crypto";
 import toast from "react-hot-toast";
-import { useAuthStore } from "./auth";
+import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation"; // Import type from conversation store
 
 // --- Helper Functions ---
@@ -49,7 +49,7 @@ type State = {
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
-  removeReaction: (conversationId, string, reactionId: string) => void;
+  removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
   updateSenderDetails: (user: Partial<User>) => void;
 };
 
