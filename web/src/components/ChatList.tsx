@@ -8,6 +8,7 @@ import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
+import { shallow } from 'zustand/shallow';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -40,8 +41,13 @@ const UserProfile = () => {
 };
 
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const { conversations, deleteGroup, deleteConversation, error } = useConversationStore();
-  const { presence } = usePresenceStore();
+  const { conversations, deleteGroup, deleteConversation, error } = useConversationStore(state => ({
+    conversations: state.conversations,
+    deleteGroup: state.deleteGroup,
+    deleteConversation: state.deleteConversation,
+    error: state.error,
+  }), shallow);
+  const presence = usePresenceStore(state => state.presence);
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false);

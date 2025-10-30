@@ -3,6 +3,7 @@ import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
+import { shallow } from 'zustand/shallow';
 
 export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');
@@ -11,7 +12,10 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const [userList, setUserList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const me = useAuthStore(s => s.user);
-  const { addOrUpdateConversation, openConversation } = useConversationStore();
+  const { addOrUpdateConversation, openConversation } = useConversationStore(state => ({
+    addOrUpdateConversation: state.addOrUpdateConversation,
+    openConversation: state.openConversation,
+  }), shallow);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {

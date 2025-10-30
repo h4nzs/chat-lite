@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useConversationStore } from '@store/conversation';
 import toast from 'react-hot-toast';
+import { shallow } from 'zustand/shallow';
 
 export default function StartNewChat({ query, onStarted }: { query: string; onStarted: (id: string) => void }) {
   const [list, setList] = useState<{ id: string; username: string; name: string; avatarUrl?: string | null }[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const { searchUsers, startConversation } = useConversationStore();
+  const { searchUsers, startConversation } = useConversationStore(state => ({
+    searchUsers: state.searchUsers,
+    startConversation: state.startConversation,
+  }), shallow);
 
   useEffect(() => {
     if (!query.trim()) {

@@ -114,7 +114,7 @@ interface MessageItemProps {
 
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
-  const { setReplyingTo } = useMessageStore();
+  const setReplyingTo = useMessageStore(state => state.setReplyingTo);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 

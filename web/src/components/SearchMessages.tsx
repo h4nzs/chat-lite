@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMessageStore } from '@store/message';
 import { FiSearch, FiX } from 'react-icons/fi';
+import { shallow } from 'zustand/shallow';
 
 interface SearchMessagesProps {
   conversationId: string;
@@ -14,8 +15,13 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
     searchMessages,
     clearSearch,
     setHighlightedMessageId,
-    setState
-  } = useMessageStore();
+  } = useMessageStore(state => ({
+    searchQuery: state.searchQuery,
+    searchResults: state.searchResults,
+    searchMessages: state.searchMessages,
+    clearSearch: state.clearSearch,
+    setHighlightedMessageId: state.setHighlightedMessageId,
+  }), shallow);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (isOpen) {

@@ -11,13 +11,14 @@ import { usePresenceStore } from "@store/presence";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
+import { shallow } from "zustand/shallow";
 
 // --- Sub-Components ---
 
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
-  const { toggleSidebar } = useConversationStore();
-  const { presence } = usePresenceStore();
+  const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
+  const presence = usePresenceStore(state => state.presence, shallow);
   const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
@@ -39,7 +40,10 @@ const ChatHeader = ({ conversation }: { conversation: any }) => {
 };
 
 const ReplyPreview = () => {
-  const { replyingTo, setReplyingTo } = useMessageStore();
+  const { replyingTo, setReplyingTo } = useMessageStore(state => ({
+    replyingTo: state.replyingTo,
+    setReplyingTo: state.setReplyingTo,
+  }), shallow);
 
   if (!replyingTo) return null;
 
@@ -129,7 +133,10 @@ export default function ChatWindow({ id }: { id: string }) {
     loadPreviousMessages 
   } = useConversation(id);
   
-  const { highlightedMessageId, setHighlightedMessageId } = useMessageStore();
+  const { highlightedMessageId, setHighlightedMessageId } = useMessageStore(state => ({
+    highlightedMessageId: state.highlightedMessageId,
+    setHighlightedMessageId: state.setHighlightedMessageId,
+  }), shallow);
   const { typing } = usePresenceStore();
   
   const virtuosoRef = useRef<any>(null);
