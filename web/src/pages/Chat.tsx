@@ -21,7 +21,7 @@ export default function Chat() {
     conversations: state.conversations,
     toggleSidebar: state.toggleSidebar,
   }), shallow);
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(state => ({ user: state.user }));
 
   // Muat percakapan awal dan buka yang terakhir aktif
   useEffect(() => {

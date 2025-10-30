@@ -16,7 +16,10 @@ interface ChatListProps {
 }
 
 const UserProfile = () => {
-  const { user, logout } = useAuthStore();
+  const { user, logout } = useAuthStore(state => ({ 
+    user: state.user, 
+    logout: state.logout 
+  }), shallow);
   if (!user) return null;
 
   return (

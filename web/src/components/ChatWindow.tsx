@@ -137,7 +137,7 @@ export default function ChatWindow({ id }: { id: string }) {
     highlightedMessageId: state.highlightedMessageId,
     setHighlightedMessageId: state.setHighlightedMessageId,
   }), shallow);
-  const { typing } = usePresenceStore();
+  const typing = usePresenceStore(state => state.typing);
   
   const virtuosoRef = useRef<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);

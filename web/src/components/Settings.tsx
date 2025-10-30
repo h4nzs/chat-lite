@@ -5,8 +5,16 @@ import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url';
 
+import { shallow } from 'zustand/shallow';
+
 export default function Settings() {
-  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore();
+  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore(state => ({
+    user: state.user,
+    updateProfile: state.updateProfile,
+    updateAvatar: state.updateAvatar,
+    sendReadReceipts: state.sendReadReceipts,
+    toggleReadReceipts: state.toggleReadReceipts,
+  }), shallow);
   const [name, setName] = useState(user?.name || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);

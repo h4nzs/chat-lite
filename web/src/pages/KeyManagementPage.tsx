@@ -5,9 +5,13 @@ import { useAuthStore } from '@store/auth';
 import { retrievePrivateKey } from '@utils/keyManagement';
 import toast from 'react-hot-toast';
 import { Spinner } from '@components/Spinner';
+import { shallow } from 'zustand/shallow';
 
 export default function KeyManagementPage() {
-  const { regenerateKeys, logout } = useAuthStore();
+  const { regenerateKeys, logout } = useAuthStore(state => ({
+    regenerateKeys: state.regenerateKeys,
+    logout: state.logout,
+  }), shallow);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
