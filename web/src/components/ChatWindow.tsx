@@ -18,7 +18,7 @@ import { shallow } from "zustand/shallow";
 const ChatHeader = ({ conversation }: { conversation: any }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
-  const presence = usePresenceStore(state => state.presence, shallow);
+  const presence = usePresenceStore(state => state.presence);
   const peerUser = !conversation.isGroup ? conversation.participants.find((p: any) => p.id !== meId) : null;
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
@@ -43,7 +43,7 @@ const ReplyPreview = () => {
   const { replyingTo, setReplyingTo } = useMessageStore(state => ({
     replyingTo: state.replyingTo,
     setReplyingTo: state.setReplyingTo,
-  }), shallow);
+  }));
 
   if (!replyingTo) return null;
 
@@ -136,7 +136,7 @@ export default function ChatWindow({ id }: { id: string }) {
   const { highlightedMessageId, setHighlightedMessageId } = useMessageStore(state => ({
     highlightedMessageId: state.highlightedMessageId,
     setHighlightedMessageId: state.setHighlightedMessageId,
-  }), shallow);
+  }));
   const typing = usePresenceStore(state => state.typing);
   
   const virtuosoRef = useRef<any>(null);

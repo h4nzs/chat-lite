@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 import { api } from "@lib/api";
 import { decryptMessage } from "@utils/crypto";
 
@@ -78,7 +79,7 @@ const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("ac
 
 // --- Zustand Store ---
 
-export const useConversationStore = create<State>((set, get) => ({
+export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   conversations: [],
   activeId: initialActiveId,
   isSidebarOpen: false,

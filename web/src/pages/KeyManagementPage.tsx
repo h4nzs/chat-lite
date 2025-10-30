@@ -11,7 +11,7 @@ export default function KeyManagementPage() {
   const { regenerateKeys, logout } = useAuthStore(state => ({
     regenerateKeys: state.regenerateKeys,
     logout: state.logout,
-  }), shallow);
+  }));
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 

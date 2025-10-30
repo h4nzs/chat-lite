@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
@@ -69,7 +70,7 @@ const setupUserEncryptionKeys = async (password: string): Promise<void> => {
 // Restore user dari localStorage kalau ada
 const savedUser = localStorage.getItem("user");
 
-export const useAuthStore = create<State>((set, get) => ({
+export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
   theme: (localStorage.getItem("theme") as "light" | "dark") || "light",
   sendReadReceipts: localStorage.getItem('sendReadReceipts') === 'false' ? false : true,

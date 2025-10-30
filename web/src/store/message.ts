@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
 import { encryptMessage, decryptMessage } from "@utils/crypto";
@@ -54,7 +55,7 @@ type State = {
 
 // --- Zustand Store ---
 
-export const useMessageStore = create<State>((set, get) => ({
+export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   messages: {},
   replyingTo: null,
   searchResults: [],

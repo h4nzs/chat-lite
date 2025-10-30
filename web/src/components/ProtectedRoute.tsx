@@ -8,7 +8,7 @@ export default function ProtectedRoute({
 }: {
   children: React.ReactNode;
 }) {
-  const user = useAuthStore((s) => s.user, shallow);
+  const user = useAuthStore((s) => s.user);
   const bootstrap = useAuthStore((s) => s.bootstrap);
   const [ready, setReady] = useState(false);
 

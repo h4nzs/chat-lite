@@ -21,7 +21,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
     searchMessages: state.searchMessages,
     clearSearch: state.clearSearch,
     setHighlightedMessageId: state.setHighlightedMessageId,
-  }), shallow);
+  }));
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (isOpen) {

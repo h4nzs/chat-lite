@@ -15,7 +15,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   const { addOrUpdateConversation, openConversation } = useConversationStore(state => ({
     addOrUpdateConversation: state.addOrUpdateConversation,
     openConversation: state.openConversation,
-  }), shallow);
+  }));
 
   useEffect(() => {
     if (searchQuery.trim() === '') {

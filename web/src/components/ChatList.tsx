@@ -49,7 +49,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     deleteGroup: state.deleteGroup,
     deleteConversation: state.deleteConversation,
     error: state.error,
-  }), shallow);
+  }));
   const presence = usePresenceStore(state => state.presence);
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');

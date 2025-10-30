@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 
 type State = {
   presence: string[];
@@ -9,7 +10,7 @@ type State = {
   setTyping: (conversationId: string, userIds: string[]) => void;
 };
 
-export const usePresenceStore = create<State>((set) => ({
+export const usePresenceStore = createWithEqualityFn<State>((set) => ({
   presence: [],
   typing: {},
 

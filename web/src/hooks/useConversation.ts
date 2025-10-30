@@ -7,7 +7,7 @@ export function useConversation(conversationId: string) {
   const { conversation, error: convoError } = useConversationStore(state => ({
     conversation: state.conversations.find(c => c.id === conversationId),
     error: state.error,
-  }), shallow);
+  }));
 
   const { 
     messages, 
@@ -29,7 +29,7 @@ export function useConversation(conversationId: string) {
     sendMessage: state.sendMessage,
     uploadFile: state.uploadFile,
     loadPreviousMessages: state.loadPreviousMessages,
-  }), shallow);
+  }));
 
   useEffect(() => {
     if (conversationId) {

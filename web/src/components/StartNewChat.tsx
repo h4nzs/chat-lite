@@ -9,7 +9,7 @@ export default function StartNewChat({ query, onStarted }: { query: string; onSt
   const { searchUsers, startConversation } = useConversationStore(state => ({
     searchUsers: state.searchUsers,
     startConversation: state.startConversation,
-  }), shallow);
+  }));
 
   useEffect(() => {
     if (!query.trim()) {

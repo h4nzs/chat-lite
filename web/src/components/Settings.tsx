@@ -14,7 +14,7 @@ export default function Settings() {
     updateAvatar: state.updateAvatar,
     sendReadReceipts: state.sendReadReceipts,
     toggleReadReceipts: state.toggleReadReceipts,
-  }), shallow);
+  }));
   const [name, setName] = useState(user?.name || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);

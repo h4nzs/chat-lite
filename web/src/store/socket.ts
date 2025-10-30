@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 import { getSocket } from "@lib/socket";
 import { useAuthStore } from "./auth";
 import { useConversationStore, Message, Conversation } from "./conversation";
@@ -19,7 +20,7 @@ type State = {
   initSocketListeners: () => () => void; // Returns a cleanup function
 };
 
-export const useSocketStore = create<State>((set) => ({
+export const useSocketStore = createWithEqualityFn<State>((set) => ({
   isConnected: false,
 
   initSocketListeners: () => {
