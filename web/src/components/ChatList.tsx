@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useChatStore } from '@store/chat';
 import { useAuthStore } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';

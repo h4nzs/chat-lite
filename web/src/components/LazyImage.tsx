@@ -1,12 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 
-interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
-  placeholder?: string
-}
+type LazyImageProps = React.ImgHTMLAttributes<HTMLImageElement>;
 
 export default function LazyImage({ 
   src, 
-  placeholder = '/placeholder.png', 
   alt, 
   className,
   ...props 

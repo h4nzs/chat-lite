@@ -3,9 +3,8 @@ import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
-import { clearSessionKeyCache } from "@utils/advancedCrypto";
 import { useChatStore } from "./chat";
-import { generateKeyPair, exportPublicKey, exportPrivateKey, storePrivateKey } from "@utils/keyManagement";
+import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
 import { getSodium } from "@lib/sodiumInitializer";
 
 type User = {
@@ -45,9 +44,8 @@ const setupUserEncryptionKeys = async (password: string): Promise<void> => {
     const sodium = await getSodium();
     const { publicKey, privateKey } = sodium.crypto_box_keypair();
     
-    // Export public and private keys to base64 strings
+    // Export public key to base64 string
     const publicKeyStr = await exportPublicKey(publicKey);
-    const privateKeyStr = await exportPrivateKey(privateKey);
     
     // Encrypt the private key using the user's password
     const encryptedPrivateKey = await storePrivateKey(privateKey, password);
@@ -154,9 +152,6 @@ export const useAuthStore = create<State>((set, get) => ({
 
     // Clear encryption key cache
     clearKeyCache();
-
-    // Clear session key cache (for forward secrecy)
-    clearSessionKeyCache();
 
     // Clear stored encryption keys
     localStorage.removeItem('publicKey');

@@ -16,7 +16,7 @@ export default function StartNewChat({ query, onStarted }: { query: string; onSt
       try {
         const r = await searchUsers(query);
         setList(r);
-      } catch (e) {
+      } catch {
         toast.error("Failed to search users.");
       }
     }, 300);
@@ -56,7 +56,7 @@ export default function StartNewChat({ query, onStarted }: { query: string; onSt
           </button>
         ))
       ) : (
-        <div className="text-center py-4 text-sm text-text-secondary">No users found for "{query}"</div>
+        <div className="text-center py-4 text-sm text-text-secondary">No users found for &quot;{query}&quot;</div>
       )}
     </div>
   );

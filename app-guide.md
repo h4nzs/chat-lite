@@ -1,115 +1,84 @@
-# Panduan Pengembangan & Peta Jalan Fitur Aplikasi Chat-Lite
+# Panduan dan Laporan Audit Aplikasi Chat-Lite
 
-Dokumen ini berisi ide, saran, dan rekomendasi untuk fitur-fitur baru yang dapat ditambahkan ke aplikasi Chat-Lite. Tujuannya adalah untuk memberikan peta jalan yang jelas untuk pengembangan selanjutnya, membangun di atas fondasi aplikasi yang sudah solid.
-
----
-
-### Konteks: Status Aplikasi Saat Ini
-
-Aplikasi Chat-Lite telah mencapai tingkat stabilitas dan kualitas kode yang tinggi. Fondasi utamanya meliputi:
-- Chat pribadi dan grup yang fungsional.
-- Enkripsi End-to-End (E2EE).
-- Pengiriman file, status online, dan indikator pengetikan.
-- Penanganan error yang baik dan UI yang telah di-refactor.
-
-Fitur-fitur berikut direkomendasikan untuk meningkatkan pengalaman pengguna, utilitas, dan daya saing aplikasi.
+Dokumen ini berisi ringkasan hasil audit teknis pada proyek Chat-Lite, mencakup temuan masalah, rekomendasi perbaikan, dan panduan untuk pengembangan di masa depan.
 
 ---
 
-## 1. Fitur Prioritas Utama (Must-Have)
+## Ringkasan Umum
 
-Fitur-fitur ini dianggap esensial untuk aplikasi chat modern dan akan memberikan peningkatan nilai yang paling signifikan bagi pengguna.
+Aplikasi ini memiliki fondasi arsitektur yang kuat dengan tumpukan teknologi modern (React, Node.js, Prisma, Socket.IO). Fokus pada keamanan dengan enkripsi end-to-end (E2EE) adalah nilai jual utama. Namun, seiring dengan penambahan fitur, beberapa area di dalam basis kode mulai menunjukkan tanda-tanda "utang teknis" (technical debt), terutama di sisi frontend.
 
-### a. **done** Jumlah Pesan Belum Dibaca (Unread Message Count)
-
-*   **Mengapa Ini Penting?**
-    Ini adalah standar UX fundamental. Pengguna perlu tahu secara sekilas percakapan mana yang memiliki pesan baru yang belum mereka lihat. Fitur ini secara drastis meningkatkan keterlibatan pengguna dan efisiensi komunikasi.
-
-*   **Rencana Implementasi:**
-    1.  **Backend:** Modifikasi endpoint `GET /api/conversations`. Untuk setiap percakapan, hitung jumlah pesan yang memiliki `createdAt` lebih baru dari `lastReadMsgId` milik pengguna saat ini (data `lastReadMsgId` sudah ada di model `Participant`). Sertakan `unreadCount` ini dalam data yang dikirim ke klien.
-    2.  **Frontend:** Di komponen `ChatList.tsx`, saat me-render setiap item percakapan, tampilkan `unreadCount` sebagai *badge* (lencana) notifikasi. Hilangkan badge ini saat pengguna membuka percakapan tersebut.
-    3.  **Real-time Update:** Saat pesan baru diterima melalui socket (`message:new`) di percakapan yang tidak aktif, `useChatStore` harus secara dinamis menambah `unreadCount` di state.
-
-### b. **done** Pencarian Pesan (Message Search)
-
-*   **Mengapa Ini Penting?**
-    Seiring waktu, percakapan akan berisi informasi penting. Tanpa fungsi pencarian, menemukan kembali informasi tersebut menjadi tidak mungkin. Ini adalah fitur utilitas murni yang sangat dibutuhkan.
-
-*   **Rencana Implementasi:**
-    1.  **Backend:** Buat endpoint baru, misalnya `GET /api/messages/search?q=<query>&conversationId=<id>`. Endpoint ini akan melakukan pencarian teks (misalnya menggunakan `contains` atau fitur Full-Text Search dari PostgreSQL) pada model `Message`, yang terbatas pada satu percakapan.
-    2.  **Frontend:** Tambahkan ikon dan input pencarian di dalam `ChatHeader.tsx`. Saat pengguna melakukan pencarian, panggil API baru tersebut. Hasilnya dapat ditampilkan dalam sebuah modal atau dengan menyorot pesan yang cocok di dalam `ChatWindow`.
+Secara keseluruhan, aplikasi ini berada dalam kondisi yang baik, tetapi memerlukan beberapa refaktorisasi strategis untuk memastikan skalabilitas dan kemudahan pemeliharaan di masa depan.
 
 ---
 
-## 2. Fitur Peningkatan Penting (Should-Have)
+## Kekuatan Proyek
 
-Fitur-fitur ini akan secara signifikan memperkaya pengalaman pengguna dan menambahkan lapisan personalisasi yang penting.
-
-### a. **done** Kustomisasi Profil Pengguna (Avatar & Status)
-
-*   **Mengapa Ini Penting?**
-    Memberi pengguna kemampuan untuk mempersonalisasi profil mereka (terutama gambar profil) adalah kunci untuk menciptakan rasa memiliki dan identitas di dalam aplikasi. Saat ini, avatar dibuat secara otomatis.
-
-*   **Rencana Implementasi:**
-    1.  **Backend:** Buat endpoint `POST /api/users/me/avatar` yang menerima unggahan gambar, memprosesnya (misalnya resize), dan menyimpan URL-nya di `avatarUrl` pada model `User`. Buat juga endpoint `PUT /api/users/me` untuk memperbarui detail lain seperti nama atau status.
-    2.  **Frontend:** Buat halaman atau modal `Settings` baru. Tambahkan komponen untuk memilih dan mengunggah gambar profil, serta form untuk mengubah nama. Perbarui `useAuthStore` untuk menangani logika ini.
-
-### b. **done** Pratinjau Gambar & Media (Image & Media Previews)
-
-*   **Mengapa Ini Penting?**
-    Saat ini, lampiran file hanya ditampilkan sebagai link. Menampilkan pratinjau gambar secara langsung di dalam chat adalah pengalaman yang jauh lebih baik dan sesuai dengan ekspektasi pengguna dari aplikasi chat modern.
-
-*   **Rencana Implementasi:**
-    1.  **Frontend:** Modifikasi komponen `MessageItem.tsx`. Jika objek pesan berisi `imageUrl` (atau `fileUrl` dengan `fileType` gambar), render komponen `LazyImage.tsx` (yang sudah ada di proyek) untuk menampilkan gambar tersebut, bukan hanya teks.
-    2.  **Lightbox:** Implementasikan *lightbox* sederhana. Saat pengguna mengklik pratinjau gambar, gambar tersebut akan ditampilkan dalam layar penuh (fullscreen overlay) untuk pengalaman melihat yang lebih baik.
+- **Arsitektur Modern:** Pemisahan yang jelas antara backend (Express) dan frontend (React) dalam satu monorepo.
+- **Keamanan Solid:** Implementasi E2EE dengan `libsodium`, penggunaan cookie `httpOnly` untuk JWT, dan middleware keamanan standar (Helmet, CORS, CSRF) menunjukkan praktik terbaik.
+- **Pengalaman Real-time:** Penggunaan Socket.IO yang efektif untuk fitur-fitur seperti status kehadiran, indikator pengetikan, dan pembaruan pesan instan.
+- **Database Type-Safe:** Penggunaan Prisma sebagai ORM memberikan keamanan tipe dari database hingga ke frontend.
 
 ---
 
-## 3. Fitur Jangka Panjang (Nice-to-Have)
+## Masalah Ditemukan & Rekomendasi Perbaikan
 
-Fitur-fitur ini lebih kompleks tetapi akan membedakan aplikasi Anda dan mempersiapkannya untuk masa depan.
+Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan tingkat keparahan.
 
-### a. **done** Status Pesan Terbaca (Read Receipts)
+### Tingkat Kritis
 
-*   **Mengapa Ini Penting?**
-    Memberikan kepastian kepada pengirim bahwa pesan mereka tidak hanya terkirim tetapi juga telah dilihat oleh penerima. Ini adalah fitur standar di aplikasi seperti WhatsApp dan Telegram.
+**1. Konfigurasi ESLint Usang di Frontend**
+- **Masalah:** Perintah `pnpm lint` di direktori `web` gagal total karena versi ESLint yang terpasang (v9+) mengharapkan file konfigurasi `eslint.config.js`, sementara proyek masih menggunakan `.eslintrc.cjs`.
+- **Lokasi:** `web/package.json`, `web/.eslintrc.cjs`
+- **Dampak:** Alat bantu kualitas kode statis tidak dapat berjalan, yang berarti potensi error dan inkonsistensi gaya tidak terdeteksi secara otomatis.
+- **Rekomendasi:** Migrasikan konfigurasi ESLint dari format `.eslintrc.cjs` ke `eslint.config.js` sesuai dengan [panduan migrasi resmi ESLint v9](https://eslint.org/docs/latest/use/configure/migration-guide).
 
-*   **Rencana Implementasi:**
-    1.  **Database:** Model `MessageStatus` sudah ada dengan enum `READ`. Ini adalah fondasi yang bagus.
-    2.  **Backend:** Buat event socket baru dari klien, misalnya `message:mark_as_read`, yang membawa `messageId`.
-    3.  **Frontend:** Di `ChatWindow`, saat sebuah `MessageItem` masuk ke dalam viewport (bisa dideteksi dengan `Intersection Observer API`), panggil event `message:mark_as_read`.
-    4.  **UI:** Di `MessageItem.tsx`, tampilkan ikon centang yang berbeda (misalnya, dua centang biru) jika status pesan adalah `READ`.
-    5.  **Privasi:** Sebagai pengembangan lanjutan, tambahkan opsi di pengaturan bagi pengguna untuk menonaktifkan pengiriman *read receipts*.
+**2. Masalah Kinerja N+1 Query di Backend**
+- **Masalah:** Endpoint `GET /api/conversations` melakukan 2 query tambahan untuk setiap percakapan yang dimiliki pengguna guna menghitung pesan yang belum dibaca. Ini menyebabkan masalah performa serius yang akan meningkat seiring dengan jumlah percakapan.
+- **Lokasi:** `server/src/routes/conversations.ts`
+- **Dampak:** Waktu muat awal aplikasi menjadi sangat lambat bagi pengguna dengan banyak riwayat percakapan.
+- **Rekomendasi:** Lakukan refaktor pada query ini. Gunakan `Prisma.$queryRaw` untuk menulis satu query SQL yang efisien untuk menghitung pesan yang belum dibaca untuk semua percakapan sekaligus, sehingga menghindari perulangan.
 
-### b. **done** Balas Pesan (Reply to Message)
+**3. Kompleksitas Tinggi pada State Management Frontend (`useChatStore`)**
+- **Masalah:** File `web/src/store/chat.ts` telah menjadi "God Object" yang menangani terlalu banyak tanggung jawab: state pesan, percakapan, kehadiran, listener socket, dan semua aksi terkait. Ini sangat sulit untuk dipelihara dan di-debug.
+- **Lokasi:** `web/src/store/chat.ts`
+- **Dampak:** Memperlambat pengembangan fitur baru dan meningkatkan risiko bug regresi karena perubahan di satu bagian dapat secara tidak terduga memengaruhi bagian lain.
+- **Rekomendasi:** Pecah `useChatStore` menjadi beberapa *store* (slices) yang lebih kecil dan fokus, seperti:
+  - `useConversationStore`: Mengelola daftar percakapan.
+  - `useMessageStore`: Mengelola pesan.
+  - `useSocketStore`: Mengelola koneksi dan listener Socket.IO.
+  - `usePresenceStore`: Mengelola status online dan pengetikan.
 
-*   **Mengapa Ini Penting?**
-    Dalam percakapan grup yang ramai, fitur balas sangat penting untuk menjaga konteks. Ini memungkinkan pengguna untuk merespons pesan tertentu secara langsung.
+### Tingkat Sedang
 
-*   **Rencana Implementasi:**
-    1.  **Database:** Tambahkan relasi opsional pada model `Message`, misalnya `repliedToId: String?` yang merujuk ke `id` pesan lain.
-    2.  **Frontend:** Di `MessageItem.tsx`, tambahkan tombol "Reply" (misalnya di menu dropdown). Saat diklik, UI di `MessageInput` akan menampilkan kutipan pesan yang akan dibalas. Saat mengirim, `repliedToId` disertakan dalam payload `message:send`.
-    3.  **UI:** Di `MessageItem.tsx`, jika sebuah pesan memiliki `repliedToId`, render kutipan kecil dari pesan asli di atas konten pesan balasan tersebut.
+**1. Validasi Input Backend yang Tidak Konsisten**
+- **Masalah:** Beberapa rute API menggunakan middleware `zodValidate` untuk validasi skema (praktik baik), tetapi banyak rute lain yang melakukan validasi secara manual atau tidak sama sekali.
+- **Lokasi:** `server/src/routes/keys.ts`, `server/src/routes/users.ts`, `server/src/routes/uploads.ts`
+- **Dampak:** Inkonsistensi dalam penanganan input, meningkatkan risiko error dan potensi celah keamanan jika ada input yang tidak divalidasi dengan benar.
+- **Rekomendasi:** Terapkan `zodValidate` secara konsisten di semua rute yang menerima input dari `req.body` atau `req.query`.
 
-Rencana Eksekusi:
+**2. Rute Pencarian Pesan yang Tidak Berguna**
+- **Masalah:** Endpoint `GET /api/messages/search` mencoba melakukan pencarian teks pada konten pesan di database. Karena konten dienkripsi, query ini tidak akan pernah mengembalikan hasil yang benar.
+- **Lokasi:** `server/src/routes/messages.ts`
+- **Dampak:** Memberikan fungsionalitas yang rusak dan rasa aman yang palsu. Membuang sumber daya server untuk query yang tidak akan pernah berhasil.
+- **Rekomendasi:** Hapus endpoint ini dari backend. Pertahankan logika pencarian saat ini yang berjalan di sisi klien pada data yang sudah didekripsi.
 
-  Fase 1: Backend & Database
-   1. Skema Database: Saya akan memodifikasi prisma/schema.prisma
-      untuk menambahkan relasi repliedTo pada model Message.
-   2. Membuat Migrasi: Saya akan membuat dan menjalankan file
-      migrasi database baru untuk menerapkan perubahan skema.
-   3. Logika Backend: Saya akan memperbarui logika pengiriman dan
-      pengambilan pesan di backend untuk menyertakan data balasan.
+### Tingkat Rendah
 
-  Fase 2: Frontend (State & Logika)
-   4. State Management: Saya akan menambahkan state replyingTo ke
-      useChatStore untuk melacak pesan mana yang sedang dibalas.
-   5. Pengiriman Pesan: Fungsi sendMessage akan diperbarui untuk
-      menyertakan repliedToId saat mengirim balasan.
+**1. Penggunaan Tipe `any` yang Berlebihan di Backend**
+- **Masalah:** Tipe `any` sering digunakan untuk objek `req` di middleware dan rute, yang menghilangkan jaminan keamanan tipe dari TypeScript.
+- **Lokasi:** Hampir semua file di `server/src/routes/`.
+- **Dampak:** Mengurangi manfaaat TypeScript, membuat kode lebih sulit untuk di-refactor, dan dapat menyembunyikan bug terkait tipe.
+- **Rekomendasi:** Buat tipe kustom yang memperluas `Request` dari Express, misalnya `interface AuthenticatedRequest extends Request { user: UserPayload }`, dan gunakan di semua rute yang dilindungi oleh `requireAuth`.
 
-  Fase 3: Frontend (UI)
-   6. Tampilan Input: Komponen MessageInput akan menampilkan
-      pratinjau dari pesan yang sedang dibalas.
-   7. Tampilan Pesan: MessageItem.tsx akan menampilkan kutipan pen
-       asli di atas pesan balasan dan menambahkan tombol "Reply" i
-      menu.
+**2. Logika Dekripsi Frontend yang Berulang**
+- **Masalah:** Logika untuk mendekripsi konten pesan (termasuk `repliedTo.content`) di-copy-paste di beberapa fungsi di dalam `useChatStore`.
+- **Lokasi:** `loadConversations`, `loadMessagesForConversation`, dan listener `message:new` di `web/src/store/chat.ts`.
+- **Dampak:** Membuat perubahan pada logika dekripsi menjadi sulit dan rawan kesalahan karena harus diubah di banyak tempat.
+- **Rekomendasi:** Buat fungsi utilitas tunggal, misalnya `decryptMessageObject(message: Message): Promise<Message>`, yang menangani dekripsi secara rekursif dan panggil fungsi ini di semua tempat yang relevan.
+
+**3. Potensi Duplikasi Socket Listener**
+- **Masalah:** `initSocketListeners` dipanggil di `App.tsx`. Jika terjadi koneksi ulang pada socket, ada kemungkinan listener lama tidak sepenuhnya bersih, yang berpotensi menyebabkan event ditangani beberapa kali.
+- **Lokasi:** `web/src/store/chat.ts`, `web/src/App.tsx`
+- **Dampak:** Perilaku aplikasi yang tidak terduga, seperti pesan yang muncul dua kali.
+- **Rekomendasi:** Ubah `initSocketListeners` agar mengembalikan fungsi pembersihan. Panggil fungsi ini di dalam `useEffect` di `App.tsx` saat komponen di-*unmount* untuk memastikan semua listener selalu dibersihkan dengan benar.

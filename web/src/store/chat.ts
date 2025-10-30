@@ -130,7 +130,7 @@ export const useChatStore = create<State>((set, get) => ({
             try {
               const decryptedContent = await decryptMessage(c.lastMessage.content, c.id);
               c.lastMessage.content = decryptedContent;
-            } catch (e) {
+            } catch {
               c.lastMessage.content = "[Encrypted Message]";
             }
           }
@@ -142,7 +142,7 @@ export const useChatStore = create<State>((set, get) => ({
       );
 
       set({ conversations: sortConversations(decryptedConversations) });
-    } catch (error) {
+    } catch {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
     }
@@ -228,8 +228,8 @@ export const useChatStore = create<State>((set, get) => ({
       const { file: fileData } = await api<{ file: any }>(`/api/uploads/${conversationId}/upload`,{ method: "POST", body: form });
       toast.success("File uploaded!", { id: toastId });
       get().sendMessage(conversationId, { fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
-    } catch (error: any) {
-      const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
+    } catch (uploadError: any) {
+      const errorMsg = uploadError.details ? JSON.parse(uploadError.details).error : uploadError.message;
       toast.error(`Upload failed: ${errorMsg}`);
     }
   },
@@ -249,7 +249,7 @@ export const useChatStore = create<State>((set, get) => ({
             if (m.content) m.content = await decryptMessage(m.content, m.conversationId);
             if (m.repliedTo?.content) m.repliedTo.content = await decryptMessage(m.repliedTo.content, m.conversationId);
             return withPreview(m);
-          } catch (err) {
+          } catch {
             m.content = '[Failed to decrypt message]';
             return withPreview(m);
           }
@@ -283,7 +283,7 @@ export const useChatStore = create<State>((set, get) => ({
             if (m.content) m.content = await decryptMessage(m.content, m.conversationId);
             if (m.repliedTo?.content) m.repliedTo.content = await decryptMessage(m.repliedTo.content, m.conversationId);
             return withPreview(m);
-          } catch (err) {
+          } catch {
             m.content = '[Failed to decrypt message]';
             return withPreview(m);
           }
@@ -371,14 +371,14 @@ export const useChatStore = create<State>((set, get) => ({
       if (newMessage.content) {
         try {
           newMessage.content = await decryptMessage(newMessage.content, newMessage.conversationId);
-        } catch (error) {
+        } catch {
           newMessage.content = "[Failed to decrypt message]";
         }
       }
       if (newMessage.repliedTo?.content) {
         try {
           newMessage.repliedTo.content = await decryptMessage(newMessage.repliedTo.content, newMessage.conversationId);
-        } catch (error) {
+        } catch {
           newMessage.repliedTo.content = "[Failed to decrypt message]";
         }
       }

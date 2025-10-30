@@ -1,5 +1,4 @@
-import { getSodium, initializeSodium } from '@lib/sodiumInitializer'
-import { useAuthStore } from '@store/auth'
+import { getSodium } from '@lib/sodiumInitializer'
 
 // Cache for derived keys to avoid recomputation
 const keyCache = new Map<string, Uint8Array>()
@@ -111,7 +110,7 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
     let combined: Uint8Array;
     try {
       combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    } catch (decodeError) {
+    } catch {
       console.log("Cannot decode as base64, returning as plain text:", cipher);
       console.log("=== END DECRYPT MESSAGE (plain text) ===");
       return cipher;
@@ -154,23 +153,5 @@ export async function decryptMessage(cipher: string, conversationId: string): Pr
     // If the error is because the content is not encrypted, return it as is
     // This handles cases where the content is plain text that doesn't need decryption
     return '[Failed to decrypt: Message may be corrupted]';
-  }
-}
-
-// For backward compatibility with existing messages encrypted with crypto-js
-import CryptoJS from "crypto-js"
-
-const LEGACY_SECRET_KEY = (import.meta.env.VITE_CHAT_SECRET as string) || ""
-
-export function decryptLegacyMessage(cipher: string): string {
-  try {
-    // If no secret key is provided, we can't decrypt legacy messages
-    if (!LEGACY_SECRET_KEY) {
-      return "[Decryption key not available]"
-    }
-    const bytes = CryptoJS.AES.decrypt(cipher, LEGACY_SECRET_KEY)
-    return bytes.toString(CryptoJS.enc.Utf8) || "[Failed to decrypt]"
-  } catch {
-    return "[Invalid encrypted message]"
   }
 }

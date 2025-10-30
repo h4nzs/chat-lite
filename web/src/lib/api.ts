@@ -56,7 +56,7 @@ export async function api<T = any>(
     try {
       const token = await getCsrfToken();
       headers['CSRF-Token'] = token;
-    } catch (e) {
+    } catch {
       console.error("Could not attach CSRF token");
     }
   }

@@ -22,7 +22,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
         const results = await api<any[]>(`/api/users/search?q=${searchQuery}`);
         const selectedIds = selectedUsers.map(u => u.id);
         setUserList(results.filter(u => u.id !== me?.id && !selectedIds.includes(u.id)));
-      } catch (error) {
+      } catch {
         toast.error("Failed to search users.");
       }
     }, 300);

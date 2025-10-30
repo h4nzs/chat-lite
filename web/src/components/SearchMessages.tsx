@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useChatStore, Message } from '@store/chat';
+import { useChatStore } from '@store/chat';
 import { FiSearch, FiX } from 'react-icons/fi';
 
 interface SearchMessagesProps {

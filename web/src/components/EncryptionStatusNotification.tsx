@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const EncryptionStatusNotification = () => {
-  const [encryptionAvailable, setEncryptionAvailable] = useState(true);
-
   useEffect(() => {
     const checkEncryptionStatus = () => {
       const publicKey = localStorage.getItem('publicKey');
       const encryptedPrivateKey = localStorage.getItem('encryptedPrivateKey');
       const isAvailable = !!(publicKey && encryptedPrivateKey);
-      
-      setEncryptionAvailable(isAvailable);
       
       if (!isAvailable) {
         // Show notification about encryption not being available

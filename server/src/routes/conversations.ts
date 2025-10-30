@@ -45,45 +45,28 @@ router.get("/", async (req: any, res, next) => {
       },
     });
 
-    // Manually fetch unread counts
-    const conversations = await Promise.all(
-      conversationsData.map(async (convo) => {
-        const participant = convo.participants.find(p => p.userId === req.user.id);
-        let unreadCount = 0;
+    // Fetch unread counts in a single efficient query
+    const unreadCounts: { conversationId: string; unreadCount: number }[] = await prisma.$queryRaw`
+      SELECT
+        p."conversationId" AS "conversationId",
+        COUNT(m.id)::int AS "unreadCount"
+      FROM "Participant" p
+      LEFT JOIN "Message" last_read_message ON p."lastReadMsgId" = last_read_message.id
+      JOIN "Message" m ON m."conversationId" = p."conversationId"
+      WHERE
+        p."userId" = ${req.user.id}
+        AND m."senderId" != ${req.user.id}
+        AND m."createdAt" > COALESCE(last_read_message."createdAt", p."joinedAt")
+      GROUP BY p."conversationId";
+    `;
 
-        if (participant) {
-          let lastReadTimestamp: Date | null = null;
+    const unreadMap = new Map(unreadCounts.map(item => [item.conversationId, item.unreadCount]));
 
-          if (participant.lastReadMsgId) {
-            const lastReadMessage = await prisma.message.findUnique({
-              where: { id: participant.lastReadMsgId },
-              select: { createdAt: true },
-            });
-            lastReadTimestamp = lastReadMessage?.createdAt ?? null;
-          }
-
-          // If there's no last read message, all messages since the user joined are unread
-          const sinceDate = lastReadTimestamp || participant.joinedAt;
-
-          unreadCount = await prisma.message.count({
-            where: {
-              conversationId: convo.id,
-              createdAt: {
-                gt: sinceDate,
-              },
-              senderId: {
-                not: req.user.id,
-              },
-            },
-          });
-        }
-
-        return {
-          ...convo,
-          unreadCount,
-        };
-      })
-    );
+    // Combine conversation data with unread counts
+    const conversations = conversationsData.map(convo => ({
+      ...convo,
+      unreadCount: unreadMap.get(convo.id) || 0,
+    }));
 
     res.json(conversations);
   } catch (error) {
