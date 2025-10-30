@@ -4,7 +4,9 @@ import { requireAuth } from "../middleware/auth.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { io } from "../socket.js"; // Impor io
+import { io } from "../socket.js";
+import { z } from "zod";
+import { zodValidate } from "../utils/validate.js";
 
 const router = Router();
 
@@ -12,7 +14,6 @@ const router = Router();
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = path.join(process.cwd(), "uploads", "avatars");
-    // Buat direktori jika belum ada
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },
@@ -51,27 +52,27 @@ router.get("/me", requireAuth, async (req: any, res, next) => {
 });
 
 // === PUT: Update user profile (e.g., name) ===
-router.put("/me", requireAuth, async (req, res, next) => {
-  try {
-    const userId = (req as any).user.id;
-    const { name } = req.body;
+router.put("/me", 
+  requireAuth, 
+  zodValidate({ body: z.object({ name: z.string().min(1).trim() }) }),
+  async (req, res, next) => {
+    try {
+      const userId = (req as any).user.id;
+      const { name } = req.body;
 
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({ error: 'Name is required' });
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { name },
+        select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+      });
+
+      io.emit('user:updated', updatedUser);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
     }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { name: name.trim() },
-      select: { id: true, email: true, username: true, name: true, avatarUrl: true },
-    });
-
-    io.emit('user:updated', updatedUser); // Siarkan pembaruan
-    res.json(updatedUser);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // === POST: Update user avatar ===
 router.post("/me/avatar", requireAuth, uploadAvatar.single('avatar'), async (req, res, next) => {
@@ -89,7 +90,7 @@ router.post("/me/avatar", requireAuth, uploadAvatar.single('avatar'), async (req
       select: { id: true, email: true, username: true, name: true, avatarUrl: true },
     });
 
-    io.emit('user:updated', updatedUser); // Siarkan pembaruan
+    io.emit('user:updated', updatedUser);
     res.json(updatedUser);
   } catch (error) {
     next(error);
@@ -97,40 +98,40 @@ router.post("/me/avatar", requireAuth, uploadAvatar.single('avatar'), async (req
 });
 
 // === GET: Cari user berdasarkan query ===
-router.get("/search", requireAuth, async (req, res, next) => {
-  try {
-    const query = req.query.q as string;
-    const meId = (req as any).user.id;
+router.get("/search", 
+  requireAuth, 
+  zodValidate({ query: z.object({ q: z.string().min(1) }) }),
+  async (req, res, next) => {
+    try {
+      const query = req.query.q as string;
+      const meId = (req as any).user.id;
 
-    if (!query) {
-      return res.json([]);
+      const users = await prisma.user.findMany({
+        where: {
+          AND: [
+            { id: { not: meId } },
+            {
+              OR: [
+                { username: { contains: query, mode: "insensitive" } },
+                { name: { contains: query, mode: "insensitive" } },
+              ],
+            },
+          ],
+        },
+        take: 10,
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          avatarUrl: true,
+        },
+      });
+
+      res.json(users);
+    } catch (e) {
+      next(e);
     }
-
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          { id: { not: meId } },
-          {
-            OR: [
-              { username: { contains: query, mode: "insensitive" } },
-              { name: { contains: query, mode: "insensitive" } },
-            ],
-          },
-        ],
-      },
-      take: 10,
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        avatarUrl: true,
-      },
-    });
-
-    res.json(users);
-  } catch (e) {
-    next(e);
   }
-});
+);
 
 export default router;
