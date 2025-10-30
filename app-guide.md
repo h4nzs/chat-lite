@@ -39,7 +39,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 - **Dampak:** Waktu muat awal aplikasi menjadi sangat lambat bagi pengguna dengan banyak riwayat percakapan.
 - **Rekomendasi:** Lakukan refaktor pada query ini. Gunakan `Prisma.$queryRaw` untuk menulis satu query SQL yang efisien untuk menghitung pesan yang belum dibaca untuk semua percakapan sekaligus, sehingga menghindari perulangan.
 
-**3. Kompleksitas Tinggi pada State Management Frontend (`useChatStore`)**
+**3. *done* Kompleksitas Tinggi pada State Management Frontend (`useChatStore`)**
 - **Masalah:** File `web/src/store/chat.ts` telah menjadi "God Object" yang menangani terlalu banyak tanggung jawab: state pesan, percakapan, kehadiran, listener socket, dan semua aksi terkait. Ini sangat sulit untuk dipelihara dan di-debug.
 - **Lokasi:** `web/src/store/chat.ts`
 - **Dampak:** Memperlambat pengembangan fitur baru dan meningkatkan risiko bug regresi karena perubahan di satu bagian dapat secara tidak terduga memengaruhi bagian lain.

@@ -48,7 +48,8 @@ type State = {
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
-  removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
+  removeReaction: (conversationId, string, reactionId: string) => void;
+  updateSenderDetails: (user: Partial<User>) => void;
 };
 
 // --- Zustand Store ---
@@ -265,5 +266,20 @@ export const useMessageStore = create<State>((set, get) => ({
         })
       }
     }));
+  },
+
+  updateSenderDetails: (user) => {
+    set(state => {
+      const newMessages = { ...state.messages };
+      for (const convoId in newMessages) {
+        newMessages[convoId] = newMessages[convoId].map(m => {
+          if (m.sender?.id === user.id) {
+            return { ...m, sender: { ...m.sender, ...user } };
+          }
+          return m;
+        });
+      }
+      return { messages: newMessages };
+    });
   },
 }));

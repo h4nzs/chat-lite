@@ -114,6 +114,15 @@ export const useSocketStore = create<State>((set) => ({
       }
     });
 
+    socket.on('user:updated', (updatedUser: any) => {
+      const { auth, convo, msg } = getStores();
+      if (updatedUser.id === auth.user?.id) return; // Ignore self-updates
+
+      // Update user details in all relevant places
+      convo.updateParticipantDetails(updatedUser);
+      msg.updateSenderDetails(updatedUser);
+    });
+
     // Return a cleanup function
     return () => {
       set({ isConnected: false });

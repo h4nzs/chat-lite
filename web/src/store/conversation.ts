@@ -71,6 +71,7 @@ type State = {
   addOrUpdateConversation: (conversation: Conversation) => void;
   removeConversation: (conversationId: string) => void;
   updateConversation: (conversationId: string, updates: Partial<Conversation>) => void;
+  updateParticipantDetails: (user: Partial<User>) => void;
 };
 
 const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
@@ -168,6 +169,17 @@ export const useConversationStore = create<State>((set, get) => ({
       conversations: state.conversations.map(c => 
         c.id === conversationId ? { ...c, ...updates } : c
       )
+    }));
+  },
+
+  updateParticipantDetails: (user) => {
+    set(state => ({
+      conversations: state.conversations.map(c => ({
+        ...c,
+        participants: c.participants.map(p => 
+          p.id === user.id ? { ...p, ...user } : p
+        ),
+      }))
     }));
   }
 }));
