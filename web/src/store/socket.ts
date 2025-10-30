@@ -94,6 +94,10 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       });
     });
 
+    socket.on('message:status_updated', ({ messageId, conversationId, readBy, status }) => {
+      getStores().msg.updateMessageStatus(conversationId, messageId, readBy, status);
+    });
+
     socket.on("reaction:new", (reaction) => {
       const { messages } = getStores().msg;
       for (const cid in messages) {
@@ -136,6 +140,7 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       socket.off("reaction:new");
       socket.off("reaction:remove");
       socket.off("message:deleted");
+      socket.off("message:status_updated");
     };
   },
 }));

@@ -48,8 +48,9 @@ type State = {
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
-  removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
+  removeReaction: (conversationId, string, reactionId: string) => void;
   updateSenderDetails: (user: Partial<User>) => void;
+  updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
 };
 
 // --- Zustand Store ---
@@ -279,6 +280,28 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
           return m;
         });
       }
+      return { messages: newMessages };
+    });
+  },
+
+  updateMessageStatus: (conversationId, messageId, userId, status) => {
+    set(state => {
+      const newMessages = { ...state.messages };
+      const convoMessages = newMessages[conversationId];
+      if (!convoMessages) return state;
+
+      newMessages[conversationId] = convoMessages.map(m => {
+        if (m.id === messageId) {
+          const existingStatus = m.statuses?.find(s => s.userId === userId);
+          if (existingStatus) {
+            return { ...m, statuses: m.statuses!.map(s => s.userId === userId ? { ...s, status } : s) };
+          } else {
+            return { ...m, statuses: [...(m.statuses || []), { userId, status, messageId, id: `temp-status-${Date.now()}` }] };
+          }
+        }
+        return m;
+      });
+
       return { messages: newMessages };
     });
   },
