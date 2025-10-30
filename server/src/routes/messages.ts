@@ -8,53 +8,6 @@ import path from "path";
 
 const router = Router();
 
-// === SEARCH: mencari pesan dalam percakapan ===
-router.get("/search", requireAuth, async (req: Request, res, next) => {
-  try {
-    const { q, conversationId } = req.query;
-    const userId = (req as any).user.id;
-
-    if (typeof q !== 'string' || q.length < 2) {
-      throw new ApiError(400, "Search query must be at least 2 characters long.");
-    }
-    if (typeof conversationId !== 'string') {
-      throw new ApiError(400, "Conversation ID is required.");
-    }
-
-    // 1. Verify user is a participant
-    const isParticipant = await prisma.participant.findFirst({
-      where: { userId, conversationId },
-    });
-    if (!isParticipant) {
-      throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
-    }
-
-    // 2. Search for messages
-    const results = await prisma.message.findMany({
-      where: {
-        conversationId,
-        content: {
-          contains: q,
-          mode: 'insensitive',
-        },
-      },
-      take: 50,
-      orderBy: {
-        createdAt: 'asc',
-      },
-      include: {
-        sender: {
-          select: { id: true, username: true, name: true, avatarUrl: true },
-        },
-      },
-    });
-
-    res.json({ success: true, results });
-  } catch (e) {
-    next(e);
-  }
-});
-
 
 // ... (GET and DELETE message routes remain the same)
 
@@ -62,7 +15,7 @@ router.get("/search", requireAuth, async (req: Request, res, next) => {
 router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
   try {
     const { conversationId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
     const { cursor } = req.query;
 
     const isParticipant = await prisma.conversation.findFirst({
@@ -118,7 +71,7 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
 router.delete("/:messageId", requireAuth, async (req, res, next) => {
   try {
     const { messageId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
 
     const message = await prisma.message.findFirst({
       where: { id: messageId, senderId: userId },
@@ -158,7 +111,7 @@ router.delete("/:messageId", requireAuth, async (req, res, next) => {
 router.post("/:messageId/reactions", requireAuth, async (req: Request, res, next) => {
   try {
     const { emoji } = req.body;
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
     const { messageId } = req.params;
 
     const message = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
@@ -179,7 +132,7 @@ router.post("/:messageId/reactions", requireAuth, async (req: Request, res, next
 router.delete("/reactions/:reactionId", requireAuth, async (req: Request, res, next) => {
   try {
     const { reactionId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
 
     const reaction = await prisma.messageReaction.findFirst({
       where: { id: reactionId, userId },

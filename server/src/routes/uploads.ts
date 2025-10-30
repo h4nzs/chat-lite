@@ -27,7 +27,7 @@ router.post("/:conversationId/upload",
 
       try {
         const { conversationId } = req.params;
-        const userId = (req as any).user.id;
+        const userId = req.user.id;
         const file = req.file;
 
         if (!file) {

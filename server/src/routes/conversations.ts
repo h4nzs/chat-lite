@@ -7,7 +7,7 @@ const router = Router();
 router.use(requireAuth);
 
 // GET all conversations for the current user
-router.get("/", async (req: any, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const conversationsData = await prisma.conversation.findMany({
       where: {
@@ -75,7 +75,7 @@ router.get("/", async (req: any, res, next) => {
 });
 
 // GET a single conversation by ID
-router.get("/:id", async (req: any, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const conversation = await prisma.conversation.findFirst({
@@ -111,7 +111,7 @@ router.get("/:id", async (req: any, res, next) => {
 });
 
 // CREATE a new conversation (private or group)
-router.post("/", async (req: any, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
     const { title, userIds, isGroup } = req.body;
     const creatorId = req.user.id;
@@ -177,7 +177,7 @@ router.post("/", async (req: any, res, next) => {
 
 
 // DELETE a conversation (group or 1-on-1)
-router.delete("/:id", async (req: any, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;

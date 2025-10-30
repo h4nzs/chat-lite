@@ -33,7 +33,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 - **Dampak:** Alat bantu kualitas kode statis tidak dapat berjalan, yang berarti potensi error dan inkonsistensi gaya tidak terdeteksi secara otomatis.
 - **Rekomendasi:** Migrasikan konfigurasi ESLint dari format `.eslintrc.cjs` ke `eslint.config.js` sesuai dengan [panduan migrasi resmi ESLint v9](https://eslint.org/docs/latest/use/configure/migration-guide).
 
-**2. Masalah Kinerja N+1 Query di Backend**
+**2. *done* Masalah Kinerja N+1 Query di Backend**
 - **Masalah:** Endpoint `GET /api/conversations` melakukan 2 query tambahan untuk setiap percakapan yang dimiliki pengguna guna menghitung pesan yang belum dibaca. Ini menyebabkan masalah performa serius yang akan meningkat seiring dengan jumlah percakapan.
 - **Lokasi:** `server/src/routes/conversations.ts`
 - **Dampak:** Waktu muat awal aplikasi menjadi sangat lambat bagi pengguna dengan banyak riwayat percakapan.
@@ -51,13 +51,13 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 
 ### Tingkat Sedang
 
-**1. Validasi Input Backend yang Tidak Konsisten**
+**1. *done* Validasi Input Backend yang Tidak Konsisten**
 - **Masalah:** Beberapa rute API menggunakan middleware `zodValidate` untuk validasi skema (praktik baik), tetapi banyak rute lain yang melakukan validasi secara manual atau tidak sama sekali.
 - **Lokasi:** `server/src/routes/keys.ts`, `server/src/routes/users.ts`, `server/src/routes/uploads.ts`
 - **Dampak:** Inkonsistensi dalam penanganan input, meningkatkan risiko error dan potensi celah keamanan jika ada input yang tidak divalidasi dengan benar.
 - **Rekomendasi:** Terapkan `zodValidate` secara konsisten di semua rute yang menerima input dari `req.body` atau `req.query`.
 
-**2. Rute Pencarian Pesan yang Tidak Berguna**
+**2. *done* Rute Pencarian Pesan yang Tidak Berguna**
 - **Masalah:** Endpoint `GET /api/messages/search` mencoba melakukan pencarian teks pada konten pesan di database. Karena konten dienkripsi, query ini tidak akan pernah mengembalikan hasil yang benar.
 - **Lokasi:** `server/src/routes/messages.ts`
 - **Dampak:** Memberikan fungsionalitas yang rusak dan rasa aman yang palsu. Membuang sumber daya server untuk query yang tidak akan pernah berhasil.
@@ -65,7 +65,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 
 ### Tingkat Rendah
 
-**1. Penggunaan Tipe `any` yang Berlebihan di Backend**
+**1. *done* Penggunaan Tipe `any` yang Berlebihan di Backend**
 - **Masalah:** Tipe `any` sering digunakan untuk objek `req` di middleware dan rute, yang menghilangkan jaminan keamanan tipe dari TypeScript.
 - **Lokasi:** Hampir semua file di `server/src/routes/`.
 - **Dampak:** Mengurangi manfaaat TypeScript, membuat kode lebih sulit untuk di-refactor, dan dapat menyembunyikan bug terkait tipe.

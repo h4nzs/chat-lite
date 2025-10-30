@@ -18,7 +18,7 @@ const avatarStorage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const userId = (req as any).user.id;
+    const userId = req.user.id;
     const extension = path.extname(file.originalname);
     cb(null, `${userId}${extension}`);
   },
@@ -39,7 +39,7 @@ const uploadAvatar = multer({
 });
 
 // === GET: User data diri ===
-router.get("/me", requireAuth, async (req: any, res, next) => {
+router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: (req as any).user.id },
@@ -104,7 +104,7 @@ router.get("/search",
   async (req, res, next) => {
     try {
       const query = req.query.q as string;
-      const meId = (req as any).user.id;
+      const meId = req.user.id;
 
       const users = await prisma.user.findMany({
         where: {

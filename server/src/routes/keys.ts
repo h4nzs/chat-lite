@@ -12,8 +12,7 @@ router.post("/keys/public",
   zodValidate({ body: z.object({ publicKey: z.string().min(1) }) }),
   async (req, res, next) => {
     try {
-      const userId = (req as any).user.id;
-      const { publicKey } = req.body;
+      const userId = req.user.id;
 
       await prisma.user.update({
         where: { id: userId },
@@ -63,7 +62,7 @@ router.post("/keys/session",
   }),
   async (req, res, next) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = req.user.id;
       const { conversationId, sessionId, encryptedKey } = req.body;
 
       const sessionKey = await prisma.sessionKey.create({
@@ -87,9 +86,8 @@ router.get("/keys/session/:conversationId",
   requireAuth,
   zodValidate({ params: z.object({ conversationId: z.string().cuid() }) }),
   async (req, res, next) => {
-    try {
-      const userId = (req as any).user.id;
-      const { conversationId } = req.params;
+      try {
+        const userId = req.user.id;      const { conversationId } = req.params;
 
       const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
