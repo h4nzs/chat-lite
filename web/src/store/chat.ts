@@ -320,19 +320,8 @@ export const useChatStore = create<State>((set, get) => ({
 
   initSocketListeners: () => {
     const socket = getSocket();
-    socket.off("presence:init");
-    socket.off("presence:user_joined");
-    socket.off("presence:user_left");
-    socket.off("typing:update");
-    socket.off("message:new");
-    socket.off("conversation:new");
-    socket.off("conversation:deleted");
-    socket.off("reaction:new");
-    socket.off("reaction:remove");
-    socket.off("message:deleted");
-    socket.off("user:updated");
-    socket.off("message:status_updated");
 
+    // --- Register all listeners ---
     socket.on("presence:init", (onlineUserIds: string[]) => set({ presence: onlineUserIds }));
     socket.on("presence:user_joined", (userId: string) => set(state => ({ presence: [...state.presence, userId] })));
     socket.on("presence:user_left", (userId: string) => set(state => ({ presence: state.presence.filter(id => id !== userId) })));
@@ -465,5 +454,21 @@ export const useChatStore = create<State>((set, get) => ({
         return { ...state, messages: { ...state.messages, [conversationId]: updatedMessages } };
       });
     });
+
+    // Return a cleanup function
+    return () => {
+      socket.off("presence:init");
+      socket.off("presence:user_joined");
+      socket.off("presence:user_left");
+      socket.off("typing:update");
+      socket.off("message:new");
+      socket.off("conversation:new");
+      socket.off("conversation:deleted");
+      socket.off("reaction:new");
+      socket.off("reaction:remove");
+      socket.off("message:deleted");
+      socket.off("user:updated");
+      socket.off("message:status_updated");
+    };
   },
 }));

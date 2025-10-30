@@ -11,7 +11,8 @@ import { useEffect } from 'react';
 
 export default function App() {
   useEffect(() => {
-    useChatStore.getState().initSocketListeners();
+    const cleanup = useChatStore.getState().initSocketListeners();
+    return cleanup; // Return the cleanup function to be called on unmount
   }, []);
   return (
     <div className="dark">

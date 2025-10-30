@@ -71,7 +71,7 @@ Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan
 - **Dampak:** Mengurangi manfaaat TypeScript, membuat kode lebih sulit untuk di-refactor, dan dapat menyembunyikan bug terkait tipe.
 - **Rekomendasi:** Buat tipe kustom yang memperluas `Request` dari Express, misalnya `interface AuthenticatedRequest extends Request { user: UserPayload }`, dan gunakan di semua rute yang dilindungi oleh `requireAuth`.
 
-**2. Logika Dekripsi Frontend yang Berulang**
+**2. *done* Logika Dekripsi Frontend yang Berulang**
 - **Masalah:** Logika untuk mendekripsi konten pesan (termasuk `repliedTo.content`) di-copy-paste di beberapa fungsi di dalam `useChatStore`.
 - **Lokasi:** `loadConversations`, `loadMessagesForConversation`, dan listener `message:new` di `web/src/store/chat.ts`.
 - **Dampak:** Membuat perubahan pada logika dekripsi menjadi sulit dan rawan kesalahan karena harus diubah di banyak tempat.
