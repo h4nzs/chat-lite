@@ -4,37 +4,8 @@ import { getSocket, disconnectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
-import { getSodium } from "@lib/sodiumInitializer";
-
-type User = {
-  id: string;
-  email: string;
-  username: string;
-  name: string;
-  avatarUrl?: string | null;
-  sendReadReceipts?: boolean; // Tambahkan properti
-};
-
-type State = {
-  user: User | null;
-  theme: "light" | "dark";
-  sendReadReceipts: boolean; // Tambahkan state
-  bootstrap: () => Promise<void>;
-  login: (emailOrUsername: string, password: string) => Promise<void>;
-  register: (data: {
-    email: string;
-    username: string;
-    password: string;
-    name: string;
-  }) => Promise<void>;
-  logout: () => Promise<void>;
-  ensureSocket: () => void;
-  setTheme: (t: "light" | "dark") => void;
-  updateProfile: (data: { name: string }) => Promise<void>;
-  updateAvatar: (file: File) => Promise<void>;
-  toggleReadReceipts: () => void; // Tambahkan fungsi
-  regenerateKeys: (password: string) => Promise<void>; // Fungsi untuk regenerasi kunci
-};
+import { useConversationStore } from "./conversation";
+import { useMessageStore } from "./message";
 
 // Helper function to setup user encryption keys
 const setupUserEncryptionKeys = async (password: string): Promise<void> => {
@@ -206,7 +177,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   async regenerateKeys(password: string) {
     // 1. Hapus kunci lama dari cache dan storage
     clearKeyCache();
-    clearSessionKeyCache();
     localStorage.removeItem('publicKey');
     localStorage.removeItem('encryptedPrivateKey');
 
@@ -214,6 +184,7 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     await setupUserEncryptionKeys(password);
 
     // 3. Hapus semua state percakapan untuk memaksa sinkronisasi ulang
-    useChatStore.setState({ conversations: [], messages: {} }, true);
+    useConversationStore.setState({ conversations: [], messages: {} }, true);
+    useMessageStore.setState({ messages: {} }, true);
   },
 }));

@@ -74,7 +74,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     if (data.content) {
       try {
         encryptedContent = await encryptMessage(data.content, conversationId);
-      } catch (error) {
+      } catch {
         toast.error("Failed to encrypt message.");
         return;
       }

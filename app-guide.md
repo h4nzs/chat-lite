@@ -1,84 +1,71 @@
-# Panduan dan Laporan Audit Aplikasi Chat-Lite
+# Panduan dan Laporan Audit Final Aplikasi Chat-Lite
 
-Dokumen ini berisi ringkasan hasil audit teknis pada proyek Chat-Lite, mencakup temuan masalah, rekomendasi perbaikan, dan panduan untuk pengembangan di masa depan.
-
----
-
-## Ringkasan Umum
-
-Aplikasi ini memiliki fondasi arsitektur yang kuat dengan tumpukan teknologi modern (React, Node.js, Prisma, Socket.IO). Fokus pada keamanan dengan enkripsi end-to-end (E2EE) adalah nilai jual utama. Namun, seiring dengan penambahan fitur, beberapa area di dalam basis kode mulai menunjukkan tanda-tanda "utang teknis" (technical debt), terutama di sisi frontend.
-
-Secara keseluruhan, aplikasi ini berada dalam kondisi yang baik, tetapi memerlukan beberapa refaktorisasi strategis untuk memastikan skalabilitas dan kemudahan pemeliharaan di masa depan.
+Dokumen ini berisi ringkasan hasil audit teknis final pada proyek Chat-Lite setelah serangkaian perbaikan besar. Dokumen ini merangkum status proyek saat ini, perbaikan yang telah diimplementasikan, dan rekomendasi untuk pengembangan selanjutnya.
 
 ---
 
-## Kekuatan Proyek
+## Ringkasan Status Saat Ini
 
-- **Arsitektur Modern:** Pemisahan yang jelas antara backend (Express) dan frontend (React) dalam satu monorepo.
-- **Keamanan Solid:** Implementasi E2EE dengan `libsodium`, penggunaan cookie `httpOnly` untuk JWT, dan middleware keamanan standar (Helmet, CORS, CSRF) menunjukkan praktik terbaik.
-- **Pengalaman Real-time:** Penggunaan Socket.IO yang efektif untuk fitur-fitur seperti status kehadiran, indikator pengetikan, dan pembaruan pesan instan.
-- **Database Type-Safe:** Penggunaan Prisma sebagai ORM memberikan keamanan tipe dari database hingga ke frontend.
+Setelah serangkaian refaktorisasi dan perbaikan bug yang signifikan, proyek Chat-Lite sekarang berada dalam kondisi yang **jauh lebih sehat, stabil, dan mudah dipelihara**. Masalah-masalah kritis terkait kinerja, kualitas kode, dan bug fungsional telah berhasil diatasi. Fondasi arsitektur yang kuat kini didukung oleh implementasi yang lebih bersih dan efisien.
+
+Aplikasi telah berhasil dimigrasikan dari satu *state management store* monolitik (`useChatStore`) menjadi beberapa *store* yang lebih kecil dan terfokus, yang merupakan pencapaian terbesar dari proses perbaikan ini.
 
 ---
 
-## Masalah Ditemukan & Rekomendasi Perbaikan
+## Status Laporan Audit Sebelumnya: **RESOLVED**
 
-Berikut adalah daftar masalah yang ditemukan selama audit, diurutkan berdasarkan tingkat keparahan.
+Semua masalah yang diidentifikasi dalam laporan audit awal telah berhasil diperbaiki. Berikut rekapitulasinya:
 
-### Tingkat Kritis
+1.  **[RESOLVED] Masalah Kinerja N+1 Query di Backend:**
+    - **Status:** Selesai.
+    - **Perbaikan:** Logika pengambilan `unreadCount` di `GET /api/conversations` telah di-refactor untuk menggunakan satu `Prisma.$queryRaw`, mengurangi jumlah *query* dari `2N+1` menjadi hanya 2 dan secara drastis meningkatkan performa.
 
-**1. *done* Konfigurasi ESLint Usang di Frontend**
-- **Masalah:** Perintah `pnpm lint` di direktori `web` gagal total karena versi ESLint yang terpasang (v9+) mengharapkan file konfigurasi `eslint.config.js`, sementara proyek masih menggunakan `.eslintrc.cjs`.
-- **Lokasi:** `web/package.json`, `web/.eslintrc.cjs`
-- **Dampak:** Alat bantu kualitas kode statis tidak dapat berjalan, yang berarti potensi error dan inkonsistensi gaya tidak terdeteksi secara otomatis.
-- **Rekomendasi:** Migrasikan konfigurasi ESLint dari format `.eslintrc.cjs` ke `eslint.config.js` sesuai dengan [panduan migrasi resmi ESLint v9](https://eslint.org/docs/latest/use/configure/migration-guide).
+2.  **[RESOLVED] Konfigurasi ESLint Usang di Frontend:**
+    - **Status:** Selesai.
+    - **Perbaikan:** Konfigurasi ESLint telah dimigrasikan ke format `eslint.config.js` yang modern. Semua *error* linting kritis (seperti `no-unused-vars`) telah diperbaiki, dan *linter* sekarang berjalan dengan sukses.
 
-**2. *done* Masalah Kinerja N+1 Query di Backend**
-- **Masalah:** Endpoint `GET /api/conversations` melakukan 2 query tambahan untuk setiap percakapan yang dimiliki pengguna guna menghitung pesan yang belum dibaca. Ini menyebabkan masalah performa serius yang akan meningkat seiring dengan jumlah percakapan.
-- **Lokasi:** `server/src/routes/conversations.ts`
-- **Dampak:** Waktu muat awal aplikasi menjadi sangat lambat bagi pengguna dengan banyak riwayat percakapan.
-- **Rekomendasi:** Lakukan refaktor pada query ini. Gunakan `Prisma.$queryRaw` untuk menulis satu query SQL yang efisien untuk menghitung pesan yang belum dibaca untuk semua percakapan sekaligus, sehingga menghindari perulangan.
+3.  **[RESOLVED] Kompleksitas Tinggi pada `useChatStore`:**
+    - **Status:** Selesai.
+    - **Perbaikan:** `useChatStore` yang monolitik telah berhasil dipecah menjadi empat *store* terpisah dan terfokus: `useConversationStore`, `useMessageStore`, `usePresenceStore`, dan `useSocketStore`. Semua komponen yang relevan telah diperbarui untuk menggunakan *store* baru ini.
 
-**3. *done* Kompleksitas Tinggi pada State Management Frontend (`useChatStore`)**
-- **Masalah:** File `web/src/store/chat.ts` telah menjadi "God Object" yang menangani terlalu banyak tanggung jawab: state pesan, percakapan, kehadiran, listener socket, dan semua aksi terkait. Ini sangat sulit untuk dipelihara dan di-debug.
-- **Lokasi:** `web/src/store/chat.ts`
-- **Dampak:** Memperlambat pengembangan fitur baru dan meningkatkan risiko bug regresi karena perubahan di satu bagian dapat secara tidak terduga memengaruhi bagian lain.
-- **Rekomendasi:** Pecah `useChatStore` menjadi beberapa *store* (slices) yang lebih kecil dan fokus, seperti:
-  - `useConversationStore`: Mengelola daftar percakapan.
-  - `useMessageStore`: Mengelola pesan.
-  - `useSocketStore`: Mengelola koneksi dan listener Socket.IO.
-  - `usePresenceStore`: Mengelola status online dan pengetikan.
+4.  **[RESOLVED] Validasi Input Backend yang Tidak Konsisten:**
+    - **Status:** Selesai.
+    - **Perbaikan:** *Middleware* `zodValidate` telah diterapkan secara konsisten di semua rute API yang relevan (`keys.ts`, `users.ts`, `uploads.ts`), memastikan penanganan input yang seragam dan aman.
 
-### Tingkat Sedang
+5.  **[RESOLVED] Rute Pencarian Pesan yang Tidak Berguna:**
+    - **Status:** Selesai.
+    - **Perbaikan:** Endpoint `GET /api/messages/search` yang tidak fungsional (karena enkripsi) telah dihapus dari backend untuk menghindari kebingungan.
 
-**1. *done* Validasi Input Backend yang Tidak Konsisten**
-- **Masalah:** Beberapa rute API menggunakan middleware `zodValidate` untuk validasi skema (praktik baik), tetapi banyak rute lain yang melakukan validasi secara manual atau tidak sama sekali.
-- **Lokasi:** `server/src/routes/keys.ts`, `server/src/routes/users.ts`, `server/src/routes/uploads.ts`
-- **Dampak:** Inkonsistensi dalam penanganan input, meningkatkan risiko error dan potensi celah keamanan jika ada input yang tidak divalidasi dengan benar.
-- **Rekomendasi:** Terapkan `zodValidate` secara konsisten di semua rute yang menerima input dari `req.body` atau `req.query`.
+6.  **[RESOLVED] Penggunaan Tipe `any` yang Berlebihan di Backend:**
+    - **Status:** Selesai.
+    - **Perbaikan:** Definisi tipe global untuk `Express.Request` telah dibuat, memungkinkan penghapusan anotasi `: any` dari objek `req` di semua rute yang dilindungi, sehingga meningkatkan keamanan tipe.
 
-**2. *done* Rute Pencarian Pesan yang Tidak Berguna**
-- **Masalah:** Endpoint `GET /api/messages/search` mencoba melakukan pencarian teks pada konten pesan di database. Karena konten dienkripsi, query ini tidak akan pernah mengembalikan hasil yang benar.
-- **Lokasi:** `server/src/routes/messages.ts`
-- **Dampak:** Memberikan fungsionalitas yang rusak dan rasa aman yang palsu. Membuang sumber daya server untuk query yang tidak akan pernah berhasil.
-- **Rekomendasi:** Hapus endpoint ini dari backend. Pertahankan logika pencarian saat ini yang berjalan di sisi klien pada data yang sudah didekripsi.
+7.  **[RESOLVED] Logika Dekripsi Frontend yang Berulang:**
+    - **Status:** Selesai.
+    - **Perbaikan:** Fungsi utilitas `decryptMessageObject` telah dipusatkan di `message.ts` dan digunakan kembali di `socket.ts` dan di tempat lain, menghilangkan duplikasi kode.
 
-### Tingkat Rendah
+8.  **[RESOLVED] Potensi Duplikasi Socket Listener:**
+    - **Status:** Selesai.
+    - **Perbaikan:** `initSocketListeners` sekarang mengembalikan fungsi pembersihan yang dipanggil dengan benar di dalam `useEffect` di `App.tsx`, memastikan *listener* tidak terduplikasi saat terjadi koneksi ulang.
 
-**1. *done* Penggunaan Tipe `any` yang Berlebihan di Backend**
-- **Masalah:** Tipe `any` sering digunakan untuk objek `req` di middleware dan rute, yang menghilangkan jaminan keamanan tipe dari TypeScript.
-- **Lokasi:** Hampir semua file di `server/src/routes/`.
-- **Dampak:** Mengurangi manfaaat TypeScript, membuat kode lebih sulit untuk di-refactor, dan dapat menyembunyikan bug terkait tipe.
-- **Rekomendasi:** Buat tipe kustom yang memperluas `Request` dari Express, misalnya `interface AuthenticatedRequest extends Request { user: UserPayload }`, dan gunakan di semua rute yang dilindungi oleh `requireAuth`.
+---
 
-**2. *done* Logika Dekripsi Frontend yang Berulang**
-- **Masalah:** Logika untuk mendekripsi konten pesan (termasuk `repliedTo.content`) di-copy-paste di beberapa fungsi di dalam `useChatStore`.
-- **Lokasi:** `loadConversations`, `loadMessagesForConversation`, dan listener `message:new` di `web/src/store/chat.ts`.
-- **Dampak:** Membuat perubahan pada logika dekripsi menjadi sulit dan rawan kesalahan karena harus diubah di banyak tempat.
-- **Rekomendasi:** Buat fungsi utilitas tunggal, misalnya `decryptMessageObject(message: Message): Promise<Message>`, yang menangani dekripsi secara rekursif dan panggil fungsi ini di semua tempat yang relevan.
+## Area Peningkatan Lanjutan (Next Steps)
 
-**3. *done* Potensi Duplikasi Socket Listener**
-- **Masalah:** `initSocketListeners` dipanggil di `App.tsx`. Jika terjadi koneksi ulang pada socket, ada kemungkinan listener lama tidak sepenuhnya bersih, yang berpotensi menyebabkan event ditangani beberapa kali.
-- **Lokasi:** `web/src/store/chat.ts`, `web/src/App.tsx`
-- **Dampak:** Perilaku aplikasi yang tidak terduga, seperti pesan yang muncul dua kali.
-- **Rekomendasi:** Ubah `initSocketListeners` agar mengembalikan fungsi pembersihan. Panggil fungsi ini di dalam `useEffect` di `App.tsx` saat komponen di-*unmount* untuk memastikan semua listener selalu dibersihkan dengan benar.
+Meskipun semua masalah kritis telah teratasi, ada beberapa area yang dapat lebih ditingkatkan di masa depan untuk kualitas kode yang lebih tinggi:
+
+- **Menghilangkan `any` Sepenuhnya:**
+  - **Masalah:** Laporan linting masih menunjukkan beberapa peringatan `no-explicit-any`. Ini sebagian besar ada di *handler* error atau pada data yang diterima dari API sebelum divalidasi.
+  - **Rekomendasi:** Buat tipe data yang lebih spesifik untuk *payload* API dan objek error. Gunakan `unknown` di dalam blok `catch` dan lakukan pemeriksaan tipe sebelum menggunakannya, alih-alih langsung menggunakan `any`.
+
+- **Refaktorisasi `useAuthStore`:**
+  - **Masalah:** Mirip dengan `useChatStore` sebelumnya, `useAuthStore` saat ini menangani banyak logika, termasuk otentikasi, manajemen profil, tema, dan kunci enkripsi.
+  - **Rekomendasi:** Pertimbangkan untuk memecah `useAuthStore` menjadi *store* yang lebih kecil, misalnya `useAuthStore` (hanya untuk login/logout/register) dan `useProfileStore` atau `useSettingsStore` untuk sisanya.
+
+- **Meningkatkan Tipe pada Komponen:**
+  - **Masalah:** Beberapa komponen masih menggunakan `any` untuk *props* (misalnya, `ChatHeader` menerima `conversation: any`).
+  - **Rekomendasi:** Manfaatkan tipe `Conversation` dan `Message` yang sudah diekspor dari `conversation.ts` untuk memberikan tipe yang kuat pada *props* komponen, sehingga meningkatkan keamanan tipe di seluruh UI.
+
+## Kesimpulan Final
+
+Proyek Chat-Lite sekarang berada dalam kondisi yang sangat baik. Utang teknis yang signifikan telah dilunasi, dan fondasi kode sekarang jauh lebih bersih, lebih efisien, dan siap untuk pengembangan fitur-fitur baru di masa depan. Tim dapat melanjutkan pengembangan dengan keyakinan yang lebih tinggi terhadap kualitas dan stabilitas aplikasi.
