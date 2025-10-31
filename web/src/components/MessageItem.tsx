@@ -10,6 +10,8 @@ import { toAbsoluteUrl } from "@utils/url";
 import LazyImage from "./LazyImage";
 import FileAttachment from "./FileAttachment";
 import useModalStore from '@store/modal';
+import { motion } from 'framer-motion';
+import clsx from 'clsx';
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -51,14 +53,27 @@ const ReplyQuote = ({ message }: { message: Message }) => {
   );
 };
 
-const MessageBubble = ({ message, mine, conversation, onImageClick }: { message: Message; mine: boolean; conversation: Conversation | undefined; onImageClick: (src: string) => void; }) => {
+const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversation }: { message: Message; mine: boolean; isLastInSequence: boolean; onImageClick: (src: string) => void; conversation: Conversation | undefined; }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
   const isImage = message.fileType?.startsWith('image/');
 
   const hasBubbleStyle = hasContent || (message.fileUrl && !isImage);
 
+  const bubbleClasses = clsx(
+    'relative max-w-md md:max-w-lg',
+    hasBubbleStyle && `px-4 py-2.5 shadow-sm`,
+    {
+      'bg-accent-gradient text-white': mine,
+      'bg-bg-primary text-text-primary': !mine,
+      'rounded-2xl': !hasBubbleStyle || isLastInSequence,
+      'rounded-t-2xl': hasBubbleStyle && !isLastInSequence,
+      'rounded-br-md': mine && !isLastInSequence,
+      'rounded-bl-md': !mine && !isLastInSequence,
+    }
+  );
+
   return (
-    <div className={`relative max-w-md md:max-w-lg ${hasBubbleStyle ? `px-4 py-2.5 rounded-2xl shadow-sm ${mine ? 'bg-accent-gradient text-white' : 'bg-bg-primary text-text-primary'}` : ''}`}>
+    <div className={bubbleClasses}>
       {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
       
       {message.fileUrl && isImage && (
@@ -110,9 +125,11 @@ interface MessageItemProps {
   conversation: Conversation | undefined;
   isHighlighted?: boolean;
   onImageClick: (src: string) => void;
+  isFirstInSequence: boolean;
+  isLastInSequence: boolean;
 }
 
-const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
+const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFirstInSequence, isLastInSequence }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const setReplyingTo = useMessageStore(state => state.setReplyingTo);
   const showConfirmation = useModalStore(state => state.showConfirmation);
@@ -161,15 +178,30 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: Mes
   }
 
   return (
-    <div 
-      ref={ref} 
+    <motion.div
+      ref={ref}
       id={message.id}
-      className={`group flex items-end gap-2 p-2 rounded-lg transition-colors duration-1000 ${isHighlighted ? 'bg-accent-color/20' : ''} ${mine ? 'justify-end' : 'justify-start'}`}>
-      {!mine && <img src={toAbsoluteUrl(message.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-bg-primary flex-shrink-0 mb-6 object-cover" />}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={clsx(
+        'group flex items-end gap-2',
+        isFirstInSequence ? 'mt-2' : 'mt-0.5',
+        mine ? 'justify-end' : 'justify-start',
+        isHighlighted && 'bg-accent-color/20 rounded-lg'
+      )}
+    >
+      {!mine && (
+        <div className="w-8 flex-shrink-0 mb-1 self-end">
+          {isLastInSequence && (
+            <img src={toAbsoluteUrl(message.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${message.sender?.name || 'U'}`} alt="Avatar" className="w-8 h-8 rounded-full bg-bg-primary object-cover" />
+          )}
+        </div>
+      )}
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className="flex flex-col">
-          <MessageBubble message={message} mine={mine} conversation={conversation} onImageClick={onImageClick} />
+          <MessageBubble message={message} mine={mine} isLastInSequence={isLastInSequence} onImageClick={onImageClick} conversation={conversation} />
           <ReactionsDisplay reactions={message.reactions} />
         </div>
         <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -202,7 +234,7 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: Mes
           </DropdownMenu.Root>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

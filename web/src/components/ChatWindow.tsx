@@ -266,16 +266,25 @@ export default function ChatWindow({ id }: { id: string }) {
           data={messages}
           startReached={loadPreviousMessages}
           components={{ Header: () => isFetchingMore ? <ChatSpinner /> : null }}
-          itemContent={(index, message) => (
-            <div className="px-4">
-              <MessageItem 
-                message={message} 
-                conversation={conversation} 
-                isHighlighted={message.id === highlightedMessageId}
-                onImageClick={handleImageClick}
-              />
-            </div>
-          )}
+          itemContent={(index, message) => {
+            const prevMessage = messages[index - 1];
+            const nextMessage = messages[index + 1];
+            const isFirstInSequence = !prevMessage || prevMessage.senderId !== message.senderId;
+            const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
+
+            return (
+              <div className="px-4">
+                <MessageItem 
+                  message={message} 
+                  conversation={conversation} 
+                  isHighlighted={message.id === highlightedMessageId}
+                  onImageClick={handleImageClick}
+                  isFirstInSequence={isFirstInSequence}
+                  isLastInSequence={isLastInSequence}
+                />
+              </div>
+            );
+          }}
           followOutput="auto"
         />
         {filteredTypingUsers.length > 0 && (
