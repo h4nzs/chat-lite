@@ -12,6 +12,8 @@ web/dist
 .env
 **/.env
 *.log
+**/.env.local
+.env.local
 
 /generated/prisma
 server/uploads/

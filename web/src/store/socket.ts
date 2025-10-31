@@ -4,6 +4,7 @@ import { useAuthStore } from "./auth";
 import { useConversationStore, Message, Conversation } from "./conversation";
 import { useMessageStore, decryptMessageObject } from "./message";
 import { usePresenceStore } from "./presence";
+import useNotificationStore from './notification';
 
 // --- Helper Functions ---
 
@@ -69,6 +70,16 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       // Handle conversation list update
       const existingConversation = convo.conversations.find(c => c.id === decryptedMessage.conversationId);
 
+      // Trigger in-app notification if the message is not from the current user and the conversation is not active
+      if (decryptedMessage.senderId !== meId && activeId !== decryptedMessage.conversationId) {
+        const senderName = decryptedMessage.sender?.name || 'Someone';
+        const groupName = existingConversation?.isGroup ? ` in "${existingConversation.title}"` : '';
+        useNotificationStore.getState().addNotification({
+          message: `New message from ${senderName}${groupName}`,
+          link: `/` // Or a more specific link
+        });
+      }
+
       if (existingConversation) {
         const newUnreadCount = activeId !== decryptedMessage.conversationId && decryptedMessage.senderId !== meId
           ? (existingConversation.unreadCount || 0) + 1
@@ -100,6 +111,14 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       // When being re-added to a group, clear the old message history first
       getStores().msg.clearMessagesForConversation(newConversation.id);
       getStores().convo.addOrUpdateConversation(newConversation);
+
+      // Notify user they were added to a new group
+      if (newConversation.isGroup) {
+        useNotificationStore.getState().addNotification({
+          message: `You have been added to the group: ${newConversation.title}`,
+          link: `/` // Or a more specific link if available
+        });
+      }
     });
 
     socket.on("conversation:deleted", ({ id }) => {
@@ -163,6 +182,16 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
     });
 
     socket.on("conversation:participant_updated", ({ conversationId, userId, role }) => {
+      const { auth, convo } = getStores();
+      if (auth.user?.id === userId) {
+        const conversation = convo.conversations.find(c => c.id === conversationId);
+        if (conversation) {
+          useNotificationStore.getState().addNotification({
+            message: `You are now an ${role.toLowerCase()} in "${conversation.title}".`,
+            link: `/`
+          });
+        }
+      }
       getStores().convo.updateParticipantRole(conversationId, userId, role);
       getStores().convo.updateConversation(conversationId, { lastUpdated: Date.now() });
     });

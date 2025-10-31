@@ -1,124 +1,64 @@
-Fase 1: Pembaruan Database & Backend (Struktur Data)
+# Rekomendasi Peningkatan untuk Aplikasi Chat-Lite
 
-   1. Modifikasi Skema Database (`schema.prisma`):
-       * Saya akan menambahkan kolom baru pada tabel Conversation:
-           * description: String? — untuk menyimpan deskripsi gru.
-           * avatarUrl: String? — untuk menyimpan URL gambar avatr
-              grup.
-       * Saya akan memanfaatkan kolom role yang sudah ada pada
-         tabel Participant untuk mengelola peran "ADMIN" dan
-         "MEMBER".
-       * Setelah skema diperbarui, saya akan membuat dan
-         menjalankan migrasi database untuk menerapkan perubahan
-         ini.
+Dokumen ini berisi daftar saran perbaikan, pengoptimalan, dan ide fitur baru yang dapat diimplementasikan untuk meningkatkan kualitas, performa, dan fungsionalitas aplikasi Chat-Lite.
 
-    2. Pembuatan API Endpoint Baru 
-      (`server/routes/conversations.ts`):
-       * Saya akan membuat beberapa endpoint baru yang dilindungi,
-         di mana hanya pengguna dengan peran "ADMIN" yang dapat
-         mengaksesnya:
-           * PUT /api/conversations/:id/details: Untuk mengedit
-             nama (title), description, dan avatarUrl grup.
-           * POST /api/conversations/:id/participants: Untuk
-             menambah anggota baru ke grup.
-           * DELETE /api/conversations/:id/participants/:userId:
-             Untuk mengeluarkan anggota dari grup.
-           * PUT /api/conversations/:id/participants/:userId/role:
-             Untuk mempromosikan anggota menjadi admin atau
-             menurunkannya kembali menjadi anggota biasa.
+---
 
-      3. Integrasi Real-Time dengan Socket.IO (`server/src/socket.ts:
-       * Setiap aksi admin melalui API di atas akan memicu event
-         socket yang akan disiarkan ke semua anggota grup.
-         Contohnya:
-           * conversation:updated: Saat detail grup
-             (nama/deskripsi/avatar) berubah.
-           * participant:added / participant:removed: Saat anggota
-             ditambah atau dikeluarkan.
-           * participant:role_changed: Saat peran seorang anggota
-             diubah.
+### 💡 Fase 1: Pengoptimalan & Peningkatan Stabilitas
 
-Fase 2: Implementasi Frontend (UI & Logika)
+Prioritas utama adalah memastikan aplikasi berjalan secepat dan seandal mungkin. Langkah-langkah ini berfokus pada pengalaman pengguna inti.
 
-   1. Pembuatan Komponen UI Baru (`web/src/components`):
-       * Saya akan membuat panel atau modal "Info Grup". Panel ini
-         akan menampilkan avatar, nama, dan deskripsi grup, besera
-          daftar lengkap semua anggota dan peran mereka ("Admin" /
-         "Anggota").
-       * Di dalam panel "Info Grup", jika pengguna yang melihat
-         adalah seorang "ADMIN", akan muncul tombol-tombol untuk:
-           * Mengedit detail grup.
-           * Menambah anggota baru.
-           * Mengelola anggota lain (memberi peran admin,
-             mengeluarkan).
+#### 1. **Optimalkan Pengambilan Data Awal (Initial Data Fetch)**
+*   **Masalah:** Saat ini, aplikasi memuat daftar percakapan terlebih dahulu, kemudian secara terpisah memuat pesan saat setiap percakapan dibuka. Ini menciptakan beberapa permintaan jaringan yang dapat memperlambat waktu muat awal.
+*   **Rekomendasi:** Modifikasi *endpoint* `GET /api/conversations` di backend untuk menyertakan **1 pesan terakhir** dari setiap percakapan dalam respons awal. Di frontend, `useConversationStore` dapat langsung menggunakan data ini. Ini akan menghilangkan kebutuhan untuk permintaan jaringan tambahan saat hanya melihat pratinjau pesan terakhir di sidebar, membuat aplikasi terasa lebih responsif saat startup.
 
-   2. Manajemen State Frontend (Zustand):
-       * Saya akan memperbarui state useConversationStore untuk
-         menyimpan dan mengelola data baru (deskripsi, avatar,
-         daftar partisipan yang lebih detail termasuk peran).
-       * Saya akan menambahkan listener di sisi klien untuk
-         menangani event-event socket baru (conversation:updated,
-         dll.) dan secara otomatis memperbarui tampilan UI tanpa
-         perlu me-refresh halaman.
+#### 2. **Tingkatkan & Standarisasi Umpan Balik UI**
+*   **Masalah:** Umpan balik untuk status `loading` dan `error` belum konsisten di seluruh aplikasi. Beberapa bagian mungkin menampilkan spinner, sementara yang lain mungkin gagal secara diam-diam.
+*   **Rekomendasi:** Buat komponen `Spinner` dan `ErrorMessage` yang dapat digunakan kembali. Terapkan komponen-komponen ini secara konsisten pada semua operasi asinkron, seperti: 
+    *   `login` dan `register`
+    *   Mengunggah file
+    *   Memuat riwayat pesan lama
+    *   Menyimpan perubahan di halaman Pengaturan
+    Ini memberikan kejelasan kepada pengguna tentang apa yang sedang terjadi di aplikasi.
 
-    3. Alur Kerja Pengguna:
-       * Pengguna (admin) mengklik header grup di ChatWindow untuk
-         membuka panel "Info Grup".
-       * Dari sana, admin dapat melakukan perubahan. Setiap
-         perubahan akan mengirim permintaan ke API backend, yang
-         kemudian akan menyiarkan pembaruan ke semua anggota grup
-         secara real-time.
+#### 3. **Audit Komprehensif Event Listener**
+*   **Masalah:** Meskipun masalah utama *listener* duplikat telah diperbaiki, aplikasi yang berkembang secara kompleks berisiko mengalami kebocoran memori (*memory leaks*) jika *event listener* (terutama dari Socket.IO) tidak dibersihkan dengan benar saat komponen di-*unmount*.
+*   **Rekomendasi:** Lakukan audit menyeluruh pada semua `useEffect` di seluruh aplikasi yang mendaftarkan *event listener* (misalnya di `useSocketStore` dan `MessageItem`). Pastikan setiap `useEffect` tersebut mengembalikan **fungsi cleanup** yang memanggil `socket.off("event-name")` atau `observer.disconnect()` untuk semua *listener* yang didaftarkan. Ini adalah praktik terbaik untuk menjaga stabilitas aplikasi jangka panjang.
 
-Ringkasan semua perubahan:
+---
 
-   * Backend (`server/`):
-       * `schema.prisma`: Menambahkan bidang description dan
-         avatarUrl ke model Conversation.
-       * `conversations.ts`:
-           * Memodifikasi pembuatan grup untuk menetapkan pembuat
-             sebagai "ADMIN".
-           * Menambahkan PUT /api/conversations/:id/details untuk
-             memperbarui nama/deskripsi grup.
-           * Menambahkan POST /api/conversations/:id/avatar untuk
-             mengunggah avatar grup.
-           * Menambahkan POST /api/conversations/:id/participants
-             untuk menambahkan anggota.
-           * Menambahkan DELETE 
-             /api/conversations/:id/participants/:userId untuk
-             menghapus anggota.
-           * Menambahkan PUT 
-             /api/conversations/:id/participants/:userId/role untk
-              mengubah peran peserta.
-           * Semua endpoint baru menyertakan pemeriksaan otorisasi
-             admin dan menyiarkan event soket yang relevan.
-   * Frontend (`web/`):
-       * `useConversationStore`:
-           * Memperbarui tipe Conversation dan Participant untuk
-             menyertakan description, avatarUrl, dan role.
-           * Memodifikasi loadConversations untuk memetakan peran
-             peserta dengan benar.
-           * Menambahkan tindakan (addParticipants,
-             removeParticipant, updateParticipantRole) untuk
-             menangani pembaruan real-time.
-       * `useSocketStore`: Menambahkan pendengar untuk event soket
-         baru (conversation:updated,
-         conversation:participants_added,
-         conversation:participant_removed,
-         conversation:participant_updated) dan memperbarui fungsi
-         pembersihan.
-       * `ChatWindow.tsx`: Memodifikasi ChatHeader agar dapat
-         diklik untuk obrolan grup, membuka GroupInfoPanel.
-       * `GroupInfoPanel.tsx`:
-           * Membuat komponen baru untuk menampilkan detail grup
-             dan peserta.
-           * Mengintegrasikan EditGroupInfoModal dan
-             AddParticipantModal.
-           * Menambahkan fungsionalitas bagi admin untuk mengunggh
-              avatar grup.
-       * `ParticipantList.tsx`: Membuat komponen untuk menampilkan
-         peserta, peran mereka, dan tindakan admin
-         (menjadikan/memberhentikan admin, menghapus).
-       * `EditGroupInfoModal.tsx`: Membuat modal bagi admin untuk
-         mengedit nama dan deskripsi grup.
-       * `AddParticipantModal.tsx`: Membuat modal bagi admin untuk
-         menambahkan peserta baru.
+### ⭐ Fase 2: Fitur Baru yang Potensial
+
+Setelah aplikasi stabil, fitur-fitur ini dapat ditambahkan untuk memperkaya fungsionalitas dan menyaingi aplikasi chat modern lainnya.
+
+#### 1. **Edit Pesan Terkirim**
+*   **Ide:** Berikan pengguna kemampuan untuk mengedit pesan teks mereka dalam jangka waktu terbatas setelah dikirim (misalnya, 15 menit).
+*   **Implementasi:**
+    *   **Backend:** Buat *endpoint* API baru `PUT /api/messages/:id`.
+    *   **UI:** Di `MessageItem`, tampilkan tombol "Edit" di menu dropdown untuk pesan milik pengguna sendiri. Saat diklik, ubah `MessageBubble` menjadi area input teks.
+    *   **Socket.IO:** Siarkan *event* `message:updated` ke semua anggota percakapan agar pesan yang diedit diperbarui secara *real-time*.
+
+#### 2. **Pencarian Global**
+*   **Ide:** Perluas fitur pencarian saat ini yang hanya mencari di dalam percakapan aktif. Buat bar pencarian global yang dapat mencari pesan atau nama pengguna di semua percakapan.
+*   **Implementasi:**
+    *   **Backend:** Buat *endpoint* API baru `GET /api/search?q=<query>` yang melakukan pencarian *full-text* di model `Message` dan `User`.
+    *   **UI:** Tampilkan hasil pencarian dalam sebuah dropdown atau halaman khusus, yang dikelompokkan berdasarkan percakapan. Mengklik hasil akan menavigasi ke pesan tersebut dalam percakapan yang relevan.
+
+#### 3. **Notifikasi Dalam Aplikasi (In-App Notifications)**
+*   **Ide:** Selain *push notification*, buat sistem notifikasi di dalam aplikasi (mirip lonceng notifikasi) untuk memberitahu pengguna saat mereka ditambahkan ke grup baru, peran mereka diubah, atau saat ada sebutan (mention) `@username`.
+*   **Implementasi:**
+    *   Buat komponen *popover* notifikasi baru di `Header` utama.
+    *   Gunakan *event-event* Socket.IO yang sudah ada (`conversation:new`, `participant:role_changed`) untuk memicu penambahan item notifikasi baru ke *state*.
+
+#### 4. **Status Kehadiran (Presence) yang Lebih Detail**
+*   **Ide:** Izinkan pengguna mengatur status kustom mereka (misalnya, "Away", "Do Not Disturb", "In a meeting") selain hanya "Online" atau "Offline".
+*   **Implementasi:**
+    *   Tambahkan kolom `status` pada model `User` di `schema.prisma`.
+    *   Buat *endpoint* API atau *event socket* bagi pengguna untuk memperbarui status mereka.
+    *   Di UI, tampilkan ikon status yang berbeda di `ChatList`, `ChatHeader`, dan profil pengguna berdasarkan status mereka.
+
+#### 5. **Pratinjau Tautan (Link Preview)**
+*   **Ide:** Saat pengguna mengirim pesan yang berisi URL, secara otomatis ambil metadata (judul, deskripsi, gambar) dari URL tersebut dan tampilkan sebagai kartu pratinjau yang kaya.
+*   **Implementasi:**
+    *   **Backend:** Saat menerima pesan baru, periksa apakah ada URL di dalamnya. Jika ada, gunakan library seperti `link-preview-js` untuk mengambil metadata di sisi server.
+    *   **UI:** Buat komponen `LinkPreviewCard` baru yang akan dirender di bawah konten pesan jika pesan tersebut berisi metadata pratinjau.

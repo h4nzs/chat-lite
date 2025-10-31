@@ -4,6 +4,7 @@ import { useAuthStore } from '@store/auth';
 import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url';
+import { requestPushPermission } from '@hooks/usePushNotifications';
 
 export default function Settings() {
   const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore(state => ({
@@ -32,6 +33,16 @@ export default function Settings() {
     if (file) {
       setAvatarFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSubscribePush = async () => {
+    try {
+      await requestPushPermission();
+      toast.success('Push notifications enabled!');
+    } catch (error: any) {
+      console.error('Error subscribing to push notifications:', error);
+      toast.error(error.message || 'Failed to enable push notifications.');
     }
   };
 
@@ -155,6 +166,21 @@ export default function Settings() {
                 aria-hidden="true"
                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${sendReadReceipts ? 'translate-x-5' : 'translate-x-0'}`}
               />
+            </button>
+          </div>
+
+          {/* Push Notifications */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-text-primary">Push Notifications</p>
+              <p className="text-sm text-text-secondary">Receive notifications for new messages.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSubscribePush}
+              className="px-4 py-2 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+            >
+              Enable Push Notifications
             </button>
           </div>
         </div>

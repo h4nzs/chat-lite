@@ -1,7 +1,21 @@
 /* eslint-env serviceworker */
 
 // Service worker for push notifications
+
+self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
+  // Skip waiting to activate the new service worker immediately.
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
+  // Take control of all open clients immediately.
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
+  console.log('Service Worker: Push Received.');
   if (event.data) {
     const data = event.data.json();
     const title = data.title || 'New message';
