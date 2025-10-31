@@ -82,16 +82,16 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
-        <h2 className="text-xl font-bold mb-4 text-white">Create New Group</h2>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-bg-surface rounded-lg shadow-xl w-full max-w-md p-6 border border-border" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-bold mb-4 text-text-primary">Create New Group</h2>
         
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Group Name"
-          className="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+          className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-color mb-4"
         />
         
         <div className="relative">
@@ -100,12 +100,12 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search users to add..."
-            className="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-color"
           />
           {userList.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-gray-700 border border-gray-600 rounded-b-lg max-h-40 overflow-y-auto z-10">
+            <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border rounded-b-lg max-h-40 overflow-y-auto z-10">
               {userList.map(user => (
-                <div key={user.id} onClick={() => handleSelectUser(user)} className="p-3 hover:bg-gray-600 cursor-pointer text-white">
+                <div key={user.id} onClick={() => handleSelectUser(user)} className="p-3 hover:bg-secondary cursor-pointer text-text-primary">
                   {user.name} (@{user.username})
                 </div>
               ))}
@@ -113,12 +113,11 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Area untuk menampilkan tag user yang dipilih */}
         <div className="flex flex-wrap gap-2 mt-4 mb-4 min-h-[40px]">
           {selectedUsers.map(user => (
-            <div key={user.id} className="flex items-center bg-blue-600 text-white rounded-full px-3 py-1 text-sm font-medium">
+            <div key={user.id} className="flex items-center bg-accent-gradient text-white rounded-full px-3 py-1 text-sm font-medium">
               <span>{user.name}</span>
-              <button onClick={() => handleRemoveUser(user.id)} className="ml-2 text-blue-200 hover:text-white font-bold">
+              <button onClick={() => handleRemoveUser(user.id)} className="ml-2 text-white/70 hover:text-white font-bold">
                 &times;
               </button>
             </div>
@@ -126,8 +125,10 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
         </div>
         
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700">Cancel</button>
-          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-secondary">
+            Cancel
+          </button>
+          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-accent-gradient text-white rounded-lg hover:opacity-90 disabled:opacity-50">
             {loading ? 'Creating...' : 'Create Group'}
           </button>
         </div>

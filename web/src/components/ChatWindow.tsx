@@ -117,12 +117,28 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
     }
   );
 
+  const textInputClasses = clsx(
+    'flex-1 bg-bg-primary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-color',
+    theme === 'dark' ? 'shadow-neumorphic-dark-inset' : 'shadow-neumorphic-light-inset'
+  );
+
+  const fileButtonClasses = clsx(
+    'p-2 rounded-full text-text-secondary transition-all duration-150',
+    'hover:text-accent-color',
+    {
+      'shadow-neumorphic-dark': theme === 'dark',
+      'active:shadow-neumorphic-dark-inset': theme === 'dark',
+      'shadow-neumorphic-light': theme === 'light',
+      'active:shadow-neumorphic-light-inset': theme === 'light',
+    }
+  );
+
   return (
     <div className="border-t border-transparent bg-transparent">
       <ReplyPreview />
       <div className="p-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent-color transition-colors">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <input 
@@ -136,7 +152,7 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
             value={text} 
             onChange={handleTextChange}
             placeholder="Type a message..."
-            className="flex-1 bg-bg-primary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-color"
+            className={textInputClasses}
           />
           <button 
             type="submit" 
