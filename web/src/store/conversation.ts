@@ -1,5 +1,5 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { api } from "@lib/api";
+import { api, authFetch } from "@lib/api";
 import { decryptMessage } from "@utils/crypto";
 import { getSocket } from "@lib/socket";
 
@@ -150,7 +150,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
     localStorage.setItem("activeId", id);
 
     // Inform the backend that the conversation has been read
-    api(`/api/conversations/${id}/read`, { method: 'POST' }).catch(console.error);
+    authFetch(`/api/conversations/${id}/read`, { method: 'POST' }).catch(console.error);
   },
 
   deleteConversation: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
