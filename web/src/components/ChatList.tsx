@@ -142,7 +142,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
 
               return (
-                <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent/20' : 'hover:bg-secondary'}`}>
+                <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary'}`}>
                   <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                       <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
@@ -150,7 +150,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
-                        <p className="font-semibold text-text-primary truncate">{title}</p>
+                        <p className={`font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
                         {c.lastMessage && <p className="text-xs text-text-secondary flex-shrink-0 ml-2">{formatConversationTime(c.lastMessage.createdAt)}</p>}
                       </div>
                       <div className="flex justify-between items-center mt-1">

@@ -8,10 +8,12 @@ import { Spinner } from "./Spinner";
 import { useConversationStore, type Conversation } from "@store/conversation";
 import { useMessageStore } from "@store/message";
 import { usePresenceStore } from "@store/presence";
+import { useThemeStore } from "@store/theme";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
+import clsx from "clsx";
 
 const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversation, onHeaderClick: () => void }) => {
   const meId = useAuthStore(s => s.user?.id);
@@ -82,8 +84,12 @@ const ReplyPreview = () => {
   );
 };
 
+
+
 const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
+  const [isPressed, setIsPressed] = useState(false);
+  const { theme } = useThemeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -97,6 +103,19 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
     setText(e.target.value);
     onTyping();
   }
+
+  const sendButtonClasses = clsx(
+    'p-3 rounded-full text-white transition-all duration-150',
+    {
+      'translate-x-px translate-y-px': isPressed,
+      'bg-accent-gradient': !isPressed,
+      'bg-accent-gradient filter brightness-90': isPressed,
+      'shadow-neumorphic-dark': !isPressed && theme === 'dark',
+      'shadow-neumorphic-dark-inset': isPressed && theme === 'dark',
+      'shadow-neumorphic-light': !isPressed && theme === 'light',
+      'shadow-neumorphic-light-inset': isPressed && theme === 'light',
+    }
+  );
 
   return (
     <div className="border-t border-transparent bg-transparent">
@@ -121,7 +140,10 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
           />
           <button 
             type="submit" 
-            className="p-3 rounded-full text-white bg-accent-gradient transition-opacity hover:opacity-90"
+            onMouseDown={() => setIsPressed(true)}
+            onMouseUp={() => setIsPressed(false)}
+            onMouseLeave={() => setIsPressed(false)}
+            className={sendButtonClasses}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
