@@ -2,27 +2,56 @@ import type { Config } from 'tailwindcss';
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class', // Pastikan mode gelap diaktifkan
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: '#181818', // Latar belakang utama
-        surface: '#1F1F1F',    // Latar belakang sidebar/panel
-        primary: '#2A2A2A',    // Latar belakang elemen sekunder (cth: bubble penerima)
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
         accent: {
-          DEFAULT: '#8A2BE2', // Ungu
-          hover: '#9932CC', // Ungu lebih gelap
-          active: '#7A2EAE', // Warna saat tombol ditekan
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
         },
-        magenta: {
-          DEFAULT: '#E91E63', // Magenta
-          hover: '#C2185B', // Magenta lebih gelap
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
         },
-        'text-primary': '#E0E0E0', // Teks utama
-        'text-secondary': '#A0A0A0', // Teks abu-abu (muted)
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        'bg-main': 'var(--bg-main)',
+        'bg-surface': 'var(--bg-surface)',
+        'bg-primary': 'var(--bg-primary)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'accent-color': 'var(--accent-color)',
+      },
+      backgroundImage: {
+        'accent-gradient': 'var(--accent-gradient)',
+        'bg-gradient': 'var(--bg-gradient)',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'], // Set font default
+        sans: ['Inter', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

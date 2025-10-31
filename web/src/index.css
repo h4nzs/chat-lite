@@ -3,13 +3,80 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --radius: 0.5rem;
+
+    /* Custom colors - Dark Theme */
+    --bg-main: #181818;
+    --bg-surface: #1F1F1F;
+    --bg-primary: #2A2A2A;
+    --text-primary: #E0E0E0;
+    --text-secondary: #A0A0A0;
+    --accent-color: #8A2BE2; /* Original purple */
+    --accent-gradient: linear-gradient(to right, #8A2BE2, #E91E63); /* Original purple to pink */
+    --bg-gradient: linear-gradient(90deg, #181818 15%, #1F1F1F 100%);
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+
+    /* Custom colors - Light Theme */
+    --bg-main: #EDF8FA;
+    --bg-surface: #FFFFFF;
+    --bg-primary: #F0F0F0;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --accent-color: #1f8cb8;
+    --accent-gradient: linear-gradient(90deg, rgba(31,140,184,1) 0%, rgba(87,199,133,1) 58%, rgba(114,242,135,1) 100%);
+    --bg-gradient: linear-gradient(90deg, rgba(237, 248, 250, 1) 15%, rgba(210, 252, 227, 1) 100%);
+  }
+
   html, body, #root {
-    @apply h-full bg-background text-text-primary;
+    @apply h-full text-text-primary;
+    background-color: var(--bg-main);
   }
 
   body {
     font-family: 'Inter', sans-serif;
     overflow: hidden;
+    background: var(--bg-gradient);
   }
 
   /* Custom Scrollbar */

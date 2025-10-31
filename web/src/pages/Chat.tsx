@@ -53,12 +53,12 @@ export default function Chat() {
   };
 
   return (
-    <div className="h-screen w-screen flex bg-background text-text-primary font-sans overflow-hidden">
+    <div className="h-screen w-screen flex bg-bg-main text-text-primary font-sans overflow-hidden">
       {isSidebarOpen && (
         <div onClick={toggleSidebar} className="fixed inset-0 bg-black/60 z-30 md:hidden" />
       )}
 
-      <aside className={`absolute md:relative w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-surface flex flex-col border-r border-gray-800 transition-transform duration-300 ease-in-out z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+      <aside className={`absolute md:relative w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-bg-surface flex flex-col border-r border-border transition-transform duration-300 ease-in-out z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <ChatList 
           activeId={activeId} 
           onOpen={handleSelectConversation}
@@ -70,7 +70,7 @@ export default function Chat() {
           <ChatWindow key={activeId} id={activeId} />
         ) : (
           <div className="flex-1 flex-col gap-4 items-center justify-center text-text-secondary hidden md:flex">
-            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <p className="text-lg">Select a conversation to start messaging</p>
           </div>
         )}

@@ -13,8 +13,6 @@ import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 
-// --- Sub-Components ---
-
 const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversation, onHeaderClick: () => void }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
@@ -25,9 +23,9 @@ const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversatio
 
   const headerContent = (
     <>
-      <img src={toAbsoluteUrl(conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
+      <img src={toAbsoluteUrl(conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-bg-primary object-cover" />
       <div>
-        <p className="font-bold text-white">{title}</p>
+        <p className="font-bold text-text-primary">{title}</p>
         <p className="text-xs text-text-secondary">
           {conversation.isGroup ? `${conversation.participants.length} members` : (isOnline ? 'Active now' : 'Offline')}
         </p>
@@ -36,8 +34,8 @@ const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversatio
   );
 
   return (
-    <div className="p-4 border-b border-gray-800 flex items-center gap-4 flex-shrink-0">
-      <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-white">
+    <div className="p-4 border-b border-border flex items-center gap-4 flex-shrink-0">
+      <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-text-primary">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       
@@ -70,12 +68,12 @@ const ReplyPreview = () => {
 
   return (
     <div className="px-4 pt-3">
-      <div className="relative bg-primary p-2 rounded-lg border-l-4 border-accent">
-        <p className="text-xs font-bold text-accent">Replying to {authorName}</p>
+      <div className="relative bg-bg-primary p-2 rounded-lg border-l-4 border-accent-color">
+        <p className="text-xs font-bold text-accent-color">Replying to {authorName}</p>
         <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
         <button 
           onClick={() => setReplyingTo(null)} 
-          className="absolute top-1 right-1 p-1 rounded-full hover:bg-gray-600"
+          className="absolute top-1 right-1 p-1 rounded-full hover:bg-secondary"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -86,7 +84,6 @@ const ReplyPreview = () => {
 
 const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
-  const [isPressed, setIsPressed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -106,7 +103,7 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
       <ReplyPreview />
       <div className="p-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent transition-colors">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-text-secondary hover:text-accent-color transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <input 
@@ -120,14 +117,11 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
             value={text} 
             onChange={handleTextChange}
             placeholder="Type a message..."
-            className="flex-1 bg-primary px-4 py-2.5 rounded-full text-white placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 bg-bg-primary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-color"
           />
           <button 
             type="submit" 
-            onMouseDown={() => setIsPressed(true)}
-            onMouseUp={() => setIsPressed(false)}
-            onMouseLeave={() => setIsPressed(false)}
-            className={`p-3 rounded-full text-white transition-all duration-150 ${isPressed ? 'shadow-neumorphic-dark-inset bg-accent-active translate-x-px translate-y-px' : 'shadow-neumorphic-dark bg-accent'}`}
+            className="p-3 rounded-full text-white bg-accent-gradient transition-opacity hover:opacity-90"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
@@ -142,8 +136,6 @@ const ChatSpinner = () => (
     <Spinner />
   </div>
 );
-
-// --- Main Component ---
 
 export default function ChatWindow({ id }: { id: string }) {
   const meId = useAuthStore((s) => s.user?.id);
@@ -211,7 +203,7 @@ export default function ChatWindow({ id }: { id: string }) {
 
   if (error) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-background text-red-400">
+      <div className="flex-1 flex flex-col items-center justify-center bg-bg-main text-destructive">
         <p>Error loading messages.</p>
         <p className="text-sm text-text-secondary">{error}</p>
       </div>
@@ -220,14 +212,14 @@ export default function ChatWindow({ id }: { id: string }) {
 
   if (isLoading || !conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-background">
+      <div className="flex-1 flex items-center justify-center bg-bg-main">
         <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-background relative">
+    <div className="flex flex-col h-full bg-bg-main relative">
       <ChatHeader conversation={conversation} onHeaderClick={() => setIsGroupInfoOpen(true)} />
       <div className="flex-1 min-h-0 relative">
         <Virtuoso
@@ -249,7 +241,7 @@ export default function ChatWindow({ id }: { id: string }) {
           followOutput="auto"
         />
         {filteredTypingUsers.length > 0 && (
-          <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
+          <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
              <div className="flex gap-1 items-end h-4">
                <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>

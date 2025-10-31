@@ -48,18 +48,18 @@ const ParticipantActions = ({ conversationId, participant, amIAdmin }: { convers
 
   return (
     <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-text-secondary hover:text-white">
+      <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-text-secondary hover:text-text-primary">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
       </button>
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-primary rounded-md shadow-lg z-10">
+        <div className="absolute right-0 mt-2 w-48 bg-bg-primary rounded-md shadow-lg z-10 border border-border">
           <ul className="py-1">
             {participant.role === 'MEMBER' ? (
-              <li><button onClick={() => handleRoleChange('ADMIN')} className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface">Make Admin</button></li>
+              <li><button onClick={() => handleRoleChange('ADMIN')} className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-bg-surface">Make Admin</button></li>
             ) : (
-              <li><button onClick={() => handleRoleChange('MEMBER')} className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface">Dismiss as Admin</button></li>
+              <li><button onClick={() => handleRoleChange('MEMBER')} className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-bg-surface">Dismiss as Admin</button></li>
             )}
-            <li><button onClick={handleRemove} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-surface">Remove from Group</button></li>
+            <li><button onClick={handleRemove} className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground">Remove from Group</button></li>
           </ul>
         </div>
       )}
@@ -71,16 +71,16 @@ const ParticipantList = ({ conversationId, participants, amIAdmin }: { conversat
   return (
     <ul className="space-y-2">
       {participants.map(p => (
-        <li key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-primary">
+        <li key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
           <div className="flex items-center gap-3">
             <img 
               src={toAbsoluteUrl(p.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${p.name}`}
               alt={p.name}
-              className="w-10 h-10 rounded-full object-cover bg-gray-700"
+              className="w-10 h-10 rounded-full object-cover bg-bg-primary"
             />
             <div>
-              <p className="font-semibold text-white">{p.name}</p>
-              {p.role === 'ADMIN' && <p className="text-xs text-accent">Admin</p>}
+              <p className="font-semibold text-text-primary">{p.name}</p>
+              {p.role === 'ADMIN' && <p className="text-xs text-accent-color">Admin</p>}
             </div>
           </div>
           <ParticipantActions conversationId={conversationId} participant={p} amIAdmin={amIAdmin} />
