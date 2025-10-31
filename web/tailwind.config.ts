@@ -45,6 +45,7 @@ export default {
         'text-primary': 'var(--text-primary)',
         'text-secondary': 'var(--text-secondary)',
         'accent-color': 'var(--accent-color)',
+        'accent-hover-bg': 'var(--accent-hover-bg)',
       },
       backgroundImage: {
         'accent-gradient': 'var(--accent-gradient)',

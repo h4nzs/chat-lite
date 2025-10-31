@@ -78,8 +78,8 @@ const AddParticipantModal = ({ conversationId, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-surface p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Add Participants</h2>
+      <div className="bg-bg-surface p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4 text-text-primary">Add Participants</h2>
         <form onSubmit={handleAddParticipants}>
           <div className="mb-4">
             <input
@@ -87,17 +87,17 @@ const AddParticipantModal = ({ conversationId, onClose }: {
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full p-2 rounded-md bg-primary border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-2 rounded-md bg-bg-primary border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
             />
             {isSearching && <p className="text-sm text-text-secondary mt-2">Searching...</p>}
           </div>
 
-          <div className="max-h-60 overflow-y-auto mb-4 border border-gray-700 rounded-md">
+          <div className="max-h-60 overflow-y-auto mb-4 border border-border rounded-md">
             {searchResults.length > 0 ? (
               searchResults.map(user => (
                 <div 
                   key={user.id} 
-                  className={`flex items-center justify-between p-2 cursor-pointer ${selectedUserIds.includes(user.id) ? 'bg-accent/30' : 'hover:bg-primary'}`}
+                  className={`flex items-center justify-between p-2 cursor-pointer ${selectedUserIds.includes(user.id) ? 'bg-accent-color/20' : 'hover:bg-secondary'}`}
                   onClick={() => handleSelectUser(user.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ const AddParticipantModal = ({ conversationId, onClose }: {
                       alt={user.name}
                       className="w-8 h-8 rounded-full object-cover bg-gray-700"
                     />
-                    <p className="text-white">{user.name} (@{user.username})</p>
+                    <p className="text-text-primary">{user.name} (@{user.username})</p>
                   </div>
                   {selectedUserIds.includes(user.id) && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -122,14 +122,14 @@ const AddParticipantModal = ({ conversationId, onClose }: {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 rounded-md bg-secondary text-text-primary hover:bg-secondary/80 transition-colors"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+              className="px-4 py-2 rounded-md bg-accent-gradient text-white hover:opacity-90 transition-colors"
               disabled={isLoading || selectedUserIds.length === 0}
             >
               {isLoading ? 'Adding...' : 'Add Selected'}

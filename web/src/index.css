@@ -33,6 +33,7 @@
     --text-secondary: #A0A0A0;
     --accent-color: #8A2BE2; /* Original purple */
     --accent-gradient: linear-gradient(to right, #8A2BE2, #E91E63); /* Original purple to pink */
+    --accent-hover-bg: rgba(138, 43, 226, 0.2);
     --bg-gradient: linear-gradient(90deg, #181818 15%, #1F1F1F 100%);
   }
 
@@ -65,6 +66,7 @@
     --text-secondary: #4B5563;
     --accent-color: #1f8cb8;
     --accent-gradient: linear-gradient(90deg, rgba(31,140,184,1) 0%, rgba(87,199,133,1) 58%, rgba(114,242,135,1) 100%);
+    --accent-hover-bg: rgba(31, 140, 184, 0.15);
     --bg-gradient: linear-gradient(90deg, rgba(237, 248, 250, 1) 15%, rgba(210, 252, 227, 1) 100%);
   }
 
