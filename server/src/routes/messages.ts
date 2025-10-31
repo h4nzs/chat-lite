@@ -18,17 +18,20 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
     const userId = req.user.id;
     const { cursor } = req.query;
 
-    const isParticipant = await prisma.conversation.findFirst({
-        where: { id: conversationId, participants: { some: { userId } } },
+    const participant = await prisma.participant.findUnique({
+      where: { userId_conversationId: { userId, conversationId } },
     });
 
-    if (!isParticipant) {
+    if (!participant) {
       throw new ApiError(403, "Forbidden: You are not a participant of this conversation.");
     }
 
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
+        createdAt: { 
+          gte: participant.joinedAt // Only fetch messages since the user joined
+        },
       },
       take: 50,
       ...(cursor && {
