@@ -47,16 +47,16 @@ const DynamicIsland = () => {
                       transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       className="min-w-[280px] max-w-sm w-auto pointer-events-auto"
                       onClick={handleClick}          >
-            <div className="relative p-px rounded-full bg-gradient-to-r from-purple-500 to-pink-500">
-              <div className="bg-surface/80 backdrop-blur-xl rounded-full">
+            <div className="relative p-px rounded-full bg-accent-gradient">
+              <div className="bg-bg-surface/80 backdrop-blur-xl rounded-full">
                 <div className="p-2 flex items-center gap-3">
                   <img 
                     src={toAbsoluteUrl(activePopup.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${activePopup.sender?.name}`}
                     alt="Sender Avatar"
-                    className="w-10 h-10 rounded-full bg-primary object-cover"
+                    className="w-10 h-10 rounded-full bg-bg-primary object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-white truncate">{activePopup.sender?.name || 'New Message'}</p>
+                    <p className="font-bold text-text-primary truncate">{activePopup.sender?.name || 'New Message'}</p>
                     <p className="text-sm text-text-secondary truncate">{activePopup.message.substring(activePopup.message.indexOf(':') + 2)}</p>
                   </div>
                   <div className="w-10 h-10 flex-shrink-0"></div> {/* Spacer */}

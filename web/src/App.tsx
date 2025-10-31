@@ -32,8 +32,9 @@ export default function App() {
         position="top-right"
         toastOptions={{
           style: {
-            background: '#333',
-            color: '#fff',
+            background: 'hsl(var(--card))',
+            color: 'hsl(var(--foreground))',
+            border: '1px solid hsl(var(--border))',
           },
         }}
       />
