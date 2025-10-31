@@ -1,6 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { api } from "@lib/api";
 import { decryptMessage } from "@utils/crypto";
+import { getSocket } from "@lib/socket";
 
 // --- Type Definitions ---
 
@@ -111,6 +112,12 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       );
 
       set({ conversations: sortConversations(decryptedConversations) });
+
+      // After loading conversations, join their respective socket rooms
+      const socket = getSocket();
+      decryptedConversations.forEach(c => {
+        socket.emit("conversation:join", c.id);
+      });
     } catch (error) {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
