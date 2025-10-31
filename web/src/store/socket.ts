@@ -160,6 +160,7 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       socket.off("reaction:remove");
       socket.off("message:deleted");
       socket.off("message:status_updated");
+      socket.off("user:updated");
     };
   },
 }));
