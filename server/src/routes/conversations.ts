@@ -91,7 +91,7 @@ router.get("/:id", async (req, res, next) => {
         participants: {
           include: {
             user: {
-              select: { id: true, username: true, avatarUrl: true },
+              select: { id: true, username: true, name: true, avatarUrl: true },
             },
           },
         },
@@ -153,7 +153,11 @@ router.post("/", async (req, res, next) => {
         },
       },
       include: {
-        participants: { include: { user: { select: { id: true, username: true, avatarUrl: true, name: true } } } },
+        participants: { 
+          include: { 
+            user: { select: { id: true, username: true, name: true, avatarUrl: true } } 
+          }
+        },
         creator: true,
       },
     });
@@ -221,6 +225,37 @@ router.delete("/:id", async (req, res, next) => {
       });
       // Notify only the user who deleted it
       io.to(userId).emit("conversation:deleted", { id });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Mark a conversation as read
+router.post("/:id/read", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Find the latest message in the conversation
+    const lastMessage = await prisma.message.findFirst({
+      where: { conversationId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (lastMessage) {
+      // Update the participant's lastReadMsgId
+      await prisma.participant.updateMany({
+        where: {
+          conversationId: id,
+          userId: userId,
+        },
+        data: {
+          lastReadMsgId: lastMessage.id,
+        },
+      });
     }
 
     res.status(204).send();

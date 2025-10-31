@@ -55,26 +55,45 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
 
     socket.on("message:new", async (newMessage: Message) => {
       const decryptedMessage = await decryptMessageObject(newMessage);
-      
-      const { convo, msg } = getStores();
+      const { convo, msg, auth } = getStores();
       const { activeId } = convo;
-      const meId = useAuthStore.getState().user?.id;
+      const meId = auth.user?.id;
 
+      // Handle message state update
       if (decryptedMessage.senderId === meId && decryptedMessage.tempId) {
         msg.replaceOptimisticMessage(decryptedMessage.conversationId, decryptedMessage.tempId, decryptedMessage);
       } else {
         msg.addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
       }
 
-      const newUnreadCount = activeId !== decryptedMessage.conversationId && decryptedMessage.senderId !== meId
-        ? (convo.conversations.find(c => c.id === decryptedMessage.conversationId)?.unreadCount || 0) + 1
-        : 0;
+      // Handle conversation list update
+      const existingConversation = convo.conversations.find(c => c.id === decryptedMessage.conversationId);
 
-      convo.addOrUpdateConversation({ 
-        ...convo.conversations.find(c => c.id === decryptedMessage.conversationId)!,
-        lastMessage: decryptedMessage,
-        unreadCount: newUnreadCount
-      });
+      if (existingConversation) {
+        const newUnreadCount = activeId !== decryptedMessage.conversationId && decryptedMessage.senderId !== meId
+          ? (existingConversation.unreadCount || 0) + 1
+          : existingConversation.unreadCount;
+
+        convo.addOrUpdateConversation({ 
+          ...existingConversation,
+          lastMessage: decryptedMessage,
+          unreadCount: newUnreadCount
+        });
+      } else {
+        // If conversation is not in the list, fetch it
+        try {
+          const newConversation = await api<Conversation>(`/api/conversations/${decryptedMessage.conversationId}`);
+          if (newConversation) {
+            convo.addOrUpdateConversation({
+              ...newConversation,
+              lastMessage: decryptedMessage,
+              unreadCount: 1, // It's a new message, so unread count is at least 1
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch new conversation:", error);
+        }
+      }
     });
 
     socket.on("conversation:new", (newConversation: Conversation) => {
