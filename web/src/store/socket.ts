@@ -164,6 +164,7 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
 
     socket.on("conversation:participant_updated", ({ conversationId, userId, role }) => {
       getStores().convo.updateParticipantRole(conversationId, userId, role);
+      getStores().convo.updateConversation(conversationId, { lastUpdated: Date.now() });
     });
 
 
