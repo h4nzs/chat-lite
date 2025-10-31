@@ -12,6 +12,7 @@ export default {
         accent: {
           DEFAULT: '#8A2BE2', // Ungu
           hover: '#9932CC', // Ungu lebih gelap
+          active: '#7A2EAE', // Warna saat tombol ditekan
         },
         magenta: {
           DEFAULT: '#E91E63', // Magenta
@@ -36,6 +37,10 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+      },
+      boxShadow: {
+        'neumorphic-dark': '6px 6px 12px #101010, -6px -6px 12px #202020',
+        'neumorphic-dark-inset': 'inset 6px 6px 12px #101010, inset -6px -6px 12px #202020',
       },
     },
   },

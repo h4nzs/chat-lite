@@ -86,6 +86,7 @@ const ReplyPreview = () => {
 
 const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
+  const [isPressed, setIsPressed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -121,7 +122,13 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
             placeholder="Type a message..."
             className="flex-1 bg-primary px-4 py-2.5 rounded-full text-white placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <button type="submit" className="p-3 rounded-full bg-accent hover:bg-accent-hover transition-colors">
+          <button 
+            type="submit" 
+            onMouseDown={() => setIsPressed(true)}
+            onMouseUp={() => setIsPressed(false)}
+            onMouseLeave={() => setIsPressed(false)}
+            className={`p-3 rounded-full text-white transition-all duration-150 ${isPressed ? 'shadow-neumorphic-dark-inset bg-accent-active translate-x-px translate-y-px' : 'shadow-neumorphic-dark bg-accent'}`}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </form>
