@@ -8,7 +8,7 @@ import { Spinner } from '@components/Spinner';
 import useModalStore from '@store/modal';
 
 export default function KeyManagementPage() {
-  const { regenerateKeys, logout } = useAuthStore(state => ({
+  const { regenerateKeys, logout } = useAuthStore(state => ({ 
     regenerateKeys: state.regenerateKeys,
     logout: state.logout,
   }));
@@ -32,7 +32,6 @@ export default function KeyManagementPage() {
         throw new Error("Failed to decrypt key. The password may be incorrect.");
       }
 
-      // Create a downloadable file
       const blob = new Blob([privateKey], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -77,11 +76,11 @@ export default function KeyManagementPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center bg-background text-text-primary p-4">
-      <div className="w-full max-w-2xl bg-surface rounded-lg shadow-lg p-8 border border-gray-800">
+    <div className="h-screen w-screen flex flex-col items-center justify-center bg-bg-main text-text-primary p-4">
+      <div className="w-full max-w-2xl bg-bg-surface rounded-lg shadow-lg p-8 border border-border">
         <div className="flex items-center gap-4 mb-6">
-          <FiKey className="text-accent text-3xl" />
-          <h1 className="text-2xl font-bold text-white">Encryption Key Management</h1>
+          <FiKey className="text-accent-color text-3xl" />
+          <h1 className="text-2xl font-bold text-text-primary">Encryption Key Management</h1>
         </div>
         <p className="text-text-secondary mb-6">
           Your end-to-end encryption keys ensure that only you and the recipient can read your messages. 
@@ -89,18 +88,18 @@ export default function KeyManagementPage() {
         </p>
         
         <div className="space-y-4">
-          <button onClick={handleBackup} disabled={isBackingUp || isGenerating} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-primary hover:bg-primary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleBackup} disabled={isBackingUp || isGenerating} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isBackingUp ? <Spinner size="sm" /> : <FiDownload />}
             <span>{isBackingUp ? 'Processing...' : 'Back Up My Encryption Key'}</span>
           </button>
-          <button onClick={handleGenerateNew} disabled={isGenerating || isBackingUp} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-red-900/50 text-red-300 hover:bg-red-900/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleGenerateNew} disabled={isGenerating || isBackingUp} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isGenerating ? <Spinner size="sm" /> : <FiRefreshCw />}
             <span>{isGenerating ? 'Generating...' : 'Generate New Keys'}</span>
           </button>
         </div>
 
         <div className="mt-8 text-center">
-          <Link to="/settings" className="text-accent hover:underline">
+          <Link to="/settings" className="text-accent-color hover:underline">
             &larr; Back to Settings
           </Link>
         </div>

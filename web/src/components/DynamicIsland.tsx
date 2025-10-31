@@ -45,7 +45,7 @@ const DynamicIsland = () => {
             exit="hidden"
             variants={islandVariants}
                       transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                      className="min-w-[280px] max-w-sm w-auto pointer-events-auto"
+                      className="min-w-[280px] max-w-sm w-auto pointer-events-auto shadow-lg"
                       onClick={handleClick}          >
             <div className="relative p-px rounded-full bg-accent-gradient">
               <div className="bg-bg-surface/80 backdrop-blur-xl rounded-full">
