@@ -19,9 +19,9 @@ const NotificationItem = ({ notification }: { notification: any }) => {
   };
 
   const content = (
-    <div className="flex items-start gap-3 p-3 hover:bg-primary/50 transition-colors">
+    <div className="flex items-start gap-3 p-3 hover:bg-secondary transition-colors">
       <div className="mt-1 flex-shrink-0">
-        <FiBell className="text-accent" />
+        <FiBell className="text-accent-color" />
       </div>
       <div>
         <p className="text-sm text-text-primary">{notification.message}</p>
@@ -43,11 +43,11 @@ const NotificationPopover = () => {
   }));
 
   return (
-    <div className="w-80 bg-surface border border-gray-700 rounded-lg shadow-lg">
-      <div className="p-3 flex justify-between items-center border-b border-gray-700">
-        <h3 className="font-bold text-white">Notifications</h3>
+    <div className="w-80 bg-bg-surface border border-border rounded-lg shadow-lg">
+      <div className="p-3 flex justify-between items-center border-b border-border">
+        <h3 className="font-bold text-text-primary">Notifications</h3>
         {notifications.length > 0 && (
-          <button onClick={clearNotifications} className="text-sm text-accent hover:underline">
+          <button onClick={clearNotifications} className="text-sm text-accent-color hover:underline">
             Clear All
           </button>
         )}

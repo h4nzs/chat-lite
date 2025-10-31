@@ -142,7 +142,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
 
               return (
-                <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary'}`}>
+                <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent-color/10 border-l-4 border-accent-color' : 'hover:bg-secondary'}`}>
                   <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                       <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />

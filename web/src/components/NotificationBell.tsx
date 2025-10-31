@@ -11,9 +11,7 @@ const NotificationBell = () => {
   }));
 
   const handleOpenChange = (open: boolean) => {
-    // When the popover is opened, mark all notifications as read.
     if (open && unreadCount > 0) {
-      // Delay slightly to avoid marking as read before the user sees the unread count.
       setTimeout(() => {
         markAllAsRead();
       }, 1000);
@@ -23,10 +21,10 @@ const NotificationBell = () => {
   return (
     <Popover.Root onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-gray-700 text-text-secondary hover:text-white transition-colors">
+        <button className="relative p-2 rounded-full hover:bg-secondary text-text-secondary hover:text-text-primary transition-colors">
           <FiBell />
           {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface" />
+            <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-bg-surface" />
           )}
         </button>
       </Popover.Trigger>
