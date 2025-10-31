@@ -44,7 +44,7 @@ Setelah aplikasi stabil, fitur-fitur ini dapat ditambahkan untuk memperkaya fung
     *   **Backend:** Buat *endpoint* API baru `GET /api/search?q=<query>` yang melakukan pencarian *full-text* di model `Message` dan `User`.
     *   **UI:** Tampilkan hasil pencarian dalam sebuah dropdown atau halaman khusus, yang dikelompokkan berdasarkan percakapan. Mengklik hasil akan menavigasi ke pesan tersebut dalam percakapan yang relevan.
 
-#### 3. **Notifikasi Dalam Aplikasi (In-App Notifications)**
+#### 3. *done* **Notifikasi Dalam Aplikasi (In-App Notifications)**
 *   **Ide:** Selain *push notification*, buat sistem notifikasi di dalam aplikasi (mirip lonceng notifikasi) untuk memberitahu pengguna saat mereka ditambahkan ke grup baru, peran mereka diubah, atau saat ada sebutan (mention) `@username`.
 *   **Implementasi:**
     *   Buat komponen *popover* notifikasi baru di `Header` utama.
