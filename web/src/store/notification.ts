@@ -6,33 +6,53 @@ export type AppNotification = {
   timestamp: number;
   read: boolean;
   link?: string; // Optional link to navigate to
+  sender?: { id: string; name: string; username: string; avatarUrl?: string | null };
 };
 
 type NotificationState = {
   notifications: AppNotification[];
   unreadCount: number;
+  activePopup: AppNotification | null;
   addNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'timestamp'>) => void;
+  showPopup: (notification: AppNotification) => void;
+  hidePopup: () => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
 };
 
+let popupTimeout: NodeJS.Timeout;
+
 const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
+  activePopup: null,
 
   addNotification: (notification) => {
-    set(state => {
-      const newNotification: AppNotification = {
-        id: Date.now().toString(), // Simple unique ID
-        timestamp: Date.now(),
-        read: false,
-        ...notification,
-      };
-      return {
-        notifications: [newNotification, ...state.notifications],
-        unreadCount: state.unreadCount + 1,
-      };
-    });
+    const newNotification: AppNotification = {
+      id: Date.now().toString(), // Simple unique ID
+      timestamp: Date.now(),
+      read: false,
+      ...notification,
+    };
+    set(state => ({
+      notifications: [newNotification, ...state.notifications],
+      unreadCount: state.unreadCount + 1,
+    }));
+    get().showPopup(newNotification);
+  },
+
+  showPopup: (notification) => {
+    if (popupTimeout) {
+      clearTimeout(popupTimeout);
+    }
+    set({ activePopup: notification });
+    popupTimeout = setTimeout(() => {
+      get().hidePopup();
+    }, 5000); // Hide after 5 seconds
+  },
+
+  hidePopup: () => {
+    set({ activePopup: null });
   },
 
   markAllAsRead: () => {

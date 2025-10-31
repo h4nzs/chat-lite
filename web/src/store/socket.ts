@@ -73,11 +73,16 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       // Trigger in-app notification if the message is not from the current user and the conversation is not active
       if (decryptedMessage.senderId !== meId && activeId !== decryptedMessage.conversationId) {
         const senderName = decryptedMessage.sender?.name || 'Someone';
-        const groupName = existingConversation?.isGroup ? ` in "${existingConversation.title}"` : '';
-        useNotificationStore.getState().addNotification({
-          message: `New message from ${senderName}${groupName}`,
-          link: `/` // Or a more specific link
-        });
+        const messageContent = decryptedMessage.content || (decryptedMessage.fileUrl ? 'Sent a file' : 'New message');
+        
+        const notificationPayload = {
+          id: decryptedMessage.id,
+          message: `${senderName}: ${messageContent}`,
+          link: decryptedMessage.conversationId,
+          sender: decryptedMessage.sender
+        };
+
+        useNotificationStore.getState().addNotification(notificationPayload);
       }
 
       if (existingConversation) {

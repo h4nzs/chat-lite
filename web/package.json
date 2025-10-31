@@ -16,6 +16,7 @@
     "@types/react-router-dom": "^5.3.3",
     "classnames": "^2.5.1",
     "crypto-js": "^4.2.0",
+    "framer-motion": "^12.23.24",
     "libsodium-wrappers": "^0.7.15",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

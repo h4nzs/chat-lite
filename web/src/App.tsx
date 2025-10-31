@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import { useSocketStore } from './store/socket';
 import { useEffect } from 'react';
 import ConfirmModal from './components/ConfirmModal';
+import DynamicIsland from './components/DynamicIsland';
 
 export default function App() {
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function App() {
       />
       <ConfirmModal />
       <BrowserRouter>
+        <DynamicIsland />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
