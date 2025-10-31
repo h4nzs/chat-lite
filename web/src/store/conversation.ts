@@ -26,15 +26,26 @@ export type Message = {
   repliedToId?: string;
 };
 
+export type Participant = {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl?: string | null;
+  role: "ADMIN" | "MEMBER";
+};
+
 export type Conversation = {
   id: string;
   isGroup: boolean;
   title?: string | null;
+  description?: string | null;
+  avatarUrl?: string | null;
   creatorId?: string | null;
-  participants: { id: string; username: string; name: string; avatarUrl?: string | null }[];
+  participants: Participant[];
   lastMessage: (Message & { preview?: string }) | null;
   updatedAt: string;
   unreadCount: number;
+  lastUpdated?: number;
 };
 
 // --- Helper Functions ---
@@ -73,6 +84,9 @@ type State = {
   removeConversation: (conversationId: string) => void;
   updateConversation: (conversationId: string, updates: Partial<Conversation>) => void;
   updateParticipantDetails: (user: Partial<User>) => void;
+  addParticipants: (conversationId: string, participants: Participant[]) => void;
+  removeParticipant: (conversationId: string, userId: string) => void;
+  updateParticipantRole: (conversationId: string, userId: string, role: "ADMIN" | "MEMBER") => void;
 };
 
 const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
@@ -92,7 +106,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       const conversations: Conversation[] = rawConversations.map(c => ({
         ...c,
         lastMessage: c.messages?.[0] || null,
-        participants: c.participants.map((p: any) => p.user),
+        participants: c.participants.map((p: any) => ({ ...p.user, role: p.role })),
       }));
 
       const decryptedConversations = await Promise.all(
@@ -192,5 +206,51 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
         ),
       }))
     }));
-  }
+  },
+
+  addParticipants: (conversationId, participants) => {
+    set(state => ({
+      conversations: state.conversations.map(c => {
+        if (c.id === conversationId) {
+          // Map the incoming participants to the correct frontend structure
+          const newParticipants = participants.map((p: any) => ({ ...p.user, role: p.role }));
+          return {
+            ...c,
+            participants: [...c.participants, ...newParticipants],
+          };
+        }
+        return c;
+      }),
+    }));
+  },
+
+  removeParticipant: (conversationId, userId) => {
+    set(state => ({
+      conversations: state.conversations.map(c => {
+        if (c.id === conversationId) {
+          return {
+            ...c,
+            participants: c.participants.filter(p => p.id !== userId),
+          };
+        }
+        return c;
+      }),
+    }));
+  },
+
+  updateParticipantRole: (conversationId, userId, role) => {
+    set(state => ({
+      conversations: state.conversations.map(c => {
+        if (c.id === conversationId) {
+          return {
+            ...c,
+            participants: c.participants.map(p => 
+              p.id === userId ? { ...p, role } : p
+            ),
+          };
+        }
+        return c;
+      }),
+    }));
+  },
 }));

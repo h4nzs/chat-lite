@@ -51,6 +51,7 @@ type State = {
   removeReaction: (conversationId, string, reactionId: string) => void;
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
+  clearMessagesForConversation: (conversationId: string) => void;
 };
 
 // --- Zustand Store ---
@@ -302,6 +303,14 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         return m;
       });
 
+      return { messages: newMessages };
+    });
+  },
+
+  clearMessagesForConversation: (conversationId) => {
+    set(state => {
+      const newMessages = { ...state.messages };
+      delete newMessages[conversationId];
       return { messages: newMessages };
     });
   },

@@ -97,6 +97,8 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
     });
 
     socket.on("conversation:new", (newConversation: Conversation) => {
+      // When being re-added to a group, clear the old message history first
+      getStores().msg.clearMessagesForConversation(newConversation.id);
       getStores().convo.addOrUpdateConversation(newConversation);
     });
 
@@ -146,6 +148,25 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       msg.updateSenderDetails(updatedUser);
     });
 
+    // --- New listeners for group management ---
+
+    socket.on("conversation:updated", (data) => {
+      getStores().convo.updateConversation(data.id, { ...data, lastUpdated: Date.now() });
+    });
+
+    socket.on("conversation:participants_added", ({ conversationId, newParticipants }) => {
+      getStores().convo.addParticipants(conversationId, newParticipants);
+    });
+
+    socket.on("conversation:participant_removed", ({ conversationId, userId }) => {
+      getStores().convo.removeParticipant(conversationId, userId);
+    });
+
+    socket.on("conversation:participant_updated", ({ conversationId, userId, role }) => {
+      getStores().convo.updateParticipantRole(conversationId, userId, role);
+    });
+
+
     // Return a cleanup function
     return () => {
       set({ isConnected: false });
@@ -161,6 +182,10 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       socket.off("message:deleted");
       socket.off("message:status_updated");
       socket.off("user:updated");
+      socket.off("conversation:updated");
+      socket.off("conversation:participants_added");
+      socket.off("conversation:participant_removed");
+      socket.off("conversation:participant_updated");
     };
   },
 }));

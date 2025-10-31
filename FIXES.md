@@ -1,123 +1,124 @@
-Kamu sedang mengerjakan proyek web app **Chat-Lite**, dibangun dengan:
-- Frontend: React (Vite + TypeScript + Tailwind)
-- Backend: Node.js (Express + Prisma + PostgreSQL)
-- Realtime: Socket.io
+Fase 1: Pembaruan Database & Backend (Struktur Data)
 
-Fitur **Search Message** sudah berhasil diimplementasikan dan berfungsi dengan benar secara logika.  
-Sekarang tugasmu adalah **memperbaiki tampilan UI** agar tampil profesional, bersih, dan konsisten dengan gaya desain Chat-Lite — tanpa mengubah UI utama percakapan.
+   1. Modifikasi Skema Database (`schema.prisma`):
+       * Saya akan menambahkan kolom baru pada tabel Conversation:
+           * description: String? — untuk menyimpan deskripsi gru.
+           * avatarUrl: String? — untuk menyimpan URL gambar avatr
+              grup.
+       * Saya akan memanfaatkan kolom role yang sudah ada pada
+         tabel Participant untuk mengelola peran "ADMIN" dan
+         "MEMBER".
+       * Setelah skema diperbarui, saya akan membuat dan
+         menjalankan migrasi database untuk menerapkan perubahan
+         ini.
 
----
+    2. Pembuatan API Endpoint Baru 
+      (`server/routes/conversations.ts`):
+       * Saya akan membuat beberapa endpoint baru yang dilindungi,
+         di mana hanya pengguna dengan peran "ADMIN" yang dapat
+         mengaksesnya:
+           * PUT /api/conversations/:id/details: Untuk mengedit
+             nama (title), description, dan avatarUrl grup.
+           * POST /api/conversations/:id/participants: Untuk
+             menambah anggota baru ke grup.
+           * DELETE /api/conversations/:id/participants/:userId:
+             Untuk mengeluarkan anggota dari grup.
+           * PUT /api/conversations/:id/participants/:userId/role:
+             Untuk mempromosikan anggota menjadi admin atau
+             menurunkannya kembali menjadi anggota biasa.
 
-## 🧩 Tujuan
-Perbaiki tampilan **komponen pencarian pesan (search message)** yang saat ini terlihat tidak sejajar dan tumpang tindih (buggy).  
-Pastikan UI-nya menyatu secara visual dengan komponen chat dan sidebar yang sudah ada.
+      3. Integrasi Real-Time dengan Socket.IO (`server/src/socket.ts:
+       * Setiap aksi admin melalui API di atas akan memicu event
+         socket yang akan disiarkan ke semua anggota grup.
+         Contohnya:
+           * conversation:updated: Saat detail grup
+             (nama/deskripsi/avatar) berubah.
+           * participant:added / participant:removed: Saat anggota
+             ditambah atau dikeluarkan.
+           * participant:role_changed: Saat peran seorang anggota
+             diubah.
 
----
+Fase 2: Implementasi Frontend (UI & Logika)
 
-## ⚙️ Area Fokus
+   1. Pembuatan Komponen UI Baru (`web/src/components`):
+       * Saya akan membuat panel atau modal "Info Grup". Panel ini
+         akan menampilkan avatar, nama, dan deskripsi grup, besera
+          daftar lengkap semua anggota dan peran mereka ("Admin" /
+         "Anggota").
+       * Di dalam panel "Info Grup", jika pengguna yang melihat
+         adalah seorang "ADMIN", akan muncul tombol-tombol untuk:
+           * Mengedit detail grup.
+           * Menambah anggota baru.
+           * Mengelola anggota lain (memberi peran admin,
+             mengeluarkan).
 
-### 🔹 1. Komponen `ChatHeader.tsx`
-- Saat pengguna klik ikon search:
-  - Input pencarian (`<input type="text">`) muncul dengan **animasi fade/slide lembut**, sejajar di area header.
-  - Jangan sampai input menindih nama pengguna atau tombol lain.
-  - Gunakan container fleksibel dengan `flex items-center gap-2 justify-between`.
-- Pastikan tampilan tetap responsif di semua ukuran layar.
-- Contoh gaya Tailwind:
-  ```tsx
-  <div className="relative flex items-center gap-2">
-    <input
-      type="text"
-      placeholder="Search messages..."
-      className="bg-neutral-800 text-sm text-gray-100 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-56 transition-all duration-300"
-    />
-    <button className="text-gray-400 hover:text-white">
-      <XIcon size={16} />
-    </button>
-  </div>
-````
+   2. Manajemen State Frontend (Zustand):
+       * Saya akan memperbarui state useConversationStore untuk
+         menyimpan dan mengelola data baru (deskripsi, avatar,
+         daftar partisipan yang lebih detail termasuk peran).
+       * Saya akan menambahkan listener di sisi klien untuk
+         menangani event-event socket baru (conversation:updated,
+         dll.) dan secara otomatis memperbarui tampilan UI tanpa
+         perlu me-refresh halaman.
 
----
+    3. Alur Kerja Pengguna:
+       * Pengguna (admin) mengklik header grup di ChatWindow untuk
+         membuka panel "Info Grup".
+       * Dari sana, admin dapat melakukan perubahan. Setiap
+         perubahan akan mengirim permintaan ke API backend, yang
+         kemudian akan menyiarkan pembaruan ke semua anggota grup
+         secara real-time.
 
-### 🔹 2. Komponen hasil pencarian (`SearchResultsList` atau setara)
+Ringkasan semua perubahan:
 
-Jika hasil pencarian ditampilkan di panel kanan (seperti saat ini), ubah tata letaknya agar:
-
-* Tidak menimpa bubble pesan utama.
-* Memiliki batas jelas antara area hasil pencarian dan area chat aktif.
-
-Gunakan gaya berikut:
-
-```tsx
-<div className="absolute right-4 top-16 w-80 max-h-[60vh] overflow-y-auto bg-neutral-900 border border-neutral-700 rounded-lg shadow-lg p-2 z-50">
-  {results.length > 0 ? (
-    results.map((msg) => (
-      <div
-        key={msg.id}
-        className="p-2 rounded-md hover:bg-neutral-800 cursor-pointer transition-colors duration-150"
-        onClick={() => handleSelect(msg.id)}
-      >
-        <p className="text-sm text-gray-200 truncate">{msg.content}</p>
-        <span className="text-xs text-gray-500">
-          {formatDate(msg.createdAt)}
-        </span>
-      </div>
-    ))
-  ) : (
-    <p className="text-center text-gray-500 py-2 text-sm">No messages found</p>
-  )}
-</div>
-```
-
-**Catatan:**
-
-* Pastikan panel hasil pencarian **mengambang (floating)** dan tidak menggeser layout utama.
-* Gunakan `absolute` dengan posisi `top` yang sejajar di bawah header aktif.
-* Tambahkan `z-index` tinggi agar tidak tertimpa bubble.
-
----
-
-### 🔹 3. Animasi & UX
-
-* Tambahkan animasi lembut saat input search muncul/menghilang menggunakan `framer-motion` atau `transition-opacity` Tailwind.
-* Saat user membuka panel hasil pencarian, beri efek blur ringan pada latar belakang chat (gunakan backdrop-filter).
-* Pastikan panel dapat ditutup dengan:
-
-  * Menekan tombol `X`
-  * Klik di luar area panel
-
----
-
-### 🔹 4. Konsistensi Visual
-
-Gunakan warna dan radius yang seragam dengan tema Chat-Lite:
-
-* Warna latar belakang: `bg-neutral-900`
-* Warna border: `border-neutral-700`
-* Warna teks: `text-gray-200`
-* Radius: `rounded-lg`
-* Shadow: `shadow-lg shadow-black/30`
-* Hover: `hover:bg-neutral-800`
-
----
-
-## ⚠️ Batasan Penting
-
-> ⚠️ Jangan ubah atau ganggu tampilan komponen berikut:
->
-> * `MessageBubble.tsx` (tampilan pesan)
-> * `React` (fitur emoji/reaksi)
-> * Menu titik tiga (`⋯`) pada pesan
->
-> Semua styling perubahan hanya berlaku untuk area pencarian pesan (search input dan daftar hasil).
-
----
-
-## ✅ Output Diharapkan
-
-* UI pencarian rapi, sejajar dengan header, tidak menutupi pesan.
-* Hasil pencarian tampil elegan dan konsisten dengan tema gelap Chat-Lite.
-* Tidak ada perubahan pada tampilan atau perilaku pesan utama.
-* Responsif dan tidak mengganggu layout chat saat resize jendela.
-* Animasi transisi lembut untuk input dan panel hasil.
-
----
+   * Backend (`server/`):
+       * `schema.prisma`: Menambahkan bidang description dan
+         avatarUrl ke model Conversation.
+       * `conversations.ts`:
+           * Memodifikasi pembuatan grup untuk menetapkan pembuat
+             sebagai "ADMIN".
+           * Menambahkan PUT /api/conversations/:id/details untuk
+             memperbarui nama/deskripsi grup.
+           * Menambahkan POST /api/conversations/:id/avatar untuk
+             mengunggah avatar grup.
+           * Menambahkan POST /api/conversations/:id/participants
+             untuk menambahkan anggota.
+           * Menambahkan DELETE 
+             /api/conversations/:id/participants/:userId untuk
+             menghapus anggota.
+           * Menambahkan PUT 
+             /api/conversations/:id/participants/:userId/role untk
+              mengubah peran peserta.
+           * Semua endpoint baru menyertakan pemeriksaan otorisasi
+             admin dan menyiarkan event soket yang relevan.
+   * Frontend (`web/`):
+       * `useConversationStore`:
+           * Memperbarui tipe Conversation dan Participant untuk
+             menyertakan description, avatarUrl, dan role.
+           * Memodifikasi loadConversations untuk memetakan peran
+             peserta dengan benar.
+           * Menambahkan tindakan (addParticipants,
+             removeParticipant, updateParticipantRole) untuk
+             menangani pembaruan real-time.
+       * `useSocketStore`: Menambahkan pendengar untuk event soket
+         baru (conversation:updated,
+         conversation:participants_added,
+         conversation:participant_removed,
+         conversation:participant_updated) dan memperbarui fungsi
+         pembersihan.
+       * `ChatWindow.tsx`: Memodifikasi ChatHeader agar dapat
+         diklik untuk obrolan grup, membuka GroupInfoPanel.
+       * `GroupInfoPanel.tsx`:
+           * Membuat komponen baru untuk menampilkan detail grup
+             dan peserta.
+           * Mengintegrasikan EditGroupInfoModal dan
+             AddParticipantModal.
+           * Menambahkan fungsionalitas bagi admin untuk mengunggh
+              avatar grup.
+       * `ParticipantList.tsx`: Membuat komponen untuk menampilkan
+         peserta, peran mereka, dan tindakan admin
+         (menjadikan/memberhentikan admin, menghapus).
+       * `EditGroupInfoModal.tsx`: Membuat modal bagi admin untuk
+         mengedit nama dan deskripsi grup.
+       * `AddParticipantModal.tsx`: Membuat modal bagi admin untuk
+         menambahkan peserta baru.

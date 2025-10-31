@@ -11,10 +11,11 @@ import { usePresenceStore } from "@store/presence";
 import { toAbsoluteUrl } from "@utils/url";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
+import GroupInfoPanel from './GroupInfoPanel';
 
 // --- Sub-Components ---
 
-const ChatHeader = ({ conversation }: { conversation: Conversation }) => {
+const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversation, onHeaderClick: () => void }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
   const presence = usePresenceStore(state => state.presence);
@@ -22,16 +23,34 @@ const ChatHeader = ({ conversation }: { conversation: Conversation }) => {
   const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
+  const headerContent = (
+    <>
+      <img src={toAbsoluteUrl(conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
+      <div>
+        <p className="font-bold text-white">{title}</p>
+        <p className="text-xs text-text-secondary">
+          {conversation.isGroup ? `${conversation.participants.length} members` : (isOnline ? 'Active now' : 'Offline')}
+        </p>
+      </div>
+    </>
+  );
+
   return (
     <div className="p-4 border-b border-gray-800 flex items-center gap-4 flex-shrink-0">
       <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-white">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <img src={toAbsoluteUrl(peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-gray-700 object-cover" />
-      <div>
-        <p className="font-bold text-white">{title}</p>
-        <p className="text-xs text-text-secondary">{isOnline ? 'Active now' : 'Offline'}</p>
-      </div>
+      
+      {conversation.isGroup ? (
+        <button onClick={onHeaderClick} className="flex items-center gap-4 text-left">
+          {headerContent}
+        </button>
+      ) : (
+        <div className="flex items-center gap-4">
+          {headerContent}
+        </div>
+      )}
+
       <div className="flex-grow" />
       <SearchMessages conversationId={conversation.id} />
     </div>
@@ -140,6 +159,7 @@ export default function ChatWindow({ id }: { id: string }) {
   
   const virtuosoRef = useRef<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
 
   const handleImageClick = (src: string) => setLightboxSrc(src);
 
@@ -200,8 +220,8 @@ export default function ChatWindow({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <ChatHeader conversation={conversation} />
+    <div className="flex flex-col h-full bg-background relative">
+      <ChatHeader conversation={conversation} onHeaderClick={() => setIsGroupInfoOpen(true)} />
       <div className="flex-1 min-h-0 relative">
         <Virtuoso
           ref={virtuosoRef}
@@ -234,6 +254,7 @@ export default function ChatWindow({ id }: { id: string }) {
       </div>
       <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
       {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+      {isGroupInfoOpen && <GroupInfoPanel conversationId={id} onClose={() => setIsGroupInfoOpen(false)} />}
     </div>
   );
 }
