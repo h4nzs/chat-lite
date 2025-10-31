@@ -136,11 +136,15 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
               const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
+              const avatarSrc = c.isGroup 
+                ? (c.avatarUrl ? `${toAbsoluteUrl(c.avatarUrl)}?t=${c.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${c.title}`)
+                : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
+
               return (
                 <div key={c.id} className={`relative flex items-center justify-between mx-2 my-1 rounded-lg transition-colors ${isActive ? 'bg-accent/20' : 'hover:bg-primary/50'}`}>
                   <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
-                      <img src={toAbsoluteUrl(peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
+                      <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-gray-700 object-cover" />
                       {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
                     </div>
                     <div className="flex-1 min-w-0">
