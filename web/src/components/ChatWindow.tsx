@@ -102,7 +102,7 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
   }
 
   return (
-    <div className="border-t border-gray-800 bg-background">
+    <div className="border-t border-transparent bg-transparent">
       <ReplyPreview />
       <div className="p-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
