@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getIo } from "../socket.js";
+import { upload } from "../utils/upload.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -110,6 +111,204 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+// --- Admin Routes for Group Management ---
+
+// UPDATE group conversation details
+router.put("/:id/details", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, description } = req.body;
+    const userId = req.user.id;
+
+    const participant = await prisma.participant.findFirst({
+      where: { conversationId: id, userId: userId },
+    });
+
+    if (!participant || participant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    const updatedConversation = await prisma.conversation.update({
+      where: { id },
+      data: { title, description },
+    });
+
+    const io = getIo();
+    io.to(id).emit("conversation:updated", {
+      id,
+      title: updatedConversation.title,
+      description: updatedConversation.description,
+    });
+
+    res.json(updatedConversation);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// UPLOAD group avatar
+router.post("/:id/avatar", upload.single('avatar'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const participant = await prisma.participant.findFirst({
+      where: { conversationId: id, userId: userId },
+    });
+
+    if (!participant || participant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No avatar file provided." });
+    }
+
+    const avatarUrl = `/uploads/images/${req.file.filename}`;
+
+    const updatedConversation = await prisma.conversation.update({
+      where: { id },
+      data: { avatarUrl },
+    });
+
+    const io = getIo();
+    io.to(id).emit("conversation:updated", {
+      id,
+      avatarUrl: updatedConversation.avatarUrl,
+    });
+
+    res.json({ avatarUrl: updatedConversation.avatarUrl });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ADD new members to a group
+router.post("/:id/participants", async (req, res, next) => {
+  try {
+    const { id: conversationId } = req.params;
+    const { userIds } = req.body;
+    const currentUserId = req.user.id;
+
+    const adminParticipant = await prisma.participant.findFirst({
+      where: { conversationId, userId: currentUserId },
+    });
+    if (!adminParticipant || adminParticipant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    const newParticipantsData = userIds.map((userId: string) => ({
+      conversationId,
+      userId,
+    }));
+
+    await prisma.participant.createMany({
+      data: newParticipantsData,
+      skipDuplicates: true,
+    });
+
+    const newParticipants = await prisma.participant.findMany({
+      where: { conversationId, userId: { in: userIds } },
+      include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } },
+    });
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { participants: { include: { user: true } }, creator: true },
+    });
+
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participants_added", { conversationId, newParticipants });
+
+    newParticipants.forEach(p => {
+      io.to(p.userId).emit("conversation:new", conversation);
+    });
+
+    res.status(201).json(newParticipants);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// UPDATE a member's role in a group
+router.put("/:id/participants/:userId/role", async (req, res, next) => {
+  try {
+    const { id: conversationId, userId: userToModifyId } = req.params;
+    const { role } = req.body;
+    const currentUserId = req.user.id;
+
+    if (role !== "ADMIN" && role !== "MEMBER") {
+      return res.status(400).json({ error: "Invalid role specified." });
+    }
+
+    const adminParticipant = await prisma.participant.findFirst({
+      where: { conversationId, userId: currentUserId },
+    });
+    if (!adminParticipant || adminParticipant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    if (currentUserId === userToModifyId) {
+      return res.status(400).json({ error: "You cannot change your own role." });
+    }
+
+    const updatedParticipant = await prisma.participant.updateMany({
+      where: { conversationId, userId: userToModifyId },
+      data: { role },
+    });
+
+    if (updatedParticipant.count === 0) {
+      return res.status(404).json({ error: "Participant not found." });
+    }
+
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participant_updated", {
+      conversationId,
+      userId: userToModifyId,
+      role,
+    });
+
+    res.json({ userId: userToModifyId, role });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// REMOVE a member from a group
+router.delete("/:id/participants/:userId", async (req, res, next) => {
+  try {
+    const { id: conversationId, userId: userToRemoveId } = req.params;
+    const currentUserId = req.user.id;
+
+    const adminParticipant = await prisma.participant.findFirst({
+      where: { conversationId, userId: currentUserId },
+    });
+    if (!adminParticipant || adminParticipant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    if (currentUserId === userToRemoveId) {
+      return res.status(400).json({ error: "You cannot remove yourself from the group." });
+    }
+
+    const deleteResult = await prisma.participant.deleteMany({
+      where: { conversationId, userId: userToRemoveId },
+    });
+
+    if (deleteResult.count === 0) {
+        return res.status(404).json({ error: "Participant not found in this group." });
+    }
+
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participant_removed", { conversationId, userId: userToRemoveId });
+    io.to(userToRemoveId).emit("conversation:deleted", { id: conversationId });
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // CREATE a new conversation (private or group)
 router.post("/", async (req, res, next) => {
   try {
@@ -149,6 +348,7 @@ router.post("/", async (req, res, next) => {
         participants: {
           create: allUserIds.map((userId: string) => ({
             user: { connect: { id: userId } },
+            role: userId === creatorId ? "ADMIN" : "MEMBER",
           })),
         },
       },
@@ -179,8 +379,241 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// UPDATE group conversation details
+router.put("/:id/details", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, description } = req.body;
+    const userId = req.user.id;
 
-// DELETE a conversation (group or 1-on-1)
+    // 1. Check if user is an admin of the group
+    const participant = await prisma.participant.findFirst({
+      where: {
+        conversationId: id,
+        userId: userId,
+      },
+    });
+
+    if (!participant || participant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    // 2. Update conversation details
+    const updatedConversation = await prisma.conversation.update({
+      where: { id },
+      data: {
+        title,
+        description,
+      },
+    });
+
+    // 3. Broadcast the update to all participants
+    const io = getIo();
+    io.to(id).emit("conversation:updated", {
+      id,
+      title: updatedConversation.title,
+      description: updatedConversation.description,
+    });
+
+    res.json(updatedConversation);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ADD new members to a group
+router.post("/:id/participants", async (req, res, next) => {
+  try {
+    const { id: conversationId } = req.params;
+    const { userIds } = req.body;
+    const currentUserId = req.user.id;
+
+    // 1. Check if user is an admin
+    const adminParticipant = await prisma.participant.findFirst({
+      where: { conversationId, userId: currentUserId },
+    });
+    if (!adminParticipant || adminParticipant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    // 2. Add new participants
+    const newParticipantsData = userIds.map((userId: string) => ({
+      conversationId,
+      userId,
+    }));
+
+    await prisma.participant.createMany({
+      data: newParticipantsData,
+      skipDuplicates: true, // Don't throw error if user is already a participant
+    });
+
+    // 3. Get full data for broadcasting
+    const newParticipants = await prisma.participant.findMany({
+      where: { conversationId, userId: { in: userIds } },
+      include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } },
+    });
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { participants: { include: { user: true } }, creator: true },
+    });
+
+    // 4. Broadcast updates
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participants_added", { conversationId, newParticipants });
+
+    newParticipants.forEach(p => {
+      io.to(p.userId).emit("conversation:new", conversation);
+    });
+
+    res.status(201).json(newParticipants);
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// UPDATE a member's role in a group
+router.put("/:id/participants/:userId/role", async (req, res, next) => {
+  try {
+    const { id: conversationId, userId: userToModifyId } = req.params;
+    const { role } = req.body;
+    const currentUserId = req.user.id;
+
+    if (role !== "ADMIN" && role !== "MEMBER") {
+      return res.status(400).json({ error: "Invalid role specified." });
+    }
+
+    // 1. Check if current user is an admin
+    const adminParticipant = await prisma.participant.findFirst({
+      where: { conversationId, userId: currentUserId },
+    });
+    if (!adminParticipant || adminParticipant.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+    }
+
+    // 2. Prevent admin from changing their own role
+    if (currentUserId === userToModifyId) {
+      return res.status(400).json({ error: "You cannot change your own role." });
+    }
+
+    // 3. Update the participant's role
+    const updatedParticipant = await prisma.participant.updateMany({
+      where: { conversationId, userId: userToModifyId },
+      data: { role },
+    });
+
+    if (updatedParticipant.count === 0) {
+      return res.status(404).json({ error: "Participant not found." });
+    }
+
+    // 4. Broadcast the update
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participant_updated", {
+      conversationId,
+      userId: userToModifyId,
+      role,
+    });
+
+    res.json({ userId: userToModifyId, role });
+  } catch (error) {
+    next(error);
+  }
+});
+
+    
+
+    // UPLOAD group avatar
+
+    router.post("/:id/avatar", upload.single('avatar'), async (req, res, next) => {
+
+      try {
+
+        const { id } = req.params;
+
+        const userId = req.user.id;
+
+    
+
+        // 1. Check if user is an admin of the group
+
+        const participant = await prisma.participant.findFirst({
+
+          where: {
+
+            conversationId: id,
+
+            userId: userId,
+
+          },
+
+        });
+
+    
+
+        if (!participant || participant.role !== "ADMIN") {
+
+          return res.status(403).json({ error: "Forbidden: You are not an admin of this group." });
+
+        }
+
+    
+
+        if (!req.file) {
+
+          return res.status(400).json({ error: "No avatar file provided." });
+
+        }
+
+    
+
+        const avatarUrl = `/uploads/images/${req.file.filename}`;
+
+    
+
+        // 2. Update conversation avatarUrl
+
+        const updatedConversation = await prisma.conversation.update({
+
+          where: { id },
+
+          data: {
+
+            avatarUrl,
+
+          },
+
+        });
+
+    
+
+        // 3. Broadcast the update to all participants
+
+        const io = getIo();
+
+        io.to(id).emit("conversation:updated", {
+
+          id,
+
+          avatarUrl: updatedConversation.avatarUrl,
+
+        });
+
+    
+
+        res.json({ avatarUrl: updatedConversation.avatarUrl });
+
+      } catch (error) {
+
+        next(error);
+
+      }
+
+    });
+
+    
+
+    // DELETE a conversation (group or 1-on-1)
 router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
