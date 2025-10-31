@@ -8,6 +8,7 @@ import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
+import useModalStore from '@store/modal';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -53,8 +54,25 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const showConfirmation = useModalStore(state => state.showConfirmation);
 
   const openCreateGroupModal = () => setShowGroupModal(true);
+
+  const handleDeleteGroup = (id: string) => {
+    showConfirmation(
+      'Delete Group',
+      'Are you sure you want to permanently delete this group? This action cannot be undone.',
+      () => deleteGroup(id)
+    );
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    showConfirmation(
+      'Delete Chat',
+      'Are you sure you want to hide this chat? It will be removed from your conversation list.',
+      () => deleteConversation(id)
+    );
+  };
 
   const formatConversationTime = useCallback((timestamp: string) => {
     const date = new Date(timestamp);
@@ -153,14 +171,14 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-gray-800 border border-gray-700 rounded-md shadow-lg z-50 p-1">
                           {c.isGroup ? (
                             <DropdownMenu.Item 
-                              onSelect={() => { if(window.confirm('Are you sure you want to permanently delete this group?')) deleteGroup(c.id); }}
+                              onSelect={() => handleDeleteGroup(c.id)}
                               className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded cursor-pointer outline-none hover:bg-red-500 hover:text-white"
                             >
                               Delete Group
                             </DropdownMenu.Item>
                           ) : (
                             <DropdownMenu.Item 
-                              onSelect={() => { if(window.confirm('Are you sure you want to hide this chat?')) deleteConversation(c.id); }}
+                              onSelect={() => handleDeleteConversation(c.id)}
                               className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded cursor-pointer outline-none hover:bg-red-500 hover:text-white"
                             >
                               Delete Chat

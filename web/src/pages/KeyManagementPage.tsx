@@ -5,6 +5,7 @@ import { useAuthStore } from '@store/auth';
 import { retrievePrivateKey } from '@utils/keyManagement';
 import toast from 'react-hot-toast';
 import { Spinner } from '@components/Spinner';
+import useModalStore from '@store/modal';
 
 export default function KeyManagementPage() {
   const { regenerateKeys, logout } = useAuthStore(state => ({
@@ -13,6 +14,7 @@ export default function KeyManagementPage() {
   }));
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const showConfirmation = useModalStore(state => state.showConfirmation);
 
   const handleBackup = async () => {
     const password = prompt("To back up your key, please enter your current password:");
@@ -51,27 +53,27 @@ export default function KeyManagementPage() {
     }
   };
 
-  const handleGenerateNew = async () => {
-    const confirmed = window.confirm(
-      "WARNING:\n\nGenerating a new key is a destructive action.\n\n- You will NOT be able to read your past encrypted messages.\n- You should back up your current key first if you want to preserve history.\n\nAre you absolutely sure you want to continue?"
+  const handleGenerateNew = () => {
+    showConfirmation(
+      "Generate New Keys",
+      "WARNING:\n\nGenerating a new key is a destructive action.\n\n- You will NOT be able to read your past encrypted messages.\n- You should back up your current key first if you want to preserve history.\n\nAre you absolutely sure you want to continue?",
+      async () => {
+        const password = prompt("To generate a new key, please enter your current password:");
+        if (!password) return;
+
+        setIsGenerating(true);
+        try {
+          await regenerateKeys(password);
+          toast.success('New keys generated successfully! Logging out for changes to take effect.', { duration: 6000 });
+          setTimeout(() => {
+            logout();
+          }, 3000);
+        } catch (error: any) {
+          toast.error(error.message || "Failed to generate new keys.");
+          setIsGenerating(false);
+        }
+      }
     );
-    if (!confirmed) return;
-
-    const password = prompt("To generate a new key, please enter your current password:");
-    if (!password) return;
-
-    setIsGenerating(true);
-    try {
-      await regenerateKeys(password);
-      toast.success('New keys generated successfully! Logging out for changes to take effect.', { duration: 6000 });
-      // Logout to force a clean state
-      setTimeout(() => {
-        logout();
-      }, 3000);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to generate new keys.");
-      setIsGenerating(false);
-    }
   };
 
   return (

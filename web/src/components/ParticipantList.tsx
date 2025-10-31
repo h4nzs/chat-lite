@@ -4,10 +4,12 @@ import { toAbsoluteUrl } from "@utils/url";
 import { useState } from "react";
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
+import useModalStore from '@store/modal';
 
 const ParticipantActions = ({ conversationId, participant, amIAdmin }: { conversationId: string, participant: Participant, amIAdmin: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuthStore();
+  const showConfirmation = useModalStore(state => state.showConfirmation);
 
   if (!amIAdmin || user?.id === participant.id) {
     return null;
@@ -26,17 +28,22 @@ const ParticipantActions = ({ conversationId, participant, amIAdmin }: { convers
     }
   };
 
-  const handleRemove = async () => {
+  const handleRemove = () => {
     setIsOpen(false);
-    if (!confirm(`Are you sure you want to remove ${participant.name} from the group?`)) return;
-    try {
-      await api(`/api/conversations/${conversationId}/participants/${participant.id}`, {
-        method: 'DELETE',
-      });
-      toast.success(`${participant.name} removed from group.`);
-    } catch (error: any) {
-      toast.error(`Failed to remove participant: ${error.message || 'Unknown error'}`);
-    }
+    showConfirmation(
+      'Remove Participant',
+      `Are you sure you want to remove ${participant.name} from the group?`,
+      async () => {
+        try {
+          await api(`/api/conversations/${conversationId}/participants/${participant.id}`, {
+            method: 'DELETE',
+          });
+          toast.success(`${participant.name} removed from group.`);
+        } catch (error: any) {
+          toast.error(`Failed to remove participant: ${error.message || 'Unknown error'}`);
+        }
+      }
+    );
   };
 
   return (

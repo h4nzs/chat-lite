@@ -8,7 +8,8 @@ import { api } from "@lib/api";
 import ReactionPopover from "./Reactions";
 import { toAbsoluteUrl } from "@utils/url";
 import LazyImage from "./LazyImage";
-import FileAttachment from "./FileAttachment"; // Import FileAttachment
+import FileAttachment from "./FileAttachment";
+import useModalStore from '@store/modal';
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -115,6 +116,7 @@ interface MessageItemProps {
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const setReplyingTo = useMessageStore(state => state.setReplyingTo);
+  const showConfirmation = useModalStore(state => state.showConfirmation);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 
@@ -142,9 +144,13 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick }: Mes
   }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
   const handleDelete = () => {
-    if (window.confirm("Are you sure?")) {
-      api(`/api/messages/${message.id}`, { method: 'DELETE' }).catch(console.error);
-    }
+    showConfirmation(
+      'Delete Message',
+      'Are you sure you want to permanently delete this message?',
+      () => {
+        api(`/api/messages/${message.id}`, { method: 'DELETE' }).catch(console.error);
+      }
+    );
   };
 
   if (message.content === "[This message was deleted]") {

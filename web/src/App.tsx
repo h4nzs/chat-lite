@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useSocketStore } from './store/socket';
 import { useEffect } from 'react';
+import ConfirmModal from './components/ConfirmModal';
 
 export default function App() {
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function App() {
           },
         }}
       />
+      <ConfirmModal />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
