@@ -2,6 +2,7 @@ node_modules/
 server/node_modules/
 web/node_modules/
 **/node_modules
+server/prisma/migrations
 
 dist
 build
