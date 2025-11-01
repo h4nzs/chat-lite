@@ -5,22 +5,31 @@ import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url';
 import { requestPushPermission } from '@hooks/usePushNotifications';
-import { useThemeStore } from '@store/theme'; // Import theme store
+import { useThemeStore } from '@store/theme';
 
 export default function Settings() {
-  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts, toggleShowEmail } = useAuthStore(state => ({
+  const {
+    user,
+    updateProfile,
+    updateAvatar,
+    sendReadReceipts: initialReadReceipts,
+    setReadReceipts,
+  } = useAuthStore(state => ({
     user: state.user,
     updateProfile: state.updateProfile,
     updateAvatar: state.updateAvatar,
     sendReadReceipts: state.sendReadReceipts,
-    toggleReadReceipts: state.toggleReadReceipts,
-    toggleShowEmail: state.toggleShowEmail,
+    setReadReceipts: state.setReadReceipts,
   }));
-  const { theme, toggleTheme } = useThemeStore(); // Use theme store
+  const { theme, toggleTheme } = useThemeStore();
+
+  // Local state for all editable fields
   const [name, setName] = useState(user?.name || '');
   const [description, setDescription] = useState(user?.description || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
+  const [showEmail, setShowEmail] = useState(user?.showEmailToOthers || false);
+  const [readReceipts, setReadReceiptsState] = useState(initialReadReceipts);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,8 +38,10 @@ export default function Settings() {
       setName(user.name || '');
       setDescription(user.description || '');
       setPreviewUrl(user.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
+      setShowEmail(user.showEmailToOthers || false);
+      setReadReceiptsState(initialReadReceipts);
     }
-  }, [user]);
+  }, [user, initialReadReceipts]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,7 +66,7 @@ export default function Settings() {
     setIsLoading(true);
     try {
       const promises = [];
-      const dataToUpdate: { name?: string; description?: string } = {};
+      const dataToUpdate: { name?: string; description?: string; showEmailToOthers?: boolean } = {};
 
       if (avatarFile) {
         promises.push(updateAvatar(avatarFile));
@@ -66,18 +77,26 @@ export default function Settings() {
       if (description !== user?.description) {
         dataToUpdate.description = description;
       }
+      if (showEmail !== user?.showEmailToOthers) {
+        dataToUpdate.showEmailToOthers = showEmail;
+      }
 
       if (Object.keys(dataToUpdate).length > 0) {
         promises.push(updateProfile(dataToUpdate));
       }
 
-      if (promises.length === 0) {
+      if (readReceipts !== initialReadReceipts) {
+        // This is a local setting, so we just call its setter
+        setReadReceipts(readReceipts);
+      }
+
+      if (promises.length === 0 && readReceipts === initialReadReceipts) {
         toast('No changes to save.');
         return;
       }
 
       await Promise.all(promises);
-      toast.success('Profile updated successfully!');
+      toast.success('Settings saved successfully!');
 
     } catch (error: any) {
       const errorMsg = error.details ? JSON.parse(error.details).error : error.message;
@@ -98,7 +117,7 @@ export default function Settings() {
         <div className="flex items-center gap-6">
           <div className="relative">
             <img 
-              src={toAbsoluteUrl(previewUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
+              src={previewUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
               alt="Avatar Preview"
               className="w-24 h-24 rounded-full bg-bg-primary object-cover border-2 border-border"
             />
@@ -208,14 +227,14 @@ export default function Settings() {
             </div>
             <button
               type="button"
-              onClick={toggleReadReceipts}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-color focus:ring-offset-2 focus:ring-offset-bg-surface ${sendReadReceipts ? 'bg-accent-gradient' : 'bg-gray-300'}`}
+              onClick={() => setReadReceiptsState(!readReceipts)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-color focus:ring-offset-2 focus:ring-offset-bg-surface ${readReceipts ? 'bg-accent-gradient' : 'bg-gray-300'}`}
               role="switch"
-              aria-checked={sendReadReceipts}
+              aria-checked={readReceipts}
             >
               <span
                 aria-hidden="true"
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${sendReadReceipts ? 'translate-x-5' : 'translate-x-0'}`}
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${readReceipts ? 'translate-x-5' : 'translate-x-0'}`}
               />
             </button>
           </div>
@@ -228,14 +247,14 @@ export default function Settings() {
             </div>
             <button
               type="button"
-              onClick={toggleShowEmail}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-color focus:ring-offset-2 focus:ring-offset-bg-surface ${user?.showEmailToOthers ? 'bg-accent-gradient' : 'bg-gray-300'}`}
+              onClick={() => setShowEmail(!showEmail)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-color focus:ring-offset-2 focus:ring-offset-bg-surface ${showEmail ? 'bg-accent-gradient' : 'bg-gray-300'}`}
               role="switch"
-              aria-checked={user?.showEmailToOthers}
+              aria-checked={showEmail}
             >
               <span
                 aria-hidden="true"
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${user?.showEmailToOthers ? 'translate-x-5' : 'translate-x-0'}`}
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showEmail ? 'translate-x-5' : 'translate-x-0'}`}
               />
             </button>
           </div>

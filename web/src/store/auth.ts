@@ -154,8 +154,8 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     set({ theme: t });
   },
 
-  async updateProfile(data) {
-    const updatedUser = await api<User>("/api/users/me", {
+  async updateProfile(data: Partial<User>) {
+    const updatedUser = await authFetch<User>("/api/users/me", {
       method: "PUT",
       body: JSON.stringify(data),
     });
@@ -176,34 +176,9 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     localStorage.setItem("user", JSON.stringify(updatedUser));
   },
 
-  toggleReadReceipts() {
-    const current = get().sendReadReceipts;
-    const next = !current;
-    set({ sendReadReceipts: next });
-    localStorage.setItem('sendReadReceipts', String(next));
-    toast.success(`Read receipts ${next ? 'enabled' : 'disabled'}`);
-  },
-
-  toggleShowEmail: async () => {
-    const currentUser = get().user;
-    if (!currentUser) return;
-
-    const newValue = !currentUser.showEmailToOthers;
-    
-    // Optimistic update
-    set({ user: { ...currentUser, showEmailToOthers: newValue } });
-
-    try {
-      await authFetch("/api/users/me", {
-        method: "PUT",
-        body: JSON.stringify({ showEmailToOthers: newValue }),
-      });
-      toast.success('Email visibility updated');
-    } catch (error) {
-      // Revert on error
-      set({ user: currentUser });
-      toast.error('Failed to update setting');
-    }
+  setReadReceipts(value: boolean) {
+    set({ sendReadReceipts: value });
+    localStorage.setItem('sendReadReceipts', String(value));
   },
 
   async regenerateKeys(password: string) {
