@@ -87,6 +87,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const showConfirm = useModalStore(state => state.showConfirm);
+  const openProfileModal = useModalStore(state => state.openProfileModal);
 
   const handleSearch = useCallback(debounce(async (query: string) => {
     if (!query.trim()) {
