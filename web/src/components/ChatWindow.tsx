@@ -15,6 +15,22 @@ import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
 
+import LinkPreviewCard from './LinkPreviewCard';
+
+// Helper function to prevent spamming the API
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const debounced = (...args: Parameters<F>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced as (...args: Parameters<F>) => void;
+}
+
 const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversation, onHeaderClick: () => void }) => {
   const meId = useAuthStore(s => s.user?.id);
   const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
@@ -91,17 +107,28 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
   const [isPressed, setIsPressed] = useState(false);
   const { theme } = useThemeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageStore();
+
+  const debouncedFetchPreview = useCallback(
+    debounce((inputText: string) => {
+      fetchTypingLinkPreview(inputText);
+    }, 500), 
+    [fetchTypingLinkPreview]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
     onSend({ content: text });
     setText('');
+    clearTypingLinkPreview();
   };
 
   const handleTextChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setText(e.target.value);
+    const newText = e.target.value;
+    setText(newText);
     onTyping();
+    debouncedFetchPreview(newText);
   }
 
   const sendButtonClasses = clsx(
@@ -136,6 +163,11 @@ const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { con
   return (
     <div className="border-t border-transparent bg-transparent">
       <ReplyPreview />
+      {typingLinkPreview && (
+        <div className="px-4 pt-3">
+          <LinkPreviewCard preview={typingLinkPreview} />
+        </div>
+      )}
       <div className="p-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>

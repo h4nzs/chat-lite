@@ -90,6 +90,7 @@ model Message {
   createdAt           DateTime        @default(now())
   statuses            MessageStatus[]
   reactions           MessageReaction[]
+  linkPreview         Json?           // To store link preview data
 
   // Fields for replies
   repliedToId         String?         @map("replied_to_id")

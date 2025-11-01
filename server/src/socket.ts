@@ -2,12 +2,11 @@ import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { socketAuthMiddleware } from "./middleware/auth.js";
 import { prisma } from "./lib/prisma.js";
-import xss from 'xss';
+import { getLinkPreview } from "link-preview-js";
 import { sendPushNotification } from "./utils/sendPushNotification.js";
 
 export let io: Server;
 
-// Gunakan Set untuk melacak user yang online secara efisien
 const onlineUsers = new Set<string>();
 
 export function getIo() {
@@ -30,14 +29,10 @@ export function registerSocket(httpServer: HttpServer) {
   io.on("connection", (socket: any) => {
     const userId = socket.user?.id;
     if (userId) {
-      socket.join(userId); // Join room personal
+      socket.join(userId);
       console.log(`[Socket Connect] User connected: ${userId}`);
       onlineUsers.add(userId);
-
-      // Kirim daftar lengkap hanya ke user yang baru connect
       socket.emit("presence:init", Array.from(onlineUsers));
-      
-      // Broadcast ke semua user lain bahwa user ini telah bergabung
       socket.broadcast.emit("presence:user_joined", userId);
     }
 
@@ -45,42 +40,57 @@ export function registerSocket(httpServer: HttpServer) {
       if (userId) {
         console.log(`[Socket Disconnect] User disconnected: ${userId}`);
         onlineUsers.delete(userId);
-        // Broadcast ke semua user bahwa user ini telah keluar
         io.emit("presence:user_left", userId);
       }
     });
 
-    // --- Event handlers lainnya ---
     socket.on("conversation:join", (conversationId: string) => {
       socket.join(conversationId);
     });
 
     socket.on("message:send", async (data, cb) => {
       try {
-        // const sanitizedContent = data.content != null ? xss(data.content) : null;
-
-        // 1. Ambil semua partisipan
         const participants = await prisma.participant.findMany({
           where: { conversationId: data.conversationId },
           select: { userId: true },
         });
 
-        // 2. Buat pesan dan statusnya dalam satu transaksi
+        let linkPreviewData: any = null;
+        if (data.content) {
+          const urlRegex = /(https?:\/\/[^\s]+)/g;
+          const urls = data.content.match(urlRegex);
+          if (urls && urls.length > 0) {
+            try {
+              const preview = await getLinkPreview(urls[0]);
+              if ('title' in preview && 'description' in preview && 'images' in preview) {
+                linkPreviewData = {
+                  url: preview.url,
+                  title: preview.title,
+                  description: preview.description,
+                  image: preview.images[0],
+                  siteName: preview.siteName,
+                };
+              }
+            } catch (e) {
+              console.error("Failed to get link preview:", e);
+            }
+          }
+        }
+
         const newMessage = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
             senderId: socket.user.id,
-            content: data.content, // Simpan konten terenkripsi langsung
+            content: data.content,
             fileUrl: data.fileUrl,
             fileName: data.fileName,
             fileType: data.fileType,
             fileSize: data.fileSize,
-            repliedToId: data.repliedToId, // Handle the reply
-            // Buat status untuk setiap partisipan
+            repliedToId: data.repliedToId,
+            linkPreview: linkPreviewData,
             statuses: {
               create: participants.map(p => ({
                 userId: p.userId,
-                // Status untuk pengirim langsung READ, untuk yang lain SENT
                 status: p.userId === socket.user.id ? 'READ' : 'SENT',
               })),
             },
@@ -88,8 +98,8 @@ export function registerSocket(httpServer: HttpServer) {
           include: { 
             sender: true, 
             reactions: { include: { user: true } },
-            statuses: true, // Sertakan status saat mengambil pesan baru
-            repliedTo: {  // Sertakan pesan yang dibalas
+            statuses: true,
+            repliedTo: { 
               include: {
                 sender: { select: { id: true, name: true, username: true } }
               }
@@ -97,7 +107,6 @@ export function registerSocket(httpServer: HttpServer) {
           }, 
         });
 
-        // DO NOT spread the Prisma object. Create a plain DTO.
         const messageToBroadcast = {
           id: newMessage.id,
           conversationId: newMessage.conversationId,
@@ -111,13 +120,13 @@ export function registerSocket(httpServer: HttpServer) {
           sender: newMessage.sender,
           reactions: newMessage.reactions,
           statuses: newMessage.statuses,
-          repliedTo: newMessage.repliedTo, // Sertakan data balasan
-          tempId: data.tempId, // Ensure tempId is included
+          repliedTo: newMessage.repliedTo,
+          linkPreview: newMessage.linkPreview, // Explicitly include linkPreview
+          tempId: data.tempId,
         };
 
         io.to(data.conversationId).emit("message:new", messageToBroadcast);
 
-        // Update a conversation's lastMessageAt timestamp
         await prisma.conversation.update({
           where: { id: data.conversationId },
           data: { lastMessageAt: newMessage.createdAt },
@@ -166,21 +175,18 @@ export function registerSocket(httpServer: HttpServer) {
       try {
         if (!userId || !messageId) return;
 
-        // Update status pesan menjadi READ
         await prisma.messageStatus.upsert({
           where: { messageId_userId: { messageId, userId } },
           update: { status: 'READ' },
           create: { messageId, userId, status: 'READ' },
         });
 
-        // Dapatkan pengirim pesan asli untuk memberitahunya
         const message = await prisma.message.findUnique({
           where: { id: messageId },
           select: { senderId: true, conversationId: true },
         });
 
         if (message && message.senderId !== userId) {
-          // Kirim event pembaruan status hanya ke pengirim
           io.to(message.senderId).emit('message:status_updated', {
             messageId,
             conversationId: message.conversationId,

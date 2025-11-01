@@ -12,6 +12,7 @@ import FileAttachment from "./FileAttachment";
 import useModalStore from '@store/modal';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
+import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -93,6 +94,8 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       {hasContent && (
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
       )}
+
+      {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}
 
       <div className={`text-xs mt-1 flex items-center gap-1.5 ${isImage && !hasContent ? 'absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 pointer-events-none' : `justify-end ${mine ? 'text-white/60' : 'opacity-60'}`}`}>
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>

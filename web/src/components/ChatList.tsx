@@ -1,16 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useConversationStore } from '@store/conversation';
 import { usePresenceStore } from '@store/presence';
-import { useAuthStore } from '@store/auth';
+import { useAuthStore, type User } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import StartNewChat from './StartNewChat';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
 import useModalStore from '@store/modal';
 import NotificationBell from './NotificationBell';
+import { api } from '@lib/api';
+import { debounce } from 'lodash';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -46,18 +47,75 @@ const UserProfile = () => {
   );
 };
 
+const SearchResults = ({ results, onSelect }: { results: User[], onSelect: (userId: string) => void }) => {
+  if (results.length === 0) {
+    return <div className="p-4 text-center text-sm text-text-secondary">No users found.</div>;
+  }
+
+  return (
+    <div className="p-2">
+      <p className="text-xs font-bold text-text-secondary px-2 mb-2">SEARCH RESULTS</p>
+      {results.map(user => (
+        <button 
+          key={user.id}
+          onClick={() => onSelect(user.id)}
+          className="w-full text-left p-3 flex items-center gap-3 rounded-lg hover:bg-secondary transition-colors"
+        >
+          <img src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold truncate text-text-primary">{user.name}</p>
+            <p className="text-sm truncate text-text-secondary">@{user.username}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const { conversations, deleteGroup, deleteConversation, error } = useConversationStore(state => ({
+  const { conversations, deleteGroup, deleteConversation, startConversation, error } = useConversationStore(state => ({
     conversations: state.conversations,
     deleteGroup: state.deleteGroup,
     deleteConversation: state.deleteConversation,
+    startConversation: state.startConversation,
     error: state.error,
   }));
   const presence = usePresenceStore(state => state.presence);
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const showConfirmation = useModalStore(state => state.showConfirmation);
+
+  const handleSearch = useCallback(debounce(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const users = await api<User[]>(`/api/users/search?q=${query}`);
+      setSearchResults(users);
+    } catch (err) {
+      console.error("Search failed", err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, 300), []);
+
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [searchQuery, handleSearch]);
+
+  const handleSelectUser = async (userId: string) => {
+    const conversationId = await startConversation(userId);
+    onOpen(conversationId);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
 
   const openCreateGroupModal = () => setShowGroupModal(true);
 
@@ -91,6 +149,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     return title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const showSearchResults = searchQuery.trim().length > 0;
+
   return (
     <div className="h-full flex flex-col bg-bg-surface">
       <UserProfile />
@@ -119,89 +179,87 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {searchQuery && (
+        {error && <div className="p-2 text-center text-red-400 bg-red-500/20 rounded-lg">{error}</div>}
+        
+        {showSearchResults ? (
+          <SearchResults results={searchResults} onSelect={handleSelectUser} />
+        ) : (
           <div className="p-2">
-            <p className="text-xs font-bold text-text-secondary px-2 mb-2">NEW CHAT</p>
-            <StartNewChat query={searchQuery} onStarted={(id) => { onOpen(id); setSearchQuery(''); }} />
+            <p className="text-xs font-bold text-text-secondary px-2 mb-2">CONVERSATIONS</p>
+            {filteredConversations.length === 0 ? (
+              <div className="text-center p-4 text-text-secondary">No conversations yet.</div>
+            ) : (
+              filteredConversations.map((c) => {
+                const isActive = c.id === activeId;
+                const peerUser = !c.isGroup ? c.participants.find(p => p.id !== meId) : null;
+                const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
+                const isOnline = peerUser ? presence.includes(peerUser.id) : false;
+
+                const avatarSrc = c.isGroup 
+                  ? (c.avatarUrl ? `${toAbsoluteUrl(c.avatarUrl)}?t=${c.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${c.title}`)
+                  : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
+
+                return (
+                  <motion.div
+                    key={c.id}
+                    whileHover={{ scale: 1.03 }}
+                    className={`relative flex items-center justify-between mx-2 my-1 rounded-lg ${isActive ? 'bg-accent-color/20 border-l-4 border-accent-color' : ''}`}>
+                    <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
+                      <div className="relative flex-shrink-0">
+                        <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
+                        {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-bg-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start">
+                          <p className={`font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
+                          {c.lastMessage && <p className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>{formatConversationTime(c.lastMessage.createdAt)}</p>}
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className={`text-sm truncate ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>
+                            {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
+                          </p>
+                          {c.unreadCount > 0 && (
+                            <span className="bg-accent-gradient text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">
+                              {c.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                          <button onClick={(e) => e.stopPropagation()} className="p-2 rounded-full hover:bg-secondary transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                          </button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-card border border-border rounded-md shadow-lg z-50 p-1">
+                            {c.isGroup ? (
+                              <DropdownMenu.Item 
+                                onSelect={() => handleDeleteGroup(c.id)}
+                                className="block w-full text-left px-3 py-2 text-sm text-destructive rounded cursor-pointer outline-none hover:bg-destructive hover:text-destructive-foreground"
+                              >
+                                Delete Group
+                              </DropdownMenu.Item>
+                            ) : (
+                              <DropdownMenu.Item 
+                                onSelect={() => handleDeleteConversation(c.id)}
+                                className="block w-full text-left px-3 py-2 text-sm text-destructive rounded cursor-pointer outline-none hover:bg-destructive hover:text-destructive-foreground"
+                              >
+                                Delete Chat
+                              </DropdownMenu.Item>
+                            )}
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         )}
-
-        <div className="p-2">
-          {error && <div className="p-2 text-center text-red-400 bg-red-500/20 rounded-lg">{error}</div>}
-          {!searchQuery && <p className="text-xs font-bold text-text-secondary px-2 mb-2">CONVERSATIONS</p>}
-          {filteredConversations.length === 0 && !searchQuery ? (
-            <div className="text-center p-4 text-text-secondary">No conversations yet.</div>
-          ) : (
-            filteredConversations.map((c) => {
-              const isActive = c.id === activeId;
-              const peerUser = !c.isGroup ? c.participants.find(p => p.id !== meId) : null;
-              const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
-              const isOnline = peerUser ? presence.includes(peerUser.id) : false;
-
-              const avatarSrc = c.isGroup 
-                ? (c.avatarUrl ? `${toAbsoluteUrl(c.avatarUrl)}?t=${c.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${c.title}`)
-                : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
-
-              return (
-                <motion.div
-                  key={c.id}
-                  whileHover={{ scale: 1.03 }}
-                  className={`relative flex items-center justify-between mx-2 my-1 rounded-lg ${isActive ? 'bg-accent-color/20 border-l-4 border-accent-color' : ''}`}>
-                  <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
-                    <div className="relative flex-shrink-0">
-                      <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
-                      {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-bg-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className={`font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
-                        {c.lastMessage && <p className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>{formatConversationTime(c.lastMessage.createdAt)}</p>}
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <p className={`text-sm truncate ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>
-                          {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
-                        </p>
-                        {c.unreadCount > 0 && (
-                          <span className="bg-accent-gradient text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">
-                            {c.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger asChild>
-                        <button onClick={(e) => e.stopPropagation()} className="p-2 rounded-full hover:bg-secondary transition-colors">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
-                        </button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-card border border-border rounded-md shadow-lg z-50 p-1">
-                          {c.isGroup ? (
-                            <DropdownMenu.Item 
-                              onSelect={() => handleDeleteGroup(c.id)}
-                              className="block w-full text-left px-3 py-2 text-sm text-destructive rounded cursor-pointer outline-none hover:bg-destructive hover:text-destructive-foreground"
-                            >
-                              Delete Group
-                            </DropdownMenu.Item>
-                          ) : (
-                            <DropdownMenu.Item 
-                              onSelect={() => handleDeleteConversation(c.id)}
-                              className="block w-full text-left px-3 py-2 text-sm text-destructive rounded cursor-pointer outline-none hover:bg-destructive hover:text-destructive-foreground"
-                            >
-                              Delete Chat
-                            </DropdownMenu.Item>
-                          )}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu.Root>
-                  </div>
-                </motion.div>
-              );
-            })
-          )}
-        </div>
       </div>
       {showGroupModal && <CreateGroupChat onClose={() => setShowGroupModal(false)} />}
     </div>

@@ -24,6 +24,7 @@ export type Message = {
   optimistic?: boolean;
   repliedTo?: Message;
   repliedToId?: string;
+  linkPreview?: any; // For link preview data
 };
 
 export type Participant = {

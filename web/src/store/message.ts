@@ -33,9 +33,12 @@ type State = {
   searchQuery: string;
   isFetchingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
+  typingLinkPreview: any | null; // For live link previews
   
   // Actions
   setReplyingTo: (message: Message | null) => void;
+  fetchTypingLinkPreview: (text: string) => void;
+  clearTypingLinkPreview: () => void;
   sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
   uploadFile: (conversationId: string, file: File) => Promise<void>;
   loadMessagesForConversation: (id: string) => Promise<void>;
@@ -64,8 +67,29 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   searchQuery: '',
   isFetchingMore: {},
   hasMore: {},
+  typingLinkPreview: null,
 
   setReplyingTo: (message) => set({ replyingTo: message }),
+
+  fetchTypingLinkPreview: async (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = text.match(urlRegex);
+    if (urls && urls.length > 0) {
+      try {
+        const preview = await api("/api/previews", {
+          method: "POST",
+          body: JSON.stringify({ url: urls[0] }),
+        });
+        set({ typingLinkPreview: preview });
+      } catch (error) {
+        set({ typingLinkPreview: null });
+      }
+    } else {
+      set({ typingLinkPreview: null });
+    }
+  },
+
+  clearTypingLinkPreview: () => set({ typingLinkPreview: null }),
 
   sendMessage: async (conversationId, data) => {
     const tempId = Date.now();
@@ -211,10 +235,15 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     set(state => {
       const currentMessages = state.messages[conversationId] || [];
       if (currentMessages.some(m => m.id === message.id)) return state; // Prevent duplicates
+      // Explicitly build the message object to ensure all properties are kept
+      const messageWithPreview = {
+        ...message,
+        linkPreview: message.linkPreview,
+      };
       return {
         messages: { 
           ...state.messages, 
-          [conversationId]: [...currentMessages, message]
+          [conversationId]: [...currentMessages, messageWithPreview]
         }
       };
     });
@@ -224,9 +253,20 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     set(state => ({
       messages: {
         ...state.messages,
-        [conversationId]: (state.messages[conversationId] || []).map(m => 
-          m.tempId === tempId ? newMessage : m
-        )
+        [conversationId]: (state.messages[conversationId] || []).map(m => {
+          if (m.tempId === tempId) {
+            // Preserve optimistic data but update with server confirmation
+            return { 
+              ...m, 
+              id: newMessage.id,
+              createdAt: newMessage.createdAt,
+              optimistic: false, 
+              error: false, 
+              linkPreview: newMessage.linkPreview // Explicitly carry over the preview
+            };
+          }
+          return m;
+        })
       }
     }));
   },

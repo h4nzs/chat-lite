@@ -9,7 +9,6 @@ const ConfirmModal = () => {
     if (isOpen) {
       setIsRendering(true);
     } else {
-      // Delay hiding to allow for exit animation
       const timer = setTimeout(() => setIsRendering(false), 200);
       return () => clearTimeout(timer);
     }
@@ -28,22 +27,22 @@ const ConfirmModal = () => {
 
       {/* Modal Panel */}
       <div 
-        className={`bg-surface rounded-lg shadow-xl w-full max-w-sm m-4 transition-all duration-200 ${isOpen ? 'opacity-100 scale-100' : 'opacity-95 scale-95'}`}
+        className={`bg-bg-surface rounded-lg shadow-xl w-full max-w-sm m-4 transition-all duration-200 ${isOpen ? 'opacity-100 scale-100' : 'opacity-95 scale-95'}`}
       >
         <div className="p-6">
-          <h3 className="text-xl font-bold text-white">{title}</h3>
-          <p className="mt-2 text-text-secondary">{message}</p>
+          <h3 className="text-xl font-bold text-text-primary">{title}</h3>
+          <p className="mt-2 text-text-secondary whitespace-pre-wrap">{message}</p>
         </div>
-        <div className="bg-primary px-6 py-3 flex justify-end gap-3 rounded-b-lg">
+        <div className="bg-bg-primary px-6 py-3 flex justify-end gap-3 rounded-b-lg border-t border-border">
           <button
             onClick={hideConfirmation}
-            className="px-4 py-2 rounded-md bg-gray-700 text-white hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="px-4 py-2 rounded-md bg-secondary text-text-primary hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
           >
             Confirm
           </button>
