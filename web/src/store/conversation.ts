@@ -31,6 +31,7 @@ export type Participant = {
   id: string;
   username: string;
   name: string;
+  description?: string | null;
   avatarUrl?: string | null;
   role: "ADMIN" | "MEMBER";
 };
@@ -107,7 +108,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       const conversations: Conversation[] = rawConversations.map(c => ({
         ...c,
         lastMessage: c.messages?.[0] || null,
-        participants: c.participants.map((p: any) => ({ ...p.user, role: p.role })),
+        participants: c.participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role })),
       }));
 
       const decryptedConversations = await Promise.all(
@@ -214,7 +215,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       conversations: state.conversations.map(c => {
         if (c.id === conversationId) {
           // Map the incoming participants to the correct frontend structure
-          const newParticipants = participants.map((p: any) => ({ ...p.user, role: p.role }));
+          const newParticipants = participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role }));
           return {
             ...c,
             participants: [...c.participants, ...newParticipants],

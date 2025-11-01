@@ -7,6 +7,15 @@ import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 
+export type User = {
+  id: string;
+  email: string;
+  username: string;
+  name: string;
+  description?: string | null;
+  avatarUrl?: string | null;
+};
+
 // Helper function to setup user encryption keys
 const setupUserEncryptionKeys = async (password: string): Promise<void> => {
   try {

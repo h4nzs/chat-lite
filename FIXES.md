@@ -62,3 +62,38 @@ Setelah aplikasi stabil, fitur-fitur ini dapat ditambahkan untuk memperkaya fung
 *   **Implementasi:**
     *   **Backend:** Saat menerima pesan baru, periksa apakah ada URL di dalamnya. Jika ada, gunakan library seperti `link-preview-js` untuk mengambil metadata di sisi server.
     *   **UI:** Buat komponen `LinkPreviewCard` baru yang akan dirender di bawah konten pesan jika pesan tersebut berisi metadata pratinjau.
+
+#### Rencana Implementasi:
+
+   1. Backend (`server/`):
+       * Database: Saya akan menambahkan kolom baru description
+         (tipe String, opsional) ke model User di
+         prisma/schema.prisma.
+       * Migrasi: Saya akan menjalankan prisma migrate dev untuk
+         menerapkan perubahan skema ke database.
+       * API: Saya akan memodifikasi endpoint PUT /api/users/me di
+         server/src/routes/users.ts. Saya akan menambahkan validai
+          untuk description (misalnya, panjang maksimal) dan
+         memperbarui logika untuk menyimpan deskripsi baru ke
+         database.
+       * Data Transfer: Saya akan memastikan data description
+         disertakan saat data pengguna diambil (misalnya, di
+         endpoint /api/users/me dan di dalam objek participants
+         pada data percakapan).
+
+   2. Frontend (`web/`):
+       * State Management: Saya akan menambahkan properti
+         description ke tipe User di web/src/store/auth.ts dan di
+         tempat lain jika diperlukan.
+       * UI Halaman Pengaturan: Saya akan memodifikasi
+         SettingsPage.tsx (web/src/pages/SettingsPage.tsx).
+           * Saya akan menambahkan textarea baru di bawah input
+             "Display Name" agar pengguna bisa melihat dan mengedt
+              deskripsi mereka.
+           * Saya akan menambahkan tombol "Save" atau membuat
+             pembaruan terjadi secara otomatis saat fokus input
+             hilang (on blur).
+       * UI Tampilan Profil: Saya akan memodifikasi komponen yang
+         menampilkan detail pengguna (misalnya, GroupInfoPanel.tsx
+         atau saat melihat profil pengguna lain) untuk menampilkan
+         deskripsi baru ini di bawah nama pengguna.

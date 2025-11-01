@@ -80,6 +80,7 @@ const ParticipantList = ({ conversationId, participants, amIAdmin }: { conversat
             />
             <div>
               <p className="font-semibold text-text-primary">{p.name}</p>
+              <p className="text-xs text-text-secondary">{p.description || 'No description'}</p>
               {p.role === 'ADMIN' && <p className="text-xs text-accent-color">Admin</p>}
             </div>
           </div>

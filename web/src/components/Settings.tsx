@@ -17,6 +17,7 @@ export default function Settings() {
   }));
   const { theme, toggleTheme } = useThemeStore(); // Use theme store
   const [name, setName] = useState(user?.name || '');
+  const [description, setDescription] = useState(user?.description || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,6 +26,7 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setDescription(user.description || '');
       setPreviewUrl(user.avatarUrl ? toAbsoluteUrl(user.avatarUrl) : null);
     }
   }, [user]);
@@ -52,11 +54,20 @@ export default function Settings() {
     setIsLoading(true);
     try {
       const promises = [];
+      const dataToUpdate: { name?: string; description?: string } = {};
+
       if (avatarFile) {
         promises.push(updateAvatar(avatarFile));
       }
       if (name !== user?.name) {
-        promises.push(updateProfile({ name }));
+        dataToUpdate.name = name;
+      }
+      if (description !== user?.description) {
+        dataToUpdate.description = description;
+      }
+
+      if (Object.keys(dataToUpdate).length > 0) {
+        promises.push(updateProfile(dataToUpdate));
       }
 
       if (promises.length === 0) {
@@ -122,6 +133,21 @@ export default function Settings() {
             onChange={(e) => setName(e.target.value)}
             className="w-full p-3 bg-bg-primary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
           />
+        </div>
+
+        {/* Description Input */}
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-text-secondary mb-2">About Me</label>
+          <textarea 
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            maxLength={200}
+            className="w-full p-3 bg-bg-primary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
+            placeholder="Tell everyone a little about yourself..."
+          />
+          <p className="text-xs text-text-secondary mt-1 text-right">{description.length} / 200</p>
         </div>
 
         {/* Email (Read-only) */}

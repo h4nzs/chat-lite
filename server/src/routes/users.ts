@@ -43,7 +43,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: (req as any).user.id },
-      select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true },
     });
     res.json(user);
   } catch (error) {
@@ -54,16 +54,29 @@ router.get("/me", requireAuth, async (req, res, next) => {
 // === PUT: Update user profile (e.g., name) ===
 router.put("/me", 
   requireAuth, 
-  zodValidate({ body: z.object({ name: z.string().min(1).trim() }) }),
+  zodValidate({ 
+    body: z.object({ 
+      name: z.string().min(1).trim().optional(),
+      description: z.string().max(200).trim().optional(),
+    }) 
+  }),
   async (req, res, next) => {
     try {
       const userId = (req as any).user.id;
-      const { name } = req.body;
+      const { name, description } = req.body;
+
+      const dataToUpdate: { name?: string; description?: string } = {};
+      if (name) dataToUpdate.name = name;
+      if (description !== undefined) dataToUpdate.description = description;
+
+      if (Object.keys(dataToUpdate).length === 0) {
+        return res.status(400).json({ error: "No update data provided." });
+      }
 
       const updatedUser = await prisma.user.update({
         where: { id: userId },
-        data: { name },
-        select: { id: true, email: true, username: true, name: true, avatarUrl: true },
+        data: dataToUpdate,
+        select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true },
       });
 
       io.emit('user:updated', updatedUser);

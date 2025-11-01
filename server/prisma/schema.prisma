@@ -15,6 +15,7 @@ model User {
   passwordHash     String
   name             String
   avatarUrl        String?
+  description      String?
   publicKey        String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt

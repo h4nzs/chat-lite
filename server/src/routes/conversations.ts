@@ -27,7 +27,7 @@ router.get("/", async (req, res, next) => {
         participants: {
           include: {
             user: {
-              select: { id: true, username: true, name: true, avatarUrl: true },
+              select: { id: true, username: true, name: true, avatarUrl: true, description: true },
             },
           },
         },
@@ -114,9 +114,9 @@ router.post("/", async (req, res, next) => {
         },
       },
       include: {
-        participants: { 
-          include: { 
-            user: { select: { id: true, username: true, name: true, avatarUrl: true } } 
+        participants: {
+          include: {
+            user: { select: { id: true, username: true, name: true, avatarUrl: true, description: true } }
           }
         },
         creator: true,
@@ -138,10 +138,6 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// NOTE: More specific routes must be defined BEFORE more generic routes (e.g., /:id/details before /:id)
-
-// --- Admin Routes for Group Management ---
-
 // GET a single conversation by ID
 router.get("/:id", async (req, res, next) => {
   try {
@@ -159,7 +155,7 @@ router.get("/:id", async (req, res, next) => {
         participants: {
           include: {
             user: {
-              select: { id: true, username: true, name: true, avatarUrl: true },
+              select: { id: true, username: true, name: true, avatarUrl: true, description: true },
             },
           },
         },
@@ -274,7 +270,7 @@ router.post("/:id/participants", async (req, res, next) => {
 
     const newParticipants = await prisma.participant.findMany({
       where: { conversationId, userId: { in: userIds } },
-      include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } },
+      include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, description: true } } },
     });
 
     const conversation = await prisma.conversation.findUnique({
@@ -357,10 +353,10 @@ router.delete("/:id/participants/:userId", async (req, res, next) => {
     }
 
     const deleteResult = await prisma.participant.delete({
-      where: { 
-        userId_conversationId: { 
-          userId: userToRemoveId, 
-          conversationId: conversationId 
+      where: {
+        userId_conversationId: {
+          userId: userToRemoveId,
+          conversationId: conversationId
         }
       },
     });
@@ -407,7 +403,7 @@ router.delete("/:id", async (req, res, next) => {
       if (deleteResult.count === 0) {
         return res.status(403).json({ error: "Only the group creator can delete the group." });
       }
-      
+
       conversation.participants.forEach(p => {
         io.to(p.userId).emit("conversation:deleted", { id });
       });
