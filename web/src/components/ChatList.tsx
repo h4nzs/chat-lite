@@ -8,7 +8,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import CreateGroupChat from './CreateGroupChat';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
-import useModalStore from '@store/modal';
+import { useModalStore } from '@store/modal';
 import NotificationBell from './NotificationBell';
 import { api } from '@lib/api';
 import { debounce } from 'lodash';
@@ -86,7 +86,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const showConfirmation = useModalStore(state => state.showConfirmation);
+  const showConfirm = useModalStore(state => state.showConfirm);
 
   const handleSearch = useCallback(debounce(async (query: string) => {
     if (!query.trim()) {
@@ -120,7 +120,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const openCreateGroupModal = () => setShowGroupModal(true);
 
   const handleDeleteGroup = (id: string) => {
-    showConfirmation(
+    showConfirm(
       'Delete Group',
       'Are you sure you want to permanently delete this group? This action cannot be undone.',
       () => deleteGroup(id)
@@ -128,7 +128,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   };
 
   const handleDeleteConversation = (id: string) => {
-    showConfirmation(
+    showConfirm(
       'Delete Chat',
       'Are you sure you want to hide this chat? It will be removed from your conversation list.',
       () => deleteConversation(id)
@@ -204,12 +204,23 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                     key={c.id}
                     whileHover={{ scale: 1.03 }}
                     className={`relative flex items-center justify-between mx-2 my-1 rounded-lg ${isActive ? 'bg-accent-color/20 border-l-4 border-accent-color' : ''}`}>
-                    <button onClick={() => onOpen(c.id)} className="w-full text-left p-3 pr-10 flex items-center gap-3">
+                    <div className="w-full text-left p-3 pr-10 flex items-center gap-3">
                       <div className="relative flex-shrink-0">
-                        <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
+                        <button 
+                          onClick={(e) => {
+                            if (peerUser) {
+                              e.stopPropagation();
+                              openProfileModal(peerUser as User);
+                            }
+                          }}
+                          disabled={!peerUser}
+                          className="disabled:cursor-default"
+                        >
+                          <img src={avatarSrc} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
+                        </button>
                         {peerUser && <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-bg-surface ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />}
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div onClick={() => onOpen(c.id)} className="flex-1 min-w-0 cursor-pointer">
                         <div className="flex justify-between items-start">
                           <p className={`font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
                           {c.lastMessage && <p className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>{formatConversationTime(c.lastMessage.createdAt)}</p>}
@@ -225,7 +236,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                           )}
                         </div>
                       </div>
-                    </button>
+                    </div>
                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
                       <DropdownMenu.Root>
                         <DropdownMenu.Trigger asChild>

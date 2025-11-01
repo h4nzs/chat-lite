@@ -4,7 +4,8 @@ import { toAbsoluteUrl } from "@utils/url";
 import { useState } from "react";
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
-import useModalStore from '@store/modal';
+import { useModalStore } from '@store/modal';
+import type { User } from "@store/auth";
 
 const ParticipantActions = ({ conversationId, participant, amIAdmin }: { conversationId: string, participant: Participant, amIAdmin: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,11 +69,18 @@ const ParticipantActions = ({ conversationId, participant, amIAdmin }: { convers
 };
 
 const ParticipantList = ({ conversationId, participants, amIAdmin }: { conversationId: string, participants: Participant[], amIAdmin: boolean }) => {
+  const openProfileModal = useModalStore(s => s.openProfileModal);
+
+  const handleProfileClick = (participant: Participant) => {
+    // The participant object structure matches the User type needed by the modal
+    openProfileModal(participant as User);
+  };
+
   return (
     <ul className="space-y-2">
       {participants.map(p => (
         <li key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
-          <div className="flex items-center gap-3">
+          <button onClick={() => handleProfileClick(p)} className="flex items-center gap-3 text-left">
             <img 
               src={toAbsoluteUrl(p.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${p.name}`}
               alt={p.name}
@@ -83,7 +91,7 @@ const ParticipantList = ({ conversationId, participants, amIAdmin }: { conversat
               <p className="text-xs text-text-secondary">{p.description || 'No description'}</p>
               {p.role === 'ADMIN' && <p className="text-xs text-accent-color">Admin</p>}
             </div>
-          </div>
+          </button>
           <ParticipantActions conversationId={conversationId} participant={p} amIAdmin={amIAdmin} />
         </li>
       ))}

@@ -63,7 +63,7 @@ Setelah aplikasi stabil, fitur-fitur ini dapat ditambahkan untuk memperkaya fung
     *   **Backend:** Saat menerima pesan baru, periksa apakah ada URL di dalamnya. Jika ada, gunakan library seperti `link-preview-js` untuk mengambil metadata di sisi server.
     *   **UI:** Buat komponen `LinkPreviewCard` baru yang akan dirender di bawah konten pesan jika pesan tersebut berisi metadata pratinjau.
 
-#### Rencana Implementasi:
+#### Rencana Implementasi user description:
 
    1. Backend (`server/`):
        * Database: Saya akan menambahkan kolom baru description

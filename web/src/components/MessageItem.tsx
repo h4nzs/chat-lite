@@ -9,7 +9,7 @@ import ReactionPopover from "./Reactions";
 import { toAbsoluteUrl } from "@utils/url";
 import LazyImage from "./LazyImage";
 import FileAttachment from "./FileAttachment";
-import useModalStore from '@store/modal';
+import { useModalStore } from '@store/modal';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
@@ -135,7 +135,7 @@ interface MessageItemProps {
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFirstInSequence, isLastInSequence }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
   const setReplyingTo = useMessageStore(state => state.setReplyingTo);
-  const showConfirmation = useModalStore(state => state.showConfirmation);
+  const showConfirm = useModalStore(state => state.showConfirm);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 

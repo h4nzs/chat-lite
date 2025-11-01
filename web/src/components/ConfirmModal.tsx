@@ -1,4 +1,4 @@
-import useModalStore from '@store/modal';
+import { useModalStore } from '@store/modal';
 import { useEffect, useState } from 'react';
 
 const ConfirmModal = () => {

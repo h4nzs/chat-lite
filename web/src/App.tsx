@@ -4,11 +4,13 @@ import Register from './pages/Register';
 import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
 import KeyManagementPage from './pages/KeyManagementPage';
+import ProfilePage from './pages/ProfilePage'; // Import ProfilePage
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useSocketStore } from './store/socket';
 import { useEffect } from 'react';
 import ConfirmModal from './components/ConfirmModal';
+import UserInfoModal from './components/UserInfoModal'; // Import UserInfoModal
 import DynamicIsland from './components/DynamicIsland';
 import { useThemeStore } from './store/theme';
 
@@ -38,8 +40,9 @@ export default function App() {
           },
         }}
       />
-      <ConfirmModal />
       <BrowserRouter>
+        <ConfirmModal />
+        <UserInfoModal />
         <DynamicIsland />
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -47,6 +50,7 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
+          <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

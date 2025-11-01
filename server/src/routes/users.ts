@@ -147,4 +147,35 @@ router.get("/search",
   }
 );
 
+// === GET: User data by ID ===
+router.get(
+  '/:userId',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          avatarUrl: true,
+          description: true,
+          createdAt: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json(user);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

@@ -1,5 +1,5 @@
 import { useCallback, useRef, ChangeEvent, useState, useEffect } from "react";
-import { useAuthStore } from "@store/auth";
+import { useAuthStore, type User } from "@store/auth";
 import { getSocket } from "@lib/socket";
 import { Virtuoso } from "react-virtuoso";
 import MessageItem from "@components/MessageItem";
@@ -10,6 +10,7 @@ import { useMessageStore } from "@store/message";
 import { usePresenceStore } from "@store/presence";
 import { useThemeStore } from "@store/theme";
 import { toAbsoluteUrl } from "@utils/url";
+import { useModalStore } from "@store/modal";
 import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
@@ -31,78 +32,103 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   return debounced as (...args: Parameters<F>) => void;
 }
 
-const ChatHeader = ({ conversation, onHeaderClick }: { conversation: Conversation, onHeaderClick: () => void }) => {
-  const meId = useAuthStore(s => s.user?.id);
-  const { toggleSidebar } = useConversationStore(state => ({ toggleSidebar: state.toggleSidebar }));
-  const presence = usePresenceStore(state => state.presence);
-  const peerUser = !conversation.isGroup ? conversation.participants.find(p => p.id !== meId) : null;
-  const title = conversation.isGroup ? (conversation.title || 'Group Chat') : (peerUser?.name || 'Chat');
+
+
+const TypingIndicator = ({ conversationId }: { conversationId: string }) => {
+  const typing = usePresenceStore((s) => s.typing[conversationId] || []);
+  const meId = useAuthStore((s) => s.user?.id);
+  const typingUsers = typing.filter((id) => id !== meId);
+
+  if (typingUsers.length === 0) return null;
+
+  return <div className="text-xs text-gray-500">typing...</div>;
+};
+
+const ChatHeader = ({ conversation, onBack, onInfoToggle }: { conversation: Conversation; onBack: () => void; onInfoToggle: () => void; }) => {
+  const meId = useAuthStore((s) => s.user?.id);
+  const presence = usePresenceStore((s) => s.presence);
+  const openProfileModal = useModalStore(s => s.openProfileModal);
+
+  const peerUser = !conversation.isGroup ? conversation.participants.find((p) => p.id !== meId) : null;
+  const title = conversation.isGroup ? conversation.title : peerUser?.name;
+  const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl;
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 
-  const headerContent = (
-    <>
-      <img src={toAbsoluteUrl(conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`} alt="Avatar" className="w-10 h-10 rounded-full bg-bg-primary object-cover" />
-      <div>
-        <p className="font-bold text-text-primary">{title}</p>
-        <p className="text-xs text-text-secondary">
-          {conversation.isGroup ? `${conversation.participants.length} members` : (isOnline ? 'Active now' : 'Offline')}
-        </p>
-      </div>
-    </>
-  );
+  const handleHeaderClick = () => {
+    if (peerUser) {
+      openProfileModal(peerUser as User);
+    } else {
+      // For group chats, toggle the info panel
+      onInfoToggle();
+    }
+  };
+
+  const getStatus = () => {
+    if (conversation.isGroup) {
+      return `${conversation.participants.length} members`;
+    }
+    if (isOnline) {
+      return "Online";
+    }
+    return "Offline";
+  };
 
   return (
-    <div className="p-4 border-b border-border flex items-center gap-4 flex-shrink-0">
-      <button onClick={toggleSidebar} className="md:hidden p-2 -ml-2 text-text-secondary hover:text-text-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      </button>
-      
-      {conversation.isGroup ? (
-        <button onClick={onHeaderClick} className="flex items-center gap-4 text-left">
-          {headerContent}
+    <div className="flex items-center justify-between p-3 border-b border-border">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="md:hidden p-2 rounded-full hover:bg-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-      ) : (
-        <div className="flex items-center gap-4">
-          {headerContent}
+        <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left">
+          <img
+            src={toAbsoluteUrl(avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`}
+            alt="Avatar"
+            className="w-10 h-10 rounded-full object-cover bg-bg-primary"
+          />
+          <div>
+            <p className="font-semibold text-text-primary">{title}</p>
+            <p className="text-xs text-text-secondary">{getStatus()}</p>
+          </div>
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <SearchMessages conversationId={conversation.id} />
+        <button onClick={onInfoToggle} className="p-2 rounded-full hover:bg-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+      </div>
+    </div>
+    );
+  };
+  
+  const ReplyPreview = () => {
+    const { replyingTo, setReplyingTo } = useMessageStore(state => ({
+      replyingTo: state.replyingTo,
+      setReplyingTo: state.setReplyingTo,
+    }));
+  
+    if (!replyingTo) return null;
+  
+    const authorName = replyingTo.sender?.name || 'User';
+    const contentPreview = replyingTo.content || (replyingTo.fileUrl ? 'File' : '...');
+  
+    return (
+      <div className="px-4 pt-3">
+        <div className="relative bg-bg-primary p-2 rounded-lg border-l-4 border-accent-color">
+          <p className="text-xs font-bold text-accent-color">Replying to {authorName}</p>
+          <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
+          <button 
+            onClick={() => setReplyingTo(null)} 
+            className="absolute top-1 right-1 p-1 rounded-full hover:bg-secondary"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
-      )}
-
-      <div className="flex-grow" />
-      <SearchMessages conversationId={conversation.id} />
-    </div>
-  );
-};
-
-const ReplyPreview = () => {
-  const { replyingTo, setReplyingTo } = useMessageStore(state => ({
-    replyingTo: state.replyingTo,
-    setReplyingTo: state.setReplyingTo,
-  }));
-
-  if (!replyingTo) return null;
-
-  const authorName = replyingTo.sender?.name || 'User';
-  const contentPreview = replyingTo.content || (replyingTo.fileUrl ? 'File' : '...');
-
-  return (
-    <div className="px-4 pt-3">
-      <div className="relative bg-bg-primary p-2 rounded-lg border-l-4 border-accent-color">
-        <p className="text-xs font-bold text-accent-color">Replying to {authorName}</p>
-        <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
-        <button 
-          onClick={() => setReplyingTo(null)} 
-          className="absolute top-1 right-1 p-1 rounded-full hover:bg-secondary"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
       </div>
-    </div>
-  );
-};
-
-
-
-const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
+    );
+  };
+  
+  const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
   const [isPressed, setIsPressed] = useState(false);
   const { theme } = useThemeStore();
