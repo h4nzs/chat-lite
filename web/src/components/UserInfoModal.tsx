@@ -1,5 +1,6 @@
 import { useModalStore } from '@store/modal';
 import { useNavigate } from 'react-router-dom';
+import { toAbsoluteUrl } from '@utils/url'; // Import utility
 
 export default function UserInfoModal() {
   const { isProfileModalOpen, profileData, closeProfileModal } = useModalStore();
@@ -25,7 +26,7 @@ export default function UserInfoModal() {
       >
         <div className="flex flex-col items-center">
           <img 
-            src={profileData.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${profileData.name}`}
+            src={toAbsoluteUrl(profileData.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${profileData.name}`}
             alt={profileData.name}
             className="w-24 h-24 rounded-full bg-gray-300 object-cover mb-4"
           />

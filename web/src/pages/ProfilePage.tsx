@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { authFetch, handleApiError } from '@lib/api';
 import type { User } from '@store/auth';
+import { toAbsoluteUrl } from '@utils/url'; // Import utility
 
 // Extend User type to include fields from the new endpoint
 type ProfileUser = User & {
@@ -49,7 +50,7 @@ export default function ProfilePage() {
     <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="flex items-center space-x-4">
         <img 
-          src={user.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
+          src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
           alt={user.name}
           className="w-24 h-24 rounded-full bg-gray-300 object-cover"
         />

@@ -44,7 +44,7 @@ const TypingIndicator = ({ conversationId }: { conversationId: string }) => {
   return <div className="text-xs text-gray-500">typing...</div>;
 };
 
-const ChatHeader = ({ conversation, onBack, onInfoToggle }: { conversation: Conversation; onBack: () => void; onInfoToggle: () => void; }) => {
+const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conversation: Conversation; onBack: () => void; onInfoToggle: () => void; onMenuClick: () => void; }) => {
   const meId = useAuthStore((s) => s.user?.id);
   const presence = usePresenceStore((s) => s.presence);
   const openProfileModal = useModalStore(s => s.openProfileModal);
@@ -76,7 +76,10 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle }: { conversation: Conv
   return (
     <div className="flex items-center justify-between p-3 border-b border-border">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="md:hidden p-2 rounded-full hover:bg-secondary">
+        <button onClick={onMenuClick} className="md:hidden p-2 rounded-full hover:bg-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <button onClick={onBack} className="hidden md:block p-2 rounded-full hover:bg-secondary">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left">
@@ -233,8 +236,9 @@ const ChatSpinner = () => (
   </div>
 );
 
-export default function ChatWindow({ id }: { id: string }) {
+export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClick: () => void }) {
   const meId = useAuthStore((s) => s.user?.id);
+  const openConversation = useConversationStore(s => s.openConversation);
   const { 
     conversation, 
     messages, 
@@ -316,7 +320,12 @@ export default function ChatWindow({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col h-full bg-bg-main relative">
-      <ChatHeader conversation={conversation} onHeaderClick={() => setIsGroupInfoOpen(true)} />
+      <ChatHeader 
+        conversation={conversation} 
+        onBack={() => openConversation(null)} 
+        onInfoToggle={() => setIsGroupInfoOpen(true)} 
+        onMenuClick={onMenuClick} // Pass prop down
+      />
       <div className="flex-1 min-h-0 relative">
         <Virtuoso
           ref={virtuosoRef}
