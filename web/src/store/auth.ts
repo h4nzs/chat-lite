@@ -14,6 +14,7 @@ export type User = {
   name: string;
   description?: string | null;
   avatarUrl?: string | null;
+  showEmailToOthers?: boolean;
 };
 
 // Helper function to setup user encryption keys
@@ -181,6 +182,28 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     set({ sendReadReceipts: next });
     localStorage.setItem('sendReadReceipts', String(next));
     toast.success(`Read receipts ${next ? 'enabled' : 'disabled'}`);
+  },
+
+  toggleShowEmail: async () => {
+    const currentUser = get().user;
+    if (!currentUser) return;
+
+    const newValue = !currentUser.showEmailToOthers;
+    
+    // Optimistic update
+    set({ user: { ...currentUser, showEmailToOthers: newValue } });
+
+    try {
+      await authFetch("/api/users/me", {
+        method: "PUT",
+        body: JSON.stringify({ showEmailToOthers: newValue }),
+      });
+      toast.success('Email visibility updated');
+    } catch (error) {
+      // Revert on error
+      set({ user: currentUser });
+      toast.error('Failed to update setting');
+    }
   },
 
   async regenerateKeys(password: string) {

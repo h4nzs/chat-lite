@@ -21,7 +21,7 @@ export default function MessageBubble({ message, isOwn, isGroup, showAvatar, sho
 
   const handleAvatarClick = () => {
     if (message.sender) {
-      openProfileModal(message.sender);
+      openProfileModal(message.sender.id);
     }
   };
 

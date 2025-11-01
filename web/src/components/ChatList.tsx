@@ -210,8 +210,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         <button 
                           onClick={(e) => {
                             if (peerUser) {
-                              e.stopPropagation();
-                              openProfileModal(peerUser as User);
+                              e.stopPropagation(); // Prevent opening the chat
+                              openProfileModal(peerUser.id);
                             }
                           }}
                           disabled={!peerUser}

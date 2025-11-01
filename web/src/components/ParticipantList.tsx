@@ -72,8 +72,7 @@ const ParticipantList = ({ conversationId, participants, amIAdmin }: { conversat
   const openProfileModal = useModalStore(s => s.openProfileModal);
 
   const handleProfileClick = (participant: Participant) => {
-    // The participant object structure matches the User type needed by the modal
-    openProfileModal(participant as User);
+    openProfileModal(participant.id);
   };
 
   return (

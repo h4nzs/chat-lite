@@ -6,15 +6,15 @@ type ModalState = {
   confirmTitle: string;
   confirmMessage: string;
   onConfirm: () => void;
-  isProfileModalOpen: boolean; // New state
-  profileData: User | null; // New state
+  isProfileModalOpen: boolean;
+  profileUserId: string | null; // Changed from profileData
 };
 
 type ModalActions = {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void;
   hideConfirm: () => void;
-  openProfileModal: (user: User) => void; // New action
-  closeProfileModal: () => void; // New action
+  openProfileModal: (userId: string) => void; // Now accepts userId
+  closeProfileModal: () => void;
 };
 
 export const useModalStore = create<ModalState & ModalActions>((set) => ({
@@ -23,11 +23,11 @@ export const useModalStore = create<ModalState & ModalActions>((set) => ({
   confirmMessage: '',
   onConfirm: () => {},
   isProfileModalOpen: false,
-  profileData: null,
+  profileUserId: null,
 
   showConfirm: (title, message, onConfirm) => set({ isConfirmOpen: true, confirmTitle: title, confirmMessage: message, onConfirm }),
   hideConfirm: () => set({ isConfirmOpen: false }),
-  openProfileModal: (user) => set({ isProfileModalOpen: true, profileData: user }),
-  closeProfileModal: () => set({ isProfileModalOpen: false, profileData: null }),
+  openProfileModal: (userId) => set({ isProfileModalOpen: true, profileUserId: userId }),
+  closeProfileModal: () => set({ isProfileModalOpen: false, profileUserId: null }),
 }));
 

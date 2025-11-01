@@ -56,7 +56,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
   const handleHeaderClick = () => {
     if (peerUser) {
-      openProfileModal(peerUser as User);
+      openProfileModal(peerUser.id);
     } else {
       // For group chats, toggle the info panel
       onInfoToggle();

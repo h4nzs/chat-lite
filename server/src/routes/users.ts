@@ -43,7 +43,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: (req as any).user.id },
-      select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true, showEmailToOthers: true },
     });
     res.json(user);
   } catch (error) {
@@ -58,16 +58,18 @@ router.put("/me",
     body: z.object({ 
       name: z.string().min(1).trim().optional(),
       description: z.string().max(200).trim().optional(),
+      showEmailToOthers: z.boolean().optional(),
     }) 
   }),
   async (req, res, next) => {
     try {
       const userId = (req as any).user.id;
-      const { name, description } = req.body;
+      const { name, description, showEmailToOthers } = req.body;
 
-      const dataToUpdate: { name?: string; description?: string } = {};
+      const dataToUpdate: { name?: string; description?: string, showEmailToOthers?: boolean } = {};
       if (name) dataToUpdate.name = name;
       if (description !== undefined) dataToUpdate.description = description;
+      if (showEmailToOthers !== undefined) dataToUpdate.showEmailToOthers = showEmailToOthers;
 
       if (Object.keys(dataToUpdate).length === 0) {
         return res.status(400).json({ error: "No update data provided." });
@@ -76,7 +78,7 @@ router.put("/me",
       const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: dataToUpdate,
-        select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true },
+        select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true, showEmailToOthers: true },
       });
 
       io.emit('user:updated', updatedUser);
@@ -164,6 +166,8 @@ router.get(
           avatarUrl: true,
           description: true,
           createdAt: true,
+          email: true, // Select email to check it
+          showEmailToOthers: true, // Select the flag
         },
       });
 
@@ -171,7 +175,21 @@ router.get(
         return res.status(404).json({ error: 'User not found' });
       }
 
-      res.json(user);
+      // Conditionally build the response
+      const publicProfile: any = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        description: user.description,
+        createdAt: user.createdAt,
+      };
+
+      if (user.showEmailToOthers) {
+        publicProfile.email = user.email;
+      }
+
+      res.json(publicProfile);
     } catch (error) {
       next(error);
     }

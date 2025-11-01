@@ -94,6 +94,12 @@ export default function ProfilePage() {
                     <dt className="w-28 font-semibold">Joined on</dt>
                     <dd>{new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</dd>
                   </div>
+                  {user.email && (
+                    <div className="flex">
+                      <dt className="w-28 font-semibold">Email</dt>
+                      <dd>{user.email}</dd>
+                    </div>
+                  )}
                 </dl>
               </div>
             </div>

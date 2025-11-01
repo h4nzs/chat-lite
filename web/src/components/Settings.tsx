@@ -8,12 +8,13 @@ import { requestPushPermission } from '@hooks/usePushNotifications';
 import { useThemeStore } from '@store/theme'; // Import theme store
 
 export default function Settings() {
-  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts } = useAuthStore(state => ({
+  const { user, updateProfile, updateAvatar, sendReadReceipts, toggleReadReceipts, toggleShowEmail } = useAuthStore(state => ({
     user: state.user,
     updateProfile: state.updateProfile,
     updateAvatar: state.updateAvatar,
     sendReadReceipts: state.sendReadReceipts,
     toggleReadReceipts: state.toggleReadReceipts,
+    toggleShowEmail: state.toggleShowEmail,
   }));
   const { theme, toggleTheme } = useThemeStore(); // Use theme store
   const [name, setName] = useState(user?.name || '');
@@ -215,6 +216,26 @@ export default function Settings() {
               <span
                 aria-hidden="true"
                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${sendReadReceipts ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+
+          {/* Show Email Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-text-primary">Show Email Address</p>
+              <p className="text-sm text-text-secondary">Allow other users to see your email address on your profile.</p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleShowEmail}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-color focus:ring-offset-2 focus:ring-offset-bg-surface ${user?.showEmailToOthers ? 'bg-accent-gradient' : 'bg-gray-300'}`}
+              role="switch"
+              aria-checked={user?.showEmailToOthers}
+            >
+              <span
+                aria-hidden="true"
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${user?.showEmailToOthers ? 'translate-x-5' : 'translate-x-0'}`}
               />
             </button>
           </div>
