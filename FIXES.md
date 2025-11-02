@@ -1,99 +1,75 @@
-# Rekomendasi Peningkatan untuk Aplikasi Chat-Lite
+# Rekomendasi & Rencana Pengembangan Chat-Lite
 
-Dokumen ini berisi daftar saran perbaikan, pengoptimalan, dan ide fitur baru yang dapat diimplementasikan untuk meningkatkan kualitas, performa, dan fungsionalitas aplikasi Chat-Lite.
-
----
-
-### 💡 Fase 1: Pengoptimalan & Peningkatan Stabilitas
-
-Prioritas utama adalah memastikan aplikasi berjalan secepat dan seandal mungkin. Langkah-langkah ini berfokus pada pengalaman pengguna inti.
-
-#### 1. **Optimalkan Pengambilan Data Awal (Initial Data Fetch)**
-*   **Masalah:** Saat ini, aplikasi memuat daftar percakapan terlebih dahulu, kemudian secara terpisah memuat pesan saat setiap percakapan dibuka. Ini menciptakan beberapa permintaan jaringan yang dapat memperlambat waktu muat awal.
-*   **Rekomendasi:** Modifikasi *endpoint* `GET /api/conversations` di backend untuk menyertakan **1 pesan terakhir** dari setiap percakapan dalam respons awal. Di frontend, `useConversationStore` dapat langsung menggunakan data ini. Ini akan menghilangkan kebutuhan untuk permintaan jaringan tambahan saat hanya melihat pratinjau pesan terakhir di sidebar, membuat aplikasi terasa lebih responsif saat startup.
-
-#### 2. **Tingkatkan & Standarisasi Umpan Balik UI**
-*   **Masalah:** Umpan balik untuk status `loading` dan `error` belum konsisten di seluruh aplikasi. Beberapa bagian mungkin menampilkan spinner, sementara yang lain mungkin gagal secara diam-diam.
-*   **Rekomendasi:** Buat komponen `Spinner` dan `ErrorMessage` yang dapat digunakan kembali. Terapkan komponen-komponen ini secara konsisten pada semua operasi asinkron, seperti: 
-    *   `login` dan `register`
-    *   Mengunggah file
-    *   Memuat riwayat pesan lama
-    *   Menyimpan perubahan di halaman Pengaturan
-    Ini memberikan kejelasan kepada pengguna tentang apa yang sedang terjadi di aplikasi.
-
-#### 3. **Audit Komprehensif Event Listener**
-*   **Masalah:** Meskipun masalah utama *listener* duplikat telah diperbaiki, aplikasi yang berkembang secara kompleks berisiko mengalami kebocoran memori (*memory leaks*) jika *event listener* (terutama dari Socket.IO) tidak dibersihkan dengan benar saat komponen di-*unmount*.
-*   **Rekomendasi:** Lakukan audit menyeluruh pada semua `useEffect` di seluruh aplikasi yang mendaftarkan *event listener* (misalnya di `useSocketStore` dan `MessageItem`). Pastikan setiap `useEffect` tersebut mengembalikan **fungsi cleanup** yang memanggil `socket.off("event-name")` atau `observer.disconnect()` untuk semua *listener* yang didaftarkan. Ini adalah praktik terbaik untuk menjaga stabilitas aplikasi jangka panjang.
+Berikut adalah daftar saran, ide, dan rekomendasi untuk perbaikan serta penambahan fitur pada aplikasi Chat-Lite di masa mendatang.
 
 ---
 
-### ⭐ Fase 2: Fitur Baru yang Potensial
+### 🚀 Fitur Baru (Major Features)
 
-Setelah aplikasi stabil, fitur-fitur ini dapat ditambahkan untuk memperkaya fungsionalitas dan menyaingi aplikasi chat modern lainnya.
+1.  **Pesan Suara (Voice Messages)**
+    *   **Ide:** Menambahkan kemampuan bagi pengguna untuk merekam dan mengirim klip suara pendek, mirip seperti WhatsApp atau Telegram.
+    *   **Manfaat:** Meningkatkan ekspresivitas dan memberikan alternatif selain mengetik.
 
-#### 1. **Edit Pesan Terkirim**
-*   **Ide:** Berikan pengguna kemampuan untuk mengedit pesan teks mereka dalam jangka waktu terbatas setelah dikirim (misalnya, 15 menit).
-*   **Implementasi:**
-    *   **Backend:** Buat *endpoint* API baru `PUT /api/messages/:id`.
-    *   **UI:** Di `MessageItem`, tampilkan tombol "Edit" di menu dropdown untuk pesan milik pengguna sendiri. Saat diklik, ubah `MessageBubble` menjadi area input teks.
-    *   **Socket.IO:** Siarkan *event* `message:updated` ke semua anggota percakapan agar pesan yang diedit diperbarui secara *real-time*.
+2.  **Panggilan Suara & Video (Voice/Video Calls)**
+    *   **Ide:** Mengintegrasikan fungsionalitas panggilan peer-to-peer (P2P) menggunakan teknologi WebRTC.
+    *   **Manfaat:** Mengubah Chat-Lite menjadi platform komunikasi yang lebih lengkap.
 
-#### 2. **Pencarian Global**
-*   **Ide:** Perluas fitur pencarian saat ini yang hanya mencari di dalam percakapan aktif. Buat bar pencarian global yang dapat mencari pesan atau nama pengguna di semua percakapan.
-*   **Implementasi:**
-    *   **Backend:** Buat *endpoint* API baru `GET /api/search?q=<query>` yang melakukan pencarian *full-text* di model `Message` dan `User`.
-    *   **UI:** Tampilkan hasil pencarian dalam sebuah dropdown atau halaman khusus, yang dikelompokkan berdasarkan percakapan. Mengklik hasil akan menavigasi ke pesan tersebut dalam percakapan yang relevan.
+3.  **Status Pengguna Kustom (Custom User Status)**
+    *   **Ide:** Memungkinkan pengguna untuk mengatur status kustom (misalnya: "Sedang rapat", "Sedang liburan") selain hanya status "Online/Offline".
+    *   **Manfaat:** Memberikan lebih banyak konteks tentang ketersediaan pengguna.
 
-#### 3. *done* **Notifikasi Dalam Aplikasi (In-App Notifications)**
-*   **Ide:** Selain *push notification*, buat sistem notifikasi di dalam aplikasi (mirip lonceng notifikasi) untuk memberitahu pengguna saat mereka ditambahkan ke grup baru, peran mereka diubah, atau saat ada sebutan (mention) `@username`.
-*   **Implementasi:**
-    *   Buat komponen *popover* notifikasi baru di `Header` utama.
-    *   Gunakan *event-event* Socket.IO yang sudah ada (`conversation:new`, `participant:role_changed`) untuk memicu penambahan item notifikasi baru ke *state*.
+4.  **Integrasi GIF & Stiker**
+    *   **Ide:** Menambahkan tombol untuk mencari dan mengirim GIF (misalnya via integrasi API Giphy) atau stiker kustom.
+    *   **Manfaat:** Menambah elemen keseruan dalam percakapan.
 
-#### 4. **Status Kehadiran (Presence) yang Lebih Detail**
-*   **Ide:** Izinkan pengguna mengatur status kustom mereka (misalnya, "Away", "Do Not Disturb", "In a meeting") selain hanya "Online" atau "Offline".
-*   **Implementasi:**
-    *   Tambahkan kolom `status` pada model `User` di `schema.prisma`.
-    *   Buat *endpoint* API atau *event socket* bagi pengguna untuk memperbarui status mereka.
-    *   Di UI, tampilkan ikon status yang berbeda di `ChatList`, `ChatHeader`, dan profil pengguna berdasarkan status mereka.
+---
 
-#### 5. **Pratinjau Tautan (Link Preview)**
-*   **Ide:** Saat pengguna mengirim pesan yang berisi URL, secara otomatis ambil metadata (judul, deskripsi, gambar) dari URL tersebut dan tampilkan sebagai kartu pratinjau yang kaya.
-*   **Implementasi:**
-    *   **Backend:** Saat menerima pesan baru, periksa apakah ada URL di dalamnya. Jika ada, gunakan library seperti `link-preview-js` untuk mengambil metadata di sisi server.
-    *   **UI:** Buat komponen `LinkPreviewCard` baru yang akan dirender di bawah konten pesan jika pesan tersebut berisi metadata pratinjau.
+### ✨ Peningkatan UI/UX (UI/UX Enhancements)
 
-#### Rencana Implementasi user description:
+1.  **Edit Pesan Terkirim**
+    *   **Ide:** Memberikan opsi bagi pengguna untuk mengedit pesan yang sudah mereka kirim (misalnya dalam batas waktu 5 menit).
+    *   **Manfaat:** Fitur standar di aplikasi chat modern yang sangat berguna untuk memperbaiki kesalahan ketik.
 
-   1. Backend (`server/`):
-       * Database: Saya akan menambahkan kolom baru description
-         (tipe String, opsional) ke model User di
-         prisma/schema.prisma.
-       * Migrasi: Saya akan menjalankan prisma migrate dev untuk
-         menerapkan perubahan skema ke database.
-       * API: Saya akan memodifikasi endpoint PUT /api/users/me di
-         server/src/routes/users.ts. Saya akan menambahkan validai
-          untuk description (misalnya, panjang maksimal) dan
-         memperbarui logika untuk menyimpan deskripsi baru ke
-         database.
-       * Data Transfer: Saya akan memastikan data description
-         disertakan saat data pengguna diambil (misalnya, di
-         endpoint /api/users/me dan di dalam objek participants
-         pada data percakapan).
+2.  **UI Balasan Pesan yang Lebih Baik (Improved Reply UI)**
+    *   **Ide:** Saat sebuah pesan merupakan balasan, tampilkan kutipan pesan asli yang lebih interaktif. Jika diklik, scroll ke pesan asli tersebut.
+    *   **Manfaat:** Mempermudah mengikuti alur percakapan yang kompleks.
 
-   2. Frontend (`web/`):
-       * State Management: Saya akan menambahkan properti
-         description ke tipe User di web/src/store/auth.ts dan di
-         tempat lain jika diperlukan.
-       * UI Halaman Pengaturan: Saya akan memodifikasi
-         SettingsPage.tsx (web/src/pages/SettingsPage.tsx).
-           * Saya akan menambahkan textarea baru di bawah input
-             "Display Name" agar pengguna bisa melihat dan mengedt
-              deskripsi mereka.
-           * Saya akan menambahkan tombol "Save" atau membuat
-             pembaruan terjadi secara otomatis saat fokus input
-             hilang (on blur).
-       * UI Tampilan Profil: Saya akan memodifikasi komponen yang
-         menampilkan detail pengguna (misalnya, GroupInfoPanel.tsx
-         atau saat melihat profil pengguna lain) untuk menampilkan
-         deskripsi baru ini di bawah nama pengguna.
+3.  **Pencarian Pesan di Sisi Server (Server-Side Search)**
+    *   **Ide:** Mengganti pencarian pesan saat ini (yang hanya memfilter pesan yang sudah dimuat) dengan pencarian berbasis API yang mencari di seluruh riwayat percakapan.
+    *   **Manfaat:** Memberikan hasil pencarian yang lengkap dan akurat.
+
+4.  **Indikator Progres Upload File**
+    *   **Ide:** Menampilkan bar atau persentase progres saat pengguna mengunggah file berukuran besar.
+    *   **Manfaat:** Memberikan feedback visual dan meningkatkan pengalaman pengguna saat mengirim file.
+
+5.  **Drag & Drop untuk Upload File**
+    *   **Ide:** Memungkinkan pengguna untuk menyeret file dari desktop mereka langsung ke jendela chat untuk mengunggahnya.
+    *   **Manfaat:** Mempercepat dan mempermudah alur pengiriman file.
+
+---
+
+### ⚡️ Peningkatan Real-time & Performa
+
+1.  **Status "Telah Dibaca oleh..." (Read by...)**
+    *   **Ide:** Di chat grup, tampilkan siapa saja yang sudah membaca pesan, tidak hanya status "telah dibaca" secara umum.
+    *   **Manfaat:** Memberikan informasi yang lebih detail dan berguna dalam percakapan grup.
+
+2.  **Indikator Pengetikan Grup yang Lebih Cerdas**
+    *   **Ide:** Jika lebih dari satu orang sedang mengetik di grup, tampilkan pesan seperti "Beberapa orang sedang mengetik..." atau "User A, User B, dan User C sedang mengetik...".
+    *   **Manfaat:** Mengurangi "noise" visual di grup yang aktif.
+
+3.  **Penanda Pesan Belum Dibaca (Unread Message Marker)**
+    *   **Ide:** Saat membuka chat yang memiliki pesan baru, tampilkan sebuah garis pemisah bertuliskan "Pesan Baru" di atas pesan pertama yang belum dibaca.
+    *   **Manfaat:** Membantu pengguna dengan cepat menemukan titik di mana mereka terakhir kali membaca.
+
+---
+
+### 🛡️ Peningkatan Backend & Keamanan
+
+1.  **Verifikasi Kunci Enkripsi (E2EE Key Verification)**
+    *   **Ide:** Menambahkan fitur di mana dua pengguna dapat memverifikasi identitas satu sama lain dengan memindai kode QR atau membandingkan string keamanan.
+    *   **Manfaat:** Meningkatkan kepercayaan dan keamanan dalam komunikasi end-to-end encryption.
+
+2.  **Penambahan Unit & Integration Test**
+    *   **Ide:** Menulis lebih banyak pengujian otomatis untuk backend (API & logika socket) dan frontend (interaksi komponen & state).
+    *   **Manfaat:** Meningkatkan stabilitas aplikasi, mencegah regresi (bug lama muncul kembali), dan mempermudah refactoring di masa depan.

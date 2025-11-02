@@ -163,7 +163,7 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
   }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
   const handleDelete = () => {
-    showConfirmation(
+    showConfirm(
       'Delete Message',
       'Are you sure you want to permanently delete this message?',
       () => {

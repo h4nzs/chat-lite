@@ -14,7 +14,7 @@ export default function KeyManagementPage() {
   }));
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const showConfirmation = useModalStore(state => state.showConfirmation);
+  const showConfirm = useModalStore(state => state.showConfirm);
 
   const handleBackup = async () => {
     const password = prompt("To back up your key, please enter your current password:");
@@ -53,7 +53,7 @@ export default function KeyManagementPage() {
   };
 
   const handleGenerateNew = () => {
-    showConfirmation(
+    showConfirm(
       "Generate New Keys",
       "WARNING:\n\nGenerating a new key is a destructive action.\n\n- You will NOT be able to read your past encrypted messages.\n- You should back up your current key first if you want to preserve history.\n\nAre you absolutely sure you want to continue?",
       async () => {

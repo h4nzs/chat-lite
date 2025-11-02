@@ -10,7 +10,7 @@ import type { User } from "@store/auth";
 const ParticipantActions = ({ conversationId, participant, amIAdmin }: { conversationId: string, participant: Participant, amIAdmin: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuthStore();
-  const showConfirmation = useModalStore(state => state.showConfirmation);
+  const showConfirm = useModalStore(s => s.showConfirm);
 
   if (!amIAdmin || user?.id === participant.id) {
     return null;
@@ -31,7 +31,7 @@ const ParticipantActions = ({ conversationId, participant, amIAdmin }: { convers
 
   const handleRemove = () => {
     setIsOpen(false);
-    showConfirmation(
+    showConfirm(
       'Remove Participant',
       `Are you sure you want to remove ${participant.name} from the group?`,
       async () => {
