@@ -4,7 +4,8 @@ import { getSocket, disconnectSocket } from "@lib/socket";
 import { useSocketStore } from './socket';
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
-import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
+import { getSodium } from '@lib/sodiumInitializer';
+import { generateKeyPair, exportPublicKey, storePrivateKey } from "@utils/keyManagement";
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 
@@ -22,8 +23,8 @@ export type User = {
 const setupUserEncryptionKeys = async (password: string): Promise<void> => {
   try {
     // Ensure sodium is initialized before generating keys
-    const sodium = await getSodium();
-    const { publicKey, privateKey } = sodium.crypto_box_keypair();
+    await getSodium(); // Ensure libsodium is ready
+    const { publicKey, privateKey } = await generateKeyPair();
     
     // Export public key to base64 string
     const publicKeyStr = await exportPublicKey(publicKey);

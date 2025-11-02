@@ -49,7 +49,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const presence = usePresenceStore((s) => s.presence);
   const openProfileModal = useModalStore(s => s.openProfileModal);
 
-  const peerUser = !conversation.isGroup ? conversation.participants.find((p) => p.id !== meId) : null;
+  const peerUser = !conversation.isGroup ? conversation.participants?.find((p) => p.id !== meId) : null;
   const title = conversation.isGroup ? conversation.title : peerUser?.name;
   const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl;
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;

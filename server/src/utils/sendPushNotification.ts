@@ -2,16 +2,6 @@ import webpush from "web-push";
 import { prisma } from "../lib/prisma.js";
 import { env } from "../config.js";
 
-if (env.vapidPublicKey && env.vapidPrivateKey) {
-  webpush.setVapidDetails(
-    "mailto:admin@chatlite.dev",
-    env.vapidPublicKey,
-    env.vapidPrivateKey
-  );
-} else {
-  console.warn("VAPID keys are not configured. Push notifications will be disabled.");
-}
-
 export async function sendPushNotification(userId: string, payload: object) {
   if (!env.vapidPublicKey || !env.vapidPrivateKey) {
     return; // Jangan lakukan apa-apa jika VAPID keys tidak ada

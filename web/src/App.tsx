@@ -12,6 +12,7 @@ import { useAuthStore } from './store/auth'; // Add this import
 import { useEffect } from 'react';
 import ConfirmModal from './components/ConfirmModal';
 import UserInfoModal from './components/UserInfoModal'; // Import UserInfoModal
+import PasswordPromptModal from './components/PasswordPromptModal';
 import DynamicIsland from './components/DynamicIsland';
 import { useThemeStore } from './store/theme';
 
@@ -45,6 +46,7 @@ export default function App() {
       <BrowserRouter>
         <ConfirmModal />
         <UserInfoModal />
+        <PasswordPromptModal />
         <DynamicIsland />
         <Routes>
           <Route path="/login" element={<Login />} />

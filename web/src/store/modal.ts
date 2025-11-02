@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { User } from './auth';
 
 type ModalState = {
   isConfirmOpen: boolean;
@@ -7,14 +6,18 @@ type ModalState = {
   confirmMessage: string;
   onConfirm: () => void;
   isProfileModalOpen: boolean;
-  profileUserId: string | null; // Changed from profileData
+  profileUserId: string | null;
+  isPasswordPromptOpen: boolean;
+  onPasswordSubmit: (password: string | null) => void;
 };
 
 type ModalActions = {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void;
   hideConfirm: () => void;
-  openProfileModal: (userId: string) => void; // Now accepts userId
+  openProfileModal: (userId: string) => void;
   closeProfileModal: () => void;
+  showPasswordPrompt: (onSubmitted: (password: string | null) => void) => void;
+  hidePasswordPrompt: () => void;
 };
 
 export const useModalStore = create<ModalState & ModalActions>((set) => ({
@@ -24,10 +27,14 @@ export const useModalStore = create<ModalState & ModalActions>((set) => ({
   onConfirm: () => {},
   isProfileModalOpen: false,
   profileUserId: null,
+  isPasswordPromptOpen: false,
+  onPasswordSubmit: () => {},
 
   showConfirm: (title, message, onConfirm) => set({ isConfirmOpen: true, confirmTitle: title, confirmMessage: message, onConfirm }),
   hideConfirm: () => set({ isConfirmOpen: false }),
   openProfileModal: (userId) => set({ isProfileModalOpen: true, profileUserId: userId }),
   closeProfileModal: () => set({ isProfileModalOpen: false, profileUserId: null }),
+  showPasswordPrompt: (onSubmitted) => set({ isPasswordPromptOpen: true, onPasswordSubmit: onSubmitted }),
+  hidePasswordPrompt: () => set({ isPasswordPromptOpen: false }),
 }));
 

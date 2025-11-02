@@ -1,157 +1,148 @@
-import { getSodium } from '@lib/sodiumInitializer'
 
-// Cache for derived keys to avoid recomputation
-const keyCache = new Map<string, Uint8Array>()
-const MAX_CACHE_SIZE = 1000;
+import { getSodium } from '@lib/sodiumInitializer';
+import { api } from '@lib/api';
+import { retrievePrivateKey, decryptSessionKeyForUser } from '@utils/keyManagement';
+import { useModalStore } from '@store/modal';
 
-// Function to clear key cache (useful for logout)
+// --- Key Cache ---
+const sessionKeyCache = new Map<string, Uint8Array>();
+const MAX_CACHE_SIZE = 100;
+let userPublicKey: Uint8Array | null = null;
+let userPrivateKey: Uint8Array | null = null;
+
 export function clearKeyCache(): void {
-  keyCache.clear()
+  sessionKeyCache.clear();
+  userPrivateKey = null;
 }
 
 function cleanupCacheIfNeeded(): void {
-  if (keyCache.size > MAX_CACHE_SIZE) {
-    // Remove oldest entries (first-in-first-out)
-    const firstKey = keyCache.keys().next().value;
-    keyCache.delete(firstKey);
+  if (sessionKeyCache.size > MAX_CACHE_SIZE) {
+    const firstKey = sessionKeyCache.keys().next().value;
+    sessionKeyCache.delete(firstKey);
   }
 }
 
-// Generate a deterministic key for a conversation based on conversation ID only
-async function generateConversationKey(conversationId: string): Promise<Uint8Array> {
-  const sodium = await getSodium()
-  
-  // Check cache first
-  const cacheKey = `${conversationId}`
-  if (keyCache.has(cacheKey)) {
-    console.log("Using cached key for conversation:", conversationId); // Debug log
-    return keyCache.get(cacheKey)!
-  }
-  
-  cleanupCacheIfNeeded(); // Clean up before adding new entry
-  
-  // Create a deterministic key based on conversation ID only
-  // This ensures both sender and receiver use the same key
-  const keyMaterial = `${conversationId}`
-  
-  // Use crypto_generichash to derive a key from the key material
-  const derivedKey = sodium.crypto_generichash(
-    sodium.crypto_secretbox_KEYBYTES,
-    keyMaterial,
-    'chat-lite-key-derivation-salt'
-  )
-  
-  console.log("Generated new key for conversation:", { conversationId, keyMaterial, derivedKey }); // Debug log
-  
-  // Cache the key
-  keyCache.set(cacheKey, derivedKey)
-  
-  return derivedKey
+// --- Password & Private Key Management ---
+
+// This function is a placeholder for a secure password retrieval mechanism (e.g., a session-scoped cache or a modal).
+async function getPassword(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    useModalStore.getState().showPasswordPrompt(
+      (password) => {
+        if (password) {
+          resolve(password);
+        } else {
+          reject(new Error("Password not provided."));
+        }
+      }
+    );
+  });
 }
 
-// Encrypt message with libsodium
-export async function encryptMessage(text: string, conversationId: string): Promise<string> {
-  console.log("=== ENCRYPT MESSAGE ===");
-  console.log("Input text:", text);
-  console.log("Conversation ID:", conversationId);
-  const sodium = await getSodium()
-  const key = await generateConversationKey(conversationId)
-  console.log("Generated key (base64):", sodium.to_base64(key, sodium.base64_variants.ORIGINAL));
-  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
-  console.log("Generated nonce (base64):", sodium.to_base64(nonce, sodium.base64_variants.ORIGINAL));
-  const encrypted = sodium.crypto_secretbox_easy(text, nonce, key)
-  console.log("Encrypted data (base64):", sodium.to_base64(encrypted, sodium.base64_variants.ORIGINAL));
+async function getMyKeyPair(): Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }> {
+  if (userPrivateKey && userPublicKey) {
+    return { publicKey: userPublicKey, privateKey: userPrivateKey };
+  }
+
+  const password = await getPassword();
+  const encryptedKey = localStorage.getItem('encryptedPrivateKey');
+  const publicKeyB64 = localStorage.getItem('publicKey');
+
+  if (!encryptedKey || !publicKeyB64) {
+    throw new Error("Encryption keys not found in storage.");
+  }
+
+  const privateKey = await retrievePrivateKey(encryptedKey, password);
+  if (!privateKey) {
+    throw new Error("Incorrect password. Failed to decrypt private key.");
+  }
+
+  const sodium = await getSodium();
+  const publicKey = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
+
+  userPrivateKey = privateKey;
+  userPublicKey = publicKey;
   
-  // Combine nonce and encrypted data for storage
-  const combined = new Uint8Array(nonce.length + encrypted.length)
-  combined.set(nonce)
-  combined.set(encrypted, nonce.length)
-  console.log("Combined data (base64):", sodium.to_base64(combined, sodium.base64_variants.ORIGINAL));
-  
-  // Return as base64 string
-  const result = sodium.to_base64(combined, sodium.base64_variants.ORIGINAL)
-  console.log("Final encrypted result:", result);
-  console.log("=== END ENCRYPT MESSAGE ===");
-  return result
+  return { publicKey, privateKey };
 }
 
-// Decrypt message with libsodium
-export async function decryptMessage(cipher: string, conversationId: string): Promise<string> {
-  console.log("=== DECRYPT MESSAGE ===");
-  console.log("Input cipher:", cipher);
-  console.log("Conversation ID:", conversationId);
-  
-  // Add safe guard for empty or invalid cipher
-  if (!cipher || typeof cipher !== "string") {
-    console.warn("Empty or invalid cipher, returning empty string");
-    return "";
+// --- Session Key Retrieval ---
+
+async function getSessionKey(conversationId: string): Promise<Uint8Array> {
+  if (sessionKeyCache.has(conversationId)) {
+    return sessionKeyCache.get(conversationId)!;
   }
-  
+
+  cleanupCacheIfNeeded();
+
   try {
-    // Check if cipher is valid and not empty
-    if (cipher.trim() === '') {
-      console.log("Empty cipher, returning as empty string");
-      console.log("=== END DECRYPT MESSAGE (empty) ===");
-      return '';
-    }
-    
-    // Check if cipher looks like base64 (basic check: length multiple of 4 and valid base64 characters)
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    if (!base64Regex.test(cipher) || cipher.length % 4 !== 0) {
-      // If it's not valid base64, return as plain text
-      console.log("Cipher is not valid base64, returning as plain text:", cipher);
-      console.log("=== END DECRYPT MESSAGE (plain text) ===");
-      return cipher;
-    }
-    
+    // 1. Fetch the encrypted session key from the server
+    const { encryptedKey } = await api<{ encryptedKey: string }>(`/api/session-keys/${conversationId}`);
+
+    // 2. Get the user's key pair (this may prompt for a password)
+    const { publicKey, privateKey } = await getMyKeyPair();
+
+    // 3. Decrypt the session key
     const sodium = await getSodium();
+    const sessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
     
-    // Try to decode as base64
-    let combined: Uint8Array;
-    try {
-      combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    } catch {
-      console.log("Cannot decode as base64, returning as plain text:", cipher);
-      console.log("=== END DECRYPT MESSAGE (plain text) ===");
-      return cipher;
-    }
+    // 4. Cache and return the decrypted key
+    sessionKeyCache.set(conversationId, sessionKey);
+    return sessionKey;
+
+  } catch (error) {
+    console.error(`Failed to get or decrypt session key for conversation ${conversationId}:`, error);
+    throw new Error("Could not establish secure session.");
+  }
+}
+
+// --- Message Encryption/Decryption ---
+
+export async function encryptMessage(text: string, conversationId: string): Promise<string> {
+  if (!text) return '';
+  
+  const sodium = await getSodium();
+  const key = await getSessionKey(conversationId);
+  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+  const encrypted = sodium.crypto_secretbox_easy(text, nonce, key);
+
+  const combined = new Uint8Array(nonce.length + encrypted.length);
+  combined.set(nonce);
+  combined.set(encrypted, nonce.length);
+
+  return sodium.to_base64(combined, sodium.base64_variants.ORIGINAL);
+}
+
+export async function decryptMessage(cipher: string, conversationId: string): Promise<string> {
+  if (!cipher || typeof cipher !== 'string' || cipher.trim() === '') {
+    return '';
+  }
+
+  const sodium = await getSodium();
+  
+  // Heuristic to check if the content is actually encrypted (Base64)
+  // This avoids trying to decrypt plain text messages from before E2EE was enabled.
+  const isLikelyEncrypted = (cipher.length > 32 && (cipher.endsWith('=') || cipher.endsWith('==') || /^[A-Za-z0-9+/]+$/.test(cipher.slice(0, -2))));
+  if (!isLikelyEncrypted) {
+    return cipher; // Return as plain text
+  }
+
+  try {
+    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
     
-    // Check if combined data is valid for decryption
     if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
-      console.log("Invalid cipher length, returning as plain text:", cipher);
-      console.log("=== END DECRYPT MESSAGE (plain text) ===");
-      return cipher;
+      return '[Invalid Encrypted Data]';
     }
-    
-    // Generate the conversation key
-    const key = await generateConversationKey(conversationId);
-    
-    // Extract nonce and encrypted data
+
+    const key = await getSessionKey(conversationId);
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
-    
-    // Decrypt
+
     const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
-    const result = sodium.to_string(decrypted);
-    
-    console.log("Decrypted result:", result);
-    console.log("=== END DECRYPT MESSAGE (success) ===");
-    return result;
+    return sodium.to_string(decrypted);
+
   } catch (error) {
-    console.error('Decryption failed:', error);
-    console.log("=== END DECRYPT MESSAGE (failed) ===");
-    
-    // Return a more specific error message, but also check if cipher itself is valid to return
-    if (error instanceof Error) {
-      if (error.message.includes('incorrect key') || error.message.includes('bad message authentication tag')) {
-        return '[Failed to decrypt: Invalid key]';
-      } else if (error.message.includes('incomplete input')) {
-        return '[Failed to decrypt: Incomplete data]';
-      }
-    }
-    
-    // If the error is because the content is not encrypted, return it as is
-    // This handles cases where the content is plain text that doesn't need decryption
-    return '[Failed to decrypt: Message may be corrupted]';
+    console.error(`Decryption failed for conversation ${conversationId}:`, error);
+    return '[Failed to decrypt message]';
   }
 }

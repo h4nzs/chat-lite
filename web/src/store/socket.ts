@@ -5,6 +5,7 @@ import { useConversationStore, Message, Conversation } from "./conversation";
 import { useMessageStore, decryptMessageObject } from "./message";
 import { usePresenceStore } from "./presence";
 import useNotificationStore from './notification';
+import { api } from '@lib/api'; // Add this missing import
 
 // --- Helper Functions ---
 

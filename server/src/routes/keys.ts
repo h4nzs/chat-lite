@@ -7,16 +7,17 @@ import { zodValidate } from "../utils/validate.js";
 const router = Router();
 
 // === POST: Upload user's public key ===
-router.post("/keys/public", 
+router.post("/public", 
   requireAuth, 
   zodValidate({ body: z.object({ publicKey: z.string().min(1) }) }),
   async (req, res, next) => {
     try {
       const userId = req.user.id;
+      const { publicKey } = req.body; // Correctly extract publicKey from body
 
       await prisma.user.update({
         where: { id: userId },
-        data: { publicKey }
+        data: { publicKey }, // Use the extracted variable
       });
 
       res.json({ ok: true });
@@ -27,7 +28,7 @@ router.post("/keys/public",
 );
 
 // === GET: Get user's public key ===
-router.get("/keys/public/:userId",
+router.get("/public/:userId",
   requireAuth,
   zodValidate({ params: z.object({ userId: z.string().cuid() }) }),
   async (req, res, next) => {

@@ -3,9 +3,47 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getIo } from "../socket.js";
 import { upload } from "../utils/upload.js";
+import sodium from "libsodium-wrappers";
+
 
 const router = Router();
 router.use(requireAuth);
+
+// Helper function to create and distribute session keys for a conversation
+async function createAndDistributeSessionKeys(conversationId: string, participantUserIds: string[]) {
+  await sodium.ready;
+
+  // 1. Generate a new random session key
+  const sessionKey = sodium.crypto_secretbox_keygen();
+
+  // 2. Fetch public keys for all participants
+  const participants = await prisma.user.findMany({
+    where: {
+      id: { in: participantUserIds },
+      publicKey: { not: null },
+    },
+    select: { id: true, publicKey: true },
+  });
+
+  if (participants.length === 0) return; // No one has a public key, can't create session
+
+  // 3. Encrypt the session key for each participant
+  const sessionKeyData = participants.map(p => {
+    const encryptedKey = sodium.crypto_box_seal(sessionKey, sodium.from_base64(p.publicKey!, sodium.base64_variants.ORIGINAL));
+    return {
+      conversationId,
+      userId: p.id,
+      encryptedKey: sodium.to_base64(encryptedKey, sodium.base64_variants.ORIGINAL),
+    };
+  });
+
+  // 4. Store the encrypted keys in the database
+  await prisma.sessionKey.createMany({
+    data: sessionKeyData,
+    skipDuplicates: true, // Avoid errors if a key already exists
+  });
+}
+
 
 // GET all conversations for the current user
 router.get("/", async (req, res, next) => {
@@ -122,6 +160,9 @@ router.post("/", async (req, res, next) => {
         creator: true,
       },
     });
+
+    // Create and distribute session keys for the new conversation
+    await createAndDistributeSessionKeys(newConversation.id, allUserIds);
 
     if (isGroup) {
       const io = getIo();
@@ -284,6 +325,9 @@ router.post("/:id/participants", async (req, res, next) => {
     newParticipants.forEach(p => {
       io.to(p.userId).emit("conversation:new", conversation);
     });
+
+    // Create and distribute session keys for the new participants
+    await createAndDistributeSessionKeys(conversationId, userIds);
 
     res.status(201).json(newParticipants);
   } catch (error) {

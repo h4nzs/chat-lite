@@ -111,27 +111,26 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
         participants: c.participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role })),
       }));
 
-      const decryptedConversations = await Promise.all(
-        conversations.map(async (c) => {
-          if (c.lastMessage?.content) {
-            try {
-              c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id);
-            } catch {
-              c.lastMessage.content = "[Encrypted Message]";
-            }
+      // Safely decrypt messages one by one to prevent a single failure from stopping the entire load
+      for (const c of conversations) {
+        if (c.lastMessage?.content) {
+          try {
+            c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id);
+          } catch (e) {
+            console.warn(`Could not decrypt last message for convo ${c.id}:`, e);
+            c.lastMessage.content = "[Encrypted Message]";
           }
-          if (c.lastMessage) {
-            c.lastMessage = withPreview(c.lastMessage);
-          }
-          return c;
-        })
-      );
+        }
+        if (c.lastMessage) {
+          c.lastMessage = withPreview(c.lastMessage);
+        }
+      }
 
-      set({ conversations: sortConversations(decryptedConversations) });
+      set({ conversations: sortConversations(conversations) });
 
       // After loading conversations, join their respective socket rooms
       const socket = getSocket();
-      decryptedConversations.forEach(c => {
+      conversations.forEach(c => {
         socket.emit("conversation:join", c.id);
       });
     } catch (error) {

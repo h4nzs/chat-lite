@@ -146,7 +146,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   }, []);
 
   const filteredConversations = conversations.filter(c => {
-    const title = c.title || c.participants.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
+    const title = c.title || c.participants?.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
     return title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -192,7 +192,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             ) : (
               filteredConversations.map((c) => {
                 const isActive = c.id === activeId;
-                const peerUser = !c.isGroup ? c.participants.find(p => p.id !== meId) : null;
+                const peerUser = !c.isGroup ? c.participants?.find(p => p.id !== meId) : null;
                 const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
                 const isOnline = peerUser ? presence.includes(peerUser.id) : false;
 

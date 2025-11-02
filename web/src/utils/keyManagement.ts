@@ -3,7 +3,7 @@ import { getSodium } from '@lib/sodiumInitializer';
 // Function to generate a new key pair for the user
 export async function generateKeyPair(): Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }> {
   const sodium = await getSodium();
-  return sodium.crypto_kx_keypair();
+  return sodium.crypto_box_keypair();
 }
 
 // Function to export public key in a string format
@@ -38,8 +38,8 @@ export async function storePrivateKey(privateKey: Uint8Array | null, password: s
     throw new TypeError("Invalid private key — must be Uint8Array");
   }
 
-  if (!password || typeof password !== "string") {
-    throw new TypeError("Invalid password — must be string");
+  if (!password || typeof password !== "string" || password.length === 0) {
+    throw new TypeError("Invalid password — must be a non-empty string");
   }
 
   try {
@@ -47,15 +47,14 @@ export async function storePrivateKey(privateKey: Uint8Array | null, password: s
     const combinedKey = `${appSecret}-${password}`;
     const combinedBytes = sodium.from_string(combinedKey);
 
-    const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
-    const key = sodium.crypto_pwhash(
-      sodium.crypto_secretbox_KEYBYTES,
-      combinedBytes,
-      salt,
-      sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-      sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-      sodium.crypto_pwhash_ALG_DEFAULT
-    );
+    const salt = sodium.randombytes_buf(32); // Using a 32-byte salt for generichash
+
+    // Derive key using crypto_generichash as a workaround for pwhash issues
+    const keyInput = new Uint8Array(salt.length + combinedBytes.length);
+    keyInput.set(salt);
+    keyInput.set(combinedBytes, salt.length);
+    const key = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, keyInput);
+
 
     const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
     const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, key);
@@ -81,23 +80,20 @@ export async function retrievePrivateKey(encryptedDataStr: string, password: str
   const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.ORIGINAL);
   
   // Extract salt, nonce, and encrypted key
-  const salt = encryptedData.slice(0, sodium.crypto_pwhash_SALTBYTES);
-  const nonce = encryptedData.slice(sodium.crypto_pwhash_SALTBYTES, sodium.crypto_pwhash_SALTBYTES + sodium.crypto_secretbox_NONCEBYTES);
-  const encryptedPrivateKey = encryptedData.slice(sodium.crypto_pwhash_SALTBYTES + sodium.crypto_secretbox_NONCEBYTES);
+  const salt = encryptedData.slice(0, 32);
+  const nonce = encryptedData.slice(32, 32 + sodium.crypto_secretbox_NONCEBYTES);
+  const encryptedPrivateKey = encryptedData.slice(32 + sodium.crypto_secretbox_NONCEBYTES);
   
   // Derive the same key from the password
   const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
   const combinedKey = `${appSecret}-${password}`;
   const combinedBytes = sodium.from_string(combinedKey);
   
-  const key = sodium.crypto_pwhash(
-    sodium.crypto_secretbox_KEYBYTES,
-    combinedBytes,
-    salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_ALG_DEFAULT
-  );
+  // Derive key using crypto_generichash to match the storing logic
+  const keyInput = new Uint8Array(salt.length + combinedBytes.length);
+  keyInput.set(salt);
+  keyInput.set(combinedBytes, salt.length);
+  const key = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, keyInput);
   
   // Decrypt the private key
   const privateKey = sodium.crypto_secretbox_open_easy(encryptedPrivateKey, nonce, key);
@@ -122,13 +118,23 @@ export async function encryptSessionKeyForUser(sessionKey: Uint8Array, recipient
 }
 
 // Function to decrypt a session key using user's private key
-export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, myPrivateKey: Uint8Array): Promise<Uint8Array> {
-  const sodium = await getSodium();
-  
+export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, publicKey: Uint8Array, privateKey: Uint8Array, sodium: any): Promise<Uint8Array> {
+  // Final, most robust check to ensure the private key is valid before use.
+  if (!privateKey || privateKey.length !== sodium.crypto_box_SECRETKEYBYTES) {
+    throw new TypeError("Invalid private key provided for session key decryption.");
+  }
+  if (!publicKey || publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) {
+    throw new TypeError("Invalid public key provided for session key decryption.");
+  }
+
   const encryptedSessionKey = sodium.from_base64(encryptedSessionKeyStr, sodium.base64_variants.ORIGINAL);
   
-  // Decrypt using private key - no need for sender's public key with seal/unseal
-  const sessionKey = sodium.crypto_box_seal_open(encryptedSessionKey, myPrivateKey);
+  // Decrypt using the full keypair
+  const sessionKey = sodium.crypto_box_seal_open(encryptedSessionKey, publicKey, privateKey);
   
+  if (!sessionKey) {
+    throw new Error("Failed to decrypt session key.");
+  }
+
   return sessionKey;
 }
