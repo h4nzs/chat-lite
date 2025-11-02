@@ -109,12 +109,11 @@ export async function authFetch<T>(
           // ulang sekali
           return await api<T>(url, options);
         }
+        // If refresh fails, just throw the original error
+        throw err;
       } catch {
-        // refresh gagal → redirect login
-        document.cookie =
-          "at=; Max-Age=0; path=/; SameSite=Lax; Secure"; // hapus cookie at
-        window.location.href = "/login";
-        throw new ApiError(401, "Session expired, please log in again");
+        // If the refresh call itself fails, throw the original error
+        throw err;
       }
     }
     throw err;

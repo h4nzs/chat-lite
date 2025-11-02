@@ -1,6 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
+import { useSocketStore } from './socket';
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { exportPublicKey, storePrivateKey } from "@utils/keyManagement";
@@ -69,7 +70,9 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
         console.warn("Encryption keys not setup - end-to-end encryption will be disabled. User should set up keys in settings.");
       }
       
-      get().ensureSocket();
+      // Initialize socket listeners AFTER user is authenticated
+      useSocketStore.getState().initSocketListeners();
+
     } catch (error) {
       console.error("Bootstrap error:", error);
       set({ user: null });

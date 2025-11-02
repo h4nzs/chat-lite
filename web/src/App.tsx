@@ -8,6 +8,7 @@ import ProfilePage from './pages/ProfilePage'; // Import ProfilePage
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useSocketStore } from './store/socket';
+import { useAuthStore } from './store/auth'; // Add this import
 import { useEffect } from 'react';
 import ConfirmModal from './components/ConfirmModal';
 import UserInfoModal from './components/UserInfoModal'; // Import UserInfoModal
@@ -18,8 +19,9 @@ export default function App() {
   const { theme } = useThemeStore();
 
   useEffect(() => {
-    const cleanup = useSocketStore.getState().initSocketListeners();
-    return cleanup; // Return the cleanup function to be called on unmount
+    // This is now the single entry point for app initialization.
+    // It ensures the user is authenticated before any other actions.
+    useAuthStore.getState().bootstrap();
   }, []);
 
   useEffect(() => {
