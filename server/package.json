@@ -23,7 +23,7 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
-    "csurf": "^1.11.0",
+    "csurf": "^1.2.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
