@@ -69,7 +69,14 @@ app.use(express.urlencoded({ extended: true }));
 const csrfProtection = csrf({
   cookie: { httpOnly: true, sameSite: "strict", secure: env.nodeEnv === "production" }
 });
-app.use(csrfProtection);
+
+// Apply CSRF protection conditionally, exempting the public key verification route
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/keys/verify') {
+    return next();
+  }
+  csrfProtection(req, res, next);
+});
 
 // === ROUTE FOR CSRF TOKEN ===
 app.get("/api/csrf-token", (req: Request, res: Response) => {

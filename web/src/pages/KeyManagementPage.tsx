@@ -35,8 +35,8 @@ export default function KeyManagementPage() {
           throw new Error("Failed to decrypt key. The password may be incorrect.");
         }
 
-        // Convert the first 16 bytes of the private key to a 12-word mnemonic
-        const mnemonic = bip39.entropyToMnemonic(privateKey.slice(0, 16));
+        // Convert the full 32-byte private key to a 24-word mnemonic
+        const mnemonic = bip39.entropyToMnemonic(privateKey);
         setRecoveryPhrase(mnemonic);
         setShowRecoveryModal(true);
 

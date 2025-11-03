@@ -70,6 +70,9 @@ export default function Login() {
           <p>Don't have an account?</p>
           <Link to="/register">Sign up</Link>
         </div>
+        <div className="text-center mt-4">
+          <Link to="/restore" className="text-sm text-accent-color hover:underline">Restore from phrase</Link>
+        </div>
       </div>
     </div>
   );

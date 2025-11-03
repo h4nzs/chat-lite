@@ -74,7 +74,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
   const renderStep2 = () => (
     <>
       <h2 className="text-2xl font-bold text-text-primary text-center mb-4">Save Your Phrase</h2>
-      <p className="text-text-secondary text-center mb-6">Write down these 12 words in order. Keep them safe.</p>
+      <p className="text-text-secondary text-center mb-6">Write down these {words.length} words in order. Keep them safe.</p>
       <div className="relative bg-bg-main p-4 rounded-lg border border-border mb-4">
         <div className={`grid grid-cols-3 gap-x-6 gap-y-4 text-lg ${!showPhrase ? 'blur-md' : ''}`}>
           {words.map((word, index) => (
@@ -132,7 +132,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
         </button>
         <button
           onClick={handleVerify}
-          disabled={userInput.length !== 12}
+          disabled={userInput.length !== words.length}
           className="w-full py-3 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/90 transition-colors font-semibold disabled:opacity-50"
         >
           Verify

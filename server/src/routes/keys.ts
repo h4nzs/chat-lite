@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { z } from "zod";
 import { zodValidate } from "../utils/validate.js";
+import sodium from "libsodium-wrappers";
+import bcrypt from "bcrypt";
 
 const router = Router();
 
@@ -21,6 +23,52 @@ router.post("/public",
       });
 
       res.json({ ok: true });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// === POST: Verify public key for account recovery ===
+router.post("/verify",
+  async (req, res, next) => {
+    try {
+      // Manual validation
+      const schema = z.object({ 
+        username: z.string().min(1), 
+        publicKey: z.string().min(1),
+        newPassword: z.string().min(6, "Password must be at least 6 characters long"),
+      });
+      const { username, publicKey, newPassword } = schema.parse(req.body);
+
+      const user = await prisma.user.findFirst({
+        where: { username: { equals: username, mode: 'insensitive' } },
+      });
+
+      if (!user || !user.publicKey) {
+        return res.status(404).json({ error: "User not found or no public key on record." });
+      }
+
+      // Constant-time comparison to prevent timing attacks
+      const serverKey = Buffer.from(user.publicKey, 'base64');
+      const providedKey = Buffer.from(publicKey, 'base64');
+
+      if (serverKey.length !== providedKey.length || !sodium.compare(serverKey, providedKey)) {
+        return res.status(403).json({ error: "Invalid recovery phrase for this user." });
+      }
+
+      // If key is verified, update the user's password and public key
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          passwordHash: hashedPassword,
+          publicKey: publicKey, // Update the public key as well
+        },
+      });
+
+      res.json({ ok: true, message: "Public key verified and password updated successfully." });
     } catch (e) {
       next(e);
     }

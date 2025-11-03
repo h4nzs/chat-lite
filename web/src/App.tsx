@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Restore from './pages/Restore';
 import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
 import KeyManagementPage from './pages/KeyManagementPage';
@@ -51,6 +52,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/restore" element={<Restore />} />
           <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
