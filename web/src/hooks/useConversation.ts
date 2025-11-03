@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useConversationStore, type Message } from '@store/conversation';
 import { useMessageStore } from '@store/message';
+import { ensureAndRatchetSession } from '@utils/crypto';
 
 export function useConversation(conversationId: string) {
   const { conversation, error: convoError } = useConversationStore(state => ({
@@ -32,7 +33,14 @@ export function useConversation(conversationId: string) {
 
   useEffect(() => {
     if (conversationId) {
-      loadMessagesForConversation(conversationId);
+      ensureAndRatchetSession(conversationId)
+        .then(() => {
+          loadMessagesForConversation(conversationId);
+        })
+        .catch(error => {
+          console.error("Failed to establish secure session on conversation open:", error);
+          // Optionally set an error state here to show in the UI
+        });
     }
   }, [conversationId, loadMessagesForConversation]);
 

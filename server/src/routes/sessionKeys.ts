@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import sodium from "libsodium-wrappers";
+import { getIo } from "../socket.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -22,7 +23,7 @@ async function createAndDistributeSessionKeys(conversationId: string, participan
     select: { id: true, publicKey: true },
   });
 
-  if (participants.length === 0) return;
+  if (participants.length === 0) return null;
 
   const sessionKeyData = participants.map(p => {
     if (!p.publicKey) return null;
@@ -41,48 +42,78 @@ async function createAndDistributeSessionKeys(conversationId: string, participan
       skipDuplicates: true,
     });
   }
+
+  return { sessionId, sessionKeyData };
 }
 
-// GET the encrypted session key for a conversation
+// GET all encrypted session keys for a user in a conversation
 router.get("/:conversationId", async (req, res, next) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    let sessionKey = await prisma.sessionKey.findFirst({
+    const sessionKeys = await prisma.sessionKey.findMany({
       where: { conversationId, userId },
+      select: { sessionId: true, encryptedKey: true },
+      orderBy: { createdAt: 'asc' },
     });
 
-    // If key doesn't exist (e.g., for a legacy conversation), create it on-the-fly
-    if (!sessionKey) {
-      const conversation = await prisma.conversation.findFirst({
-        where: {
-          id: conversationId,
-          participants: { some: { userId } },
-        },
-        include: {
-          participants: { select: { userId: true } },
-        },
-      });
+    // This endpoint is now primarily for fetching historical keys.
+    // If no keys exist, it's not necessarily an error, the client can ratchet a new one.
+    res.json({ keys: sessionKeys });
 
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found or you are not a participant." });
-      }
+  } catch (error) {
+    next(error);
+  }
+});
 
-      const participantIds = conversation.participants.map(p => p.userId);
-      await createAndDistributeSessionKeys(conversationId, participantIds);
+// POST: Force create a new session key for a conversation (ratcheting)
+router.post("/:conversationId/ratchet", async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
 
-      // Retry fetching the key
-      sessionKey = await prisma.sessionKey.findFirst({
-        where: { conversationId, userId },
-      });
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        participants: { some: { userId } },
+      },
+      include: {
+        participants: { select: { userId: true } },
+      },
+    });
 
-      if (!sessionKey) {
-        return res.status(500).json({ error: "Failed to create and retrieve session key." });
-      }
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found or you are not a participant." });
     }
 
-    res.json({ encryptedKey: sessionKey.encryptedKey });
+    const participantIds = conversation.participants.map(p => p.userId);
+    const newSessionInfo = await createAndDistributeSessionKeys(conversationId, participantIds);
+
+    if (!newSessionInfo) {
+      return res.status(500).json({ error: "Failed to create new session key." });
+    }
+
+    // Find the specific encrypted key for the requesting user
+    const userEncryptedKey = newSessionInfo.sessionKeyData.find(d => d.userId === userId);
+
+    // Proactively send the new encrypted session key to all other participants
+    const io = getIo();
+    newSessionInfo.sessionKeyData.forEach(keyData => {
+      if (keyData.userId !== userId) { // Don't send to the user who initiated the ratchet
+        io.to(keyData.userId).emit('session:new_key', {
+          conversationId: keyData.conversationId,
+          sessionId: newSessionInfo.sessionId,
+          encryptedKey: keyData.encryptedKey,
+        });
+      }
+    });
+
+    res.status(201).json({
+      sessionId: newSessionInfo.sessionId,
+      encryptedKey: userEncryptedKey?.encryptedKey,
+    });
+
   } catch (error) {
     next(error);
   }

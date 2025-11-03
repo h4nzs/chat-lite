@@ -8,6 +8,8 @@ import { getSodium } from '@lib/sodiumInitializer';
 import { generateKeyPair, exportPublicKey, storePrivateKey } from "@utils/keyManagement";
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
+import { retrievePrivateKey } from "@utils/keyManagement";
+import { useModalStore } from "./modal";
 
 export type User = {
   id: string;
@@ -17,6 +19,23 @@ export type User = {
   description?: string | null;
   avatarUrl?: string | null;
   showEmailToOthers?: boolean;
+};
+
+type State = {
+  user: User | null;
+  theme: "light" | "dark";
+  sendReadReceipts: boolean;
+  bootstrap: () => Promise<void>;
+  login: (emailOrUsername: string, password: string) => Promise<void>;
+  register: (data: any) => Promise<void>;
+  logout: () => Promise<void>;
+  ensureSocket: () => void;
+  setTheme: (t: "light" | "dark") => void;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  updateAvatar: (file: File) => Promise<void>;
+  setReadReceipts: (value: boolean) => void;
+  regenerateKeys: (password: string) => Promise<void>;
+  getPrivateKey: () => Promise<Uint8Array>;
 };
 
 // Helper function to setup user encryption keys
@@ -51,6 +70,7 @@ const setupUserEncryptionKeys = async (password: string): Promise<void> => {
 
 // Restore user dari localStorage kalau ada
 const savedUser = localStorage.getItem("user");
+let privateKeyCache: Uint8Array | null = null;
 
 export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
@@ -134,6 +154,9 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     eraseCookie("at");
     eraseCookie("rt");
 
+    // Clear in-memory private key cache
+    privateKeyCache = null;
+
     // Clear encryption key cache
     clearKeyCache();
 
@@ -197,5 +220,34 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     // 3. Hapus semua state percakapan untuk memaksa sinkronisasi ulang
     useConversationStore.setState({ conversations: [], messages: {} }, true);
     useMessageStore.setState({ messages: {} }, true);
+  },
+
+  async getPrivateKey() {
+    // Check in-memory cache first
+    if (privateKeyCache) {
+      return privateKeyCache;
+    }
+
+    return new Promise((resolve, reject) => {
+      useModalStore.getState().showPasswordPrompt(async (password) => {
+        if (!password) {
+          return reject(new Error("Password not provided."));
+        }
+        try {
+          const encryptedKey = localStorage.getItem('encryptedPrivateKey');
+          if (!encryptedKey) {
+            throw new Error("Encrypted private key not found in storage.");
+          }
+          const pk = await retrievePrivateKey(encryptedKey, password);
+          if (!pk) {
+            throw new Error("Incorrect password. Failed to decrypt private key.");
+          }
+          privateKeyCache = pk; // Cache the key
+          resolve(pk);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   },
 }));

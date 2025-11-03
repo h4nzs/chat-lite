@@ -11,10 +11,10 @@ import type { Message } from "./conversation"; // Import type from conversation 
 export async function decryptMessageObject(message: Message): Promise<Message> {
   try {
     if (message.content) {
-      message.content = await decryptMessage(message.content, message.conversationId);
+      message.content = await decryptMessage(message.content, message.conversationId, (message as any).sessionId);
     }
     if (message.repliedTo?.content) {
-      message.repliedTo.content = await decryptMessage(message.repliedTo.content, message.conversationId);
+      message.repliedTo.content = await decryptMessage(message.repliedTo.content, message.conversationId, (message.repliedTo as any).sessionId);
     }
     return message;
   } catch {
@@ -96,12 +96,15 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     const me = useAuthStore.getState().user;
     const { replyingTo, addOptimisticMessage, setReplyingTo } = get();
 
-    let encryptedContent = data.content;
+    let payload: Partial<Message> = { ...data };
+
     if (data.content) {
       try {
-        encryptedContent = await encryptMessage(data.content, conversationId);
-      } catch {
-        toast.error("Failed to encrypt message.");
+        const { ciphertext, sessionId } = await encryptMessage(data.content, conversationId);
+        payload.content = ciphertext;
+        payload.sessionId = sessionId;
+      } catch (e: any) {
+        toast.error(`Encryption failed: ${e.message}`);
         return;
       }
     }
@@ -114,20 +117,19 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       sender: me!,
       createdAt: new Date().toISOString(),
       optimistic: true,
-      ...data,
+      ...data, // Use original, unencrypted content for optimistic UI
       repliedTo: replyingTo || undefined,
     };
 
     addOptimisticMessage(conversationId, optimisticMessage);
     
     const socket = getSocket();
-    const payload = { 
-      ...data, 
-      content: encryptedContent,
+    const finalPayload = { 
+      ...payload, 
       repliedToId: replyingTo?.id,
     };
 
-    socket.emit("message:send", { conversationId, tempId, ...payload }, (ack: { ok: boolean, error?: string }) => {
+    socket.emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
       if (!ack.ok) {
         toast.error(`Failed to send message: ${ack.error || 'Unknown error'}`);
         set(state => ({

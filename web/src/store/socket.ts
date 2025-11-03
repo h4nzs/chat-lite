@@ -6,6 +6,9 @@ import { useMessageStore, decryptMessageObject } from "./message";
 import { usePresenceStore } from "./presence";
 import useNotificationStore from './notification';
 import { api } from '@lib/api'; // Add this missing import
+import { decryptSessionKeyForUser } from '@utils/keyManagement';
+import { addSessionKey } from '@lib/keychainDb';
+import { getSodium } from '@lib/sodiumInitializer';
 
 // --- Helper Functions ---
 
@@ -200,6 +203,25 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       }
       getStores().convo.updateParticipantRole(conversationId, userId, role);
       getStores().convo.updateConversation(conversationId, { lastUpdated: Date.now() });
+    });
+
+    socket.on('session:new_key', async ({ conversationId, sessionId, encryptedKey }) => {
+      try {
+        console.log(`Received new session key ${sessionId} for conversation ${conversationId}`);
+        const privateKey = await useAuthStore.getState().getPrivateKey(); // This needs to be implemented
+        const publicKeyB64 = localStorage.getItem('publicKey');
+        if (!privateKey || !publicKeyB64) {
+          throw new Error("User keys not available to decrypt new session key.");
+        }
+        const sodium = await getSodium();
+        const publicKey = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
+
+        const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
+        await addSessionKey(conversationId, sessionId, newSessionKey);
+        console.log(`Successfully stored new session key ${sessionId}`);
+      } catch (error) {
+        console.error("Failed to process new session key:", error);
+      }
     });
 
 

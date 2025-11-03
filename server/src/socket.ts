@@ -86,6 +86,7 @@ export function registerSocket(httpServer: HttpServer) {
             fileName: data.fileName,
             fileType: data.fileType,
             fileSize: data.fileSize,
+            sessionId: data.sessionId, // Add session ID for E2EE
             repliedToId: data.repliedToId,
             linkPreview: linkPreviewData,
             statuses: {
@@ -122,6 +123,7 @@ export function registerSocket(httpServer: HttpServer) {
           statuses: newMessage.statuses,
           repliedTo: newMessage.repliedTo,
           linkPreview: newMessage.linkPreview, // Explicitly include linkPreview
+          sessionId: newMessage.sessionId, // Broadcast the session ID
           tempId: data.tempId,
         };
 

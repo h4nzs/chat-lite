@@ -1,30 +1,30 @@
-
 import { getSodium } from '@lib/sodiumInitializer';
 import { api } from '@lib/api';
 import { retrievePrivateKey, decryptSessionKeyForUser } from '@utils/keyManagement';
 import { useModalStore } from '@store/modal';
+import {
+  addSessionKey,
+  getSessionKey as getKeyFromDb,
+  getLatestSessionKey,
+  clearAllKeys as clearKeychainDb,
+} from '@lib/keychainDb';
 
-// --- Key Cache ---
-const sessionKeyCache = new Map<string, Uint8Array>();
-const MAX_CACHE_SIZE = 100;
+// --- User Private Key Cache (in-memory for one session) ---
 let userPublicKey: Uint8Array | null = null;
 let userPrivateKey: Uint8Array | null = null;
 
-export function clearKeyCache(): void {
-  sessionKeyCache.clear();
-  userPrivateKey = null;
-}
+// --- Ratchet Tracker (in-memory for one session) ---
+// This ensures we only ratchet once per conversation per app session.
+const ratchetedConversations = new Set<string>();
 
-function cleanupCacheIfNeeded(): void {
-  if (sessionKeyCache.size > MAX_CACHE_SIZE) {
-    const firstKey = sessionKeyCache.keys().next().value;
-    sessionKeyCache.delete(firstKey);
-  }
+export function clearKeyCache(): void {
+  userPublicKey = null;
+  userPrivateKey = null;
+  ratchetedConversations.clear();
+  clearKeychainDb(); // Clear the IndexedDB keychain on logout
 }
 
 // --- Password & Private Key Management ---
-
-// This function is a placeholder for a secure password retrieval mechanism (e.g., a session-scoped cache or a modal).
 async function getPassword(): Promise<string> {
   return new Promise((resolve, reject) => {
     useModalStore.getState().showPasswordPrompt(
@@ -39,7 +39,7 @@ async function getPassword(): Promise<string> {
   });
 }
 
-async function getMyKeyPair(): Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }> {
+async function getMyKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
   if (userPrivateKey && userPublicKey) {
     return { publicKey: userPublicKey, privateKey: userPrivateKey };
   }
@@ -66,43 +66,59 @@ async function getMyKeyPair(): Promise<{ publicKey: Uint8Array, privateKey: Uint
   return { publicKey, privateKey };
 }
 
-// --- Session Key Retrieval ---
+// --- Session Ratcheting and Key Retrieval ---
 
-async function getSessionKey(conversationId: string): Promise<Uint8Array> {
-  if (sessionKeyCache.has(conversationId)) {
-    return sessionKeyCache.get(conversationId)!;
+/**
+ * Ensures a session is established and up-to-date for a conversation.
+ * If it's a new app session for this convo, it ratchets a new key.
+ */
+export async function ensureAndRatchetSession(conversationId: string): Promise<void> {
+  if (ratchetedConversations.has(conversationId)) {
+    return; // Already ratcheted in this app session
   }
 
-  cleanupCacheIfNeeded();
-
   try {
-    // 1. Fetch the encrypted session key from the server
-    const { encryptedKey } = await api<{ encryptedKey: string }>(`/api/session-keys/${conversationId}`);
+    console.log(`Ratcheting session for conversation ${conversationId}...`);
+    const { sessionId, encryptedKey } = await api<{ sessionId: string; encryptedKey: string }>(
+      `/api/session-keys/${conversationId}/ratchet`,
+      { method: 'POST' }
+    );
 
-    // 2. Get the user's key pair (this may prompt for a password)
+    if (!sessionId || !encryptedKey) {
+      throw new Error('Invalid response from ratchet endpoint.');
+    }
+
     const { publicKey, privateKey } = await getMyKeyPair();
-
-    // 3. Decrypt the session key
     const sodium = await getSodium();
-    const sessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
-    
-    // 4. Cache and return the decrypted key
-    sessionKeyCache.set(conversationId, sessionKey);
-    return sessionKey;
+    const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
 
+    await addSessionKey(conversationId, sessionId, newSessionKey);
+    ratchetedConversations.add(conversationId);
+    console.log(`Successfully ratcheted and stored new session key ${sessionId} for ${conversationId}`);
   } catch (error) {
-    console.error(`Failed to get or decrypt session key for conversation ${conversationId}:`, error);
-    throw new Error("Could not establish secure session.");
+    console.error(`Failed to ratchet session for ${conversationId}:`, error);
+    throw new Error('Could not establish a secure session.');
   }
 }
 
 // --- Message Encryption/Decryption ---
 
-export async function encryptMessage(text: string, conversationId: string): Promise<string> {
-  if (!text) return '';
-  
+export async function encryptMessage(
+  text: string,
+  conversationId: string
+): Promise<{ ciphertext: string; sessionId: string }> {
+  if (!text) {
+    throw new Error('Cannot encrypt empty text.');
+  }
+
+  const latestKey = await getLatestSessionKey(conversationId);
+  if (!latestKey) {
+    // This should ideally not happen if ensureAndRatchetSession is called first.
+    throw new Error('No session key available for encryption. Please re-open the conversation.');
+  }
+
+  const { sessionId, key } = latestKey;
   const sodium = await getSodium();
-  const key = await getSessionKey(conversationId);
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
   const encrypted = sodium.crypto_secretbox_easy(text, nonce, key);
 
@@ -110,39 +126,46 @@ export async function encryptMessage(text: string, conversationId: string): Prom
   combined.set(nonce);
   combined.set(encrypted, nonce.length);
 
-  return sodium.to_base64(combined, sodium.base64_variants.ORIGINAL);
+  const ciphertext = sodium.to_base64(combined, sodium.base64_variants.ORIGINAL);
+  return { ciphertext, sessionId };
 }
 
-export async function decryptMessage(cipher: string, conversationId: string): Promise<string> {
+export async function decryptMessage(
+  cipher: string,
+  conversationId: string,
+  sessionId: string | null | undefined
+): Promise<string> {
   if (!cipher || typeof cipher !== 'string' || cipher.trim() === '') {
     return '';
   }
+  
+  if (!sessionId) {
+    // This is likely an old message from before the ratcheting system was implemented.
+    return '[Message from an old session, cannot be decrypted]';
+  }
 
   const sodium = await getSodium();
-  
-  // Heuristic to check if the content is actually encrypted (Base64)
-  // This avoids trying to decrypt plain text messages from before E2EE was enabled.
-  const isLikelyEncrypted = (cipher.length > 32 && (cipher.endsWith('=') || cipher.endsWith('==') || /^[A-Za-z0-9+/]+$/.test(cipher.slice(0, -2))));
-  if (!isLikelyEncrypted) {
-    return cipher; // Return as plain text
+  const key = await getKeyFromDb(conversationId, sessionId);
+
+  if (!key) {
+    // We don't have the key for this session. This can happen if the user
+    // cleared their storage or is on a new device.
+    return '[Decryption key not found for this message]';
   }
 
   try {
     const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    
     if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
       return '[Invalid Encrypted Data]';
     }
 
-    const key = await getSessionKey(conversationId);
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
 
     const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
     return sodium.to_string(decrypted);
-
   } catch (error) {
-    console.error(`Decryption failed for conversation ${conversationId}:`, error);
+    console.error(`Decryption failed for convo ${conversationId}, session ${sessionId}:`, error);
     return '[Failed to decrypt message]';
   }
 }
