@@ -1,27 +1,29 @@
 import { Link } from 'react-router-dom';
-import { FiKey, FiDownload, FiRefreshCw } from 'react-icons/fi';
+import { FiKey, FiShield, FiRefreshCw } from 'react-icons/fi';
 import { useState } from 'react';
 import { useAuthStore } from '@store/auth';
 import { retrievePrivateKey } from '@utils/keyManagement';
 import toast from 'react-hot-toast';
 import { Spinner } from '@components/Spinner';
 import { useModalStore } from '@store/modal';
+import * as bip39 from 'bip39';
+import RecoveryPhraseModal from '@components/RecoveryPhraseModal';
 
 export default function KeyManagementPage() {
   const { regenerateKeys, logout } = useAuthStore(state => ({ 
     regenerateKeys: state.regenerateKeys,
     logout: state.logout,
   }));
-  const [isBackingUp, setIsBackingUp] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const showConfirm = useModalStore(state => state.showConfirm);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryPhrase, setRecoveryPhrase] = useState('');
+  const { showConfirm, showPasswordPrompt } = useModalStore();
 
-  const handleBackup = async () => {
-    const { showPasswordPrompt } = useModalStore.getState();
+  const handleShowRecovery = () => {
     showPasswordPrompt(async (password) => {
       if (!password) return;
 
-      setIsBackingUp(true);
+      setIsProcessing(true);
       try {
         const encryptedKey = localStorage.getItem('encryptedPrivateKey');
         if (!encryptedKey) {
@@ -33,23 +35,15 @@ export default function KeyManagementPage() {
           throw new Error("Failed to decrypt key. The password may be incorrect.");
         }
 
-        const blob = new Blob([privateKey], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'chat-lite-private-key.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        toast.success('Key backup downloaded successfully!', { duration: 5000 });
-        toast('IMPORTANT: Store this file in a secure location. Do not share it with anyone.', { icon: '⚠️', duration: 8000 });
+        // Convert the first 16 bytes of the private key to a 12-word mnemonic
+        const mnemonic = bip39.entropyToMnemonic(privateKey.slice(0, 16));
+        setRecoveryPhrase(mnemonic);
+        setShowRecoveryModal(true);
 
       } catch (error: any) {
-        toast.error(error.message || "Backup failed.");
+        toast.error(error.message || "Failed to generate recovery phrase.");
       } finally {
-        setIsBackingUp(false);
+        setIsProcessing(false);
       }
     });
   };
@@ -92,13 +86,13 @@ export default function KeyManagementPage() {
         </p>
         
         <div className="space-y-4">
-          <button onClick={handleBackup} disabled={isBackingUp || isGenerating} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isBackingUp ? <Spinner size="sm" /> : <FiDownload />}
-            <span>{isBackingUp ? 'Processing...' : 'Back Up My Encryption Key'}</span>
+          <button onClick={handleShowRecovery} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isProcessing ? <Spinner size="sm" /> : <FiShield />}
+            <span>{isProcessing ? 'Processing...' : 'Show Recovery Phrase'}</span>
           </button>
-          <button onClick={handleGenerateNew} disabled={isGenerating || isBackingUp} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isGenerating ? <Spinner size="sm" /> : <FiRefreshCw />}
-            <span>{isGenerating ? 'Generating...' : 'Generate New Keys'}</span>
+          <button onClick={handleGenerateNew} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isProcessing ? <Spinner size="sm" /> : <FiRefreshCw />}
+            <span>{isProcessing ? 'Generating...' : 'Generate New Keys'}</span>
           </button>
         </div>
 
@@ -108,6 +102,7 @@ export default function KeyManagementPage() {
           </Link>
         </div>
       </div>
+      {showRecoveryModal && <RecoveryPhraseModal phrase={recoveryPhrase} onClose={() => setShowRecoveryModal(false)} />}
     </div>
   );
 }

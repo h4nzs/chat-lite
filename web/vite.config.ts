@@ -17,5 +17,8 @@ export default defineConfig({
       '@tests': path.resolve(__dirname, './src/tests'),
     },
   },
+  define: {
+    'global.Buffer': ['buffer', 'Buffer'],
+  },
 
 });
