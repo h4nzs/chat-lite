@@ -3,8 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getIo } from "../socket.js";
 import { upload } from "../utils/upload.js";
-import sodium from "libsodium-wrappers";
-
+import { rotateAndDistributeSessionKeys } from "../utils/sessionKeys.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -326,8 +325,8 @@ router.post("/:id/participants", async (req, res, next) => {
       io.to(p.userId).emit("conversation:new", conversation);
     });
 
-    // Create and distribute session keys for the new participants
-    await createAndDistributeSessionKeys(conversationId, userIds);
+    // Rotate session keys to include the new participants
+    await rotateAndDistributeSessionKeys(conversationId, currentUserId);
 
     res.status(201).json(newParticipants);
   } catch (error) {
@@ -409,12 +408,52 @@ router.delete("/:id/participants/:userId", async (req, res, next) => {
     io.to(conversationId).emit("conversation:participant_removed", { conversationId, userId: userToRemoveId });
     io.to(userToRemoveId).emit("conversation:deleted", { id: conversationId });
 
+    // Rotate session keys for the remaining members
+    await rotateAndDistributeSessionKeys(conversationId, currentUserId);
+
     res.status(204).send();
   } catch (error) {
     // Catch error if participant not found and send a 404
     if (error.code === 'P2025') {
       return res.status(404).json({ error: "Participant not found in this group." });
     }
+    next(error);
+  }
+});
+
+// LEAVE a group
+router.delete("/:id/leave", async (req, res, next) => {
+  try {
+    const { id: conversationId } = req.params;
+    const userId = req.user.id;
+
+    const participant = await prisma.participant.findFirst({
+      where: { conversationId, userId },
+    });
+
+    if (!participant) {
+      return res.status(404).json({ error: "You are not a member of this group." });
+    }
+
+    // Prevent creator from leaving for now, they should delete the group instead
+    const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    if (conversation?.creatorId === userId) {
+      return res.status(400).json({ error: "Group creator cannot leave the group; please delete it instead." });
+    }
+
+    await prisma.participant.delete({
+      where: { userId_conversationId: { userId, conversationId } },
+    });
+
+    const io = getIo();
+    io.to(conversationId).emit("conversation:participant_removed", { conversationId, userId });
+    io.to(userId).emit("conversation:deleted", { id: conversationId });
+
+    // Rotate session keys for the remaining members
+    await rotateAndDistributeSessionKeys(conversationId, userId);
+
+    res.status(204).send();
+  } catch (error) {
     next(error);
   }
 });

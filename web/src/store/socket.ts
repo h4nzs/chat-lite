@@ -132,6 +132,8 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
 
     socket.on("conversation:deleted", ({ id }) => {
       getStores().convo.removeConversation(id);
+      getStores().msg.clearMessagesForConversation(id);
+      useNotificationStore.getState().removeNotificationsForConversation(id);
     });
 
     socket.on("message:deleted", ({ messageId, conversationId }) => {

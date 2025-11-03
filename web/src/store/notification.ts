@@ -18,6 +18,7 @@ type NotificationState = {
   hidePopup: () => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
+  removeNotificationsForConversation: (conversationId: string) => void;
 };
 
 let popupTimeout: NodeJS.Timeout;
@@ -64,6 +65,15 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   clearNotifications: () => {
     set({ notifications: [], unreadCount: 0 });
+  },
+
+  removeNotificationsForConversation: (conversationId: string) => {
+    set(state => {
+      if (state.activePopup?.link === conversationId) {
+        return { activePopup: null };
+      }
+      return {};
+    });
   },
 }));
 
