@@ -21,7 +21,7 @@ export function clearKeyCache(): void {
   userPublicKey = null;
   userPrivateKey = null;
   ratchetedConversations.clear();
-  clearKeychainDb(); // Clear the IndexedDB keychain on logout
+  // clearKeychainDb(); // Clear the IndexedDB keychain on logout - REMOVED
 }
 
 // --- Password & Private Key Management ---
