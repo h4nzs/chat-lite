@@ -17,60 +17,64 @@ export default function KeyManagementPage() {
   const showConfirm = useModalStore(state => state.showConfirm);
 
   const handleBackup = async () => {
-    const password = prompt("To back up your key, please enter your current password:");
-    if (!password) return;
+    const { showPasswordPrompt } = useModalStore.getState();
+    showPasswordPrompt(async (password) => {
+      if (!password) return;
 
-    setIsBackingUp(true);
-    try {
-      const encryptedKey = localStorage.getItem('encryptedPrivateKey');
-      if (!encryptedKey) {
-        throw new Error("No encrypted key found in storage.");
+      setIsBackingUp(true);
+      try {
+        const encryptedKey = localStorage.getItem('encryptedPrivateKey');
+        if (!encryptedKey) {
+          throw new Error("No encrypted key found in storage.");
+        }
+
+        const privateKey = await retrievePrivateKey(encryptedKey, password);
+        if (!privateKey) {
+          throw new Error("Failed to decrypt key. The password may be incorrect.");
+        }
+
+        const blob = new Blob([privateKey], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chat-lite-private-key.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast.success('Key backup downloaded successfully!', { duration: 5000 });
+        toast('IMPORTANT: Store this file in a secure location. Do not share it with anyone.', { icon: '⚠️', duration: 8000 });
+
+      } catch (error: any) {
+        toast.error(error.message || "Backup failed.");
+      } finally {
+        setIsBackingUp(false);
       }
-
-      const privateKey = await retrievePrivateKey(encryptedKey, password);
-      if (!privateKey) {
-        throw new Error("Failed to decrypt key. The password may be incorrect.");
-      }
-
-      const blob = new Blob([privateKey], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'chat-lite-private-key.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('Key backup downloaded successfully!', { duration: 5000 });
-      toast('IMPORTANT: Store this file in a secure location. Do not share it with anyone.', { icon: '⚠️', duration: 8000 });
-
-    } catch (error: any) {
-      toast.error(error.message || "Backup failed.");
-    } finally {
-      setIsBackingUp(false);
-    }
+    });
   };
 
   const handleGenerateNew = () => {
     showConfirm(
       "Generate New Keys",
       "WARNING:\n\nGenerating a new key is a destructive action.\n\n- You will NOT be able to read your past encrypted messages.\n- You should back up your current key first if you want to preserve history.\n\nAre you absolutely sure you want to continue?",
-      async () => {
-        const password = prompt("To generate a new key, please enter your current password:");
-        if (!password) return;
+      () => {
+        const { showPasswordPrompt } = useModalStore.getState();
+        showPasswordPrompt(async (password) => {
+          if (!password) return;
 
-        setIsGenerating(true);
-        try {
-          await regenerateKeys(password);
-          toast.success('New keys generated successfully! Logging out for changes to take effect.', { duration: 6000 });
-          setTimeout(() => {
-            logout();
-          }, 3000);
-        } catch (error: any) {
-          toast.error(error.message || "Failed to generate new keys.");
-          setIsGenerating(false);
-        }
+          setIsGenerating(true);
+          try {
+            await regenerateKeys(password);
+            toast.success('New keys generated successfully! Logging out for changes to take effect.', { duration: 6000 });
+            setTimeout(() => {
+              logout();
+            }, 3000);
+          } catch (error: any) {
+            toast.error(error.message || "Failed to generate new keys.");
+            setIsGenerating(false);
+          }
+        });
       }
     );
   };

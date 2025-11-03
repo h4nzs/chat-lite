@@ -74,59 +74,51 @@ Berikut adalah daftar saran, ide, dan rekomendasi untuk perbaikan serta penambah
     *   **Ide:** Menulis lebih banyak pengujian otomatis untuk backend (API & logika socket) dan frontend (interaksi komponen & state).
     *   **Manfaat:** Meningkatkan stabilitas aplikasi, mencegah regresi (bug lama muncul kembali), dan mempermudah refactoring di masa depan.
 
-### Saran utama saya adalah mengimplementasikan arsitektur 
-  End-to-End Encryption (E2EE) yang sesungguhnya dan menjadikan 
-  halaman `/settings/keys` sebagai pusat manajemen keamanan 
-  pengguna.
 
-  Ini akan mengubah halaman tersebut dari tidak berguna menjadi
-  salah satu fitur paling krusial di aplikasi.
+Kekuatan Sistem Saat Ini (Yang Sudah Kita Lakukan Dengan Benar)
 
-  Bagaimana kita bisa melakukannya?
+   1. Enkripsi End-to-End (E2EE) Fundamental: Kita sudah menerapkan prinsip inti E2EE. Pesan dienkripsi di perangkat Anda dan
+      hanya bisa didekripsi oleh perangkat penerima. Server tidak bisa membaca isi pesan.
+   2. Kunci Identitas Pengguna: Setiap pengguna sekarang memiliki pasangan kunci publik/privat yang unik, yang merupakan dasar
+      dari identitas digital yang aman.
+   3. Kunci Sesi per Percakapan: Setiap percakapan memiliki kunci enkripsi acak yang terpisah. Ini adalah praktik yang baik,
+      karena jika satu kunci percakapan bocor, percakapan Anda yang lain tetap aman.
+   4. Manajemen Kunci Sisi Klien: Kunci privat Anda dienkripsi menggunakan password Anda dan disimpan di browser. Ini jauh
+      lebih baik daripada menyimpannya dalam bentuk teks biasa.
 
-  Halaman /settings/keys akan menjadi "brankas" digital pengguna,
-   dengan fungsi sebagai berikut:
+  Kelemahan dan Area Peningkatan (Di Mana Kita Bisa Lebih Baik)
 
-   1. Manajemen Kunci Identitas: Halaman ini akan mengelola kunci 
-      privat pengguna, yang merupakan kunci utama untuk semua
-      aktivitas enkripsi.
-   2. Fitur Backup & Restore Kunci: Pengguna harus bisa mem-backup
-      kunci privat mereka yang terenkripsi. Ini sangat penting.
-      Tanpa backup, jika pengguna membersihkan cache browser atau
-      pindah perangkat, mereka akan kehilangan akses ke semua
-      riwayat pesan terenkripsi selamanya. Halaman ini bisa
-      menyediakan fitur untuk mengunduh file backup kunci atau
-      menampilkan "frasa pemulihan".
-   3. Regenerasi Kunci: Memberikan opsi untuk membuat ulang pasann
-       kunci (publik/privat) jika pengguna merasa kuncinya bocor.
-      Ini akan memicu proses untuk mengenkripsi ulang kunci sesi i
-      semua percakapan.
-   4. Verifikasi Keamanan (Opsional, tapi sangat baik): Menampilkn
-      "kode keamanan" atau "sidik jari" unik dari kunci pengguna,
-      yang bisa mereka bandingkan dengan kontak mereka untuk
-      memastikan tidak ada serangan man-in-the-middle.
+  Meskipun fondasinya kuat, ada beberapa celah keamanan yang perlu dipertimbangkan:
 
-  Langkah Teknisnya:
+   1. (Kritis) Backup Kunci yang Tidak Aman: Fitur "Backup Key" saat ini hanya mengunduh kunci privat dalam bentuk teks biasa.
+      Jika file backup tersebut dicuri, seluruh keamanan akun Anda hancur. Ini adalah celah yang paling mendesak untuk
+      diperbaiki.
+   2. (Tinggi) Tidak Ada Verifikasi Kontak (Trust on First Use): Saat Anda memulai chat dengan seseorang, Anda secara otomatis
+      "mempercayai" kunci publik yang diberikan oleh server. Anda tidak punya cara untuk memverifikasi apakah kunci tersebut
+      benar-benar milik teman Anda, atau milik penyerang man-in-the-middle.
+   3. (Tinggi) Kurangnya *Forward Secrecy* (Kerahasiaan Masa Depan): Kita menggunakan satu kunci sesi untuk seluruh riwayat
+      percakapan. Jika kunci sesi ini suatu saat bocor, penyerang bisa mendekripsi semua pesan di masa lalu dalam percakapan
+      tersebut.
+   4. (Sedang) Penanganan Anggota Grup: Saat anggota baru ditambahkan ke grup, mereka mendapatkan kunci sesi yang ada. Ini
+      berarti mereka berpotensi bisa membaca pesan yang dikirim sebelum mereka bergabung. Sebaliknya, jika anggota dikeluarkan,
+      mereka masih memegang kunci sesi dan bisa terus mengintip pesan baru.
 
-  Untuk mewujudkan ini, kita perlu melakukan refactor pada logika
-  enkripsi:
+  Saran dan Roadmap Peningkatan Keamanan
 
-   1. Hentikan penggunaan kunci dari ID percakapan.
-   2. Gunakan arsitektur E2EE yang sudah dirintis: Saat percakapan
-      dibuat, hasilkan sebuah "kunci sesi" yang acak.
-   3. Enkripsi "kunci sesi" tersebut menggunakan kunci publik dari
-      setiap partisipan dalam percakapan.
-   4. Simpan atau distribusikan kunci sesi yang terenkripsi ini.
-      Setiap pengguna kemudian bisa mendekripsinya menggunakan kui
-       privat mereka sendiri.
-   5. Gunakan kunci sesi yang sudah didekripsi untuk mengenkripsi
-      dan mendekripsi semua pesan dalam percakapan tersebut.
+  Berikut adalah langkah-langkah yang saya sarankan untuk membuat aplikasi ini benar-benar aman, diurutkan berdasarkan
+  prioritas:
+
+
+  ┌──┬───────────┬───────────────────────────────────────────────────────────────────────┬──────────────────────────────────┐
+  │  │ Fitur     │ Deskripsi Teknis                                                      │ Manfaat Keamanan                 │
+  ├──┼───────────┼───────────────────────────────────────────────────────────────────────┼──────────────────────────────────┤
+  │  │ **Backup... │ Alih-alih mengunduh file, kita tampilkan "Frasa Pemulihan" (12-24 ... │ Menghilangkan risiko file bac... │
+  │  │ **Verifi... │ Untuk setiap percakapan, kita tampilkan "Kode Keamanan" (serangkai... │ Memberikan jaminan bahwa Anda... │
+  │  │ **Implem... │ Alih-alih satu kunci sesi, kita gunakan algoritma (seperti Double ... │ Jika satu kunci pesan bocor, ... │
+  │  │ **Regene... │ Setiap kali ada perubahan anggota grup (masuk, keluar, atau dikelu... │ Mencegah anggota baru membaca... │
+  └──┴───────────┴───────────────────────────────────────────────────────────────────────┴──────────────────────────────────┘
 
   Kesimpulan:
 
-  Daripada menghapus halaman /settings/keys, saya sangat
-  menyarankan untuk menjadikannya inti dari fitur keamanan 
-  aplikasi. Ini tidak hanya akan memperbaiki fungsionalitas yang
-  rusak, tetapi juga secara dramatis meningkatkan tingkat
-  keamanan dan kepercayaan pengguna terhadap Chat-Lite,
-  mengubahnya menjadi aplikasi chat E2EE yang sebenarnya.
+  Sistem kita saat ini sudah merupakan lompatan besar dari kondisi awal. Namun, untuk bisa dengan percaya diri menyebutnya
+  "aman", saya sangat merekomendasikan untuk mengikuti roadmap di atas, dimulai dengan memperbaiki fitur backup kunci.

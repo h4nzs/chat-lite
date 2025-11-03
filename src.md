@@ -1,140 +1,38 @@
-# Rekomendasi perbaikan — langkah demi langkah (prioritas tinggi → rendah)
+# Analisis Keamanan Sistem Enkripsi Chat-Lite
 
-> Catatan umum sebelum mulai: lakukan perubahan satu-persatu dan jalankan aplikasinya (mode dev) untuk melihat perubahan efeknya. Buat commit terpisah sehingga mudah rollback.
+**Pendapat Umum:**
+Sistem enkripsi kita sekarang **jauh lebih aman** daripada sebelumnya, tetapi belum bisa disebut "sempurna". Kita telah membangun fondasi yang sangat kuat, namun ada beberapa area penting yang bisa dan seharusnya kita tingkatkan untuk mencapai tingkat keamanan seperti aplikasi chat terkemuka (misalnya Signal).
 
-## 1) Verifikasi cara import & inisialisasi `libsodium` (perbaikan paling cepat dan sering sukses)
+### Kekuatan Sistem Saat Ini (Yang Sudah Kita Lakukan Dengan Benar)
 
-Pastikan kamu **selalu** menunggu `sodium.ready` sebelum memakai fungsi apa pun. Implementasi yang aman:
+1.  **Enkripsi End-to-End (E2EE) Fundamental:** Kita sudah menerapkan prinsip inti E2EE. Pesan dienkripsi di perangkat Anda dan hanya bisa didekripsi oleh perangkat penerima. Server tidak bisa membaca isi pesan.
+2.  **Kunci Identitas Pengguna:** Setiap pengguna sekarang memiliki pasangan kunci publik/privat yang unik, yang merupakan dasar dari identitas digital yang aman.
+3.  **Kunci Sesi per Percakapan:** Setiap percakapan memiliki kunci enkripsi acak yang terpisah. Ini adalah praktik yang baik, karena jika satu kunci percakapan bocor, percakapan Anda yang lain tetap aman.
+4.  **Manajemen Kunci Sisi Klien:** Kunci privat Anda dienkripsi menggunakan password Anda dan disimpan di browser. Ini jauh lebih baik daripada menyimpannya dalam bentuk teks biasa.
 
-```ts
-// utils/sodium.ts (contoh)
-import * as _sodium from 'libsodium-wrappers';
+### Kelemahan dan Area Peningkatan (Di Mana Kita Bisa Lebih Baik)
 
-let sodiumPromise: Promise<typeof _sodium> | null = null;
+Meskipun fondasinya kuat, ada beberapa celah keamanan yang perlu dipertimbangkan:
 
-export async function getSodium() {
-  if (!sodiumPromise) {
-    sodiumPromise = (async () => {
-      const sodium = await _sodium;
-      await sodium.ready; // <= penting
-      return sodium;
-    })();
-  }
-  return sodiumPromise;
-}
-```
+1.  **(Kritis) Backup Kunci yang Tidak Aman:** Fitur "Backup Key" saat ini hanya mengunduh kunci privat dalam bentuk teks biasa. Jika file backup tersebut dicuri, seluruh keamanan akun Anda hancur. Ini adalah celah yang paling mendesak untuk diperbaiki.
+2.  **(Tinggi) Tidak Ada Verifikasi Kontak (Trust on First Use):** Saat Anda memulai chat dengan seseorang, Anda secara otomatis "mempercayai" kunci publik yang diberikan oleh server. Anda tidak punya cara untuk memverifikasi apakah kunci tersebut benar-benar milik teman Anda, atau milik penyerang *man-in-the-middle*.
+3.  **(Tinggi) Kurangnya *Forward Secrecy* (Kerahasiaan Masa Depan):** Kita menggunakan satu kunci sesi untuk seluruh riwayat percakapan. Jika kunci sesi ini suatu saat bocor, penyerang bisa mendekripsi **semua pesan di masa lalu** dalam percakapan tersebut.
+4.  **(Sedang) Penanganan Anggota Grup:** Saat anggota baru ditambahkan ke grup, mereka mendapatkan kunci sesi yang ada. Ini berarti mereka berpotensi bisa membaca pesan yang dikirim *sebelum* mereka bergabung. Sebaliknya, jika anggota dikeluarkan, mereka masih memegang kunci sesi dan bisa terus mengintip pesan baru.
 
-Di mana pun kamu pakai `getSodium()` pastikan `await getSodium()` terjadi sebelum akses konstanta (mis. `sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE`).
+### Saran dan Roadmap Peningkatan Keamanan
 
-**Kenapa:** banyak pengguna Vite/bundler lupa `await sodium.ready` sehingga objek sodium belum selesai inisialisasi WASM → konstanta jadi undefined.
+Berikut adalah langkah-langkah yang saya sarankan untuk membuat aplikasi ini benar-benar aman, diurutkan berdasarkan prioritas:
 
----
+| Prioritas | Fitur | Deskripsi Teknis | Manfaat Keamanan |
+| :--- | :--- | :--- | :--- |
+| **1. Kritis** | **Backup Kunci Terenkripsi (Recovery Phrase)** | Alih-alih mengunduh file, kita tampilkan "Frasa Pemulihan" (12-24 kata acak) kepada pengguna. Kunci privat akan dienkripsi menggunakan frasa ini. Saat pindah perangkat, pengguna cukup memasukkan frasa tersebut untuk memulihkan kuncinya. | Menghilangkan risiko file backup kunci dicuri. Ini adalah standar industri untuk dompet kripto dan aplikasi aman. Di masa depan, kita bisa membangun fitur "Restore" di halamn
+      login yang memungkinkan pengguna memasukkan frasa ini untuk
+memulihkan akun/kunci mereka di
+perangkat baru.|
+| **2. Tinggi** | **Verifikasi Kontak (Safety Numbers)** | Untuk setiap percakapan, kita tampilkan "Kode Keamanan" (serangkaian angka atau QR code) yang unik. Kode ini dibuat dari kombinasi kunci publik Anda dan teman chat Anda. Anda bisa membandingkan kode ini melalui telepon atau bertemu langsung untuk memastikan tidak ada penyadapan. | Memberikan jaminan bahwa Anda berbicara dengan orang yang benar, bukan dengan penyadap. |
+| **3. Tinggi** | **Implementasi *Ratcheting* (Sesi Berputar)** | Alih-alih satu kunci sesi, kita gunakan algoritma (seperti Double Ratchet) untuk membuat kunci baru untuk **setiap pesan**. Atau, sebagai langkah awal yang lebih sederhana, kita bisa membuat kunci sesi baru setiap kali aplikasi dibuka atau setiap 24 jam. | Jika satu kunci pesan bocor, penyerang hanya bisa membaca pesan itu saja, bukan seluruh riwayat. Ini adalah inti dari *Forward Secrecy*. |
+| **4. Sedang** | **Regenerasi Kunci Grup** | Setiap kali ada perubahan anggota grup (masuk, keluar, atau dikeluarkan), server harus secara otomatis membuat **kunci sesi yang benar-benar baru** dan mendistribusikannya hanya kepada anggota yang masih aktif. | Mencegah anggota baru membaca riwayat chat, dan mencegah anggota yang sudah keluar untuk terus membaca chat baru. |
 
-## 2) Tambahkan cek defensif & diagnostic log
+**Kesimpulan:**
 
-Sebelum memanggil `crypto_pwhash` tambahkan pemeriksaan nilai:
-
-```ts
-const sodium = await getSodium();
-if (typeof sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE !== 'number') {
-  console.error('Sodium constants missing', {
-    opslimit: sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    memlimit: sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    alg: sodium.crypto_pwhash_ALG_DEFAULT
-  });
-  throw new Error('libsodium not initialized properly');
-}
-```
-
-**Tujuan:** konfirmasi cepat apakah konstanta memang undefined pada runtime — berguna untuk debugging dan laporan bug.
-
----
-
-## 3) Konfigurasi Vite untuk WASM (jika masalahnya terkait bundling)
-
-Tambahkan konfigurasi agar Vite tidak meng-optimasi/mem-bundle `libsodium-wrappers` secara agresif dan agar file `.wasm` tersedia di runtime:
-
-Contoh perubahan `vite.config.ts`:
-
-```ts
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  optimizeDeps: {
-    exclude: ['libsodium-wrappers']  // hindari pre-bundling yang mengacaukan inisialisasi WASM
-  },
-  build: {
-    target: 'es2020',
-    // ensure wasm assets are copied
-    rollupOptions: {
-      output: {
-        // Biarkan .wasm sebagai asset — bukan inline
-      }
-    }
-  },
-  assetsInclude: ['**/*.wasm']  // pastikan vite menganggap .wasm sebagai asset
-});
-```
-
-**Catatan:** ada banyak variasi tergantung versi Vite; jika diperlukan, gunakan `vite-plugin-wasm` atau `vite-plugin-static-copy` untuk memastikan file `.wasm` disalin ke `dist` dengan path yang bisa diakses.
-
----
-
-## 4) Alternatif paket: gunakan `libsodium-wrappers-sumo`
-
-Jika konfigurasi Vite tetap menyulitkan, dua jalan keluar cepat:
-
-* **A. `libsodium-wrappers-sumo`** — paket “sumo” berisi fallback asm.js sehingga lebih toleran terhadap bundler (meskipun ukuran lebih besar). Ganti import:
-
-```bash
-npm install libsodium-wrappers-sumo
-```
-
-```ts
-import * as _sodium from 'libsodium-wrappers-sumo';
-await (await _sodium).ready;
-```
-
-**Saran:** coba dulu `libsodium-wrappers-sumo` (minim perubahan) — kalau itu memecahkan masalah, kamu aman melanjutkan. Jika ukuran bundle jadi masalah.
-
----
-
-## 5) Jalankan reproducer kecil (isolated test)
-
-Buat file JS/TS kecil di proyek (mis. `scripts/test-sodium.ts`) yang **langsung** melakukan import `libsodium-wrappers` dan panggil `crypto_pwhash` sederhana — jalankan di browser dev server atau Node (tergantung dukungan) untuk memastikan apakah itu gagal di lingkungan dev:
-
-```ts
-// scripts/test-sodium.ts (pseudo)
-import * as sodium from 'libsodium-wrappers';
-(async () => {
-  await sodium.ready;
-  console.log('sodium ready, opslimit:', sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE);
-  const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
-  const key = sodium.crypto_pwhash(
-    sodium.crypto_secretbox_KEYBYTES,
-    'password',
-    salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_ALG_DEFAULT
-  );
-  console.log('pwhash ok length', key.length);
-})();
-```
-
-Jika test ini gagal di dev server, artinya masalah berada di bundling/init WASM — lanjut ke langkah 3/4.
-
----
-
----
-
-# Checklist tindakan segera (urutan yang saya rekomendasikan)
-
-1. Pastikan `getSodium()` memanggil dan `await sodium.ready`. (implementasi/cek)
-2. Tambahkan diagnostic logging (cek konstanta sodium) sebelum pemanggilan `crypto_pwhash`. (cek nilai undefined)
-3. Jalankan `scripts/test-sodium.ts` atau minimal reproducer untuk verifikasi cepat. (diagnosis)
-4. Jika konstanta undefined → ubah `vite.config.ts` seperti di atas (exclude / assetsInclude). Restart dev server. (perbaikan bundling)
-5. Jika masih gagal → coba `libsodium-wrappers-sumo`. (fallback)
-6. (Opsional) Beri report ke upstream `libsodium-wrappers` dan cek issue tracker untuk kombinasi Vite-versi yang digunakan (investigasi kompatibilitas). (investigasi lanjutan)
-
----
+Sistem kita saat ini sudah merupakan lompatan besar dari kondisi awal. Namun, untuk bisa dengan percaya diri menyebutnya "aman", saya sangat merekomendasikan untuk mengikuti roadmap di atas, dimulai dengan memperbaiki fitur backup kunci.
