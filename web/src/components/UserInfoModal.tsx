@@ -2,19 +2,27 @@ import { useEffect, useState } from 'react';
 import { useModalStore } from '@store/modal';
 import { useNavigate } from 'react-router-dom';
 import { toAbsoluteUrl } from '@utils/url';
-import { authFetch, handleApiError } from '@lib/api';
+import { authFetch, handleApiError, api } from '@lib/api';
 import type { User } from '@store/auth';
 import { Spinner } from './Spinner';
+import { generateSafetyNumber, importPublicKey } from '@utils/keyManagement';
+import SafetyNumberModal from './SafetyNumberModal';
+import { markAsVerified, isVerified } from '@utils/verification';
+import { useConversationStore } from '@store/conversation';
 
-// The user type for the profile modal can have an optional email
-type ProfileUser = User & { email?: string };
+// The user type for the profile modal can have an optional email and public key
+type ProfileUser = User & { email?: string; publicKey?: string };
 
 const ModalContent = () => {
   const { profileUserId, closeProfileModal } = useModalStore();
+  const { activeId } = useConversationStore(); // Get active conversation ID
   const navigate = useNavigate();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [safetyNumber, setSafetyNumber] = useState('');
+  const [isAlreadyVerified, setIsAlreadyVerified] = useState(false);
 
   useEffect(() => {
     if (!profileUserId) return;
@@ -26,6 +34,9 @@ const ModalContent = () => {
       try {
         const userData = await authFetch<ProfileUser>(`/api/users/${profileUserId}`);
         setUser(userData);
+        if (activeId && userData.publicKey) {
+          setIsAlreadyVerified(isVerified(activeId, userData.publicKey));
+        }
       } catch (e) {
         setError(handleApiError(e));
       } finally {
@@ -34,12 +45,36 @@ const ModalContent = () => {
     };
 
     fetchUser();
-  }, [profileUserId]);
+  }, [profileUserId, activeId]);
 
   const handleViewProfile = () => {
     if (!user) return;
     closeProfileModal();
     navigate(`/profile/${user.id}`);
+  };
+
+  const handleVerifySecurity = async () => {
+    if (!user?.publicKey) {
+      setError("This user has not set up their encryption keys yet.");
+      return;
+    }
+
+    try {
+      const myPublicKeyB64 = localStorage.getItem('publicKey');
+      if (!myPublicKeyB64) {
+        throw new Error("Your public key is not found. Please set up your keys first.");
+      }
+
+      const myPublicKey = await importPublicKey(myPublicKeyB64);
+      const theirPublicKey = await importPublicKey(user.publicKey);
+
+      const sn = await generateSafetyNumber(myPublicKey, theirPublicKey);
+      setSafetyNumber(sn);
+      setShowSafetyModal(true);
+
+    } catch (e: any) {
+      setError(e.message || "Failed to generate safety number.");
+    }
   };
 
   return (
@@ -74,12 +109,33 @@ const ModalContent = () => {
               View Full Profile
             </button>
             <button
+              onClick={handleVerifySecurity}
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none"
+            >
+              Verify Security
+            </button>
+            <button
               onClick={closeProfileModal}
               className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none"
             >
               Close
             </button>
           </div>
+          {showSafetyModal && 
+            <SafetyNumberModal 
+              safetyNumber={safetyNumber} 
+              userName={user.name} 
+              onClose={() => setShowSafetyModal(false)} 
+              onVerify={() => {
+                if (activeId && user.publicKey) {
+                  markAsVerified(activeId, user.publicKey);
+                  setIsAlreadyVerified(true);
+                }
+                setShowSafetyModal(false);
+              }}
+              isVerified={isAlreadyVerified}
+            />
+          }
         </>
       )}
     </div>

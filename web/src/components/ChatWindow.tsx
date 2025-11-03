@@ -15,6 +15,8 @@ import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
+import { isVerified } from '@utils/verification';
+import { FiShield } from 'react-icons/fi';
 
 import LinkPreviewCard from './LinkPreviewCard';
 
@@ -53,6 +55,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const title = conversation.isGroup ? conversation.title : peerUser?.name;
   const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl;
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
+  const isConvVerified = peerUser && (peerUser as any).publicKey ? isVerified(conversation.id, (peerUser as any).publicKey) : false;
 
   const handleHeaderClick = () => {
     if (peerUser) {
@@ -89,7 +92,10 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
             className="w-10 h-10 rounded-full object-cover bg-bg-primary"
           />
           <div>
-            <p className="font-semibold text-text-primary">{title}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-text-primary">{title}</p>
+              {isConvVerified && <FiShield className="text-green-500" title="Verified Contact" />} 
+            </div>
             <p className="text-xs text-text-secondary">{getStatus()}</p>
           </div>
         </button>

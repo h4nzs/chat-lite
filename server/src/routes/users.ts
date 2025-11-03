@@ -166,6 +166,7 @@ router.get(
           avatarUrl: true,
           description: true,
           createdAt: true,
+          publicKey: true, // Include public key
           email: true, // Select email to check it
           showEmailToOthers: true, // Select the flag
         },
@@ -183,6 +184,7 @@ router.get(
         avatarUrl: user.avatarUrl,
         description: user.description,
         createdAt: user.createdAt,
+        publicKey: user.publicKey, // Add public key to the response
       };
 
       if (user.showEmailToOthers) {

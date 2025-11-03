@@ -138,3 +138,30 @@ export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, p
 
   return sessionKey;
 }
+
+// Function to generate a verifiable safety number from two public keys
+export async function generateSafetyNumber(myPublicKey: Uint8Array, theirPublicKey: Uint8Array): Promise<string> {
+  const sodium = await getSodium();
+
+  // Ensure a consistent order for concatenation by comparing the keys
+  let combined;
+  if (sodium.compare(myPublicKey, theirPublicKey) < 0) {
+    combined = new Uint8Array(myPublicKey.length + theirPublicKey.length);
+    combined.set(myPublicKey, 0);
+    combined.set(theirPublicKey, myPublicKey.length);
+  } else {
+    combined = new Uint8Array(myPublicKey.length + theirPublicKey.length);
+    combined.set(theirPublicKey, 0);
+    combined.set(myPublicKey, theirPublicKey.length);
+  }
+
+  // Hash the combined public keys to create a shared secret fingerprint
+  const hash = sodium.crypto_generichash(64, combined);
+
+  // Format the first 30 bytes of the hash into 6 groups of 5 digits
+  const fingerprint = sodium.to_hex(hash.slice(0, 30));
+  const chunks = fingerprint.match(/.{1,10}/g) || []; // 10 hex chars = 5 bytes
+  const digitGroups = chunks.map(chunk => parseInt(chunk, 16).toString().padStart(5, '0').slice(-5));
+  
+  return digitGroups.join(' ');
+}
