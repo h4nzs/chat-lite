@@ -161,7 +161,7 @@ router.post("/", async (req, res, next) => {
     });
 
     // Create and distribute session keys for the new conversation
-    await createAndDistributeSessionKeys(newConversation.id, allUserIds);
+    await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
 
     if (isGroup) {
       const io = getIo();

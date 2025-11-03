@@ -29,6 +29,8 @@ model User {
   pushSubscriptions PushSubscription[]
   hiddenConversations UserHiddenConversation[] // Relasi untuk soft delete
   createdConversations Conversation[] @relation("CreatedConversations")
+  authenticators     Authenticator[]
+  currentChallenge String?
 
   @@index([email])
   @@index([username])
@@ -197,4 +199,18 @@ model UserHiddenConversation {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, conversationId])
+}
+
+model Authenticator {
+  id              String  @id
+  credentialID    String  @unique
+  userId          String
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialPublicKey String
+  counter         BigInt
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports      String?
+
+  @@index([userId])
 }

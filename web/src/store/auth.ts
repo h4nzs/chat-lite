@@ -10,6 +10,7 @@ import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import { retrievePrivateKey } from "@utils/keyManagement";
 import { useModalStore } from "./modal";
+import { startAuthentication } from '@simplewebauthn/browser';
 
 export type User = {
   id: string;
@@ -27,6 +28,7 @@ type State = {
   sendReadReceipts: boolean;
   bootstrap: () => Promise<void>;
   login: (emailOrUsername: string, password: string) => Promise<void>;
+  loginWithBiometrics: (username: string) => Promise<boolean>;
   register: (data: any) => Promise<void>;
   logout: () => Promise<void>;
   ensureSocket: () => void;
@@ -220,6 +222,37 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     // 3. Hapus semua state percakapan untuk memaksa sinkronisasi ulang
     useConversationStore.setState({ conversations: [], messages: {} }, true);
     useMessageStore.setState({ messages: {} }, true);
+  },
+
+  async loginWithBiometrics(username: string) {
+    try {
+      // 1. Get options from server
+      const authOptions = await api("/api/auth/webauthn/auth-options", {
+        method: "POST",
+        body: JSON.stringify({ username }),
+      });
+
+      // 2. Start authentication with the browser
+      const authResp = await startAuthentication(authOptions);
+
+      // 3. Verify the response with the server
+      const verification = await api("/api/auth/webauthn/auth-verify", {
+        method: "POST",
+        body: JSON.stringify({ username, webauthnResponse: authResp }),
+      });
+
+      if (verification?.verified) {
+        // If successful, the server has set the auth cookies.
+        // Now, bootstrap the app to fetch user data.
+        await get().bootstrap();
+        return true;
+      } else {
+        throw new Error("Biometric verification failed.");
+      }
+    } catch (err: any) {
+      console.error("Biometric login error:", err);
+      throw err; // Re-throw to be caught by the UI
+    }
   },
 
   async getPrivateKey() {

@@ -16,6 +16,8 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.14.0",
+    "@simplewebauthn/server": "^13.2.2",
+    "@simplewebauthn/typescript-types": "^8.3.4",
     "@types/cookie": "^0.6.0",
     "@types/web-push": "^3.6.4",
     "bcrypt": "^5.1.1",

@@ -12,8 +12,20 @@ import { z } from "zod";
 import { zodValidate } from "../utils/validate.js";
 import { env } from "../config.js";
 import { JwtPayload } from "jsonwebtoken";
+import { requireAuth } from "../middleware/auth.js";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
 
 const router = Router();
+
+// WebAuthn
+const rpName = "Chat Lite";
+const rpID = env.nodeEnv === "production" ? "chat-lite.dev" : "localhost";
+const expectedOrigin = env.corsOrigin || "http://localhost:5173";
 
 function setAuthCookies(
   res: Response,
@@ -175,6 +187,202 @@ router.post("/logout", async (req, res) => {
   res.clearCookie("at", { path: "/" });
   res.clearCookie("rt", { path: "/" });
   res.json({ ok: true });
+});
+
+// === WEBAUTHN REGISTRATION ===
+
+// 1. Generate registration options
+router.get("/webauthn/register-options", requireAuth, async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    const userAuthenticators = await prisma.authenticator.findMany({ 
+      where: { userId: user.id }
+    });
+
+    const options = await generateRegistrationOptions({
+      rpName,
+      rpID,
+      userID: Buffer.from(user.id),
+      userName: user.username,
+      // Don't recommend users create multiple registrations of the same authenticator
+      excludeCredentials: userAuthenticators.map(auth => ({
+        id: auth.credentialID,
+        type: 'public-key',
+        transports: auth.transports?.split(',') as any,
+      })),
+    });
+
+    // Store the challenge to verify it later
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { currentChallenge: options.challenge },
+    });
+
+    res.json(options);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 2. Verify the registration response
+router.post("/webauthn/register-verify", requireAuth, async (req, res, next) => {
+  try {
+    const user = req.user;
+    const { currentChallenge } = await prisma.user.findUnique({ where: { id: user.id }, select: { currentChallenge: true }});
+
+    if (!currentChallenge) {
+      return res.status(400).json({ error: "No challenge found for this user." });
+    }
+
+    const verification = await verifyRegistrationResponse({
+      response: req.body,
+      expectedChallenge: currentChallenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+    });
+
+    const { verified, registrationInfo } = verification;
+
+    if (verified && registrationInfo) {
+      const { credentialPublicKey, credentialID, counter, credentialDeviceType, credentialBackedUp, transports } = registrationInfo;
+      
+      await prisma.authenticator.create({
+        data: {
+          userId: user.id,
+          credentialID: Buffer.from(credentialID).toString('base64'),
+          credentialPublicKey: Buffer.from(credentialPublicKey).toString('base64'),
+          counter,
+          credentialDeviceType,
+          credentialBackedUp,
+          transports: transports?.join(','),
+        },
+      });
+
+      // Clear the challenge
+      await prisma.user.update({ where: { id: user.id }, data: { currentChallenge: null } });
+
+      return res.json({ verified });
+    }
+
+    res.status(400).json({ error: "Could not verify registration." });
+
+  } catch (e) {
+    next(e);
+  }
+});
+
+// === WEBAUTHN AUTHENTICATION ===
+
+// 1. Generate authentication options
+router.post("/webauthn/auth-options", async (req, res, next) => {
+  try {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: "Username is required." });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ email: username }, { username: username }] },
+      include: { authenticators: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const options = await generateAuthenticationOptions({
+      allowCredentials: user.authenticators.map(auth => ({
+        id: Buffer.from(auth.credentialID, 'base64'),
+        type: 'public-key',
+        transports: auth.transports?.split(',') as any,
+      })),
+      userVerification: 'preferred',
+    });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { currentChallenge: options.challenge },
+    });
+
+    res.json(options);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 2. Verify the authentication response and return the re-encrypted master key
+router.post("/webauthn/auth-verify", async (req, res, next) => {
+  try {
+    const { username, password, webauthnResponse } = req.body;
+
+    if (!username || !password || !webauthnResponse) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ email: username }, { username: username }] },
+      include: { authenticators: true },
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const expectedChallenge = user.currentChallenge;
+    if (!expectedChallenge) return res.status(400).json({ error: "No challenge found." });
+
+    const authenticator = user.authenticators.find(
+      (auth) => auth.credentialID === Buffer.from(webauthnResponse.rawId, 'base64').toString('base64')
+    );
+
+    if (!authenticator) return res.status(404).json({ error: "Authenticator not found." });
+
+    const verification = await verifyAuthenticationResponse({
+      response: webauthnResponse,
+      expectedChallenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      authenticator: {
+        credentialID: Buffer.from(authenticator.credentialID, 'base64'),
+        credentialPublicKey: Buffer.from(authenticator.credentialPublicKey, 'base64'),
+        counter: authenticator.counter,
+        transports: authenticator.transports?.split(',') as any,
+      },
+    });
+
+    const { verified, authenticationInfo } = verification;
+
+    if (!verified) return res.status(400).json({ error: "Verification failed." });
+
+    // Update the authenticator counter
+    await prisma.authenticator.update({
+      where: { id: authenticator.id },
+      data: { counter: authenticationInfo.newCounter },
+    });
+
+    // Clear the challenge
+    await prisma.user.update({ where: { id: user.id }, data: { currentChallenge: null } });
+
+    // --- THIS IS THE KEY STEP ---
+    // Decrypt the master private key with the user's password
+    const encryptedMasterKey = ""; // This needs to be fetched from a secure vault/db
+    // In our case, we can't do this securely on the server without the password.
+    // The logic needs to be adjusted. The client will do the decryption.
+    // For now, we will just send a success response.
+
+    // The correct flow is: WebAuthn proves possession of the device.
+    // The client can then unlock the locally stored encrypted private key.
+    // We will adjust the client-side logic for this.
+
+    // For now, just return a success and the JWTs to log the user in.
+    const tokens = await issueTokens(user);
+    setAuthCookies(res, tokens);
+
+    res.json({ verified: true, user: { id: user.id, username: user.username, name: user.name } });
+
+  } catch (e) {
+    console.error("WebAuthn Auth Error:", e);
+    next(e);
+  }
 });
 
 export default router;

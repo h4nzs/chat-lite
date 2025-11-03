@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FiKey, FiShield, FiRefreshCw } from 'react-icons/fi';
+import { IoFingerPrint } from "react-icons/io5";
 import { useState } from 'react';
 import { useAuthStore } from '@store/auth';
 import { retrievePrivateKey } from '@utils/keyManagement';
@@ -8,6 +9,8 @@ import { Spinner } from '@components/Spinner';
 import { useModalStore } from '@store/modal';
 import * as bip39 from 'bip39';
 import RecoveryPhraseModal from '@components/RecoveryPhraseModal';
+import { startRegistration } from '@simplewebauthn/browser';
+import { api } from '@lib/api';
 
 export default function KeyManagementPage() {
   const { regenerateKeys, logout } = useAuthStore(state => ({ 
@@ -46,6 +49,35 @@ export default function KeyManagementPage() {
         setIsProcessing(false);
       }
     });
+  };
+
+  const handleRegisterDevice = async () => {
+    setIsProcessing(true);
+    try {
+      // 1. Get options from the server
+      const regOptions = await api("/api/auth/webauthn/register-options");
+
+      // 2. Start the registration process in the browser
+      const attResp = await startRegistration(regOptions);
+
+      // 3. Send the response to the server for verification
+      const verificationJSON = await api("/api/auth/webauthn/register-verify", {
+        method: "POST",
+        body: JSON.stringify(attResp),
+      });
+
+      if (verificationJSON?.verified) {
+        toast.success("Device registered successfully!");
+      } else {
+        throw new Error("Failed to verify device registration.");
+      }
+
+    } catch (error: any) {
+      toast.error(error.message || "Device registration failed.");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleGenerateNew = () => {
@@ -89,6 +121,10 @@ export default function KeyManagementPage() {
           <button onClick={handleShowRecovery} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isProcessing ? <Spinner size="sm" /> : <FiShield />}
             <span>{isProcessing ? 'Processing...' : 'Show Recovery Phrase'}</span>
+          </button>
+          <button onClick={handleRegisterDevice} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isProcessing ? <Spinner size="sm" /> : <IoFingerPrint />}
+            <span>{isProcessing ? 'Processing...' : 'Register This Device for Biometric Login'}</span>
           </button>
           <button onClick={handleGenerateNew} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isProcessing ? <Spinner size="sm" /> : <FiRefreshCw />}

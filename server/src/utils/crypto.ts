@@ -1,113 +1,53 @@
-import sodium from 'libsodium-wrappers'
-import { env } from '../config.js'
 
-// Cache for derived keys to avoid recomputation
-const keyCache = new Map<string, Uint8Array>()
+import sodium from 'libsodium-wrappers';
+import { env } from '../config.js';
+import crypto from 'crypto';
 
-// Generate a deterministic key for a conversation based on conversation ID only
-async function generateConversationKey(conversationId: string): Promise<Uint8Array> {
-  await sodium.ready
-  
-  // Check cache first
-  const cacheKey = `${conversationId}`
-  if (keyCache.has(cacheKey)) {
-    return keyCache.get(cacheKey)!
-  }
-  
-  // Create a deterministic key based on conversation ID only
-  // This ensures both sender and receiver use the same key
-  const keyMaterial = `${conversationId}`
-  
-  // Use crypto_generichash to derive a key from the key material
-  const derivedKey = sodium.crypto_generichash(
-    sodium.crypto_secretbox_KEYBYTES,
-    keyMaterial,
-    'chat-lite-key-derivation-salt'
-  )
-  
-  // Cache the key
-  keyCache.set(cacheKey, derivedKey)
-  
-  return derivedKey
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const SALT_LENGTH = 64;
+const TAG_LENGTH = 16;
+const KEY_LENGTH = 32;
+const PBKDF2_ITERATIONS = 310000;
+
+/**
+ * Decrypts the master private key using the user's password.
+ * This is used on the server during the WebAuthn authentication flow.
+ */
+export async function decryptMasterPrivateKey(encryptedKeyB64: string, password: string): Promise<Uint8Array> {
+  await sodium.ready;
+  const combined = Buffer.from(encryptedKeyB64, 'base64');
+
+  const salt = combined.slice(0, SALT_LENGTH);
+  const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const tag = combined.slice(combined.length - TAG_LENGTH);
+  const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH, combined.length - TAG_LENGTH);
+
+  const key = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha512');
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return new Uint8Array(decrypted);
 }
 
-// Encrypt message with libsodium
-export async function encryptMessage(text: string, conversationId: string): Promise<string> {
-  await sodium.ready
-  const key = await generateConversationKey(conversationId)
-  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
-  const encrypted = sodium.crypto_secretbox_easy(text, nonce, key)
-  
-  // Combine nonce and encrypted data for storage
-  const combined = new Uint8Array(nonce.length + encrypted.length)
-  combined.set(nonce)
-  combined.set(encrypted, nonce.length)
-  
-  // Return as base64 string
-  return sodium.to_base64(combined, sodium.base64_variants.ORIGINAL)
-}
+/**
+ * Re-encrypts the master private key using a temporary key derived from the WebAuthn challenge.
+ * This allows securely passing the key to the client for one session.
+ */
+export async function reEncryptMasterKeyForClient(privateKey: Uint8Array, challenge: string): Promise<string> {
+  await sodium.ready;
 
-// Decrypt message with libsodium
-export async function decryptMessage(cipher: string, conversationId: string): Promise<string> {
-  try {
-    // Check if cipher is valid
-    if (!cipher || typeof cipher !== 'string') {
-      throw new Error('Invalid cipher text');
-    }
-    
-    // Cek apakah cipher adalah pesan teks biasa (tidak dienkripsi)
-    // Jika cipher tidak berupa base64 yang valid, asumsikan itu adalah teks biasa
-    try {
-      sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    } catch {
-      // Jika tidak bisa di-decode sebagai base64, asumsikan itu adalah teks biasa
-      return cipher;
-    }
-    
-    await sodium.ready;
-    const key = await generateConversationKey(conversationId);
-    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
-    
-    // Check if combined data is valid
-    if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
-      throw new Error('Incomplete input data');
-    }
-    
-    // Extract nonce and encrypted data
-    const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
-    const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
-    
-    // Decrypt
-    const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
-    return sodium.to_string(decrypted);
-  } catch (error) {
-    console.error('Decryption failed:', error);
-    // Return a more specific error message
-    if (error instanceof Error) {
-      if (error.message.includes('incorrect key')) {
-        return '[Failed to decrypt: Invalid key]';
-      } else if (error.message.includes('incomplete input')) {
-        return '[Failed to decrypt: Incomplete data]';
-      }
-    }
-    return '[Failed to decrypt: Message may be corrupted]';
-  }
-}
+  // Derive a temporary, single-use key from the challenge
+  const tempKey = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, challenge);
+  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
 
-// For backward compatibility with existing messages encrypted with crypto-js
-import CryptoJS from 'crypto-js'
+  const ciphertext = sodium.crypto_secretbox_easy(privateKey, nonce, tempKey);
 
-const LEGACY_SECRET_KEY = env.chatSecret || ''
+  const combined = new Uint8Array(nonce.length + ciphertext.length);
+  combined.set(nonce);
+  combined.set(ciphertext, nonce.length);
 
-export function decryptLegacyMessage(cipher: string): string {
-  try {
-    // If no secret key is provided, we can't decrypt legacy messages
-    if (!LEGACY_SECRET_KEY) {
-      return '[Decryption key not available]'
-    }
-    const bytes = CryptoJS.AES.decrypt(cipher, LEGACY_SECRET_KEY)
-    return bytes.toString(CryptoJS.enc.Utf8) || '[Failed to decrypt]'
-  } catch {
-    return '[Invalid encrypted message]'
-  }
+  return sodium.to_base64(combined, sodium.base64_variants.ORIGINAL);
 }
