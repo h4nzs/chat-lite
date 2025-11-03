@@ -7,8 +7,9 @@ import type { User } from '@store/auth';
 import { Spinner } from './Spinner';
 import { generateSafetyNumber, importPublicKey } from '@utils/keyManagement';
 import SafetyNumberModal from './SafetyNumberModal';
-import { markAsVerified, isVerified } from '@utils/verification';
 import { useConversationStore } from '@store/conversation';
+import { useVerificationStore } from '@store/verification';
+
 
 // The user type for the profile modal can have an optional email and public key
 type ProfileUser = User & { email?: string; publicKey?: string };
@@ -16,13 +17,15 @@ type ProfileUser = User & { email?: string; publicKey?: string };
 const ModalContent = () => {
   const { profileUserId, closeProfileModal } = useModalStore();
   const { activeId } = useConversationStore(); // Get active conversation ID
+  const { verifiedStatus, setVerified } = useVerificationStore();
   const navigate = useNavigate();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyNumber, setSafetyNumber] = useState('');
-  const [isAlreadyVerified, setIsAlreadyVerified] = useState(false);
+
+  const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
 
   useEffect(() => {
     if (!profileUserId) return;
@@ -34,9 +37,6 @@ const ModalContent = () => {
       try {
         const userData = await authFetch<ProfileUser>(`/api/users/${profileUserId}`);
         setUser(userData);
-        if (activeId && userData.publicKey) {
-          setIsAlreadyVerified(isVerified(activeId, userData.publicKey));
-        }
       } catch (e) {
         setError(handleApiError(e));
       } finally {
@@ -128,8 +128,7 @@ const ModalContent = () => {
               onClose={() => setShowSafetyModal(false)} 
               onVerify={() => {
                 if (activeId && user.publicKey) {
-                  markAsVerified(activeId, user.publicKey);
-                  setIsAlreadyVerified(true);
+                  setVerified(activeId, user.publicKey);
                 }
                 setShowSafetyModal(false);
               }}

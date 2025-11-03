@@ -2,6 +2,7 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { api, authFetch } from "@lib/api";
 import { decryptMessage } from "@utils/crypto";
 import { getSocket } from "@lib/socket";
+import { useVerificationStore } from './verification';
 
 // --- Type Definitions ---
 
@@ -127,6 +128,9 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       }
 
       set({ conversations: sortConversations(conversations) });
+
+      // Initialize verification statuses from localStorage
+      useVerificationStore.getState().loadInitialStatus(conversations);
 
       // After loading conversations, join their respective socket rooms
       const socket = getSocket();

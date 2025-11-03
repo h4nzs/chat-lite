@@ -15,7 +15,7 @@ import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
-import { isVerified } from '@utils/verification';
+import { useVerificationStore } from '@store/verification';
 import { FiShield } from 'react-icons/fi';
 
 import LinkPreviewCard from './LinkPreviewCard';
@@ -50,12 +50,13 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const meId = useAuthStore((s) => s.user?.id);
   const presence = usePresenceStore((s) => s.presence);
   const openProfileModal = useModalStore(s => s.openProfileModal);
+  const { verifiedStatus } = useVerificationStore();
 
   const peerUser = !conversation.isGroup ? conversation.participants?.find((p) => p.id !== meId) : null;
   const title = conversation.isGroup ? conversation.title : peerUser?.name;
   const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerUser?.avatarUrl;
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
-  const isConvVerified = peerUser && (peerUser as any).publicKey ? isVerified(conversation.id, (peerUser as any).publicKey) : false;
+  const isConvVerified = verifiedStatus[conversation.id] || false;
 
   const handleHeaderClick = () => {
     if (peerUser) {
