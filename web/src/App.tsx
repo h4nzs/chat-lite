@@ -5,6 +5,7 @@ import Restore from './pages/Restore';
 import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
 import KeyManagementPage from './pages/KeyManagementPage';
+import SessionManagerPage from './pages/SessionManagerPage';
 import ProfilePage from './pages/ProfilePage'; // Import ProfilePage
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
@@ -18,15 +19,33 @@ import ChatInfoModal from './components/ChatInfoModal';
 import DynamicIsland from './components/DynamicIsland';
 import ConnectionStatusBanner from './components/ConnectionStatusBanner'; // Import ConnectionStatusBanner
 import { useThemeStore } from './store/theme';
+import { getSocket } from './lib/socket';
 
 export default function App() {
   const { theme } = useThemeStore();
+  const { bootstrap, logout, user } = useAuthStore();
 
   useEffect(() => {
     // This is now the single entry point for app initialization.
     // It ensures the user is authenticated before any other actions.
-    useAuthStore.getState().bootstrap();
-  }, []);
+    bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    if (user) {
+      const socket = getSocket();
+      socket.on('force_logout', (data) => {
+        // Optional: Check if the logged-out session matches the current one if needed
+        // For now, any force_logout for the user will trigger a logout
+        console.log(`Received force_logout for session: ${data.jti}. Logging out.`);
+        logout();
+      });
+
+      return () => {
+        socket.off('force_logout');
+      };
+    }
+  }, [user, logout]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -60,6 +79,7 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
+          <Route path="/settings/sessions" element={<ProtectedRoute><SessionManagerPage /></ProtectedRoute>} />
           <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

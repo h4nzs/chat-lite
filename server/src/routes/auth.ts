@@ -50,7 +50,7 @@ function setAuthCookies(
   });
 }
 
-async function issueTokens(user: any) {
+async function issueTokens(user: any, req: import('express').Request) {
   const access = signAccessToken({
     id: user.id,
     email: user.email,
@@ -59,7 +59,13 @@ async function issueTokens(user: any) {
   const jti = newJti();
   const refresh = signAccessToken({ sub: user.id, jti }, { expiresIn: "30d" });
   await prisma.refreshToken.create({
-    data: { jti, userId: user.id, expiresAt: refreshExpiryDate() },
+    data: { 
+      jti, 
+      userId: user.id, 
+      expiresAt: refreshExpiryDate(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    },
   });
   return { access, refresh };
 }
@@ -82,7 +88,7 @@ router.post(
       const user = await prisma.user.create({
         data: { email, username, passwordHash: hash, name },
       });
-      const tokens = await issueTokens(user);
+      const tokens = await issueTokens(user, req);
       setAuthCookies(res, tokens);
       res.json({
         user: {
@@ -123,7 +129,7 @@ router.post(
       const ok = await bcrypt.compare(password, user.passwordHash);
       if (!ok) throw new ApiError(401, "Invalid credentials");
 
-      const tokens = await issueTokens(user);
+      const tokens = await issueTokens(user, req);
       setAuthCookies(res, tokens);
       res.json({
         user: {
@@ -164,7 +170,7 @@ router.post("/refresh", async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) throw new ApiError(401, "User not found");
 
-    const tokens = await issueTokens(user);
+    const tokens = await issueTokens(user, req);
     setAuthCookies(res, tokens);
     res.json({ ok: true });
   } catch (e) {
@@ -374,7 +380,7 @@ router.post("/webauthn/auth-verify", async (req, res, next) => {
     // We will adjust the client-side logic for this.
 
     // For now, just return a success and the JWTs to log the user in.
-    const tokens = await issueTokens(user);
+    const tokens = await issueTokens(user, req);
     setAuthCookies(res, tokens);
 
     res.json({ verified: true, user: { id: user.id, username: user.username, name: user.name } });

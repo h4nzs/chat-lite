@@ -154,9 +154,12 @@ model RefreshToken {
   jti          String   @unique
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String
+  userAgent    String?
+  ipAddress    String?
   revokedAt    DateTime?
   replacedById String?
   createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @updatedAt
   expiresAt    DateTime
 
   @@index([userId])

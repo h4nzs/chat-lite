@@ -25,6 +25,7 @@ import uploadsRouter from "./routes/uploads.js";
 import keysRouter from "./routes/keys.js";
 import previewsRouter from "./routes/previews.js";
 import sessionKeysRouter from "./routes/sessionKeys.js";
+import sessionsRouter from "./routes/sessions.js";
 import webpush from "web-push";
 
 // Set VAPID keys for web-push notifications
@@ -43,7 +44,7 @@ app.use(helmet());
 app.disable('x-powered-by');
 
 const corsMiddleware = cors({
-  origin: env.corsOrigin || "http://localhost:5173",
+  origin: [ env.corsOrigin || "http://localhost:5173", "https://6p163mzc-5173.asse.devtunnels.ms/" ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],
@@ -117,6 +118,7 @@ app.use("/api/uploads", uploadsRouter);
 app.use("/api/keys", keysRouter);
 app.use("/api/previews", previewsRouter);
 app.use("/api/session-keys", sessionKeysRouter);
+app.use("/api/sessions", sessionsRouter);
 
 // === HEALTH CHECK ===
 app.get("/health", (_req: Request, res: Response) => {
