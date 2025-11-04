@@ -136,15 +136,21 @@ export default function Chat() {
           <ChatWindow key={activeId} id={activeId} onMenuClick={toggleSidebar} />
 
         ) : (
+          <div className="flex-1 flex flex-col h-full">
+            {/* Mobile-only header with toggle */}
+            <div className="md:hidden p-4 border-b border-border flex items-center flex-shrink-0">
+              <button onClick={toggleSidebar} className="p-2 text-text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+              <p className="ml-4 font-semibold">Conversations</p>
+            </div>
 
-          <div className="flex-1 flex-col gap-4 items-center justify-center text-text-secondary hidden md:flex">
-
-            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-
-            <p className="text-lg">Select a conversation to start messaging</p>
-
+            {/* Placeholder Content */}
+            <div className="flex-1 flex flex-col gap-4 items-center justify-center text-text-secondary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p className="text-lg">Select a conversation to start messaging</p>
+            </div>
           </div>
-
         )}
 
       </main>
