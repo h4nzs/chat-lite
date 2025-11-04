@@ -16,7 +16,8 @@ import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
 import { useVerificationStore } from '@store/verification';
-import { FiShield } from 'react-icons/fi';
+import { FiShield, FiSmile } from 'react-icons/fi';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import LinkPreviewCard from './LinkPreviewCard';
@@ -142,7 +143,9 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
   const [isPressed, setIsPressed] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageStore();
 
   const hasText = text.trim().length > 0;
@@ -153,6 +156,23 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
     }, 500), 
     [fetchTypingLinkPreview]
   );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setText(prevText => prevText + emojiData.emoji);
+    setShowEmojiPicker(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,12 +222,27 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <LinkPreviewCard preview={typingLinkPreview} />
         </div>
       )}
-      <div className="p-4 bg-bg-surface shadow-card rounded-t-xl"> {/* Changed to shadow-card */}
+      <div className="p-4 bg-bg-surface shadow-card rounded-t-xl relative"> {/* Added relative positioning */}
+        {showEmojiPicker && (
+          <div ref={emojiPickerRef} className="absolute bottom-full mb-2">
+            <EmojiPicker 
+              onEmojiClick={handleEmojiClick} 
+              autoFocusSearch={false}
+              lazyLoadEmojis={true}
+              theme={useThemeStore.getState().theme as any}
+            />
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>
             <motion.svg 
               whileHover={{ scale: 1.1, rotate: -15 }}
               xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
+          </button>
+          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={fileButtonClasses}>
+            <motion.div whileHover={{ scale: 1.1 }}>
+              <FiSmile size={22} />
+            </motion.div>
           </button>
           <input 
             ref={fileInputRef}

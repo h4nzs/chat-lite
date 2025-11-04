@@ -69,8 +69,8 @@ export default {
         },
       },
       boxShadow: {
-        'soft': '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04)', // Very subtle
-        'card': '0 4px 12px rgba(0, 0, 0, 0.1)', // More pronounced for cards
+        'soft': '0 1px 3px 0 var(--shadow-color), 0 1px 2px 0 var(--shadow-color)', // Very subtle
+        'card': '0 4px 12px var(--shadow-color)', // More pronounced for cards
       },
     },
   },

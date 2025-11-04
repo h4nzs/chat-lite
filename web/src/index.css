@@ -40,6 +40,7 @@
     --signup-link-bg: #333;
     --signup-link-hover-bg: #444;
     --signup-link-color: white;
+    --shadow-color: rgba(0, 0, 0, 0.1);
   }
 
   .light {
@@ -77,6 +78,7 @@
     --signup-link-bg: #E0E0E0;
     --signup-link-hover-bg: #D0D0D0;
     --signup-link-color: var(--text-primary);
+    --shadow-color: rgba(0, 0, 0, 0.15);
   }
 
   html, body, #root {
