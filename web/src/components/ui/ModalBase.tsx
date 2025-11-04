@@ -51,7 +51,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
-            className="relative w-full max-w-md bg-bg-surface rounded-xl shadow-card flex flex-col"
+            className="relative w-full max-w-md bg-bg-surface rounded-xl shadow-card flex flex-col max-h-[90vh]"
             onMouseDown={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -67,7 +67,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
             </div>
 
             {/* Content */}
-            <div className="p-4 overflow-y-auto">
+            <div className="p-4 overflow-y-auto flex-grow">
               {children}
             </div>
 
