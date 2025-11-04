@@ -1,43 +1,44 @@
 /* eslint-env serviceworker */
 
-// Check if Workbox is available and import it
-if (typeof importScripts === 'function') {
-    importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+// 1. Import Workbox library
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
 
-    // Set up precaching (placeholder will be injected by vite-plugin-pwa)
-    if (workbox) {
-        console.log(`Yay! Workbox is loaded 🎉`);
-        workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+// 2. Check if Workbox is loaded
+if (workbox) {
+  console.log(`Workbox is loaded.`);
 
-        // --- Caching Strategy for API ---
-        workbox.routing.registerRoute(
-          ({ url }) => url.pathname.startsWith('/api/conversations'),
-          new workbox.strategies.StaleWhileRevalidate({
-            cacheName: 'api-conversations-cache',
-            plugins: [
-              new workbox.cacheable.CacheableResponsePlugin({
-                statuses: [0, 200], // Cache successful responses & opaque responses
-              }),
-            ],
-          })
-        );
-    } else {
-        console.log(`Boo! Workbox didn't load 😬`);
-    }
+  // 3. Deconstruct necessary modules for clarity
+  const { precaching, routing, strategies, cacheableResponse } = workbox;
+
+  // 4. Inject precache manifest. This is a placeholder that vite-plugin-pwa will replace.
+  precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+
+  // 5. Caching Strategy for API
+  routing.registerRoute(
+    ({ url }) => url.pathname.startsWith('/api/conversations'),
+    new strategies.StaleWhileRevalidate({
+      cacheName: 'api-conversations-cache',
+      plugins: [
+        new cacheableResponse.CacheableResponsePlugin({
+          statuses: [0, 200], // Cache successful and opaque responses
+        }),
+      ],
+    })
+  );
+
+} else {
+  console.error(`Workbox failed to load.`);
 }
 
-
-// --- Existing Push Notification Logic ---
+// --- 6. Existing Push Notification & Lifecycle Logic ---
 
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
-  // Skip waiting to activate the new service worker immediately.
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activating...');
-  // Take control of all open clients immediately.
   event.waitUntil(self.clients.claim());
 });
 
@@ -67,22 +68,17 @@ self.addEventListener('notificationclick', (event) => {
   const conversationId = event.notification.data?.conversationId;
   const targetUrl = conversationId ? `/conversations/${conversationId}` : '/';
 
-  // This looks for a matching client (browser tab) and focuses it.
   event.waitUntil(
     self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
-      // If a window for the app is already open, focus it.
       for (const client of clientList) {
-        // A simple check to see if the client is the app.
-        // You might want to make this more robust.
         if (client.url.includes(self.location.origin)) {
           client.navigate(targetUrl);
           return client.focus();
         }
       }
-      // If no window is open, open a new one.
       if (self.clients.openWindow) {
         return self.clients.openWindow(targetUrl);
       }
