@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
 import { FiRefreshCw } from 'react-icons/fi'; // Import retry icon
+import { getUserColor } from '@utils/color';
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -210,6 +211,14 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
       
       <div className={`flex items-center gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className="flex flex-col">
+          {!mine && conversation?.isGroup && message.sender?.name && (
+            <p 
+              className="text-xs font-semibold mb-1" 
+              style={{ color: getUserColor(message.senderId) }}
+            >
+              {message.sender.name}
+            </p>
+          )}
           <MessageBubble message={message} mine={mine} isLastInSequence={isLastInSequence} onImageClick={onImageClick} conversation={conversation} />
           <ReactionsDisplay reactions={message.reactions} />
         </div>

@@ -345,7 +345,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                 onInfoToggle={() => setIsGroupInfoOpen(true)} 
                 onMenuClick={onMenuClick} // Pass prop down
               />
-              <div className="flex-1 min-h-0 relative">
+              <div className="flex-1 min-h-0 relative" role="log">
                 <Virtuoso
                   ref={virtuosoRef}
                   initialTopMostItemIndex={messages.length - 1}
@@ -374,7 +374,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                   followOutput="auto"
                 />
                 {filteredTypingUsers.length > 0 && (
-                  <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
+                  <div aria-live="polite" className="absolute bottom-2 left-4 flex items-center gap-2 bg-bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
                      <div className="flex gap-1 items-end h-4">
                        <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                        <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import useDynamicIslandStore from './dynamicIsland';
 
 export type AppNotification = {
   id: string;
@@ -12,21 +13,14 @@ export type AppNotification = {
 type NotificationState = {
   notifications: AppNotification[];
   unreadCount: number;
-  activePopup: AppNotification | null;
   addNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'timestamp'>) => void;
-  showPopup: (notification: AppNotification) => void;
-  hidePopup: () => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
-  removeNotificationsForConversation: (conversationId: string) => void;
 };
 
-let popupTimeout: NodeJS.Timeout;
-
-const useNotificationStore = create<NotificationState>((set, get) => ({
+const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
-  activePopup: null,
 
   addNotification: (notification) => {
     const newNotification: AppNotification = {
@@ -39,21 +33,16 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
       notifications: [newNotification, ...state.notifications],
       unreadCount: state.unreadCount + 1,
     }));
-    get().showPopup(newNotification);
-  },
 
-  showPopup: (notification) => {
-    if (popupTimeout) {
-      clearTimeout(popupTimeout);
+    // Integrate with Dynamic Island
+    if (newNotification.sender && newNotification.link) {
+      useDynamicIslandStore.getState().addActivity({
+        type: 'notification',
+        sender: newNotification.sender,
+        message: newNotification.message,
+        link: newNotification.link,
+      }, 5000); // Auto-hide after 5 seconds
     }
-    set({ activePopup: notification });
-    popupTimeout = setTimeout(() => {
-      get().hidePopup();
-    }, 5000); // Hide after 5 seconds
-  },
-
-  hidePopup: () => {
-    set({ activePopup: null });
   },
 
   markAllAsRead: () => {
@@ -65,15 +54,6 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   clearNotifications: () => {
     set({ notifications: [], unreadCount: 0 });
-  },
-
-  removeNotificationsForConversation: (conversationId: string) => {
-    set(state => {
-      if (state.activePopup?.link === conversationId) {
-        return { activePopup: null };
-      }
-      return {};
-    });
   },
 }));
 

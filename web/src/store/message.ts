@@ -5,6 +5,10 @@ import { encryptMessage, decryptMessage } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation"; // Import type from conversation store
+import axios from 'axios';
+import useDynamicIslandStore from './dynamicIsland';
+
+const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
 // --- Helper Functions ---
 
@@ -148,16 +152,40 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   },
 
   uploadFile: async (conversationId, file) => {
-    const toastId = toast.loading(`Uploading ${file.name}...`);
+    const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
+    
+    const activityId = addActivity({
+      type: 'upload',
+      fileName: file.name,
+      progress: 0,
+    });
+
     try {
       const form = new FormData();
       form.append("file", file);
-      const { file: fileData } = await api<{ file: any }>(`/api/uploads/${conversationId}/upload`, { method: "POST", body: form });
-      toast.success("File uploaded!", { id: toastId });
+
+      const response = await axios.post<{ file: any }>(
+        `${API_URL}/api/uploads/${conversationId}/upload`,
+        form,
+        {
+          withCredentials: true,
+          onUploadProgress: (progressEvent) => {
+            const progress = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+            updateActivity(activityId, { progress });
+          },
+        }
+      );
+
+      const { file: fileData } = response.data;
+      
+      updateActivity(activityId, { progress: 100 });
+      setTimeout(() => removeActivity(activityId), 1000); // Keep it for a second to show 100%
+
       get().sendMessage(conversationId, { fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
     } catch (uploadError: any) {
-      const errorMsg = uploadError.details ? JSON.parse(uploadError.details).error : uploadError.message;
+      const errorMsg = uploadError.response?.data?.error || uploadError.message || "Upload failed";
       toast.error(`Upload failed: ${errorMsg}`);
+      removeActivity(activityId);
     }
   },
 

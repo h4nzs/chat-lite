@@ -106,3 +106,16 @@
     background: #555;
   }
 }
+
+@layer components {
+  /* Global Focus-Visible Styles for Accessibility */
+  .btn, 
+  button, 
+  a, 
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  textarea {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-color focus-visible:ring-offset-bg-surface;
+  }
+}
