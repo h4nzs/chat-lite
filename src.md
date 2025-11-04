@@ -26,23 +26,6 @@ Untuk membuat aplikasi terasa lebih "halus", stabil, dan mengurangi kebutuhan pe
 
 
 
-**2. State "Optimistic" yang Lebih Cerdas untuk Pesan (Prioritas Sedang)**
-
-*   **Masalah:** Pesan yang gagal terkirim hanya ditandai dengan error, tanpa ada cara mudah untuk mencoba lagi.
-*   **Langkah Implementasi:**
-    1.  **Tambahkan State Error pada Pesan:** Di tipe `Message` (`conversation.ts`), tambahkan properti opsional `error: boolean`.
-    2.  **Modifikasi `sendMessage`:** Di `message.ts`, saat `socket.emit` gagal atau mengembalikan `ack` dengan error, perbarui pesan optimis di state dan set `error` menjadi `true`.
-    3.  **Update UI `MessageBubble`:** Di komponen `MessageBubble.tsx`, jika `message.error` adalah `true`, tampilkan ikon peringatan (misalnya, `FiAlertCircle`) di samping pesan.
-    4.  **Implementasikan Fungsi "Coba Lagi":** Buat fungsi `retrySendMessage(message: Message)` di `useMessageStore`. Saat ikon peringatan diklik, panggil fungsi ini. Fungsi ini akan menghapus pesan error dari state dan memanggil kembali `sendMessage` dengan data yang sama.
-
-**3. Virtualisasi untuk Daftar yang Panjang (Peningkatan Performa)**
-
-*   **Masalah:** Daftar percakapan dan daftar pengguna bisa menjadi lambat jika jumlahnya sangat banyak.
-*   **Langkah Implementasi:**
-    1.  **Analisis Komponen:** Identifikasi komponen yang me-render daftar panjang, yaitu `ChatList.tsx` dan `StartNewChat.tsx`.
-    2.  **Implementasi `react-virtuoso`:** Ganti pemetaan (`.map()`) standar di dalam komponen tersebut dengan komponen `<Virtuoso />` dari `react-virtuoso`.
-    3.  **Konfigurasi Virtuoso:** Konfigurasikan properti `data` untuk menerima array percakapan atau pengguna, dan properti `itemContent` untuk me-render satu item baris. Ini akan memastikan hanya item yang terlihat di layar yang di-render dalam DOM.
-
 **4. Pre-fetching dan Caching yang Lebih Agresif (Peningkatan Kecepatan yang Dirasakan)**
 
 *   **Masalah:** Ada jeda saat memuat pesan atau data lain saat pengguna berinteraksi.

@@ -13,13 +13,19 @@ import { useModalStore } from '@store/modal';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
+import { FiRefreshCw } from 'react-icons/fi'; // Import retry icon
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
+  const retrySendMessage = useMessageStore(s => s.retrySendMessage);
 
   if (message.senderId !== meId) return null;
   if (message.error) {
-    return <svg title="Failed to send" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
+    return (
+      <button onClick={() => retrySendMessage(message)} title="Failed to send. Click to retry.">
+        <FiRefreshCw className="text-destructive cursor-pointer" size={16} />
+      </button>
+    );
   }
   if (message.optimistic) {
     return <svg title="Sending..." xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>;

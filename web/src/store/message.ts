@@ -55,6 +55,7 @@ type State = {
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
+  retrySendMessage: (message: Message) => void;
 };
 
 // --- Zustand Store ---
@@ -355,5 +356,20 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       delete newMessages[conversationId];
       return { messages: newMessages };
     });
+  },
+
+  retrySendMessage: (message: Message) => {
+    const { conversationId, tempId, content, fileUrl, fileName, fileType, fileSize, repliedToId } = message;
+    
+    // Hapus pesan yang gagal dari state
+    set(state => ({
+      messages: {
+        ...state.messages,
+        [conversationId]: state.messages[conversationId]?.filter(m => m.tempId !== tempId) || [],
+      },
+    }));
+
+    // Kirim ulang pesan
+    get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
   },
 }));
