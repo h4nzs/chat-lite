@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useConversationStore } from '@store/conversation';
+import { useMessageStore } from '@store/message';
 import { usePresenceStore } from '@store/presence';
 import { useAuthStore, type User } from '@store/auth';
 import { sanitizeText } from '@utils/sanitize';
@@ -82,6 +83,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     startConversation: state.startConversation,
     error: state.error,
   }));
+  const loadMessagesForConversation = useMessageStore(s => s.loadMessagesForConversation);
   const presence = usePresenceStore(state => state.presence);
   const meId = useAuthStore((s) => s.user?.id);
   const [searchQuery, setSearchQuery] = useState('');
@@ -207,6 +209,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               return (
                 <motion.div
                   key={c.id}
+                  onMouseEnter={() => loadMessagesForConversation(c.id)}
                   whileHover={{ scale: 1.03 }}
                   className={`relative flex items-center justify-between mx-2 my-1 rounded-lg ${isActive ? 'bg-accent-color/20 border-l-4 border-accent-color' : ''}`}>
                   <div className="w-full text-left p-3 pr-10 flex items-center gap-3">

@@ -1,6 +1,33 @@
 /* eslint-env serviceworker */
 
-// Service worker for push notifications
+// Check if Workbox is available and import it
+if (typeof importScripts === 'function') {
+    importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+
+    // Set up precaching (placeholder will be injected by vite-plugin-pwa)
+    if (workbox) {
+        console.log(`Yay! Workbox is loaded 🎉`);
+        workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+
+        // --- Caching Strategy for API ---
+        workbox.routing.registerRoute(
+          ({ url }) => url.pathname.startsWith('/api/conversations'),
+          new workbox.strategies.StaleWhileRevalidate({
+            cacheName: 'api-conversations-cache',
+            plugins: [
+              new workbox.cacheable.CacheableResponsePlugin({
+                statuses: [0, 200], // Cache successful responses & opaque responses
+              }),
+            ],
+          })
+        );
+    } else {
+        console.log(`Boo! Workbox didn't load 😬`);
+    }
+}
+
+
+// --- Existing Push Notification Logic ---
 
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
