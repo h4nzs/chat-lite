@@ -161,6 +161,18 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     });
 
     try {
+      // 1. Fetch the CSRF token first
+      const { data: csrfData } = await axios.get<{ csrfToken: string }>(
+        `${API_URL}/api/csrf-token`,
+        { withCredentials: true }
+      );
+      const csrfToken = csrfData.csrfToken;
+
+      if (!csrfToken) {
+        throw new Error('Could not retrieve CSRF token.');
+      }
+
+      // 2. Perform the upload with the token
       const form = new FormData();
       form.append("file", file);
 
@@ -169,6 +181,9 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         form,
         {
           withCredentials: true,
+          headers: {
+            'CSRF-Token': csrfToken,
+          },
           onUploadProgress: (progressEvent) => {
             const progress = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
             updateActivity(activityId, { progress });
