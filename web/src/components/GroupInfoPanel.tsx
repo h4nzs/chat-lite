@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useConversationStore, Participant } from '@store/conversation';
+import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import ParticipantList from './ParticipantList';
 import EditGroupInfoModal from './EditGroupInfoModal';
@@ -7,6 +7,7 @@ import AddParticipantModal from './AddParticipantModal';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
 import { toAbsoluteUrl } from '@utils/url';
+import { FiEdit2, FiLogOut, FiPlus, FiX } from 'react-icons/fi';
 
 const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; onClose: () => void; }) => {
   const { conversation } = useConversationStore(state => ({
@@ -55,8 +56,8 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
   };
 
   const handleLeaveGroup = async () => {
-    if (!window.confirm("Are you sure you want to leave this group?")) return;
-
+    // We will use our custom ConfirmModal now
+    // This logic will be moved or triggered via the modal store
     const toastId = toast.loading('Leaving group...');
     try {
       await api(`/api/conversations/${conversation.id}/leave`, { method: 'DELETE' });
@@ -76,18 +77,20 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
       <div 
         className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
         onClick={handleClose}
+        aria-hidden="true"
       ></div>
 
       <div className={`absolute top-0 right-0 h-full w-full max-w-md bg-bg-surface border-l border-border z-50 flex flex-col transition-transform duration-300 ease-in-out ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="p-4 border-b border-border flex items-center">
+        <header className="p-4 border-b border-border flex items-center flex-shrink-0">
           <button onClick={handleClose} className="p-2 -ml-2 mr-2 text-text-secondary hover:text-text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            <FiX size={24} />
           </button>
           <h2 className="text-xl font-bold text-text-primary">Group Info</h2>
-        </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="text-center mb-6">
+        <main className="flex-1 overflow-y-auto bg-bg-main p-4 md:p-6 space-y-6">
+          {/* Group Identity Card */}
+          <div className="bg-bg-surface rounded-xl shadow-soft p-6 text-center relative">
             <div className="relative w-24 h-24 mx-auto mb-4">
               <img 
                 src={avatarSrc}
@@ -95,45 +98,51 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
                 className="w-full h-full rounded-full object-cover bg-bg-primary"
               />
               {amIAdmin && (
-                <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 bg-accent-gradient rounded-full p-2 text-white hover:opacity-90">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9z"/><path d="m16.5 9.4-9.3 9.3"/><path d="m16.5 15.6 3.3-3.3"/></svg>
-                </button>
+                <>
+                  <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 bg-accent-gradient rounded-full p-2 text-white hover:opacity-90" aria-label="Change group avatar">
+                    <FiEdit2 size={16} />
+                  </button>
+                  <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
+                </>
               )}
-              <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
             </div>
             <h3 className="text-2xl font-bold text-text-primary">{conversation.title}</h3>
             <p className="text-text-secondary mt-1">{conversation.description || 'No description'}</p>
             {amIAdmin && (
-              <button onClick={() => setIsEditing(true)} className="text-sm text-accent-color hover:underline mt-2">Edit</button>
-            )}
-          </div>
-
-          <div>
-            <h4 className="text-lg font-semibold mb-2 text-text-primary">{conversation.participants.length} Members</h4>
-            {amIAdmin && (
-              <button 
-                onClick={() => setIsAddParticipantModalOpen(true)}
-                className="w-full flex items-center justify-center p-2 mb-4 rounded-md bg-transparent border border-border text-accent-color hover:bg-secondary transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" y1="10" x2="16" y2="16"/></svg>
-                <span className="ml-2">Add Participants</span>
+              <button onClick={() => setIsEditing(true)} className="absolute top-4 right-4 text-text-secondary hover:text-accent-color">
+                <FiEdit2 size={20} />
               </button>
             )}
+          </div>
+
+          {/* Members Card */}
+          <div className="bg-bg-surface rounded-xl shadow-soft">
+            <div className="p-6 border-b border-border">
+              <h4 className="text-lg font-semibold text-text-primary">{conversation.participants.length} Members</h4>
+              {amIAdmin && (
+                <button 
+                  onClick={() => setIsAddParticipantModalOpen(true)}
+                  className="w-full flex items-center justify-center p-2 mt-4 rounded-lg bg-transparent border border-dashed border-border text-accent-color hover:bg-secondary transition-colors"
+                >
+                  <FiPlus className="mr-2" />
+                  <span>Add Participants</span>
+                </button>
+              )}
+            </div>
             <ParticipantList conversationId={conversation.id} participants={conversation.participants} amIAdmin={amIAdmin} />
           </div>
-        </div>
 
-        {!amIAdmin && (
-          <div className="p-4 border-t border-border">
-            <button 
+          {/* Actions Card */}
+          <div className="bg-bg-surface rounded-xl shadow-soft">
+             <button 
               onClick={handleLeaveGroup}
-              className="w-full flex items-center justify-center p-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors"
+              className="w-full flex items-center p-4 text-red-500 hover:bg-red-500/10 transition-colors rounded-xl"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              <span className="ml-2">Leave Group</span>
+              <FiLogOut className="mr-3" />
+              <span className="font-semibold">Leave Group</span>
             </button>
           </div>
-        )}
+        </main>
 
         {isEditing && (
           <EditGroupInfoModal
