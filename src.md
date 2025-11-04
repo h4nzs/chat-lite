@@ -1,36 +1,52 @@
 # Analisis Keamanan Sistem Enkripsi Chat-Lite
 
 **Pendapat Umum:**
-Sistem enkripsi kita sekarang **jauh lebih aman** daripada sebelumnya, tetapi belum bisa disebut "sempurna". Kita telah membangun fondasi yang sangat kuat, namun ada beberapa area penting yang bisa dan seharusnya kita tingkatkan untuk mencapai tingkat keamanan seperti aplikasi chat terkemuka (misalnya Signal).
+Sistem enkripsi kita sekarang **jauh lebih aman** daripada sebelumnya. Kita telah membangun fondasi yang sangat kuat dengan mengimplementasikan standar industri modern untuk E2EE, manajemen kunci, dan autentikasi.
 
 ### Kekuatan Sistem Saat Ini (Yang Sudah Kita Lakukan Dengan Benar)
 
 1.  **Enkripsi End-to-End (E2EE) Fundamental:** Kita sudah menerapkan prinsip inti E2EE. Pesan dienkripsi di perangkat Anda dan hanya bisa didekripsi oleh perangkat penerima. Server tidak bisa membaca isi pesan.
 2.  **Kunci Identitas Pengguna:** Setiap pengguna sekarang memiliki pasangan kunci publik/privat yang unik, yang merupakan dasar dari identitas digital yang aman.
-3.  **Kunci Sesi per Percakapan:** Setiap percakapan memiliki kunci enkripsi acak yang terpisah. Ini adalah praktik yang baik, karena jika satu kunci percakapan bocor, percakapan Anda yang lain tetap aman.
-4.  **Manajemen Kunci Sisi Klien:** Kunci privat Anda dienkripsi menggunakan password Anda dan disimpan di browser. Ini jauh lebih baik daripada menyimpannya dalam bentuk teks biasa.
-
-### Kelemahan dan Area Peningkatan (Di Mana Kita Bisa Lebih Baik)
-
-Meskipun fondasinya kuat, ada beberapa celah keamanan yang perlu dipertimbangkan:
-
-1.  **(Kritis) Backup Kunci yang Tidak Aman:** Fitur "Backup Key" saat ini hanya mengunduh kunci privat dalam bentuk teks biasa. Jika file backup tersebut dicuri, seluruh keamanan akun Anda hancur. Ini adalah celah yang paling mendesak untuk diperbaiki.
-2.  **(Tinggi) Tidak Ada Verifikasi Kontak (Trust on First Use):** Saat Anda memulai chat dengan seseorang, Anda secara otomatis "mempercayai" kunci publik yang diberikan oleh server. Anda tidak punya cara untuk memverifikasi apakah kunci tersebut benar-benar milik teman Anda, atau milik penyerang *man-in-the-middle*.
-3.  **(Tinggi) Kurangnya *Forward Secrecy* (Kerahasiaan Masa Depan):** Kita menggunakan satu kunci sesi untuk seluruh riwayat percakapan. Jika kunci sesi ini suatu saat bocor, penyerang bisa mendekripsi **semua pesan di masa lalu** dalam percakapan tersebut.
-4.  **(Sedang) Penanganan Anggota Grup:** Saat anggota baru ditambahkan ke grup, mereka mendapatkan kunci sesi yang ada. Ini berarti mereka berpotensi bisa membaca pesan yang dikirim *sebelum* mereka bergabung. Sebaliknya, jika anggota dikeluarkan, mereka masih memegang kunci sesi dan bisa terus mengintip pesan baru.
-
-### Saran dan Roadmap Peningkatan Keamanan
-
-Berikut adalah langkah-langkah yang saya sarankan untuk membuat aplikasi ini benar-benar aman, diurutkan berdasarkan prioritas:
-
-| Prioritas | Fitur | Deskripsi Teknis | Manfaat Keamanan |
-| :--- | :--- | :--- | :--- |
-| **1. done** | **Backup & Restore via Recovery Phrase** | **Backup:** Saat diminta, aplikasi menampilkan "Frasa Pemulihan" (12-24 kata acak) yang digenerate dari kunci privat pengguna. **Restore:** Di halaman login, pengguna bisa memilih opsi "Restore", lalu memasukkan username, frasa pemulihan, dan password baru. Aplikasi akan meregenerasi kunci privat dari frasa, memverifikasinya ke server, lalu mengenkripsi kunci tersebut dengan password baru untuk disimpan di perangkat baru. | Menghilangkan risiko file backup kunci dicuri dan menyediakan alur pemulihan akun yang aman dan portabel. Ini adalah standar industri untuk dompet kripto dan aplikasi aman. |
-| **2. done** | **Otentikasi Biometrik (WebAuthn)** | Alih-alih meminta password di setiap sesi, gunakan API WebAuthn untuk mengikat kunci privat utama ke biometrik (sidik jari/wajah) atau PIN perangkat. Saat perlu mendekripsi kunci, aplikasi akan memicu dialog sistem operasi untuk otentikasi, bukan meminta password. | **Kenyamanan Drastis:** Menghilangkan kebutuhan mengetik password berulang kali. **Keamanan Tinggi:** Mengikat keamanan akun ke perangkat keras, membuatnya jauh lebih sulit diserang daripada password saja. |
-| **3. done** | **Verifikasi Kontak (Safety Numbers)** | Untuk setiap percakapan, kita tampilkan "Kode Keamanan" (serangkaian angka atau QR code) yang unik. Kode ini dibuat dari kombinasi kunci publik Anda dan teman chat Anda. Anda bisa membandingkan kode ini melalui telepon atau bertemu langsung untuk memastikan tidak ada penyadapan. | Memberikan jaminan bahwa Anda berbicara dengan orang yang benar, bukan dengan penyadap. |
-| **3. done** | **Implementasi *Ratcheting* (Sesi Berputar)** | Alih-alih satu kunci sesi, kita gunakan algoritma (seperti Double Ratchet) untuk membuat kunci baru untuk **setiap pesan**. Atau, sebagai langkah awal yang lebih sederhana, kita bisa membuat kunci sesi baru setiap kali aplikasi dibuka atau setiap 24 jam. | Jika satu kunci pesan bocor, penyerang hanya bisa membaca pesan itu saja, bukan seluruh riwayat. Ini adalah inti dari *Forward Secrecy*. |
-| **4. done** | **Regenerasi Kunci Grup** | Setiap kali ada perubahan anggota grup (masuk, keluar, atau dikeluarkan), server harus secara otomatis membuat **kunci sesi yang benar-benar baru** dan mendistribusikannya hanya kepada anggota yang masih aktif. | Mencegah anggota baru membaca riwayat chat, dan mencegah anggota yang sudah keluar untuk terus membaca chat baru. |
+3.  **Manajemen Kunci Sisi Klien:** Kunci privat pengguna dienkripsi menggunakan password mereka dan disimpan di browser, yang jauh lebih aman daripada menyimpannya dalam bentuk teks biasa.
+4.  **Forward Secrecy & Post-Compromise Security:** Dengan implementasi *ratcheting* (kunci sesi yang berputar untuk setiap pesan), kebocoran satu kunci pesan tidak akan membocorkan riwayat atau pesan di masa depan.
+5.  **Verifikasi Kontak (Safety Numbers):** Pengguna dapat memverifikasi identitas lawan bicara mereka untuk memastikan tidak ada serangan *man-in-the-middle*.
+6.  **Manajemen Kunci Grup yang Aman:** Kunci sesi grup secara otomatis dirotasi setiap kali ada perubahan keanggotaan, mencegah anggota baru membaca riwayat dan anggota yang keluar dari membaca pesan baru.
+7.  **Opsi Login Modern & Aman:** Selain password, pengguna dapat menggunakan **Otentikasi Biometrik (WebAuthn)**, yang mengikat keamanan akun ke perangkat keras.
+8.  **Pemulihan Akun yang Aman:** Fitur **Backup & Restore via Recovery Phrase** menyediakan alur pemulihan akun yang aman dan portabel tanpa risiko kebocoran file kunci.
 
 **Kesimpulan:**
 
-Sistem kita saat ini sudah merupakan lompatan besar dari kondisi awal. Namun, untuk bisa dengan percaya diri menyebutnya "aman", saya sangat merekomendasikan untuk mengikuti roadmap di atas, dimulai dengan memperbaiki fitur backup kunci.
+Fondasi keamanan aplikasi ini sangat solid dan telah mengadopsi praktik-praktik terbaik. Fokus selanjutnya adalah pada peningkatan stabilitas dan pengalaman pengguna.
+
+---
+
+# Rekomendasi untuk Stabilitas dan Pengalaman Pengguna
+
+Untuk membuat aplikasi terasa lebih "halus", stabil, dan mengurangi kebutuhan pengguna untuk me-refresh halaman, berikut adalah beberapa rekomendasi dengan langkah implementasi yang lebih konkret:
+
+
+
+**2. State "Optimistic" yang Lebih Cerdas untuk Pesan (Prioritas Sedang)**
+
+*   **Masalah:** Pesan yang gagal terkirim hanya ditandai dengan error, tanpa ada cara mudah untuk mencoba lagi.
+*   **Langkah Implementasi:**
+    1.  **Tambahkan State Error pada Pesan:** Di tipe `Message` (`conversation.ts`), tambahkan properti opsional `error: boolean`.
+    2.  **Modifikasi `sendMessage`:** Di `message.ts`, saat `socket.emit` gagal atau mengembalikan `ack` dengan error, perbarui pesan optimis di state dan set `error` menjadi `true`.
+    3.  **Update UI `MessageBubble`:** Di komponen `MessageBubble.tsx`, jika `message.error` adalah `true`, tampilkan ikon peringatan (misalnya, `FiAlertCircle`) di samping pesan.
+    4.  **Implementasikan Fungsi "Coba Lagi":** Buat fungsi `retrySendMessage(message: Message)` di `useMessageStore`. Saat ikon peringatan diklik, panggil fungsi ini. Fungsi ini akan menghapus pesan error dari state dan memanggil kembali `sendMessage` dengan data yang sama.
+
+**3. Virtualisasi untuk Daftar yang Panjang (Peningkatan Performa)**
+
+*   **Masalah:** Daftar percakapan dan daftar pengguna bisa menjadi lambat jika jumlahnya sangat banyak.
+*   **Langkah Implementasi:**
+    1.  **Analisis Komponen:** Identifikasi komponen yang me-render daftar panjang, yaitu `ChatList.tsx` dan `StartNewChat.tsx`.
+    2.  **Implementasi `react-virtuoso`:** Ganti pemetaan (`.map()`) standar di dalam komponen tersebut dengan komponen `<Virtuoso />` dari `react-virtuoso`.
+    3.  **Konfigurasi Virtuoso:** Konfigurasikan properti `data` untuk menerima array percakapan atau pengguna, dan properti `itemContent` untuk me-render satu item baris. Ini akan memastikan hanya item yang terlihat di layar yang di-render dalam DOM.
+
+**4. Pre-fetching dan Caching yang Lebih Agresif (Peningkatan Kecepatan yang Dirasakan)**
+
+*   **Masalah:** Ada jeda saat memuat pesan atau data lain saat pengguna berinteraksi.
+*   **Langkah Implementasi:**
+    1.  **Pre-fetch saat Hover:** Di komponen `ChatItem.tsx`, tambahkan event handler `onMouseEnter`.
+    2.  **Panggil `loadMessages`:** Di dalam `onMouseEnter`, panggil action `useMessageStore.getState().loadMessagesForConversation(conversation.id)`, tetapi pastikan action ini memiliki logika untuk tidak memuat ulang jika data sudah ada.
+    3.  **Konfigurasi Service Worker:** Edit file `sw.js` untuk menggunakan strategi caching `StaleWhileRevalidate` atau `CacheFirst` dari Workbox untuk rute API yang sering diakses (misalnya, `/api/conversations`). Ini akan membuat aplikasi memuat data dari cache terlebih dahulu untuk kecepatan instan, sambil memperbaruinya di latar belakang.

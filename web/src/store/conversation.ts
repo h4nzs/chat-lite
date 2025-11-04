@@ -91,6 +91,7 @@ type State = {
   addParticipants: (conversationId: string, participants: Participant[]) => void;
   removeParticipant: (conversationId: string, userId: string) => void;
   updateParticipantRole: (conversationId: string, userId: string, role: "ADMIN" | "MEMBER") => void;
+  resyncState: () => Promise<void>;
 };
 
 const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
@@ -102,6 +103,11 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   activeId: initialActiveId,
   isSidebarOpen: false,
   error: null,
+
+  resyncState: async () => {
+    console.log("Resyncing conversation state...");
+    await get().loadConversations();
+  },
 
   loadConversations: async () => {
     try {

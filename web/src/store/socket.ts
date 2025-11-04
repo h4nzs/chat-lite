@@ -29,9 +29,27 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
 
   initSocketListeners: () => {
     const socket = getSocket();
-    set({ isConnected: true });
+    // Set initial connection status based on current socket state
+    set({ isConnected: socket.connected });
 
-    // --- Register all listeners ---
+    // --- Register connection status listeners ---
+    socket.on("connect", () => {
+      console.log("✅ Socket connected (store)");
+      set({ isConnected: true });
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("⚠️ Socket disconnected (store):", reason);
+      set({ isConnected: false });
+    });
+
+    socket.on("reconnect", (attempt) => {
+      console.log("🔄 Socket reconnected (store) after", attempt, "attempts");
+      set({ isConnected: true });
+      getStores().convo.resyncState(); // Call resync function
+    });
+
+    // --- Register all other listeners ---
 
     socket.on("presence:init", (onlineUserIds: string[]) => {
       getStores().presence.setPresence(onlineUserIds);

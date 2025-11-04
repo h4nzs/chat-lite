@@ -15,6 +15,7 @@ import ConfirmModal from './components/ConfirmModal';
 import UserInfoModal from './components/UserInfoModal'; // Import UserInfoModal
 import PasswordPromptModal from './components/PasswordPromptModal';
 import DynamicIsland from './components/DynamicIsland';
+import ConnectionStatusBanner from './components/ConnectionStatusBanner'; // Import ConnectionStatusBanner
 import { useThemeStore } from './store/theme';
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
           },
         }}
       />
+      <ConnectionStatusBanner /> {/* Add ConnectionStatusBanner here */}
       <BrowserRouter>
         <ConfirmModal />
         <UserInfoModal />
