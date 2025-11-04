@@ -10,6 +10,9 @@ import { decryptSessionKeyForUser } from '@utils/keyManagement';
 import { addSessionKey } from '@lib/keychainDb';
 import { getSodium } from '@lib/sodiumInitializer';
 
+let listenersInitialized = false;
+export const resetListenersInitialized = () => { listenersInitialized = false; };
+
 // --- Helper Functions ---
 
 const getStores = () => ({
@@ -28,6 +31,8 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
   isConnected: false,
 
   initSocketListeners: () => {
+    if (listenersInitialized) return () => {}; // Return an empty cleanup function if already initialized
+
     const socket = getSocket();
     // Set initial connection status based on current socket state
     set({ isConnected: socket.connected });
@@ -244,6 +249,7 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       }
     });
 
+    listenersInitialized = true; // Set the flag
 
     // Return a cleanup function
     return () => {

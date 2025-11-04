@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import ConfirmModal from './components/ConfirmModal';
 import UserInfoModal from './components/UserInfoModal'; // Import UserInfoModal
 import PasswordPromptModal from './components/PasswordPromptModal';
+import ChatInfoModal from './components/ChatInfoModal';
 import DynamicIsland from './components/DynamicIsland';
 import ConnectionStatusBanner from './components/ConnectionStatusBanner'; // Import ConnectionStatusBanner
 import { useThemeStore } from './store/theme';
@@ -50,6 +51,7 @@ export default function App() {
         <ConfirmModal />
         <UserInfoModal />
         <PasswordPromptModal />
+        <ChatInfoModal />
         <DynamicIsland />
         <Routes>
           <Route path="/login" element={<Login />} />

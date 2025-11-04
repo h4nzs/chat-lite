@@ -9,6 +9,7 @@ type ModalState = {
   profileUserId: string | null;
   isPasswordPromptOpen: boolean;
   onPasswordSubmit: (password: string | null) => void;
+  isChatInfoModalOpen: boolean;
 };
 
 type ModalActions = {
@@ -18,6 +19,8 @@ type ModalActions = {
   closeProfileModal: () => void;
   showPasswordPrompt: (onSubmitted: (password: string | null) => void) => void;
   hidePasswordPrompt: () => void;
+  openChatInfoModal: () => void;
+  closeChatInfoModal: () => void;
 };
 
 export const useModalStore = create<ModalState & ModalActions>((set) => ({
@@ -29,6 +32,7 @@ export const useModalStore = create<ModalState & ModalActions>((set) => ({
   profileUserId: null,
   isPasswordPromptOpen: false,
   onPasswordSubmit: () => {},
+  isChatInfoModalOpen: false,
 
   showConfirm: (title, message, onConfirm) => set({ isConfirmOpen: true, confirmTitle: title, confirmMessage: message, onConfirm }),
   hideConfirm: () => set({ isConfirmOpen: false }),
@@ -36,5 +40,7 @@ export const useModalStore = create<ModalState & ModalActions>((set) => ({
   closeProfileModal: () => set({ isProfileModalOpen: false, profileUserId: null }),
   showPasswordPrompt: (onSubmitted) => set({ isPasswordPromptOpen: true, onPasswordSubmit: onSubmitted }),
   hidePasswordPrompt: () => set({ isPasswordPromptOpen: false }),
+  openChatInfoModal: () => set({ isChatInfoModalOpen: true }),
+  closeChatInfoModal: () => set({ isChatInfoModalOpen: false }),
 }));
 

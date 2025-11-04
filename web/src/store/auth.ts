@@ -1,7 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { authFetch, api } from "@lib/api";
 import { getSocket, disconnectSocket } from "@lib/socket";
-import { useSocketStore } from './socket';
+import { useSocketStore, resetListenersInitialized } from './socket';
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { getSodium } from '@lib/sodiumInitializer';
@@ -171,6 +171,7 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     localStorage.removeItem("activeId");
     set({ user: null });
 
+    resetListenersInitialized(); // Reset the flag
     disconnectSocket();
   },
 
