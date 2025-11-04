@@ -69,10 +69,8 @@ export default {
         },
       },
       boxShadow: {
-        'neumorphic-dark': '6px 6px 12px #101010, -6px -6px 12px #202020',
-        'neumorphic-dark-inset': 'inset 6px 6px 12px #101010, inset -6px -6px 12px #202020',
-        'neumorphic-light': '6px 6px 12px #d1d9e6, -6px -6px 12px #ffffff',
-        'neumorphic-light-inset': 'inset 6px 6px 12px #d1d9e6, inset -6px -6px 12px #ffffff',
+        'soft': '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04)', // Very subtle
+        'card': '0 4px 12px rgba(0, 0, 0, 0.1)', // More pronounced for cards
       },
     },
   },

@@ -14,6 +14,7 @@ import NotificationBell from './NotificationBell';
 import { api } from '@lib/api';
 import { Virtuoso } from 'react-virtuoso';
 import { debounce } from 'lodash';
+import clsx from 'clsx';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -32,7 +33,7 @@ const UserProfile = () => {
       <div className="flex items-center gap-3">
         <img src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-10 h-10 rounded-full bg-bg-primary object-cover" />
         <div>
-          <p className="font-semibold text-text-primary">{user.name}</p>
+          <p className="text-lg font-semibold text-text-primary">{user.name}</p>
           <p className="text-xs text-text-secondary">Available</p>
         </div>
       </div>
@@ -66,7 +67,7 @@ const SearchResults = ({ results, onSelect }: { results: User[], onSelect: (user
         >
           <img src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`} alt="Avatar" className="w-12 h-12 rounded-full bg-bg-primary object-cover" />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate text-text-primary">{user.name}</p>
+            <p className="text-base font-semibold truncate text-text-primary">{user.name}</p>
             <p className="text-sm truncate text-text-secondary">@{user.username}</p>
           </div>
         </button>
@@ -175,7 +176,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             <button 
               onClick={openCreateGroupModal} 
               title="New Group Chat" // Tooltip on hover
-              className="p-2 rounded-full text-text-secondary hover:bg-secondary hover:text-text-primary transition-colors"
+              className="p-2 rounded-full bg-accent-color text-white hover:bg-accent-color/80 transition-colors shadow-soft"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
             </button>
@@ -206,12 +207,18 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 ? (c.avatarUrl ? `${toAbsoluteUrl(c.avatarUrl)}?t=${c.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${c.title}`)
                 : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
 
+              const itemClasses = clsx(
+                'relative flex items-center justify-between mx-2 my-1 rounded-lg transition-shadow duration-200 bg-bg-surface shadow-soft',
+                {
+                  'bg-accent-color/20 border-l-4 border-accent-color shadow-card': isActive,
+                }
+              );
+
               return (
                 <motion.div
                   key={c.id}
                   onMouseEnter={() => loadMessagesForConversation(c.id)}
-                  whileHover={{ scale: 1.03 }}
-                  className={`relative flex items-center justify-between mx-2 my-1 rounded-lg ${isActive ? 'bg-accent-color/20 border-l-4 border-accent-color' : ''}`}>
+                  className={itemClasses}>
                   <div className="w-full text-left p-3 pr-10 flex items-center gap-3">
                     <div className="relative flex-shrink-0">
                       <button 
@@ -230,7 +237,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                     </div>
                     <div onClick={() => onOpen(c.id)} className="flex-1 min-w-0 cursor-pointer">
                       <div className="flex justify-between items-start">
-                        <p className={`font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
+                        <p className={`text-base font-semibold truncate ${isActive ? 'text-accent-color' : 'text-text-primary'}`}>{title}</p>
                         {c.lastMessage && <p className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>{formatConversationTime(c.lastMessage.createdAt)}</p>}
                       </div>
                       <div className="flex justify-between items-center mt-1">

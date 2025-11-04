@@ -68,7 +68,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
 
   const bubbleClasses = clsx(
     'relative max-w-md md:max-w-lg',
-    hasBubbleStyle && `px-4 py-2.5 shadow-sm`,
+    hasBubbleStyle && `px-4 py-2.5 shadow-soft`, // Changed shadow-sm to shadow-soft
     {
       'bg-accent-gradient text-white': mine,
       'bg-bg-primary text-text-primary': !mine,
@@ -98,7 +98,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       )}
 
       {hasContent && (
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        <p className="text-base whitespace-pre-wrap break-words">{message.content}</p>
       )}
 
       {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}

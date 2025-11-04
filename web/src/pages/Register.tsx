@@ -54,7 +54,7 @@ export default function Register() {
   return (
     <div className="flex items-center justify-center h-screen bg-background">
       <div className="form_main">
-        <p className="heading">Sign Up</p>
+        <h1 className="text-3xl font-bold text-foreground mb-8">Sign Up</h1>
         {error && <p className="text-red-500 text-sm mb-4 -mt-4 text-center">{error}</p>}
         <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
           <div className="inputContainer">

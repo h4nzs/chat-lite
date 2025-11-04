@@ -94,7 +94,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           />
           <div>
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-text-primary">{title}</p>
+              <p className="text-lg font-semibold text-text-primary">{title}</p>
               {isConvVerified && <FiShield className="text-green-500" title="Verified Contact" />} 
             </div>
             <p className="text-xs text-text-secondary">{getStatus()}</p>
@@ -173,27 +173,21 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       'translate-x-px translate-y-px': isPressed,
       'bg-accent-gradient': !isPressed,
       'bg-accent-gradient filter brightness-90': isPressed,
-      'shadow-neumorphic-dark': !isPressed && theme === 'dark',
-      'shadow-neumorphic-dark-inset': isPressed && theme === 'dark',
-      'shadow-neumorphic-light': !isPressed && theme === 'light',
-      'shadow-neumorphic-light-inset': isPressed && theme === 'light',
+      'shadow-soft': !isPressed, // Use new soft shadow
+      'shadow-inner': isPressed, // Use inner shadow for pressed state
     }
   );
 
   const textInputClasses = clsx(
     'flex-1 bg-bg-primary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-color',
-    theme === 'dark' ? 'shadow-neumorphic-dark-inset' : 'shadow-neumorphic-light-inset'
+    'shadow-inner' // Use inner shadow for recessed look
   );
 
   const fileButtonClasses = clsx(
     'p-2 rounded-full text-text-secondary transition-all duration-150',
     'hover:text-accent-color',
-    {
-      'shadow-neumorphic-dark': theme === 'dark',
-      'active:shadow-neumorphic-dark-inset': theme === 'dark',
-      'shadow-neumorphic-light': theme === 'light',
-      'active:shadow-neumorphic-light-inset': theme === 'light',
-    }
+    'shadow-soft', // Use soft shadow for elevated look
+    'active:shadow-inner' // Use inner shadow for pressed state
   );
 
   return (
@@ -204,7 +198,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <LinkPreviewCard preview={typingLinkPreview} />
         </div>
       )}
-      <div className="p-4">
+      <div className="p-4 bg-bg-surface shadow-card rounded-t-xl"> {/* Changed to shadow-card */}
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
