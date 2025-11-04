@@ -17,6 +17,7 @@ import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
 import { useVerificationStore } from '@store/verification';
 import { FiShield } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import LinkPreviewCard from './LinkPreviewCard';
 
@@ -141,9 +142,10 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
   const [text, setText] = useState('');
   const [isPressed, setIsPressed] = useState(false);
-  const { theme } = useThemeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageStore();
+
+  const hasText = text.trim().length > 0;
 
   const debouncedFetchPreview = useCallback(
     debounce((inputText: string) => {
@@ -154,7 +156,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!hasText) return;
     onSend({ content: text });
     setText('');
     clearTypingLinkPreview();
@@ -168,13 +170,15 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   }
 
   const sendButtonClasses = clsx(
-    'p-3 rounded-full text-white transition-all duration-150',
+    'p-3 rounded-full text-white transition-all duration-200',
     {
-      'translate-x-px translate-y-px': isPressed,
+      'translate-y-px': isPressed && hasText,
       'bg-accent-gradient': !isPressed,
       'bg-accent-gradient filter brightness-90': isPressed,
-      'shadow-soft': !isPressed, // Use new soft shadow
-      'shadow-inner': isPressed, // Use inner shadow for pressed state
+      'shadow-soft': !isPressed,
+      'shadow-inner': isPressed,
+      'scale-100 opacity-100': hasText,
+      'scale-90 opacity-60 cursor-not-allowed': !hasText,
     }
   );
 
@@ -201,7 +205,9 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       <div className="p-4 bg-bg-surface shadow-card rounded-t-xl"> {/* Changed to shadow-card */}
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            <motion.svg 
+              whileHover={{ scale: 1.1, rotate: -15 }}
+              xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
           </button>
           <input 
             ref={fileInputRef}
@@ -218,7 +224,8 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           />
           <button 
             type="submit" 
-            onMouseDown={() => setIsPressed(true)}
+            disabled={!hasText}
+            onMouseDown={() => hasText && setIsPressed(true)}
             onMouseUp={() => setIsPressed(false)}
             onMouseLeave={() => setIsPressed(false)}
             className={sendButtonClasses}
@@ -302,73 +309,88 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     }
   };
 
-  if (error) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-bg-main text-destructive">
-        <p>Error loading messages.</p>
-        <p className="text-sm text-text-secondary">{error}</p>
-      </div>
-    );
-  }
-
-  if (isLoading || !conversation) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-bg-main">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col h-full bg-bg-main relative">
-      <ChatHeader 
-        conversation={conversation} 
-        onBack={() => openConversation(null)} 
-        onInfoToggle={() => setIsGroupInfoOpen(true)} 
-        onMenuClick={onMenuClick} // Pass prop down
-      />
-      <div className="flex-1 min-h-0 relative">
-        <Virtuoso
-          ref={virtuosoRef}
-          initialTopMostItemIndex={messages.length - 1}
-          data={messages}
-          startReached={loadPreviousMessages}
-          components={{ Header: () => isFetchingMore ? <ChatSpinner /> : null }}
-          itemContent={(index, message) => {
-            const prevMessage = messages[index - 1];
-            const nextMessage = messages[index + 1];
-            const isFirstInSequence = !prevMessage || prevMessage.senderId !== message.senderId;
-            const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
-
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={id}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex flex-col h-full bg-bg-main relative"
+      >
+        {(() => {
+          if (error) {
             return (
-              <div className="px-4">
-                <MessageItem 
-                  message={message} 
-                  conversation={conversation} 
-                  isHighlighted={message.id === highlightedMessageId}
-                  onImageClick={handleImageClick}
-                  isFirstInSequence={isFirstInSequence}
-                  isLastInSequence={isLastInSequence}
-                />
+              <div className="flex-1 flex flex-col items-center justify-center bg-bg-main text-destructive">
+                <p>Error loading messages.</p>
+                <p className="text-sm text-text-secondary">{error}</p>
               </div>
             );
-          }}
-          followOutput="auto"
-        />
-        {filteredTypingUsers.length > 0 && (
-          <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
-             <div className="flex gap-1 items-end h-4">
-               <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-               <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-               <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></span>
-             </div>
-             <span>typing...</span>
-           </div>
-        )}
-      </div>
-      <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
-      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
-      {isGroupInfoOpen && <GroupInfoPanel conversationId={id} onClose={() => setIsGroupInfoOpen(false)} />}
-    </div>
+          }
+
+          if (isLoading || !conversation) {
+            return (
+              <div className="flex-1 flex items-center justify-center bg-bg-main">
+                <Spinner size="lg" />
+              </div>
+            );
+          }
+
+          return (
+            <>
+              <ChatHeader 
+                conversation={conversation} 
+                onBack={() => openConversation(null)} 
+                onInfoToggle={() => setIsGroupInfoOpen(true)} 
+                onMenuClick={onMenuClick} // Pass prop down
+              />
+              <div className="flex-1 min-h-0 relative">
+                <Virtuoso
+                  ref={virtuosoRef}
+                  initialTopMostItemIndex={messages.length - 1}
+                  data={messages}
+                  startReached={loadPreviousMessages}
+                  components={{ Header: () => isFetchingMore ? <ChatSpinner /> : null }}
+                  itemContent={(index, message) => {
+                    const prevMessage = messages[index - 1];
+                    const nextMessage = messages[index + 1];
+                    const isFirstInSequence = !prevMessage || prevMessage.senderId !== message.senderId;
+                    const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
+
+                    return (
+                      <div className="px-4">
+                        <MessageItem 
+                          message={message} 
+                          conversation={conversation} 
+                          isHighlighted={message.id === highlightedMessageId}
+                          onImageClick={handleImageClick}
+                          isFirstInSequence={isFirstInSequence}
+                          isLastInSequence={isLastInSequence}
+                        />
+                      </div>
+                    );
+                  }}
+                  followOutput="auto"
+                />
+                {filteredTypingUsers.length > 0 && (
+                  <div className="absolute bottom-2 left-4 flex items-center gap-2 bg-bg-surface/80 backdrop-blur-sm text-text-secondary text-xs rounded-full px-3 py-1.5 shadow-lg animate-fade-in">
+                     <div className="flex gap-1 items-end h-4">
+                       <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                       <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                       <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></span>
+                     </div>
+                     <span>typing...</span>
+                   </div>
+                )}
+              </div>
+              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
+              {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+              {isGroupInfoOpen && <GroupInfoPanel conversationId={id} onClose={() => setIsGroupInfoOpen(false)} />}
+            </>
+          );
+        })()}
+      </motion.div>
+    </AnimatePresence>
   );
 }
