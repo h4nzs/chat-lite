@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
 import { Spinner } from './Spinner';
+import ModalBase from './ui/ModalBase';
 
 interface EditGroupInfoModalProps {
   conversationId: string;
@@ -33,46 +34,45 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-bg-surface rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="p-4 border-b border-border">
-          <h2 className="text-xl font-bold text-text-primary">Edit Group Info</h2>
+    <ModalBase
+      isOpen={true}
+      onClose={onClose}
+      title="Edit Group Info"
+      footer={(
+        <>
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-md text-text-primary bg-secondary hover:bg-secondary/80">
+            Cancel
+          </button>
+          <button type="submit" form="edit-group-form" disabled={isLoading} className="px-4 py-2 rounded-md text-white bg-accent-gradient hover:opacity-90 disabled:opacity-50 flex items-center">
+            {isLoading && <Spinner size="sm" className="mr-2" />} 
+            Save Changes
+          </button>
+        </>
+      )}
+    >
+      <form id="edit-group-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="group-title" className="block text-sm font-medium text-text-secondary mb-1">Group Name</label>
+          <input
+            id="group-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary"
+            required
+          />
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="p-4 space-y-4">
-            <div>
-              <label htmlFor="group-title" className="block text-sm font-medium text-text-secondary mb-1">Group Name</label>
-              <input
-                id="group-title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="group-description" className="block text-sm font-medium text-text-secondary mb-1">Description</label>
-              <textarea
-                id="group-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
-              />
-            </div>
-          </div>
-          <div className="p-4 border-t border-border flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md text-text-primary bg-secondary hover:bg-secondary/80">
-              Cancel
-            </button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-md text-white bg-accent-gradient hover:opacity-90 disabled:opacity-50 flex items-center">
-              {isLoading && <Spinner size="sm" className="mr-2" />} 
-              Save Changes
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div>
+          <label htmlFor="group-description" className="block text-sm font-medium text-text-secondary mb-1">Description</label>
+          <textarea
+            id="group-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary"
+          />
+        </div>
+      </form>
+    </ModalBase>
   );
 }

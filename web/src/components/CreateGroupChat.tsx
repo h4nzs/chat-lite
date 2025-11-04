@@ -3,6 +3,7 @@ import { useConversationStore, type Conversation } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 import toast from 'react-hot-toast';
+import ModalBase from './ui/ModalBase';
 
 type UserSearchResult = {
   id: string;
@@ -82,16 +83,28 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-bg-surface rounded-lg shadow-xl w-full max-w-md p-6 border border-border" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4 text-text-primary">Create New Group</h2>
-        
+    <ModalBase
+      isOpen={true}
+      onClose={onClose}
+      title="Create New Group"
+      footer={(
+        <>
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-secondary">
+            Cancel
+          </button>
+          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-accent-gradient text-white rounded-lg hover:opacity-90 disabled:opacity-50">
+            {loading ? 'Creating...' : 'Create Group'}
+          </button>
+        </>
+      )}
+    >
+      <div className="flex flex-col gap-4">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Group Name"
-          className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-color mb-4"
+          className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg"
         />
         
         <div className="relative">
@@ -100,10 +113,10 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search users to add..."
-            className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-color"
+            className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg"
           />
           {userList.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border rounded-b-lg max-h-40 overflow-y-auto z-10">
+            <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border rounded-b-lg max-h-40 overflow-y-auto z-10 shadow-lg">
               {userList.map(user => (
                 <div key={user.id} onClick={() => handleSelectUser(user)} className="p-3 hover:bg-secondary cursor-pointer text-text-primary">
                   {user.name} (@{user.username})
@@ -113,7 +126,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-4 mb-4 min-h-[40px]">
+        <div className="flex flex-wrap gap-2 min-h-[40px]">
           {selectedUsers.map(user => (
             <div key={user.id} className="flex items-center bg-accent-gradient text-white rounded-full px-3 py-1 text-sm font-medium">
               <span>{user.name}</span>
@@ -123,16 +136,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-secondary">
-            Cancel
-          </button>
-          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-accent-gradient text-white rounded-lg hover:opacity-90 disabled:opacity-50">
-            {loading ? 'Creating...' : 'Create Group'}
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalBase>
   );
 }
