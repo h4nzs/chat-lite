@@ -73,10 +73,12 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
     {
       'bg-accent text-accent-foreground': mine,
       'bg-surface text-text-primary': !mine,
-      'rounded-2xl': !hasBubbleStyle || isLastInSequence,
-      'rounded-t-2xl': hasBubbleStyle && !isLastInSequence,
-      'rounded-br-md': mine && !isLastInSequence,
-      'rounded-bl-md': !mine && !isLastInSequence,
+      // Add a "tail" to the last message in a sequence
+      'rounded-t-2xl': true,
+      'rounded-bl-2xl': mine,
+      'rounded-br-2xl': !mine,
+      'rounded-br-sm': mine && isLastInSequence,
+      'rounded-bl-sm': !mine && isLastInSequence,
     }
   );
 

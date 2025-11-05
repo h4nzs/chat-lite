@@ -203,15 +203,16 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               const peerUser = !c.isGroup ? c.participants?.find(p => p.id !== meId) : null;
               const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
               const isOnline = peerUser ? presence.includes(peerUser.id) : false;
+              const isUnread = c.unreadCount > 0;
 
               const avatarSrc = c.isGroup 
                 ? (c.avatarUrl ? `${toAbsoluteUrl(c.avatarUrl)}?t=${c.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${c.title}`)
                 : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
 
               const itemClasses = clsx(
-                'relative flex items-center justify-between mx-3 my-2 rounded-lg transition-shadow duration-200 bg-bg-surface shadow-soft',
+                'relative flex items-center justify-between mx-3 my-2 rounded-lg transition-all duration-200 bg-surface shadow-soft hover:bg-secondary',
                 {
-                  'bg-accent/10 border-l-4 border-accent shadow-card': isActive,
+                  'bg-gradient-to-r from-accent/10 to-surface border-l-4 border-accent shadow-card': isActive,
                 }
               );
 
@@ -242,10 +243,10 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         {c.lastMessage && <p className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>{formatConversationTime(c.lastMessage.createdAt)}</p>}
                       </div>
                       <div className="flex justify-between items-center mt-1">
-                        <p className={`text-sm truncate ${isActive ? 'text-text-secondary' : 'text-text-secondary'}`}>
+                        <p className={`text-sm truncate ${isUnread ? 'font-bold text-text-primary' : 'text-text-secondary'}`}>
                           {c.lastMessage?.preview || sanitizeText(c.lastMessage?.content || '') || 'No messages yet'}
                         </p>
-                        {c.unreadCount > 0 && (
+                        {isUnread && (
                           <span className="bg-accent text-accent-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">
                             {c.unreadCount}
                           </span>

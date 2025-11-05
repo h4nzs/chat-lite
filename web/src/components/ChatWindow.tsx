@@ -88,7 +88,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
         <button onClick={onBack} className="hidden md:block p-2 rounded-full hover:bg-secondary">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left">
+        <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left p-2 -ml-2 rounded-lg hover:bg-secondary transition-colors">
           <img
             src={toAbsoluteUrl(avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`}
             alt="Avatar"
@@ -97,7 +97,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <div>
             <div className="flex items-center gap-2">
               <p className="text-lg font-semibold text-text-primary">{title}</p>
-              {isConvVerified && <FiShield className="text-green-500" title="Verified Contact" />} 
+              {isConvVerified && <FiShield className="text-accent" title="Verified Contact" />} 
             </div>
             <p className="text-xs text-text-secondary">{getStatus()}</p>
           </div>
@@ -352,7 +352,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="flex flex-col h-full bg-bg-main relative"
+        className="flex flex-col h-full bg-gradient-to-b from-bg-main to-bg-surface relative"
       >
         {(() => {
           if (error) {
