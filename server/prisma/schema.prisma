@@ -17,6 +17,7 @@ model User {
   avatarUrl        String?
   description      String?
   publicKey        String?
+  recoveryPhraseHash String?
   showEmailToOthers Boolean          @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt

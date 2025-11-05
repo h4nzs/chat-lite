@@ -44,7 +44,7 @@ app.use(helmet());
 app.disable('x-powered-by');
 
 const corsMiddleware = cors({
-  origin: [ env.corsOrigin || "http://localhost:5173", "https://6p163mzc-5173.asse.devtunnels.ms/" ],
+  origin: env.corsOrigin || "http://localhost:5173",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],

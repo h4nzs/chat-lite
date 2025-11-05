@@ -36,39 +36,40 @@ router.post("/verify",
       // Manual validation
       const schema = z.object({ 
         username: z.string().min(1), 
-        publicKey: z.string().min(1),
-        newPassword: z.string().min(6, "Password must be at least 6 characters long"),
+        recoveryPhrase: z.string().min(1),
+        newPassword: z.string().min(8, "Password must be at least 8 characters long"),
       });
-      const { username, publicKey, newPassword } = schema.parse(req.body);
+      const { username, recoveryPhrase, newPassword } = schema.parse(req.body);
 
       const user = await prisma.user.findFirst({
         where: { username: { equals: username, mode: 'insensitive' } },
       });
 
-      if (!user || !user.publicKey) {
-        return res.status(404).json({ error: "User not found or no public key on record." });
+      if (!user || !user.recoveryPhraseHash) {
+        return res.status(404).json({ error: "User not found or no recovery method on record." });
       }
 
-      // Constant-time comparison to prevent timing attacks
-      const serverKey = Buffer.from(user.publicKey, 'base64');
-      const providedKey = Buffer.from(publicKey, 'base64');
+      // Hash the provided phrase on the server
+      await sodium.ready;
+      const providedPhraseHash = sodium.crypto_generichash(64, recoveryPhrase);
+      const serverHash = sodium.from_base64(user.recoveryPhraseHash, sodium.base64_variants.ORIGINAL);
 
-      if (serverKey.length !== providedKey.length || !sodium.compare(serverKey, providedKey)) {
+      // Constant-time comparison to prevent timing attacks
+      if (serverHash.length !== providedPhraseHash.length || !sodium.compare(serverHash, providedPhraseHash)) {
         return res.status(403).json({ error: "Invalid recovery phrase for this user." });
       }
 
-      // If key is verified, update the user's password and public key
+      // If phrase is verified, update the user's password
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       await prisma.user.update({
         where: { id: user.id },
         data: { 
           passwordHash: hashedPassword,
-          publicKey: publicKey, // Update the public key as well
         },
       });
 
-      res.json({ ok: true, message: "Public key verified and password updated successfully." });
+      res.json({ ok: true, message: "Recovery phrase verified and password updated successfully." });
     } catch (e) {
       next(e);
     }

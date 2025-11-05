@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/auth";
 import '../styles/AuthForm.css'; // Import the new CSS
 import { FiUser, FiMail, FiLock, FiUserCheck } from 'react-icons/fi';
+import RecoveryPhraseModal from "@components/RecoveryPhraseModal";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -11,8 +12,10 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState('form'); // 'form' | 'verify'
+  const [recoveryPhrase, setRecoveryPhrase] = useState('');
   const navigate = useNavigate();
-  const register = useAuthStore((s) => s.register);
+  const registerAndGeneratePhrase = useAuthStore((s) => s.registerAndGeneratePhrase);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,13 +45,18 @@ export default function Register() {
     // --- End of validation logic ---
 
     try {
-      await register({ name, username, email, password });
-      navigate("/");
+      const phrase = await registerAndGeneratePhrase({ name, username, email, password });
+      setRecoveryPhrase(phrase);
+      setStep('verify');
     } catch (err: any) {
       setError(err.message || "Registration failed. Please check your information and try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (step === 'verify') {
+    return <RecoveryPhraseModal phrase={recoveryPhrase} onClose={() => navigate('/')} />
   }
 
   return (

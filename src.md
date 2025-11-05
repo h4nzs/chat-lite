@@ -8,7 +8,7 @@ Dokumen ini berisi rencana pengembangan fitur-fitur baru dan penyempurnaan arsit
 
 **Tujuan:** Memberikan pengguna kontrol penuh atas keamanan akun mereka, terutama dalam skenario perangkat hilang atau dicuri.
 
-#### Fitur 1.1: Manajemen Sesi Aktif & Pencabutan Jarak Jauh
+#### Fitur 1.1: Manajemen Sesi Aktif & Pencabutan Jarak Jauh **done**
 
 *   **Masalah yang Dipecahkan:** Saat ini, jika perangkat pengguna yang dalam keadaan login jatuh ke tangan orang lain, tidak ada cara bagi pengguna untuk membatalkan sesi aktif di perangkat tersebut dari jarak jauh. Ini adalah celah keamanan yang signifikan.
 *   **Konsep:** Membuat sebuah halaman di mana pengguna dapat melihat semua perangkat dan browser tempat akun mereka aktif, dan memiliki kemampuan untuk "menendang" atau me-logout sesi tersebut dari jarak jauh.
@@ -31,6 +31,62 @@ Dokumen ini berisi rencana pengembangan fitur-fitur baru dan penyempurnaan arsit
 
 *   **Konsep:** Kunci master privat tidak lagi dibuat secara acak, melainkan **dihasilkan ulang** setiap kali login menggunakan Frasa Pemulihan (Recovery Phrase) sebagai sumber utamanya.
 *   **Trade-off:** Keamanan sangat tinggi, tetapi pengguna wajib menjaga Frasa Pemulihan mereka. Jika hilang, akun tidak dapat dipulihkan.
+
+Langkah 1: Integrasikan `RecoveryPhraseModal` ke Alur 
+  Registrasi
+
+   * File yang akan diubah: web/src/pages/Register.tsx dan
+     web/src/store/auth.ts.
+   * Logika:
+       1. Setelah pengguna berhasil mendaftar di Register.tsx,
+          jangan langsung arahkan mereka ke halaman chat.
+       2. Sebagai gantinya, panggil sebuah fungsi baru di auth.ts,
+          misalnya generateAndShowRecoveryPhrase().
+       3. Fungsi ini akan:
+           * Membuat frasa pemulihan baru menggunakan bip39.
+           * Menyimpan hash dari frasa ini di server. Ini penting
+             agar server bisa memverifikasi frasa saat pemulihan
+             tanpa pernah mengetahui frasa aslinya.
+           * Membuka RecoveryPhraseModal dan menampilkan frasa
+             tersebut kepada pengguna.
+       4. Hanya setelah pengguna berhasil memverifikasi frasa di
+          modal, kita akan menyelesaikan proses login dan
+          mengarahkan mereka ke halaman chat.
+
+  Langkah 2: Ubah Logika `logout` dan `login` untuk Persistensi
+
+   * File yang akan diubah: web/src/store/auth.ts.
+   * Logika `logout`:
+       * Hapus baris
+         localStorage.removeItem('encryptedPrivateKey'); dan
+         localStorage.removeItem('publicKey');. Kita tidak lagi
+         menghancurkan kunci saat logout.
+   * Logika `login`:
+       * Setelah login dengan password berhasil, aplikasi harus
+         memeriksa: "Apakah encryptedPrivateKey ada di
+         localStorage?".
+       * Jika ya: Tidak perlu melakukan apa-apa. Pengguna bisa
+         langsung melanjutkan karena kuncinya sudah ada dari sesi
+         sebelumnya.
+       * Jika tidak (kasus login di perangkat baru): Ini adalah
+         titik di mana kita seharusnya mengarahkan pengguna ke
+         halaman Restore.tsx atau menampilkan pesan yang
+         menyarankan mereka untuk memulihkan dari frasa atau
+         menautkan perangkat baru. Namun, untuk saat ini, kita bia
+          membiarkannya kosong, dan pengguna harus secara manual
+         pergi ke halaman "Restore".
+
+  Langkah 3: Modifikasi Alur `Restore.tsx`
+
+   * File yang akan diubah: server/src/routes/keys.ts (atau file
+     rute yang menangani /api/keys/verify).
+   * Logika:
+       * Endpoint /api/keys/verify tidak boleh hanya memverifikasi
+         kunci publik. Ia harus menerima frasa pemulihan (atau
+         hash-nya), membandingkannya dengan hash yang disimpan di
+         database, dan jika cocok, barulah mengizinkan pembaruan
+         password. Ini adalah perubahan backend yang paling 
+         signifikan.
 
 #### Opsi 2.2: Menyimpan Kunci Master Terenkripsi (Lebih Nyaman, Sedikit Kurang Aman)
 

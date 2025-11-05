@@ -56,10 +56,10 @@ export default function Restore() {
       const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
       const publicKeyB64 = sodium.to_base64(publicKeyBytes, sodium.base64_variants.ORIGINAL);
 
-      // 3. Verify public key and update password on server
+      // 3. Verify phrase and update password on server
       await api("/api/keys/verify", {
         method: "POST",
-        body: JSON.stringify({ username, publicKey: publicKeyB64, newPassword }),
+        body: JSON.stringify({ username, recoveryPhrase: trimmedPhrase, newPassword }),
       });
 
       // 4. Store the recovered keys on the new device

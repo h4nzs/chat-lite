@@ -79,14 +79,16 @@ router.post(
       username: z.string().min(3).max(32),
       password: z.string().min(8).max(128),
       name: z.string().min(1).max(80),
+      publicKey: z.string(),
+      recoveryPhraseHash: z.string(),
     }),
   }),
   async (req, res, next) => {
     try {
-      const { email, username, password, name } = req.body;
+      const { email, username, password, name, publicKey, recoveryPhraseHash } = req.body;
       const hash = await bcrypt.hash(password, 10);
       const user = await prisma.user.create({
-        data: { email, username, passwordHash: hash, name },
+        data: { email, username, passwordHash: hash, name, publicKey, recoveryPhraseHash },
       });
       const tokens = await issueTokens(user, req);
       setAuthCookies(res, tokens);

@@ -30,6 +30,7 @@ type State = {
   login: (emailOrUsername: string, password: string) => Promise<void>;
   loginWithBiometrics: (username: string) => Promise<boolean>;
   register: (data: any) => Promise<void>;
+  registerAndGeneratePhrase: (data: any) => Promise<string>;
   logout: () => Promise<void>;
   ensureSocket: () => void;
   setTheme: (t: "light" | "dark") => void;
@@ -138,11 +139,38 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
       await setupUserEncryptionKeys(data.password);
     } catch (encryptionError) {
       console.error("Failed to setup user encryption keys during registration:", encryptionError);
-      // Continue registration without encryption - user can set it up later
-      // This prevents registration failure if there are issues with encryption setup
+      // Continue login without encryption - user can set it up later
+      // This prevents login failure if there are issues with encryption setup
     }
-    
     get().ensureSocket();
+  },
+
+  async registerAndGeneratePhrase(data) {
+    const sodium = await getSodium();
+    const bip39 = await import('bip39');
+    const phrase = bip39.generateMnemonic(256); // 24 words
+    const privateKeyHex = bip39.mnemonicToEntropy(phrase);
+    const privateKeyBytes = sodium.from_hex(privateKeyHex);
+    const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
+    const publicKeyB64 = sodium.to_base64(publicKeyBytes, sodium.base64_variants.ORIGINAL);
+
+    // Hash the phrase for server-side verification
+    const phraseHash = sodium.to_base64(sodium.crypto_generichash(64, phrase));
+
+    const res = await api<{ user: User }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhraseHash: phraseHash }),
+    });
+
+    set({ user: res.user });
+    localStorage.setItem("user", JSON.stringify(res.user));
+
+    const encryptedPrivateKey = await storePrivateKey(privateKeyBytes, data.password);
+    localStorage.setItem('publicKey', publicKeyB64);
+    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
+
+    get().ensureSocket();
+    return phrase;
   },
 
   async logout() {
@@ -162,9 +190,9 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     // Clear encryption key cache
     clearKeyCache();
 
-    // Clear stored encryption keys
-    localStorage.removeItem('publicKey');
-    localStorage.removeItem('encryptedPrivateKey');
+    // DO NOT clear stored encryption keys for persistent sessions
+    // localStorage.removeItem('publicKey');
+    // localStorage.removeItem('encryptedPrivateKey');
 
     // Clear state lokal
     localStorage.removeItem("user");
