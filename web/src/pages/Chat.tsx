@@ -3,138 +3,101 @@ import ChatWindow from '@components/ChatWindow';
 import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { useEffect } from 'react';
-import clsx from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Chat() {
-
   const {
-
     activeId,
-
     openConversation,
-
     loadConversations,
-
     isSidebarOpen,
-
     conversations,
-
     toggleSidebar,
-
   } = useConversationStore(state => ({
-
     activeId: state.activeId,
-
     openConversation: state.openConversation,
-
     loadConversations: state.loadConversations,
-
     isSidebarOpen: state.isSidebarOpen,
-
     conversations: state.conversations,
-
     toggleSidebar: state.toggleSidebar,
-
   }));
-
   const { user } = useAuthStore(state => ({ user: state.user }));
 
-
-
-  // Muat percakapan awal dan buka yang terakhir aktif
-
+  // Load initial conversations and open the last active one
   useEffect(() => {
-
     if (user) {
-
       loadConversations().then(() => {
-
         const savedId = localStorage.getItem("activeId");
-
         if (savedId) {
-
           openConversation(savedId);
-
         }
-
       });
-
     }
-
   }, [user, loadConversations, openConversation]);
 
-
-
-  // Cek jika activeId valid, jika tidak, reset dan buka sidebar
-
+  // Check if activeId is valid, otherwise reset and open sidebar
   useEffect(() => {
-
     if (activeId && conversations.length > 0) {
-
       const conversationExists = conversations.some(c => c.id === activeId);
-
       if (!conversationExists) {
-
         useConversationStore.setState({ activeId: null, isSidebarOpen: true });
-
         localStorage.removeItem("activeId");
-
       }
-
     }
-
   }, [activeId, conversations]);
 
-
-
   const handleSelectConversation = (id: string) => {
-
     openConversation(id);
-
     // On mobile, hide the sidebar after selecting a conversation
-
     if (window.innerWidth < 768 && isSidebarOpen) {
-
       toggleSidebar();
-
     }
-
   };
 
-
-
   return (
-
     <div className="h-screen w-screen flex bg-bg-main text-text-primary font-sans overflow-hidden">
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={toggleSidebar} 
+            className="fixed inset-0 bg-black/60 z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
 
-      {isSidebarOpen && (
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.aside 
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="absolute md:hidden w-full max-w-sm h-full bg-bg-surface flex flex-col border-r border-border z-40"
+          >
+            <ChatList 
+              activeId={activeId} 
+              onOpen={handleSelectConversation}
+            />
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
-        <div onClick={toggleSidebar} className="fixed inset-0 bg-black/60 z-30 md:hidden" />
-
-      )}
-
-
-
-      <aside className={`absolute md:relative w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-bg-surface flex flex-col border-r border-border transition-transform duration-300 ease-in-out z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-bg-surface flex-col border-r border-border">
         <ChatList 
-
           activeId={activeId} 
-
           onOpen={handleSelectConversation}
-
         />
-
       </aside>
 
-
-
       <main className="flex-1 flex flex-col h-full">
-
         {activeId && conversations.some(c => c.id === activeId) ? (
-
           <ChatWindow key={activeId} id={activeId} onMenuClick={toggleSidebar} />
-
         ) : (
           <div className="flex-1 flex flex-col h-full">
             {/* Mobile-only header with toggle */}
@@ -147,13 +110,12 @@ export default function Chat() {
 
             {/* Placeholder Content */}
             <div className="flex-1 flex flex-col gap-4 items-center justify-center text-text-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <p className="text-lg">Select a conversation to start messaging</p>
             </div>
           </div>
         )}
-
       </main>
-
-    </div>  );
+    </div>
+  );
 }

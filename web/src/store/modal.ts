@@ -1,46 +1,42 @@
 import { create } from 'zustand';
 
-type ModalState = {
+export interface ModalState {
   isConfirmOpen: boolean;
   confirmTitle: string;
   confirmMessage: string;
   onConfirm: () => void;
+  isChatInfoModalOpen: boolean;
   isProfileModalOpen: boolean;
-  profileUserId: string | null;
   isPasswordPromptOpen: boolean;
   onPasswordSubmit: (password: string | null) => void;
-  isChatInfoModalOpen: boolean;
-};
-
-type ModalActions = {
+  profileUserId: string | null;
   showConfirm: (title: string, message: string, onConfirm: () => void) => void;
   hideConfirm: () => void;
-  openProfileModal: (userId: string) => void;
-  closeProfileModal: () => void;
-  showPasswordPrompt: (onSubmitted: (password: string | null) => void) => void;
-  hidePasswordPrompt: () => void;
   openChatInfoModal: () => void;
   closeChatInfoModal: () => void;
-};
+  openProfileModal: (userId: string) => void;
+  closeProfileModal: () => void;
+  showPasswordPrompt: (callback: (password: string | null) => void) => void;
+  hidePasswordPrompt: () => void;
+}
 
-export const useModalStore = create<ModalState & ModalActions>((set) => ({
+export const useModalStore = create<ModalState>()(set => ({
   isConfirmOpen: false,
   confirmTitle: '',
   confirmMessage: '',
   onConfirm: () => {},
+  isChatInfoModalOpen: false,
   isProfileModalOpen: false,
-  profileUserId: null,
   isPasswordPromptOpen: false,
   onPasswordSubmit: () => {},
-  isChatInfoModalOpen: false,
-
+  profileUserId: null,
   showConfirm: (title, message, onConfirm) => set({ isConfirmOpen: true, confirmTitle: title, confirmMessage: message, onConfirm }),
   hideConfirm: () => set({ isConfirmOpen: false }),
-  openProfileModal: (userId) => set({ isProfileModalOpen: true, profileUserId: userId }),
-  closeProfileModal: () => set({ isProfileModalOpen: false, profileUserId: null }),
-  showPasswordPrompt: (onSubmitted) => set({ isPasswordPromptOpen: true, onPasswordSubmit: onSubmitted }),
-  hidePasswordPrompt: () => set({ isPasswordPromptOpen: false }),
   openChatInfoModal: () => set({ isChatInfoModalOpen: true }),
   closeChatInfoModal: () => set({ isChatInfoModalOpen: false }),
+  openProfileModal: (userId) => set({ isProfileModalOpen: true, profileUserId: userId }),
+  closeProfileModal: () => set({ isProfileModalOpen: false, profileUserId: null }),
+  showPasswordPrompt: (callback) => set({ isPasswordPromptOpen: true, onPasswordSubmit: callback }),
+  hidePasswordPrompt: () => set({ isPasswordPromptOpen: false }),
 }));
 

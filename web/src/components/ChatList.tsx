@@ -218,6 +218,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
 
               return (
                 <motion.div
+                  layout
                   key={c.id}
                   onMouseEnter={() => loadMessagesForConversation(c.id)}
                   className={itemClasses}>

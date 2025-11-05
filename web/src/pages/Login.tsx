@@ -1,15 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/auth";
-import '../styles/AuthForm.css'; // Import the new CSS
-import { FiUser, FiLock } from 'react-icons/fi';
+import AuthForm from "../components/AuthForm";
 import { IoFingerPrint } from "react-icons/io5";
 
 export default function Login() {
-  const [emailOrUsername, setEmailOrUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [isBiometricsAvailable, setIsBiometricsAvailable] = useState(false);
   const navigate = useNavigate();
   const { login, loginWithBiometrics } = useAuthStore(s => ({ login: s.login, loginWithBiometrics: s.loginWithBiometrics }));
@@ -20,97 +16,58 @@ export default function Login() {
     }
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-
-    if (!emailOrUsername || !password) {
+  const handleLogin = async (data: { a: string; b?: string }) => {
+    if (!data.a || !data.b) {
       setError("Both fields are required.");
       return;
     }
-    
-    setLoading(true);
-    try {
-      await login(emailOrUsername, password);
-      navigate("/");
-    } catch (err: any) {
-      setError(err.message || "Login failed. Please check your credentials.");
-    } finally {
-      setLoading(false);
-    }
-  }
+    await login(data.a, data.b);
+    navigate("/");
+  };
 
-  async function handleBiometricLogin() {
-    setError("");
-    if (!emailOrUsername) {
+  async function handleBiometricLogin(username: string) {
+    if (!username) {
       setError("Please enter your username or email first to use biometrics.");
       return;
     }
-    setLoading(true);
     try {
-      await loginWithBiometrics(emailOrUsername);
+      await loginWithBiometrics(username);
       navigate("/");
     } catch (err: any) {
       setError(err.message || "Biometric login failed.");
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-background">
-      <div className="form_main">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Login</h1>
-        {error && <p className="text-red-500 text-sm mb-4 -mt-4 text-center">{error}</p>}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
-          <div className="inputContainer">
-            <FiUser className="inputIcon" />
-            <input 
-              type="text"
-              placeholder="Email or Username"
-              value={emailOrUsername}
-              onChange={(e) => setEmailOrUsername(e.target.value)}
-              className="inputField"
-              disabled={loading}
-              required
-            />
-          </div>
-          <div className="inputContainer">
-            <FiLock className="inputIcon" />
-            <input 
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="inputField"
-              disabled={loading}
-              required
-            />
-          </div>
-          <button id="button" type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </button>
+    <div className="flex items-center justify-center h-screen bg-background text-text-primary p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-surface rounded-2xl shadow-card p-8">
+          <h1 className="text-3xl font-bold text-center text-foreground mb-6">Login</h1>
+          <AuthForm 
+            onSubmit={handleLogin}
+            button="Login"
+          />
           {isBiometricsAvailable && (
             <button 
               type="button"
-              onClick={handleBiometricLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 mt-4 p-2.5 rounded-full bg-secondary text-text-primary hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              // A bit of a hack to get the username, ideally AuthForm would expose its state
+              onClick={() => handleBiometricLogin((document.querySelector('input[placeholder="Email or Username"]') as HTMLInputElement)?.value)}
+              className="w-full flex items-center justify-center gap-3 mt-4 btn btn-secondary"
             >
               <IoFingerPrint />
               <span>Login with Biometrics</span>
             </button>
           )}
-        </form>
-        <div className="signupContainer">
-          <p>Don't have an account?</p>
-          <Link to="/register">Sign up</Link>
         </div>
-        <div className="text-center mt-4">
-          <Link to="/restore" className="text-sm text-accent-color hover:underline">Restore from phrase</Link>
-        </div>
-        <div className="text-center mt-2">
-          <Link to="/link-device" className="text-sm text-accent-color hover:underline">Link a new device</Link>
+
+        <div className="text-center mt-6">
+          <p className="text-text-secondary">
+            Don't have an account? <Link to="/register" className="font-semibold text-accent hover:underline">Sign up</Link>
+          </p>
+          <div className="flex justify-center gap-4 mt-4">
+            <Link to="/restore" className="text-sm text-accent hover:underline">Restore from phrase</Link>
+            <Link to="/link-device" className="text-sm text-accent hover:underline">Link a new device</Link>
+          </div>
         </div>
       </div>
     </div>

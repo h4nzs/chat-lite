@@ -109,6 +109,7 @@
   input[type="password"],
   input[type="email"],
   textarea {
+    @apply transition-colors duration-200 ease-in-out;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-bg-surface;
   }
 }
