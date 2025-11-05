@@ -53,18 +53,18 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
   const renderStep1 = () => (
     <>
       <div className="flex flex-col items-center text-center mb-6">
-        <FiShield className="text-yellow-400 text-5xl mb-4" />
+        <FiShield className="text-accent text-5xl mb-4" />
         <h2 className="text-2xl font-bold text-text-primary">Your Recovery Phrase</h2>
         <p className="text-text-secondary mt-2">
           This is the **only** way to recover your account if you lose access. Write it down and store it in a secure, offline location.
         </p>
       </div>
-      <div className="bg-destructive/10 text-destructive-foreground p-4 rounded-lg text-sm mb-6">
+      <div className="bg-destructive/10 text-destructive p-4 rounded-lg text-sm mb-6">
         <p className="font-bold">NEVER share this phrase with anyone. Anyone with this phrase can access all your messages.</p>
       </div>
       <button
         onClick={() => setStep(2)}
-        className="w-full py-3 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/90 transition-colors font-semibold"
+        className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
       >
         I Understand, Show My Phrase
       </button>
@@ -75,7 +75,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
     <>
       <h2 className="text-2xl font-bold text-text-primary text-center mb-4">Save Your Phrase</h2>
       <p className="text-text-secondary text-center mb-6">Write down these {words.length} words in order. Keep them safe.</p>
-      <div className="relative bg-bg-main p-4 rounded-lg border border-border mb-4">
+      <div className="relative bg-background p-4 rounded-lg border border-border mb-4">
         <div className={`grid grid-cols-3 gap-x-6 gap-y-4 text-lg ${!showPhrase ? 'blur-md' : ''}`}>
           {words.map((word, index) => (
             <span key={index} className="text-text-primary font-mono">{index + 1}. {word}</span>
@@ -97,7 +97,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
       </div>
       <button
         onClick={() => setStep(3)}
-        className="w-full py-3 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/90 transition-colors font-semibold"
+        className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
       >
         I've Saved It, Now Verify
       </button>
@@ -108,7 +108,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
     <>
       <h2 className="text-2xl font-bold text-text-primary text-center mb-4">Verify Your Phrase</h2>
       <p className="text-text-secondary text-center mb-6">Tap the words in the correct order to confirm your backup.</p>
-      <div className="bg-bg-main p-4 rounded-lg border border-border min-h-[100px] mb-4 font-mono text-lg text-center">
+      <div className="bg-background p-4 rounded-lg border border-border min-h-[100px] mb-4 font-mono text-lg text-center">
         {userInput.join(' ') || <span className="text-text-secondary">Your selected words will appear here...</span>}
       </div>
       <div className="flex flex-wrap gap-3 justify-center mb-6">
@@ -133,7 +133,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
         <button
           onClick={handleVerify}
           disabled={userInput.length !== words.length}
-          className="w-full py-3 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/90 transition-colors font-semibold disabled:opacity-50"
+          className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold disabled:opacity-50"
         >
           Verify
         </button>
@@ -143,7 +143,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-surface rounded-xl shadow-2xl p-8 w-full max-w-md border border-border relative">
+      <div className="bg-surface rounded-xl shadow-2xl p-8 w-full max-w-md border border-border relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">&times;</button>
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}

@@ -89,12 +89,12 @@ export default function UserInfoModal() {
           <img 
             src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
             alt={user.name}
-            className="w-24 h-24 rounded-full bg-bg-primary object-cover mb-4"
+            className="w-24 h-24 rounded-full bg-secondary object-cover mb-4"
           />
           <h3 className="text-xl font-bold text-text-primary">{user.name}</h3>
           <p className="text-sm text-text-secondary">@{user.username}</p>
           {user.email && (
-            <p className="text-sm text-accent-color mt-1">{user.email}</p>
+            <p className="text-sm text-accent mt-1">{user.email}</p>
           )}
           <p className="text-text-secondary mt-2 text-sm">
             {user.description || 'This user prefers to keep an air of mystery.'}
@@ -115,7 +115,7 @@ export default function UserInfoModal() {
           <div className="w-full flex flex-col space-y-2">
             <button
               onClick={handleViewProfile}
-              className="w-full px-4 py-2 rounded-md bg-accent-gradient text-white hover:opacity-90 transition-colors"
+              className="w-full px-4 py-2 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
             >
               View Full Profile
             </button>

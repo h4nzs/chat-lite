@@ -3,93 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  /* New Professional Color Palette (Dark Mode Default) */
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
-    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.1); /* Added shadow-card variable */
+    --bg-main: 222 47% 11%;      /* Slate 900 */
+    --bg-surface: 222 47% 15%;    /* Slate 850 */
+    --border: 217 33% 25%;       /* Slate 700 */
+    --ring: 217 91% 60%;         /* Blue 500 */
 
-    /* Custom colors - Dark Theme */
-    --bg-main: #181818;
-    --bg-surface: #1F1F1F;
-    --bg-primary: #2A2A2A;
-    --text-primary: #E0E0E0;
-    --text-secondary: #A0A0A0;
-    --accent-color: #8A2BE2; /* Original purple */
-    --accent-gradient: linear-gradient(to right, #8A2BE2, #E91E63); /* Original purple to pink */
-    --accent-hover-bg: rgba(138, 43, 226, 0.2);
-    --bg-gradient: linear-gradient(90deg, #181818 15%, #1F1F1F 100%);
-    --auth-card-bg: #1E1F22; /* Auth card background for dark theme */
-    --signup-link-bg: #333;
-    --signup-link-hover-bg: #444;
-    --signup-link-color: white;
-    --shadow-color: rgba(0, 0, 0, 0.1);
+    --text-primary: 210 40% 98%;   /* Slate 50 */
+    --text-secondary: 215 20% 65%; /* Slate 400 */
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 25%;
+    --secondary-foreground: 210 40% 98%;
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --shadow-color: 222 47% 5%;
   }
 
   .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
+    --bg-main: 220 20% 96%;      /* Slate 100 */
+    --bg-surface: 0 0% 100%;       /* White */
+    --border: 214 32% 91%;       /* Slate 200 */
+    --ring: 217 91% 60%;         /* Blue 500 */
 
-    /* Custom colors - Light Theme */
-    --bg-main: #EDF8FA;
-    --bg-surface: #FFFFFF;
-    --bg-primary: #D1D5DB;
-    --text-primary: #111827;
-    --text-secondary: #4B5563;
-    --accent-color: #1f8cb8;
-    --accent-gradient: linear-gradient(90deg, rgba(31,140,184,1) 0%, rgba(87,199,133,1) 58%, rgba(114,242,135,1) 100%);
-    --accent-hover-bg: rgba(31, 140, 184, 0.15);
-    --bg-gradient: linear-gradient(90deg, rgba(237, 248, 250, 1) 15%, rgba(210, 252, 227, 1) 100%);
-    --auth-card-bg: var(--card); /* Auth card background for light theme */
-    --signup-link-bg: #E0E0E0;
-    --signup-link-hover-bg: #D0D0D0;
-    --signup-link-color: var(--text-primary);
-    --shadow-color: rgba(0, 0, 0, 0.15);
+    --text-primary: 222 47% 11%;   /* Slate 900 */
+    --text-secondary: 215 28% 45%; /* Slate 600 */
+
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --shadow-color: 220 20% 80%;
   }
 
   html, body, #root {
     @apply h-full text-text-primary;
-    background-color: var(--bg-main);
+    background-color: hsl(var(--bg-main));
   }
 
   body {
     font-family: 'Inter', sans-serif;
     overflow: hidden;
-    background: var(--bg-gradient);
   }
 
   /* Custom Scrollbar */
@@ -101,11 +71,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #333;
+    background: hsl(var(--border));
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: hsl(var(--ring));
   }
 }
 
@@ -118,6 +88,6 @@
   input[type="password"],
   input[type="email"],
   textarea {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-color focus-visible:ring-offset-bg-surface;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-bg-surface;
   }
 }

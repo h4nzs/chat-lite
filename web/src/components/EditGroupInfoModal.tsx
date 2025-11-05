@@ -43,7 +43,7 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-md text-text-primary bg-secondary hover:bg-secondary/80">
             Cancel
           </button>
-          <button type="submit" form="edit-group-form" disabled={isLoading} className="px-4 py-2 rounded-md text-white bg-accent-gradient hover:opacity-90 disabled:opacity-50 flex items-center">
+          <button type="submit" form="edit-group-form" disabled={isLoading} className="px-4 py-2 rounded-md text-accent-foreground bg-accent hover:bg-accent/90 disabled:opacity-50 flex items-center">
             {isLoading && <Spinner size="sm" className="mr-2" />} 
             Save Changes
           </button>
@@ -58,7 +58,7 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary"
+            className="w-full p-2 bg-background border border-border rounded-md text-text-primary"
             required
           />
         </div>
@@ -69,7 +69,7 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="w-full p-2 bg-bg-primary border border-border rounded-md text-text-primary"
+            className="w-full p-2 bg-background border border-border rounded-md text-text-primary"
           />
         </div>
       </form>

@@ -1,96 +1,75 @@
-# Dokumentasi Teknis & Panduan Pengembangan Aplikasi
+# Roadmap Peningkatan UI/UX
 
-Dokumen ini berfungsi sebagai panduan teknis untuk arsitektur, alur kerja, dan pengembangan aplikasi obrolan ini.
-
----
-
-## 1. Arsitektur & Teknologi
-
-Aplikasi ini menggunakan arsitektur client-server modern dengan fokus kuat pada keamanan dan komunikasi real-time.
-
-- **Frontend (Direktori `web/`):**
-  - **Framework:** React (dibuat dengan Vite)
-  - **Bahasa:** TypeScript
-  - **Manajemen State:** Zustand (dengan pemisahan store per-fitur, misal `authStore`, `conversationStore`, `socketStore`)
-  - **Styling:** Tailwind CSS
-  - **Fitur:** Progressive Web App (PWA) dengan Service Worker untuk fungsionalitas offline dan notifikasi.
-
-- **Backend (Direktori `server/`):**
-  - **Framework:** Node.js dengan Express.js
-  - **Bahasa:** TypeScript
-  - **Database:** PostgreSQL dengan **Prisma** sebagai ORM.
-  - **Cache & Antrian:** **Redis** (digunakan untuk fitur penautan perangkat).
-
-- **Komunikasi & Keamanan:**
-  - **Real-time:** **Socket.IO** digunakan untuk semua komunikasi real-time (pesan, status online, notifikasi).
-  - **Enkripsi End-to-End (E2EE):** Menggunakan `libsodium-wrappers` untuk memastikan hanya pengirim dan penerima yang dapat membaca pesan.
-  - **Otentikasi:** Menggunakan JSON Web Tokens (JWT) dengan mekanisme refresh token, serta mendukung login tanpa kata sandi melalui **Passkeys (WebAuthn)**.
-  - **Keamanan Server:** Menggunakan `helmet` untuk header keamanan (termasuk CSP), proteksi CSRF, dan `rate-limiting`.
+Dokumen ini menguraikan rencana untuk meningkatkan antarmuka pengguna (UI) dan pengalaman pengguna (UX) aplikasi agar lebih modern, profesional, dan menyenangkan untuk digunakan. Fondasi aplikasi sudah baik, dan sekarang kita akan fokus pada lapisan "poles".
 
 ---
 
-## 2. Alur Kerja Utama
+## 1. Membangun Sistem Desain yang Konsisten
 
-### a. Enkripsi End-to-End (E2EE)
+Tujuan: Menciptakan tampilan yang kohesif dan konsisten di seluruh aplikasi.
 
-Server tidak pernah bisa membaca isi pesan. Alurnya adalah sebagai berikut:
-1.  **Distribusi Kunci:** Saat sebuah percakapan dibuat, sebuah *kunci sesi* (session key) dibuat. Kunci ini kemudian dienkripsi menggunakan kunci publik (public key) dari masing-masing peserta dan disimpan di server.
-2.  **Pengambilan Kunci:** Saat pengguna membuka percakapan, klien akan mengunduh *kunci sesi* yang terenkripsi untuknya, lalu mendekripsinya menggunakan kunci privat (private key) pengguna tersebut.
-3.  **Enkripsi/Dekripsi Pesan:** Semua pesan yang dikirim dalam sesi tersebut dienkripsi dan didekripsi di sisi klien menggunakan *kunci sesi* ini.
+- **[ ] Definisikan Palet Warna Profesional:**
+  - **Tugas:** Tinjau dan perbarui `tailwind.config.ts`. Definisikan palet warna yang jelas untuk mode terang dan gelap, termasuk warna primer (aksen), sekunder, latar belakang (utama, permukaan), teks (primer, sekunder), dan border.
+  - **Alasan:** Konsistensi warna adalah fondasi dari desain yang baik dan meningkatkan keterbacaan.
 
-### b. Penautan Perangkat (Device Linking)
+- **[ ] Standarisasi Tipografi:**
+  - **Tugas:** Tetapkan skala tipografi yang jelas untuk berbagai elemen teks (judul halaman, nama di daftar obrolan, isi pesan, label tombol). Tentukan ukuran font, ketebalan (font-weight), dan tinggi baris (line-height).
+  - **Alasan:** Tipografi yang konsisten meningkatkan hierarki visual dan membuat konten lebih mudah dibaca.
 
-Fitur ini memungkinkan pengguna untuk login di perangkat baru dengan aman tanpa memasukkan kata sandi.
-1.  **Inisiasi (Perangkat Baru):** Menampilkan QR code yang berisi `roomId` dan *kunci publik sementara*.
-2.  **Pemindaian (Perangkat Lama):** Memindai QR code, lalu mengenkripsi *kunci privat utama* pengguna dengan *kunci publik sementara* dari perangkat baru.
-3.  **Transfer Aman:** Kunci yang terenkripsi ini dikirim ke server, yang kemudian meneruskannya ke perangkat baru melalui room Socket.IO yang aman.
-4.  **Amankan Ulang:** Perangkat baru mendekripsi *kunci privat utama*, lalu **meminta pengguna membuat kata sandi baru** khusus untuk perangkat tersebut. Kunci utama kemudian dienkripsi ulang dengan kata sandi baru ini dan disimpan di `localStorage`.
-5.  **Finalisasi:** Perangkat baru menyelesaikan otentikasi dengan server dan sesi baru pun dimulai.
-
-### c. Komunikasi Real-time
-
-Aplikasi sangat bergantung pada Socket.IO untuk interaktivitas.
-- **Rooms:** Setiap pengguna otomatis bergabung ke *room* dengan `userId`-nya sendiri (untuk notifikasi personal) dan juga ke *room* untuk setiap percakapan yang sedang dibuka (`conversationId`).
-- **Event Penting:**
-  - `message:send`: Mengirim pesan. Logika di server akan membuat percakapan 1-on-1 secara implisit jika belum ada.
-  - `conversation:new`: Server mengirim event ini ke pengguna yang baru ditambahkan ke sebuah percakapan, agar daftar obrolan mereka diperbarui secara real-time.
-  - `presence:*`: Menangani status online/offline pengguna.
-  - `typing:*`: Menangani indikator "sedang mengetik".
+- **[ ] Terapkan Skala Spasi (Spacing Scale):**
+  - **Tugas:** Gunakan skala spasi yang konsisten (misalnya, kelipatan 4px atau 8px) untuk semua `margin`, `padding`, dan `gap`. Ini dapat dikonfigurasi di `tailwind.config.ts`.
+  - **Alasan:** Menciptakan ritme visual yang teratur dan membuat tata letak terlihat lebih rapi dan terstruktur.
 
 ---
 
-## 3. Panduan Pengembangan
+## 2. Mendesain Ulang Komponen Kunci
 
-### a. Prasyarat
-- Node.js (v18+)
-- pnpm
-- PostgreSQL
-- Redis
+Tujuan: Membuat komponen inti lebih menarik secara visual dan lebih informatif.
 
-### b. Setup Awal
-1.  **Konfigurasi Environment:** Salin `.env.example` menjadi `.env` di direktori `server/` dan `web/`, lalu isi nilainya sesuai kebutuhan pengembangan.
-2.  **Instalasi Dependensi:** Jalankan `pnpm install` di direktori root, `server/`, dan `web/`.
-3.  **Setup Database:** Jalankan `pnpm prisma migrate dev` di dalam direktori `server/` untuk membuat dan migrasi database.
+- **[ ] `ChatItem` (Item dalam Daftar Obrolan):**
+  - **Tugas:** Desain ulang tampilan setiap item. Pertimbangkan untuk menggunakan gradien halus atau bayangan untuk item yang aktif. Tambahkan efek `hover` yang lebih terlihat. Buat indikator "belum dibaca" lebih menonjol.
+  - **Alasan:** Memudahkan pengguna untuk memindai daftar obrolan mereka dan menemukan percakapan yang relevan dengan cepat.
 
-### c. Menjalankan Aplikasi
-1.  **Jalankan Redis:** Buka terminal dan jalankan `redis-server`.
-2.  **Jalankan Backend:** Di direktori `server/`, jalankan `pnpm dev`.
-3.  **Jalankan Frontend:** Di direktori `web/`, jalankan `pnpm dev`.
+- **[ ] `MessageBubble` (Gelembung Pesan):**
+  - **Tugas:** Perhalus tampilan gelembung pesan. Tambahkan "ekor" pada gelembung untuk menunjukkan arah pesan. Perbaiki spasi di dalam gelembung dan tingkatkan tampilan status pesan (terkirim, dibaca).
+  - **Alasan:** Meningkatkan estetika inti dari aplikasi obrolan dan kejelasan status pesan.
 
-### d. Perintah Penting
-- `pnpm prisma migrate reset` (di `server/`): Mengosongkan dan mereset database.
-- `pnpm test` (di `server/` atau `web/`): Menjalankan unit test.
+- **[ ] `ChatWindow` (Jendela Obrolan):**
+  - **Tugas:** Desain ulang header `ChatWindow` agar lebih menarik, mungkin dengan menyatukan avatar dan nama dengan lebih baik. Tambahkan latar belakang yang halus (subtle pattern atau gradien) pada area obrolan.
+  - **Alasan:** Membuat area interaksi utama lebih menarik secara visual.
+
+- **[ ] Formulir & Tombol:**
+  - **Tugas:** Standarisasi tampilan semua tombol (primer, sekunder, destruktif) dan input field. Pastikan status `hover`, `focus`, dan `disabled` terlihat jelas dan konsisten.
+  - **Alasan:** Meningkatkan kegunaan dan memberikan umpan balik visual yang jelas kepada pengguna.
 
 ---
 
-## 4. Rencana Perbaikan & Roadmap
+## 3. Menambahkan Interaksi Mikro & Animasi
 
-Berikut adalah daftar tugas yang direkomendasikan untuk pengembangan selanjutnya.
+Tujuan: Membuat aplikasi terasa lebih hidup, responsif, dan modern.
 
-- **[ ] Refactor Panggilan API di `LinkDevicePage.tsx`:**
-  - **Tugas:** Ubah panggilan `fetch` ke `/api/auth/finalize-linking` agar menggunakan fungsi `api` terpusat dari `web/src/lib/api.ts`.
-  - **Alasan:** Konsistensi kode dan sentralisasi logika API.
+- **[ ] Transisi Halus:**
+  - **Tugas:** Terapkan `transition` CSS pada semua elemen interaktif (tombol, tautan, input) untuk perubahan warna dan bayangan yang mulus saat hover atau focus.
+  - **Alasan:** Memberikan pengalaman yang lebih halus dan profesional.
 
-- **[ ] Tinjau dan Perkuat Header Keamanan (CSP):**
-  - **Tugas:** Di `server/src/app.ts`, sesuaikan `connectSrc` di dalam `Content-Security-Policy` untuk lingkungan produksi.
-  - **Alasan:** Memastikan kebijakan keamanan sesuai dengan domain produksi Anda.
+- **[ ] Animasi dengan `framer-motion`:**
+  - **Tugas:** Manfaatkan `framer-motion` (yang sudah menjadi dependensi) untuk menambahkan animasi yang berarti:
+    - Animasi `layout` saat daftar obrolan diurutkan ulang.
+    - Animasi `fade-in` dan `slide-up` saat pesan baru muncul.
+    - Animasi `scale` dan `fade` saat modal muncul dan menghilang.
+    - Animasi saat sidebar mobile terbuka dan tertutup.
+  - **Alasan:** Meningkatkan UX secara signifikan dengan memberikan umpan balik visual yang dinamis dan memandu perhatian pengguna.
+
+---
+
+## 4. Peningkatan Aksesibilitas (a11y)
+
+Tujuan: Memastikan aplikasi dapat digunakan oleh sebanyak mungkin orang.
+
+- **[ ] Status Fokus yang Jelas:**
+  - **Tugas:** Pastikan semua elemen interaktif (tombol, input, tautan) memiliki indikator fokus yang jelas (misalnya, cincin fokus atau outline) saat dinavigasi menggunakan keyboard. Gunakan `focus-visible` dari Tailwind.
+  - **Alasan:** Penting untuk pengguna yang mengandalkan navigasi keyboard.
+
+- **[ ] Kontras Warna:**
+  - **Tugas:** Setelah palet warna baru didefinisikan, periksa kembali rasio kontras antara teks dan latar belakang untuk memastikan keterbacaan, terutama untuk teks sekunder.
+  - **Alasan:** Membantu pengguna dengan gangguan penglihatan untuk menggunakan aplikasi dengan nyaman.

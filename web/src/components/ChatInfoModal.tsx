@@ -4,7 +4,7 @@ import { FiShield, FiKey, FiAlertTriangle, FiZap, FiLock, FiHelpCircle } from 'r
 
 const InfoSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-4">
-    <div className="flex-shrink-0 text-accent-color mt-1">{icon}</div>
+    <div className="flex-shrink-0 text-accent mt-1">{icon}</div>
     <div>
       <h3 className="font-semibold text-text-primary">{title}</h3>
       <div className="text-sm text-text-secondary space-y-2">{children}</div>
@@ -36,7 +36,7 @@ export default function ChatInfoModal() {
           <p>
             Your entire account is secured by a single <span className="font-semibold text-text-primary">"Master Key"</span>. This key is mathematically generated from your unique, 24-word <span className="font-semibold text-text-primary">Recovery Phrase</span> that you received during registration.
           </p>
-          <p className="p-3 bg-yellow-500/10 text-yellow-500 rounded-lg">
+          <p className="p-3 bg-accent/10 text-accent rounded-lg">
             <span className="font-bold">This is the most important concept:</span> Your Recovery Phrase is the ultimate backup and source of truth for your account. We do not store it and cannot recover it for you. If you lose your phrase, you lose your account forever.
           </p>
         </InfoSection>
@@ -63,7 +63,7 @@ export default function ChatInfoModal() {
               <span className="font-semibold text-text-primary">Pulihkan (Restore):</span> Jika Anda tidak memiliki perangkat yang sudah login, Anda dapat menggunakan fitur "Pulihkan" dan memasukkan Frasa Pemulihan 24 kata Anda. Ini akan meregenerasi Kunci Master Anda di perangkat baru.
             </li>
           </ul>
-          <p className="p-3 bg-yellow-500/10 text-yellow-500 rounded-lg">
+          <p className="p-3 bg-accent/10 text-accent rounded-lg">
             <span className="font-bold">Penting:</span> Saat menautkan perangkat baru, Anda akan diminta untuk membuat kata sandi baru. Kata sandi ini hanya untuk perangkat tersebut dan akan digunakan untuk membuka kunci Master Anda di perangkat baru tersebut.
           </p>
         </InfoSection>

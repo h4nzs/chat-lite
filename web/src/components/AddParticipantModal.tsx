@@ -95,7 +95,7 @@ const AddParticipantModal = ({ conversationId, onClose }: {
           <button
             type="submit"
             form="add-participant-form"
-            className="px-4 py-2 rounded-md bg-accent-gradient text-white hover:opacity-90 transition-colors"
+            className="px-4 py-2 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
             disabled={isLoading || selectedUserIds.length === 0}
           >
             {isLoading ? 'Adding...' : 'Add Selected'}
@@ -110,7 +110,7 @@ const AddParticipantModal = ({ conversationId, onClose }: {
             placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-2 rounded-md bg-bg-primary border border-border text-text-primary"
+            className="w-full p-2 rounded-md bg-background border border-border text-text-primary"
           />
           {isSearching && <p className="text-sm text-text-secondary mt-2">Searching...</p>}
         </div>
@@ -120,14 +120,14 @@ const AddParticipantModal = ({ conversationId, onClose }: {
             searchResults.map(user => (
               <div 
                 key={user.id} 
-                className={`flex items-center justify-between p-2 cursor-pointer ${selectedUserIds.includes(user.id) ? 'bg-accent-color/20' : 'hover:bg-secondary'}`}
+                className={`flex items-center justify-between p-2 cursor-pointer ${selectedUserIds.includes(user.id) ? 'bg-accent/20' : 'hover:bg-secondary'}`}
                 onClick={() => handleSelectUser(user.id)}
               >
                 <div className="flex items-center gap-3">
                   <img 
                     src={toAbsoluteUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
                     alt={user.name}
-                    className="w-8 h-8 rounded-full object-cover bg-gray-700"
+                    className="w-8 h-8 rounded-full object-cover bg-secondary"
                   />
                   <p className="text-text-primary">{user.name} (@{user.username})</p>
                 </div>

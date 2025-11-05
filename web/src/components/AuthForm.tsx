@@ -33,21 +33,21 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
         <>
           <input
             aria-label="Name"
-            className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600"
+            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="Name"
             value={name}
             onChange={(e) => setE(e.target.value)}
           />
           <input
             aria-label="Email"
-            className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600"
+            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="Email"
             value={email}
             onChange={(e) => setC(e.target.value)}
           />
           <input
             aria-label="Username"
-            className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600"
+            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="Username"
             value={username}
             onChange={(e) => setD(e.target.value)}
@@ -56,7 +56,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       ) : (
         <input
           aria-label="Email or Username"
-          className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600"
+          className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="Email or Username"
           value={emailOrUsername}
           onChange={(e) => setA(e.target.value)}
@@ -66,7 +66,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       <input
         aria-label="Password"
         minLength={8}
-        className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600"
+        className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
         placeholder="Password"
         type="password"
         value={password}
@@ -74,7 +74,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       />
 
       <button
-        className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold shadow-md hover:opacity-90 transition"
+        className="w-full py-3 rounded-lg bg-accent text-accent-foreground font-semibold shadow-md hover:bg-accent/90 transition"
         aria-label={button}
       >
         {button}

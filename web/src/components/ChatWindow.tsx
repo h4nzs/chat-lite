@@ -45,7 +45,7 @@ const TypingIndicator = ({ conversationId }: { conversationId: string }) => {
 
   if (typingUsers.length === 0) return null;
 
-  return <div className="text-xs text-gray-500">typing...</div>;
+  return <div className="text-xs text-text-secondary">typing...</div>;
 };
 
 const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conversation: Conversation; onBack: () => void; onInfoToggle: () => void; onMenuClick: () => void; }) => {
@@ -92,7 +92,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <img
             src={toAbsoluteUrl(avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`}
             alt="Avatar"
-            className="w-10 h-10 rounded-full object-cover bg-bg-primary"
+            className="w-10 h-10 rounded-full object-cover bg-secondary"
           />
           <div>
             <div className="flex items-center gap-2">
@@ -126,8 +126,8 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   
     return (
       <div className="px-4 pt-3">
-        <div className="relative bg-bg-primary p-2 rounded-lg border-l-4 border-accent-color">
-          <p className="text-xs font-bold text-accent-color">Replying to {authorName}</p>
+        <div className="relative bg-secondary p-2 rounded-lg border-l-4 border-accent">
+          <p className="text-xs font-bold text-accent">Replying to {authorName}</p>
           <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
           <button 
             onClick={() => setReplyingTo(null)} 
@@ -190,11 +190,11 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   }
 
   const sendButtonClasses = clsx(
-    'p-3 rounded-full text-white transition-all duration-200',
+    'p-3 rounded-full text-accent-foreground transition-all duration-200',
     {
       'translate-y-px': isPressed && hasText,
-      'bg-accent-gradient': !isPressed,
-      'bg-accent-gradient filter brightness-90': isPressed,
+      'bg-accent': !isPressed,
+      'bg-accent/90': isPressed,
       'shadow-soft': !isPressed,
       'shadow-inner': isPressed,
       'scale-100 opacity-100': hasText,
@@ -203,13 +203,13 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   );
 
   const textInputClasses = clsx(
-    'flex-1 bg-bg-primary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-color',
+    'flex-1 bg-secondary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent',
     'shadow-inner' // Use inner shadow for recessed look
   );
 
   const fileButtonClasses = clsx(
     'p-2 rounded-full text-text-secondary transition-all duration-150',
-    'hover:text-accent-color',
+    'hover:text-accent',
     'shadow-soft', // Use soft shadow for elevated look
     'active:shadow-inner' // Use inner shadow for pressed state
   );
@@ -265,7 +265,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
             onMouseLeave={() => setIsPressed(false)}
             className={sendButtonClasses}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </form>
       </div>

@@ -92,7 +92,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-border rounded-lg text-text-primary hover:bg-secondary">
             Cancel
           </button>
-          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-accent-gradient text-white rounded-lg hover:opacity-90 disabled:opacity-50">
+          <button onClick={handleCreateGroup} disabled={loading || !title.trim() || selectedUsers.length === 0} className="px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 disabled:opacity-50">
             {loading ? 'Creating...' : 'Create Group'}
           </button>
         </>
@@ -104,7 +104,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Group Name"
-          className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg"
+          className="w-full p-3 border border-border bg-background text-text-primary rounded-lg"
         />
         
         <div className="relative">
@@ -113,10 +113,10 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search users to add..."
-            className="w-full p-3 border border-border bg-bg-primary text-text-primary rounded-lg"
+            className="w-full p-3 border border-border bg-background text-text-primary rounded-lg"
           />
           {userList.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-bg-primary border border-border rounded-b-lg max-h-40 overflow-y-auto z-10 shadow-lg">
+            <div className="absolute top-full left-0 right-0 bg-surface border border-border rounded-b-lg max-h-40 overflow-y-auto z-10 shadow-lg">
               {userList.map(user => (
                 <div key={user.id} onClick={() => handleSelectUser(user)} className="p-3 hover:bg-secondary cursor-pointer text-text-primary">
                   {user.name} (@{user.username})
@@ -128,9 +128,9 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-wrap gap-2 min-h-[40px]">
           {selectedUsers.map(user => (
-            <div key={user.id} className="flex items-center bg-accent-gradient text-white rounded-full px-3 py-1 text-sm font-medium">
+            <div key={user.id} className="flex items-center bg-accent text-accent-foreground rounded-full px-3 py-1 text-sm font-medium">
               <span>{user.name}</span>
-              <button onClick={() => handleRemoveUser(user.id)} className="ml-2 text-white/70 hover:text-white font-bold">
+              <button onClick={() => handleRemoveUser(user.id)} className="ml-2 text-accent-foreground/70 hover:text-accent-foreground font-bold">
                 &times;
               </button>
             </div>

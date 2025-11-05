@@ -31,13 +31,13 @@ export default function SafetyNumberModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-bg-surface rounded-xl shadow-2xl p-8 w-full max-w-md border border-border relative" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface rounded-xl shadow-2xl p-8 w-full max-w-md border border-border relative" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">
           <FiX size={24} />
         </button>
         
         <div className="flex flex-col items-center text-center">
-          <FiShield className="text-accent-color text-5xl mb-4" />
+          <FiShield className="text-accent text-5xl mb-4" />
           <h2 className="text-2xl font-bold text-text-primary">Verify Safety Number</h2>
           <p className="text-text-secondary mt-2 mb-6">
             To ensure your conversation with <span className="font-bold text-text-primary">{userName}</span> is end-to-end encrypted, compare this safety number. It should be the same for both of you.
@@ -56,18 +56,18 @@ export default function SafetyNumberModal({
                   viewBox={`0 0 256 256`}
                 />
               </div>
-              <div className="font-mono text-2xl tracking-wider text-text-primary my-4 p-4 bg-bg-main rounded-lg w-full">
+              <div className="font-mono text-2xl tracking-wider text-text-primary my-4 p-4 bg-background rounded-lg w-full">
                 {formattedNumber}
               </div>
             </>
           )}
 
           {isVerified ? (
-            <p className="text-green-500 font-semibold">You have already verified this contact.</p>
+            <p className="text-accent font-semibold">You have already verified this contact.</p>
           ) : (
             <button 
               onClick={onVerify}
-              className="w-full mt-4 py-3 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/90 transition-colors font-semibold"
+              className="w-full mt-4 py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
             >
               Mark as Verified
             </button>

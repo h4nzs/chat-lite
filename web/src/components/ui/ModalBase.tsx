@@ -73,7 +73,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
 
             {/* Footer */}
             {footer && (
-              <div className="flex justify-end gap-3 p-4 border-t border-border bg-bg-primary rounded-b-xl">
+              <div className="flex justify-end gap-3 p-4 border-t border-border bg-background rounded-b-xl">
                 {footer}
               </div>
             )}

@@ -26,9 +26,9 @@ export default function PasswordPromptModal() {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-bg-surface rounded-lg shadow-xl p-8 w-full max-w-sm border border-border">
+      <div className="bg-surface rounded-lg shadow-xl p-8 w-full max-w-sm border border-border">
         <div className="flex flex-col items-center text-center mb-6">
-          <FiKey className="text-accent-color text-4xl mb-4" />
+          <FiKey className="text-accent text-4xl mb-4" />
           <h2 className="text-xl font-bold text-text-primary">Password Required</h2>
           <p className="text-text-secondary mt-2 text-sm">To decrypt your keys and continue, please enter your login password.</p>
         </div>
@@ -40,7 +40,7 @@ export default function PasswordPromptModal() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-bg-main border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent-color text-text-primary"
+              className="w-full px-4 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent text-text-primary"
               placeholder="Enter your password..."
               autoFocus
             />
@@ -55,7 +55,7 @@ export default function PasswordPromptModal() {
             </button>
             <button
               type="submit"
-              className="w-full py-2 px-4 rounded-md bg-accent-color text-white hover:bg-accent-color/80 transition-colors"
+              className="w-full py-2 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
             >
               Continue
             </button>

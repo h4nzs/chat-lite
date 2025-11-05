@@ -6,50 +6,37 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: 'hsl(var(--border) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
+        background: 'hsl(var(--bg-main) / <alpha-value>)', // App background
+        foreground: 'hsl(var(--text-primary) / <alpha-value>)', // Main text
+
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
         },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
-        },
-        'bg-main': 'var(--bg-main)',
-        'bg-surface': 'var(--bg-surface)',
-        'bg-primary': 'var(--bg-primary)',
-        'text-primary': 'var(--text-primary)',
-        'text-secondary': 'var(--text-secondary)',
-        'accent-color': 'var(--accent-color)',
-        'accent-hover-bg': 'var(--accent-hover-bg)',
+
+        // Custom Semantic Colors
+        'bg-main': 'hsl(var(--bg-main) / <alpha-value>)',
+        'bg-surface': 'hsl(var(--bg-surface) / <alpha-value>)',
+        'text-primary': 'hsl(var(--text-primary) / <alpha-value>)',
+        'text-secondary': 'hsl(var(--text-secondary) / <alpha-value>)',
       },
-      backgroundImage: {
-        'accent-gradient': 'var(--accent-gradient)',
-        'bg-gradient': 'var(--bg-gradient)',
+      boxShadow: {
+        'soft': '0 1px 3px 0 hsl(var(--shadow-color) / 0.1), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06)',
+        'card': '0 4px 12px hsl(var(--shadow-color) / 0.15)',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
@@ -67,10 +54,6 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
-      },
-      boxShadow: {
-        'soft': '0 1px 3px 0 var(--shadow-color), 0 1px 2px 0 var(--shadow-color)', // Very subtle
-        'card': '0 4px 12px var(--shadow-color)', // More pronounced for cards
       },
     },
   },

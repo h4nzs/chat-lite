@@ -21,7 +21,7 @@ const SettingsRow = ({ title, description, children }: { title: string; descript
 
 // Reusable component for a settings card
 const SettingsCard = ({ children }: { children: React.ReactNode }) => (
-  <div className="bg-bg-surface rounded-xl shadow-soft divide-y divide-border">{children}</div>
+  <div className="bg-surface rounded-xl shadow-soft divide-y divide-border">{children}</div>
 );
 
 // Toggle Switch Component
@@ -29,7 +29,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
   <button
     type="button"
     onClick={onChange}
-    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${checked ? 'bg-accent-gradient' : 'bg-gray-300 dark:bg-gray-600'}`}
+    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${checked ? 'bg-accent' : 'bg-secondary'}`}
     role="switch"
     aria-checked={checked}
   >
@@ -129,12 +129,12 @@ export default function Settings() {
               <img 
                 src={previewUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
                 alt="Avatar Preview"
-                className="w-24 h-24 rounded-full bg-bg-primary object-cover border-2 border-border"
+                className="w-24 h-24 rounded-full bg-secondary object-cover border-2 border-border"
               />
               <button 
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 bg-accent-gradient text-white p-2 rounded-full hover:opacity-90 transition-opacity"
+                className="absolute bottom-0 right-0 bg-accent text-accent-foreground p-2 rounded-full hover:bg-accent/90 transition-opacity"
                 aria-label="Change avatar"
               >
                 <FiEdit2 size={16} />
@@ -160,8 +160,8 @@ export default function Settings() {
               />
             </div>
           </div>
-          <div className="bg-bg-primary/50 p-4 flex justify-end">
-            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-accent-gradient text-white font-semibold hover:opacity-90 disabled:opacity-50 flex items-center">
+          <div className="bg-background p-4 flex justify-end">
+            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center">
               {isLoading && <Spinner size="sm" className="mr-2" />} 
               {isLoading ? 'Saving...' : 'Save Profile'}
             </button>
@@ -205,8 +205,8 @@ export default function Settings() {
             </SettingsRow>
           </Link>
         </div>
-        <div className="bg-bg-primary/50 p-4 flex justify-end">
-            <button onClick={handlePrivacySubmit} className="px-4 py-2 rounded-lg bg-accent-gradient text-white font-semibold hover:opacity-90 disabled:opacity-50 flex items-center">
+        <div className="bg-background p-4 flex justify-end">
+            <button onClick={handlePrivacySubmit} className="px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center">
               Save Privacy Settings
             </button>
           </div>
@@ -217,7 +217,7 @@ export default function Settings() {
         <div className="p-6">
           <h3 className="text-lg font-semibold text-text-primary mb-2">Notifications</h3>
           <SettingsRow title="Push Notifications" description="Receive notifications for new messages on this device.">
-            <button onClick={handleSubscribePush} className="px-3 py-1.5 text-sm rounded-lg bg-accent-gradient text-white font-semibold hover:opacity-90">
+            <button onClick={handleSubscribePush} className="px-3 py-1.5 text-sm rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90">
               Enable
             </button>
           </SettingsRow>

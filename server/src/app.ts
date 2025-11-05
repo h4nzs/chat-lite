@@ -68,14 +68,16 @@ const corsMiddleware = cors({
 });
 app.use(corsMiddleware);
 
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 menit
-    max: 100, // max 100 request / 15 menit
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+if (isProd) {
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 menit
+      max: 100, // max 100 request / 15 menit
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  );
+}
 
 // === MIDDLEWARE ===
 app.use(logger("dev"));
