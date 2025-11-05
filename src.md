@@ -58,7 +58,7 @@ Tujuan: Membuat aplikasi terasa lebih hidup, responsif, dan modern.
     - Animasi `fade-in` dan `slide-up` saat pesan baru muncul.
     - Animasi `scale` dan `fade` saat modal muncul dan menghilang.
     - Animasi saat sidebar mobile terbuka dan tertutup.
-  - **Alasan:** Meningkatkan UX secara signifikan dengan memberikan umpan balik visual yang dinamis dan memandu perhatian pengguna.
+  - **Alasan:** Meningkatkan UX secara signifikan dengan memberikan umpan balik visual yang dinamis dan memandu perhatian pengguna.cd ch  -
 
 ---
 

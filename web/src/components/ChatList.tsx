@@ -263,7 +263,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         </button>
                       </DropdownMenu.Trigger>
                       <DropdownMenu.Portal>
-                        <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-surface border border-border rounded-md shadow-lg z-50 p-1">
+                        <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-surface/80 backdrop-blur-sm border border-border rounded-md shadow-lg z-50 p-1">
                           {c.isGroup ? (
                             <DropdownMenu.Item 
                               onSelect={() => handleDeleteGroup(c.id)}

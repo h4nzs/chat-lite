@@ -85,6 +85,10 @@ export function registerSocket(httpServer: HttpServer) {
     });
 
     socket.on("message:send", async (data, cb) => {
+      if (!socket.user) {
+        return cb?.({ ok: false, error: "User not authenticated" });
+      }
+
       try {
         const senderId = socket.user.id;
         let conversationId = data.conversationId;
@@ -219,13 +223,13 @@ export function registerSocket(httpServer: HttpServer) {
     });
 
     socket.on("typing:start", ({ conversationId }) => {
-      if (conversationId) {
+      if (conversationId && socket.user) {
         socket.to(conversationId).emit("typing:update", { userId: socket.user.id, conversationId, isTyping: true });
       }
     });
 
     socket.on("typing:stop", ({ conversationId }) => {
-      if (conversationId) {
+      if (conversationId && socket.user) {
         socket.to(conversationId).emit("typing:update", { userId: socket.user.id, conversationId, isTyping: false });
       }
     });
