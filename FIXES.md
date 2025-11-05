@@ -1,124 +1,104 @@
-# Rekomendasi & Rencana Pengembangan Chat-Lite
+# Project Change Log
 
-Berikut adalah daftar saran, ide, dan rekomendasi untuk perbaikan serta penambahan fitur pada aplikasi Chat-Lite di masa mendatang.
+This file contains the last 100 commits, showing the history of fixes, features, and refactoring.
 
----
-
-### 🚀 Fitur Baru (Major Features)
-
-1.  **Pesan Suara (Voice Messages)**
-    *   **Ide:** Menambahkan kemampuan bagi pengguna untuk merekam dan mengirim klip suara pendek, mirip seperti WhatsApp atau Telegram.
-    *   **Manfaat:** Meningkatkan ekspresivitas dan memberikan alternatif selain mengetik.
-
-2.  **Panggilan Suara & Video (Voice/Video Calls)**
-    *   **Ide:** Mengintegrasikan fungsionalitas panggilan peer-to-peer (P2P) menggunakan teknologi WebRTC.
-    *   **Manfaat:** Mengubah Chat-Lite menjadi platform komunikasi yang lebih lengkap.
-
-3.  **Status Pengguna Kustom (Custom User Status)**
-    *   **Ide:** Memungkinkan pengguna untuk mengatur status kustom (misalnya: "Sedang rapat", "Sedang liburan") selain hanya status "Online/Offline".
-    *   **Manfaat:** Memberikan lebih banyak konteks tentang ketersediaan pengguna.
-
-4.  **Integrasi GIF & Stiker**
-    *   **Ide:** Menambahkan tombol untuk mencari dan mengirim GIF (misalnya via integrasi API Giphy) atau stiker kustom.
-    *   **Manfaat:** Menambah elemen keseruan dalam percakapan.
-
----
-
-### ✨ Peningkatan UI/UX (UI/UX Enhancements)
-
-1.  **Edit Pesan Terkirim**
-    *   **Ide:** Memberikan opsi bagi pengguna untuk mengedit pesan yang sudah mereka kirim (misalnya dalam batas waktu 5 menit).
-    *   **Manfaat:** Fitur standar di aplikasi chat modern yang sangat berguna untuk memperbaiki kesalahan ketik.
-
-2.  **UI Balasan Pesan yang Lebih Baik (Improved Reply UI)**
-    *   **Ide:** Saat sebuah pesan merupakan balasan, tampilkan kutipan pesan asli yang lebih interaktif. Jika diklik, scroll ke pesan asli tersebut.
-    *   **Manfaat:** Mempermudah mengikuti alur percakapan yang kompleks.
-
-3.  **Pencarian Pesan di Sisi Server (Server-Side Search)**
-    *   **Ide:** Mengganti pencarian pesan saat ini (yang hanya memfilter pesan yang sudah dimuat) dengan pencarian berbasis API yang mencari di seluruh riwayat percakapan.
-    *   **Manfaat:** Memberikan hasil pencarian yang lengkap dan akurat.
-
-4.  **Indikator Progres Upload File**
-    *   **Ide:** Menampilkan bar atau persentase progres saat pengguna mengunggah file berukuran besar.
-    *   **Manfaat:** Memberikan feedback visual dan meningkatkan pengalaman pengguna saat mengirim file.
-
-5.  **Drag & Drop untuk Upload File**
-    *   **Ide:** Memungkinkan pengguna untuk menyeret file dari desktop mereka langsung ke jendela chat untuk mengunggahnya.
-    *   **Manfaat:** Mempercepat dan mempermudah alur pengiriman file.
-
----
-
-### ⚡️ Peningkatan Real-time & Performa
-
-1.  **Status "Telah Dibaca oleh..." (Read by...)**
-    *   **Ide:** Di chat grup, tampilkan siapa saja yang sudah membaca pesan, tidak hanya status "telah dibaca" secara umum.
-    *   **Manfaat:** Memberikan informasi yang lebih detail dan berguna dalam percakapan grup.
-
-2.  **Indikator Pengetikan Grup yang Lebih Cerdas**
-    *   **Ide:** Jika lebih dari satu orang sedang mengetik di grup, tampilkan pesan seperti "Beberapa orang sedang mengetik..." atau "User A, User B, dan User C sedang mengetik...".
-    *   **Manfaat:** Mengurangi "noise" visual di grup yang aktif.
-
-3.  **Penanda Pesan Belum Dibaca (Unread Message Marker)**
-    *   **Ide:** Saat membuka chat yang memiliki pesan baru, tampilkan sebuah garis pemisah bertuliskan "Pesan Baru" di atas pesan pertama yang belum dibaca.
-    *   **Manfaat:** Membantu pengguna dengan cepat menemukan titik di mana mereka terakhir kali membaca.
-
----
-
-### 🛡️ Peningkatan Backend & Keamanan
-
-1.  **Verifikasi Kunci Enkripsi (E2EE Key Verification)**
-    *   **Ide:** Menambahkan fitur di mana dua pengguna dapat memverifikasi identitas satu sama lain dengan memindai kode QR atau membandingkan string keamanan.
-    *   **Manfaat:** Meningkatkan kepercayaan dan keamanan dalam komunikasi end-to-end encryption.
-
-2.  **Penambahan Unit & Integration Test**
-    *   **Ide:** Menulis lebih banyak pengujian otomatis untuk backend (API & logika socket) dan frontend (interaksi komponen & state).
-    *   **Manfaat:** Meningkatkan stabilitas aplikasi, mencegah regresi (bug lama muncul kembali), dan mempermudah refactoring di masa depan.
-
-
-Kekuatan Sistem Saat Ini (Yang Sudah Kita Lakukan Dengan Benar)
-
-   1. Enkripsi End-to-End (E2EE) Fundamental: Kita sudah menerapkan prinsip inti E2EE. Pesan dienkripsi di perangkat Anda dan
-      hanya bisa didekripsi oleh perangkat penerima. Server tidak bisa membaca isi pesan.
-   2. Kunci Identitas Pengguna: Setiap pengguna sekarang memiliki pasangan kunci publik/privat yang unik, yang merupakan dasar
-      dari identitas digital yang aman.
-   3. Kunci Sesi per Percakapan: Setiap percakapan memiliki kunci enkripsi acak yang terpisah. Ini adalah praktik yang baik,
-      karena jika satu kunci percakapan bocor, percakapan Anda yang lain tetap aman.
-   4. Manajemen Kunci Sisi Klien: Kunci privat Anda dienkripsi menggunakan password Anda dan disimpan di browser. Ini jauh
-      lebih baik daripada menyimpannya dalam bentuk teks biasa.
-
-  Kelemahan dan Area Peningkatan (Di Mana Kita Bisa Lebih Baik)
-
-  Meskipun fondasinya kuat, ada beberapa celah keamanan yang perlu dipertimbangkan:
-
-   1. (Kritis) Backup Kunci yang Tidak Aman: Fitur "Backup Key" saat ini hanya mengunduh kunci privat dalam bentuk teks biasa.
-      Jika file backup tersebut dicuri, seluruh keamanan akun Anda hancur. Ini adalah celah yang paling mendesak untuk
-      diperbaiki.
-   2. (Tinggi) Tidak Ada Verifikasi Kontak (Trust on First Use): Saat Anda memulai chat dengan seseorang, Anda secara otomatis
-      "mempercayai" kunci publik yang diberikan oleh server. Anda tidak punya cara untuk memverifikasi apakah kunci tersebut
-      benar-benar milik teman Anda, atau milik penyerang man-in-the-middle.
-   3. (Tinggi) Kurangnya *Forward Secrecy* (Kerahasiaan Masa Depan): Kita menggunakan satu kunci sesi untuk seluruh riwayat
-      percakapan. Jika kunci sesi ini suatu saat bocor, penyerang bisa mendekripsi semua pesan di masa lalu dalam percakapan
-      tersebut.
-   4. (Sedang) Penanganan Anggota Grup: Saat anggota baru ditambahkan ke grup, mereka mendapatkan kunci sesi yang ada. Ini
-      berarti mereka berpotensi bisa membaca pesan yang dikirim sebelum mereka bergabung. Sebaliknya, jika anggota dikeluarkan,
-      mereka masih memegang kunci sesi dan bisa terus mengintip pesan baru.
-
-  Saran dan Roadmap Peningkatan Keamanan
-
-  Berikut adalah langkah-langkah yang saya sarankan untuk membuat aplikasi ini benar-benar aman, diurutkan berdasarkan
-  prioritas:
-
-
-  ┌──┬───────────┬───────────────────────────────────────────────────────────────────────┬──────────────────────────────────┐
-  │  │ Fitur     │ Deskripsi Teknis                                                      │ Manfaat Keamanan                 │
-  ├──┼───────────┼───────────────────────────────────────────────────────────────────────┼──────────────────────────────────┤
-  │  │ **Backup... │ Alih-alih mengunduh file, kita tampilkan "Frasa Pemulihan" (12-24 ... │ Menghilangkan risiko file bac... │
-  │  │ **Verifi... │ Untuk setiap percakapan, kita tampilkan "Kode Keamanan" (serangkai... │ Memberikan jaminan bahwa Anda... │
-  │  │ **Implem... │ Alih-alih satu kunci sesi, kita gunakan algoritma (seperti Double ... │ Jika satu kunci pesan bocor, ... │
-  │  │ **Regene... │ Setiap kali ada perubahan anggota grup (masuk, keluar, atau dikelu... │ Mencegah anggota baru membaca... │
-  └──┴───────────┴───────────────────────────────────────────────────────────────────────┴──────────────────────────────────┘
-
-  Kesimpulan:
-
-  Sistem kita saat ini sudah merupakan lompatan besar dari kondisi awal. Namun, untuk bisa dengan percaya diri menyebutnya
-  "aman", saya sangat merekomendasikan untuk mengikuti roadmap di atas, dimulai dengan memperbaiki fitur backup kunci.
+- 8172097 - bttr ui/ux (47 minutes ago)
+- 482bd03 - new ui/ux (5 hours ago)
+- 5aa7b62 - new ui/ux (5 hours ago)
+- 669f7bc - new ui/ux (6 hours ago)
+- 99e87a5 - new info (6 hours ago)
+- 47aa849 - stable7 (7 hours ago)
+- 9abbfe1 - fix error decrypt (7 hours ago)
+- 7041c81 - add redis (7 hours ago)
+- f2c4cb4 - fix (7 hours ago)
+- 37eb95a - better socket for realtime (7 hours ago)
+- 08d59f3 - new linked device (8 hours ago)
+- f111fbc - new flow for user account master key (10 hours ago)
+- 2c6f748 - new session manage (19 hours ago)
+- 13b46dd - bttr guide (24 hours ago)
+- a0ff4c4 - new modal for guide (24 hours ago)
+- 5ae46b8 - new emot pick (25 hours ago)
+- 1955960 - fix mobile screen (32 hours ago)
+- dacc836 - fix upload (33 hours ago)
+- f601fb6 - fix layout (33 hours ago)
+- 02f7aa0 - update layout (33 hours ago)
+- d5c1140 - new layout (33 hours ago)
+- d343f04 - stable ui/ux (33 hours ago)
+- 56094f6 - update ui/ux (33 hours ago)
+- b4f3c5d - update ui/ux (34 hours ago)
+- 32b79a5 - new ui/ux (34 hours ago)
+- 8f0a465 - fix worker service (34 hours ago)
+- dc25eb5 - new worker service (35 hours ago)
+- 0e3a0ff - new virtuso render (35 hours ago)
+- 8c1b2f7 - bttr socket conn (35 hours ago)
+- 955946b - new biometric sys (2 days ago)
+- 4a9f7ad - new restore func (2 days ago)
+- 0f7baa6 - new restore func (2 days ago)
+- 2e765ba - new renew key for group (2 days ago)
+- 7e6b76b - new ratcheting and chain session key stable (2 days ago)
+- 8dbb3f0 - new ratcheting and chain session key (2 days ago)
+- abb10ab - stable verif contact (2 days ago)
+- dd5fe01 - new key verif (2 days ago)
+- 5a8618c - new bc key with fhrase e2ee (2 days ago)
+- 5c00b46 - stable e2ee (2 days ago)
+- 0604780 - new e2ee implementations test (3 days ago)
+- 4127e19 - fix token unauth (3 days ago)
+- 404f898 - fix stable6 (3 days ago)
+- 4f6dbad - stable6 (3 days ago)
+- 061f047 - stable show email (4 days ago)
+- ac2156d - new show email (4 days ago)
+- 8e36440 - stable profile view (4 days ago)
+- 407d54f - fix sum profile view (4 days ago)
+- f298ef1 - new profile view (4 days ago)
+- f97a1e1 - new user desc (4 days ago)
+- 5792fdc - stable5. (4 days ago)
+- a7953f7 - stable5 (4 days ago)
+- 3ac7abc - bttr bubble (5 days ago)
+- 5990fae - theme key update (5 days ago)
+- 2c71190 - theme update (5 days ago)
+- afb8cd3 - theme stable (5 days ago)
+- 781a24f - theme stable (5 days ago)
+- ce675bd - fix bttr theme (5 days ago)
+- 5251bd7 - fix popup theme (5 days ago)
+- 4c28a44 - fix theme (5 days ago)
+- ad498ca - (rollback 120359b)new theme (5 days ago)
+- 120359b - bttr input form (5 days ago)
+- 4aff648 - bttr send bttn (5 days ago)
+- f342a6a - bttr auth form (5 days ago)
+- b839e03 - fix popup (5 days ago)
+- bff1f3a - popup notif center (5 days ago)
+- 841de8c - popup notif bttr (5 days ago)
+- 77c6cb1 - popup notif (5 days ago)
+- 47c43bf - add in app notif stable5 (5 days ago)
+- cd6f4e8 - stable5 (5 days ago)
+- e1d69ab - bttr ux modal (5 days ago)
+- 7e2d8f7 - fix add new confirm modal (5 days ago)
+- 63ada2e - fix auth 1-1 after group stable (5 days ago)
+- 708662e - group stable2 (5 days ago)
+- 34913b5 - group stable (5 days ago)
+- 30220fd - fix chat history group uaer as joinedAt (5 days ago)
+- 040e182 - fix chat history group as joinedAt (5 days ago)
+- 099e237 - new group util stable (5 days ago)
+- b057d12 - fix socket emit room (5 days ago)
+- 95f2257 - fix clean socket (5 days ago)
+- 72442cf - stable unread count, read recipt (5 days ago)
+- 556f272 - (rollback fa953ae) fix recipt rt (6 days ago)
+- fa953ae - fix any stable4 (6 days ago)
+- 50bbaa0 - fix stable4 (6 days ago)
+- c87b29b - stable4 (6 days ago)
+- 06bd023 - fixed stable4 (6 days ago)
+- f962e88 - fixed stable (6 days ago)
+- 7331c62 - fixed shallow stable (6 days ago)
+- feae885 - fix more shallow stable (6 days ago)
+- 2327990 - fix shallow stable (6 days ago)
+- 8246fd7 - fix etc stable (6 days ago)
+- 272badf - fix refactor usechatstore stable (6 days ago)
+- 719ef1f - fix socket duplikat stable (6 days ago)
+- 2b0d7ac - fix decrypt logic stable (6 days ago)
+- be7dbee - fix anotasi any stable (6 days ago)
+- 6a4af0c - fix validation zod stable (6 days ago)
+- 17b01e4 - audit fix stable (6 days ago)
+- 55dc2d0 - fix preview media. stable3 (6 days ago)
+- 7994713 - stable search, previews, new reply (8 days ago)
+- c7c8541 - stable search, previews (8 days ago)
+- 9d2faea - bttr search fix (8 days ago)
