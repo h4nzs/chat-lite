@@ -1,139 +1,53 @@
 # Changelog
 
-All notable changes to the Chat-Lite project will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.0] - 2025-11-05
 
-## [Unreleased]
+This is a massive overhaul release, focusing on security, new features, and a complete UI/UX redesign.
 
-### Added
-- Comprehensive application summary documentation
-- Detailed deployment guide with nginx configuration
-- Security hardening recommendations
-- Performance tuning guidelines
-- Troubleshooting guide
-- Backup and recovery procedures
+### Added (New Features)
 
-### Changed
-- Enhanced message validation to prevent blank screens
-- Improved socket authentication with safer cookie parsing
-- Added JSON serialization for Prisma results
-- Updated message content sanitization
-- Fixed message disappearing after render issue
-- Improved error handling with graceful degradation
+- **Secure Device Linking:** Implemented a new, secure flow to link a new device using a QR code, eliminating the need to re-enter the recovery phrase.
+- **Biometric Login:** Added support for logging in using platform authenticators (e.g., fingerprint, face ID).
+- **Account Restore:** Created a new flow for restoring an account from the 24-word recovery phrase.
+- **Session Management:** Added a new page where users can view and manage all their active sessions.
+- **Group Chat:** Implemented full support for creating and managing group conversations.
+- **E2EE & Security:**
+  - Implemented the Double Ratchet algorithm for robust, self-healing E2EE session management.
+  - Added Safety Number verification to allow users to confirm the identity of their contacts.
+  - Strengthened the master key generation and storage process.
+- **In-App Notifications:** Built a notification center and popup system for real-time, in-app alerts.
+- **User Profiles:** Added user profiles with display names and descriptions.
+- **Message Features:**
+  - Implemented link previews for URLs shared in messages.
+  - Added message search functionality.
+  - Implemented read receipts and unread message counts.
+  - Added an emoji picker to the message input.
+  - Implemented message replies.
 
-### Fixed
-- Blank screen issues when receiving invalid messages
-- Message disappearance after render
-- Socket authentication vulnerabilities
-- XSS protection for message content
-- Memory leaks in message caching
-- Improper message filtering logic
+### Changed (Improvements & Refactors)
 
-## [1.2.0] - 2025-10-20
-
-### Added
-- End-to-end encryption using libsodium
-- Message reactions with emoji support
-- File and image upload capabilities
-- Online/offline presence indicators
-- Typing indicators
-- Message read receipts
-- Dark/light theme toggle
-- Push notifications support
-- Virtualized message lists for performance
-- Advanced crypto utilities for session keys
-- Key management system for encryption
-
-### Changed
-- Upgraded to React 18 with concurrent features
-- Implemented Zustand for state management
-- Migrated to Vite for faster builds
-- Enhanced security with proper JWT handling
-- Improved UI/UX with Tailwind CSS
-- Added comprehensive error handling
-- Implemented proper socket authentication
-- Added message validation and sanitization
+- **Major UI/UX Overhaul:**
+  - Defined and implemented a new professional, HSL-based color palette with full light/dark mode support.
+  - Redesigned all key components (`ChatList`, `MessageBubble`, `ChatWindow`, Modals) for a modern and consistent look.
+  - Standardized all forms, inputs, and buttons across the application with clear `hover`, `focus`, and `disabled` states.
+  - Added smooth CSS transitions and `framer-motion` animations for a more dynamic and responsive user experience (e.g., sidebar slide-in, message fade-in, list re-ordering).
+  - Improved color contrast ratios for better accessibility.
+- **Architecture & Performance:**
+  - Migrated device linking state from server memory to **Redis** for improved scalability and reliability.
+  - Refactored socket logic for more efficient real-time communication, including implicit 1-on-1 chat creation.
+  - Replaced CSS-based animations with `framer-motion` for smoother, physics-based transitions.
+  - Implemented `react-virtuoso` for efficient rendering of long message and conversation lists.
 
 ### Fixed
-- Various security vulnerabilities
-- Performance bottlenecks in message rendering
-- Authentication issues with socket connections
-- Message ordering problems
-- File upload security issues
-- Cache management inefficiencies
 
-## [1.1.0] - 2025-09-15
-
-### Added
-- Real-time messaging with Socket.IO
-- User authentication with JWT
-- Conversation management
-- Message history persistence
-- Responsive UI design
-- Basic message sending/receiving
-
-### Changed
-- Migrated from simple chat demo to full-featured application
-- Implemented PostgreSQL database with Prisma ORM
-- Added proper user management
-- Enhanced security with bcrypt password hashing
-- Improved error handling
-
-### Fixed
-- Connection stability issues
-- Message delivery reliability
-- User session management
-- Database query optimizations
-
-## [1.0.0] - 2025-08-01
-
-### Added
-- Initial project structure
-- Basic Express.js backend
-- Simple React frontend
-- In-memory message storage
-- WebSocket communication
-- Minimal UI components
-
----
-
-## Versioning Strategy
-
-### Major Version (X.y.z)
-- Breaking changes to the API or core functionality
-- Major architectural changes
-- Removal of deprecated features
-
-### Minor Version (x.Y.z)
-- New features that are backward-compatible
-- Significant improvements to existing functionality
-- Performance enhancements
-- Security updates
-
-### Patch Version (x.y.Z)
-- Backward-compatible bug fixes
-- Minor improvements
-- Documentation updates
-- Dependency updates
-
-## Release Process
-
-1. Update CHANGELOG.md with changes for the new release
-2. Bump version in package.json files for both frontend and backend
-3. Create a git tag for the release
-4. Push changes to repository
-5. Create GitHub release with release notes
-6. Update documentation if needed
-
-## Deprecation Policy
-
-Features may be deprecated in minor versions and removed in major versions. Deprecated features will be:
-- Clearly marked in documentation
-- Accompanied by migration guides
-- Supported for at least one major version after deprecation
-
----
-
-*This project follows semantic versioning principles*
+- **Server Stability:** Fixed a critical server crash that occurred during `typing` events by adding defensive checks for the user object.
+- **Client-Side Errors:**
+  - Resolved a `ReferenceError` in the `ChatList` component that occurred after a refactor.
+  - Fixed a bug that prevented messages from being decrypted correctly on the client.
+- **UI/UX Bugs:**
+  - Fixed an issue where modals and dropdowns had a transparent background, adding a `backdrop-blur` effect for a modern look.
+  - Corrected numerous visual and contrast issues across the app after the new theme was implemented.
+- **Authentication:** Patched a token unauthorization bug.
+- **General Stability:** Numerous miscellaneous bug fixes and stability improvements (as noted by commits like `stable`, `stable3`, `stable4`, `stable5`, etc.).
