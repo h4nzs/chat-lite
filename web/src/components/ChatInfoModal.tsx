@@ -51,12 +51,20 @@ export default function ChatInfoModal() {
           </ul>
         </InfoSection>
 
-        <InfoSection icon={<FiAlertTriangle size={20} />} title="Switching to a New Device">
+        <InfoSection icon={<FiAlertTriangle size={20} />} title="Mengakses Akun Anda di Perangkat Baru">
           <p>
-            To access your account and messages on a new computer or phone, you must use the <span className="font-semibold text-text-primary">"Restore"</span> feature. 
+            Anda memiliki dua cara untuk mengakses akun dan pesan Anda di perangkat baru:
           </p>
-          <p>
-            You will be prompted to enter your 24-word Recovery Phrase. This will securely regenerate your identical Master Key on the new device, giving you full access to your account and history.
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <span className="font-semibold text-text-primary">Penautan Perangkat (Device Linking):</span> Ini adalah cara yang paling nyaman. Dari perangkat yang sudah login, Anda dapat memindai QR code yang ditampilkan di perangkat baru. Anda akan diminta untuk membuat <span className="font-semibold text-text-primary">kata sandi baru yang spesifik untuk perangkat ini</span>. Ini akan mentransfer kunci Master Anda dengan aman ke perangkat baru.
+            </li>
+            <li>
+              <span className="font-semibold text-text-primary">Pulihkan (Restore):</span> Jika Anda tidak memiliki perangkat yang sudah login, Anda dapat menggunakan fitur "Pulihkan" dan memasukkan Frasa Pemulihan 24 kata Anda. Ini akan meregenerasi Kunci Master Anda di perangkat baru.
+            </li>
+          </ul>
+          <p className="p-3 bg-yellow-500/10 text-yellow-500 rounded-lg">
+            <span className="font-bold">Penting:</span> Saat menautkan perangkat baru, Anda akan diminta untuk membuat kata sandi baru. Kata sandi ini hanya untuk perangkat tersebut dan akan digunakan untuk membuka kunci Master Anda di perangkat baru tersebut.
           </p>
         </InfoSection>
 
