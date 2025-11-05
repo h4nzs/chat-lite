@@ -395,7 +395,7 @@ router.post("/webauthn/auth-verify", async (req, res, next) => {
 });
 
 // === DEVICE LINKING FINALIZATION ===
-import { linkingTokens } from '../socket.js';
+import { redisClient } from '../lib/redis.js';
 
 router.post(
   "/finalize-linking",
@@ -408,17 +408,16 @@ router.post(
     try {
       const { linkingToken } = req.body;
 
-      const tokenData = linkingTokens.get(linkingToken);
+      const userId = await redisClient.get(linkingToken);
 
-      if (!tokenData || tokenData.expiry < new Date()) {
-        linkingTokens.delete(linkingToken); // Clean up expired/invalid token
+      if (!userId) {
         throw new ApiError(401, "Invalid or expired linking token.");
       }
 
       // Immediately delete the token to make it single-use
-      linkingTokens.delete(linkingToken);
+      await redisClient.del(linkingToken);
 
-      const user = await prisma.user.findUnique({ where: { id: tokenData.userId } });
+      const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) throw new ApiError(404, "User not found.");
 
       res.json({

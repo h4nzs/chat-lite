@@ -5,13 +5,13 @@ import { prisma } from "./lib/prisma.js";
 import { getLinkPreview } from "link-preview-js";
 import { sendPushNotification } from "./utils/sendPushNotification.js";
 import crypto from "crypto";
+import { redisClient } from "./lib/redis.js";
 
 export let io: Server;
 
 const onlineUsers = new Set<string>();
 
-// Map<token, { userId: string, expiry: Date }>
-export const linkingTokens = new Map<string, { userId: string, expiry: Date }>();
+
 
 export function getIo() {
   if (!io) {
@@ -60,8 +60,7 @@ export function registerSocket(httpServer: HttpServer) {
 
       // Generate a single-use token for finalization
       const linkingToken = crypto.randomBytes(32).toString('hex');
-      const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
-      linkingTokens.set(linkingToken, { userId, expiry });
+      await redisClient.set(linkingToken, userId, { EX: 300 }); // 5 minutes expiry
 
       // Relay the payload to the new device in the specific room
       console.log(`[Linking Server] Relaying payload to room ${data.roomId}`);
