@@ -144,6 +144,9 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
       getStores().msg.clearMessagesForConversation(newConversation.id);
       getStores().convo.addOrUpdateConversation(newConversation);
 
+      // Also join the socket room to receive real-time updates for this new conversation
+      socket.emit("conversation:join", newConversation.id);
+
       // Notify user they were added to a new group
       if (newConversation.isGroup) {
         useNotificationStore.getState().addNotification({

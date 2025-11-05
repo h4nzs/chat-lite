@@ -163,14 +163,11 @@ router.post("/", async (req, res, next) => {
     // Create and distribute session keys for the new conversation
     await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
 
-    if (isGroup) {
-      const io = getIo();
-      allUserIds.forEach(userId => {
-        if (userId !== creatorId) {
-          io.to(userId).emit("conversation:new", newConversation);
-        }
-      });
-    }
+    const io = getIo();
+    const otherParticipants = allUserIds.filter(uid => uid !== creatorId);
+    otherParticipants.forEach(userId => {
+      io.to(userId).emit("conversation:new", newConversation);
+    });
 
     res.status(201).json(newConversation);
   } catch (error) {
