@@ -73,7 +73,8 @@ const csrfProtection = csrf({
 
 // Apply CSRF protection conditionally, exempting the public key verification route
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/keys/verify') {
+  const exemptedPaths = ['/api/keys/verify', '/api/auth/finalize-linking'];
+  if (exemptedPaths.includes(req.originalUrl)) {
     return next();
   }
   csrfProtection(req, res, next);

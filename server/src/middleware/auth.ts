@@ -48,13 +48,8 @@ export function socketAuthMiddleware(
   next: (err?: Error) => void
 ) {
   try {
-    // Prioritaskan validasi token dengan cara mem-parsing cookie langsung dari header
     let token: string | undefined = undefined;
     
-    // Logging untuk debugging
-    console.log("Socket handshake headers:", socket.handshake.headers);
-    
-    // Ekstrak token dari cookie
     if (socket.handshake.headers?.cookie) {
       const cookies = Object.fromEntries(
         socket.handshake.headers.cookie.split(";").map((c) => {
@@ -63,16 +58,16 @@ export function socketAuthMiddleware(
         })
       );
       token = cookies["at"] || undefined;
-      console.log("Token from cookie:", token);
     }
 
     const user = verifySocketAuth(token);
-    if (!user) return next(new Error("Unauthorized"));
-
-    (socket as any).user = user;
+    if (user) {
+      (socket as any).user = user;
+    }
+    
     next();
   } catch (err) {
     console.error("Socket authentication error:", err);
-    next(new Error("Unauthorized"));
+    next(new Error("Internal server error during auth"));
   }
 }

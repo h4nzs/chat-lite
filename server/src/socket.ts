@@ -4,10 +4,14 @@ import { socketAuthMiddleware } from "./middleware/auth.js";
 import { prisma } from "./lib/prisma.js";
 import { getLinkPreview } from "link-preview-js";
 import { sendPushNotification } from "./utils/sendPushNotification.js";
+import crypto from "crypto";
 
 export let io: Server;
 
 const onlineUsers = new Set<string>();
+
+// Map<token, { userId: string, expiry: Date }>
+export const linkingTokens = new Map<string, { userId: string, expiry: Date }>();
 
 export function getIo() {
   if (!io) {
@@ -28,19 +32,52 @@ export function registerSocket(httpServer: HttpServer) {
 
   io.on("connection", (socket: any) => {
     const userId = socket.user?.id;
+
+    // Handle authenticated users
     if (userId) {
       socket.join(userId);
       console.log(`[Socket Connect] User connected: ${userId}`);
       onlineUsers.add(userId);
       socket.emit("presence:init", Array.from(onlineUsers));
       socket.broadcast.emit("presence:user_joined", userId);
+    } else {
+      console.log(`[Socket Connect] Guest connected: ${socket.id}`);
     }
+
+    // Handle device linking
+    socket.on("linking:join_room", (roomId: string) => {
+      if (!userId) { // Only non-authenticated sockets can join linking rooms
+        socket.join(roomId);
+        console.log(`[Linking] Guest ${socket.id} joined room ${roomId}`);
+      }
+    });
+
+    socket.on("linking:send_payload", async (data: { roomId: string, encryptedMasterKey: string }) => {
+      // This event must be from an authenticated user
+      if (!userId) return;
+
+      console.log(`[Linking Server] Received payload from ${userId} for room ${data.roomId}`);
+
+      // Generate a single-use token for finalization
+      const linkingToken = crypto.randomBytes(32).toString('hex');
+      const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
+      linkingTokens.set(linkingToken, { userId, expiry });
+
+      // Relay the payload to the new device in the specific room
+      console.log(`[Linking Server] Relaying payload to room ${data.roomId}`);
+      io.to(data.roomId).emit("linking:receive_payload", { 
+        encryptedMasterKey: data.encryptedMasterKey,
+        linkingToken: linkingToken, // Send the token to the new device
+      });
+    });
 
     socket.on("disconnect", () => {
       if (userId) {
         console.log(`[Socket Disconnect] User disconnected: ${userId}`);
         onlineUsers.delete(userId);
         io.emit("presence:user_left", userId);
+      } else {
+        console.log(`[Socket Disconnect] Guest disconnected: ${socket.id}`);
       }
     });
 

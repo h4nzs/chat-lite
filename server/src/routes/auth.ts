@@ -197,6 +197,7 @@ router.post("/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
+
 // === WEBAUTHN REGISTRATION ===
 
 // 1. Generate registration options
@@ -392,5 +393,53 @@ router.post("/webauthn/auth-verify", async (req, res, next) => {
     next(e);
   }
 });
+
+// === DEVICE LINKING FINALIZATION ===
+import { linkingTokens } from '../socket.js';
+
+router.post(
+  "/finalize-linking",
+  zodValidate({
+    body: z.object({
+      linkingToken: z.string(),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      const { linkingToken } = req.body;
+
+      const tokenData = linkingTokens.get(linkingToken);
+
+      if (!tokenData || tokenData.expiry < new Date()) {
+        linkingTokens.delete(linkingToken); // Clean up expired/invalid token
+        throw new ApiError(401, "Invalid or expired linking token.");
+      }
+
+      // Immediately delete the token to make it single-use
+      linkingTokens.delete(linkingToken);
+
+      const user = await prisma.user.findUnique({ where: { id: tokenData.userId } });
+      if (!user) throw new ApiError(404, "User not found.");
+
+      // Issue new tokens for the newly linked device
+      const tokens = await issueTokens(user, req);
+      setAuthCookies(res, tokens);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+          avatarUrl: user.avatarUrl,
+        },
+      });
+
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
 
 export default router;

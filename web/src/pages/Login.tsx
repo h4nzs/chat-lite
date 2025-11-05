@@ -109,6 +109,9 @@ export default function Login() {
         <div className="text-center mt-4">
           <Link to="/restore" className="text-sm text-accent-color hover:underline">Restore from phrase</Link>
         </div>
+        <div className="text-center mt-2">
+          <Link to="/link-device" className="text-sm text-accent-color hover:underline">Link a new device</Link>
+        </div>
       </div>
     </div>
   );

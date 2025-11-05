@@ -199,6 +199,11 @@ export default function Settings() {
               <FiChevronRight size={20} className="text-text-secondary" />
             </SettingsRow>
           </Link>
+          <Link to="/settings/link-device" className="block w-full text-left">
+            <SettingsRow title="Link a New Device" description="Connect a new device to your account by scanning a QR code.">
+              <FiChevronRight size={20} className="text-text-secondary" />
+            </SettingsRow>
+          </Link>
         </div>
         <div className="bg-bg-primary/50 p-4 flex justify-end">
             <button onClick={handlePrivacySubmit} className="px-4 py-2 rounded-lg bg-accent-gradient text-white font-semibold hover:opacity-90 disabled:opacity-50 flex items-center">

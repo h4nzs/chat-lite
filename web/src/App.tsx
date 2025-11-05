@@ -6,6 +6,8 @@ import Chat from './pages/Chat';
 import SettingsPage from './pages/SettingsPage';
 import KeyManagementPage from './pages/KeyManagementPage';
 import SessionManagerPage from './pages/SessionManagerPage';
+import LinkDevicePage from './pages/LinkDevicePage';
+import DeviceScannerPage from './pages/DeviceScannerPage';
 import ProfilePage from './pages/ProfilePage'; // Import ProfilePage
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
@@ -76,10 +78,12 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/restore" element={<Restore />} />
+          <Route path="/link-device" element={<LinkDevicePage />} />
           <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
           <Route path="/settings/sessions" element={<ProtectedRoute><SessionManagerPage /></ProtectedRoute>} />
+          <Route path="/settings/link-device" element={<ProtectedRoute><DeviceScannerPage /></ProtectedRoute>} />
           <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
