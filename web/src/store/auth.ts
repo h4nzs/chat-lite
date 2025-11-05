@@ -39,6 +39,7 @@ type State = {
   setReadReceipts: (value: boolean) => void;
   regenerateKeys: (password: string) => Promise<void>;
   getPrivateKey: () => Promise<Uint8Array>;
+  setUser: (user: User) => void;
 };
 
 // Helper function to setup user encryption keys
@@ -311,5 +312,10 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
         }
       });
     });
+  },
+
+  setUser(user: User) {
+    set({ user });
+    localStorage.setItem("user", JSON.stringify(user));
   },
 }));

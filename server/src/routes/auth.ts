@@ -421,10 +421,6 @@ router.post(
       const user = await prisma.user.findUnique({ where: { id: tokenData.userId } });
       if (!user) throw new ApiError(404, "User not found.");
 
-      // Issue new tokens for the newly linked device
-      const tokens = await issueTokens(user, req);
-      setAuthCookies(res, tokens);
-
       res.json({
         user: {
           id: user.id,
@@ -432,6 +428,7 @@ router.post(
           username: user.username,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          publicKey: user.publicKey,
         },
       });
 

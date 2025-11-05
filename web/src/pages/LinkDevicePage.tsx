@@ -7,6 +7,8 @@ import { io, Socket } from "socket.io-client";
 import { getSodium } from '@lib/sodiumInitializer';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuthStore } from '@store/auth';
+import { useModalStore } from '@store/modal';
+import { getSocket } from '@lib/socket';
 
 const SERVER_URL = import.meta.env.VITE_WS_URL || "http://localhost:4000";
 
@@ -36,6 +38,7 @@ export default function LinkDevicePage() {
         const linkingPrivKey = sodium.to_base64(linkingKeys.privateKey, sodium.base64_variants.URLSAFE_NO_PADDING);
 
         sessionStorage.setItem('linkingPrivKey', linkingPrivKey);
+        sessionStorage.setItem('linkingPubKey', linkingPubKey);
 
         const dataToEncode = JSON.stringify({ roomId, linkingPubKey });
         setQrData(dataToEncode);
@@ -46,32 +49,73 @@ export default function LinkDevicePage() {
 
         socket.on('linking:receive_payload', async (payload: { encryptedMasterKey: string, linkingToken: string }) => {
           try {
-            const storedLinkingPrivKey = sessionStorage.getItem('linkingPrivKey');
-            if (!storedLinkingPrivKey) throw new Error('Linking session expired.');
+            const linkingPrivKeyB64 = sessionStorage.getItem('linkingPrivKey');
+            const linkingPubKeyB64 = sessionStorage.getItem('linkingPubKey');
+            if (!linkingPrivKeyB64 || !linkingPubKeyB64) throw new Error('Linking session expired.');
 
-            // Full decryption logic will be needed here
-            // For now, we just proceed with the finalization step
+            const sodium = await getSodium();
+            const { storePrivateKey } = await import('@utils/keyManagement');
 
-            const response = await fetch('/api/auth/finalize-linking', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ linkingToken: payload.linkingToken }),
+            // Decrypt the master private key
+            const encryptedMasterKeyBytes = sodium.from_base64(payload.encryptedMasterKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+            const linkingPubKeyBytes = sodium.from_base64(linkingPubKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+            const linkingPrivKeyBytes = sodium.from_base64(linkingPrivKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+            
+            const masterPrivateKey = sodium.crypto_box_seal_open(encryptedMasterKeyBytes, linkingPubKeyBytes, linkingPrivKeyBytes);
+
+            // Prompt user for a NEW password for this device
+            const { showPasswordPrompt } = (await import('@store/modal')).useModalStore.getState();
+            showPasswordPrompt(async (newDevicePassword) => {
+              if (!newDevicePassword) {
+                setError('Password not provided. Linking canceled.');
+                setStatus('failed');
+                return;
+              }
+
+              try {
+                // Re-encrypt the master key with the new password and store it
+                const encryptedKeyForStorage = await storePrivateKey(masterPrivateKey, newDevicePassword);
+                localStorage.setItem('encryptedPrivateKey', encryptedKeyForStorage);
+
+                // Finalize the linking process with the server
+                const response = await fetch('/api/auth/finalize-linking', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ linkingToken: payload.linkingToken }),
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || 'Failed to finalize linking on server.');
+                }
+
+                const { user } = await response.json();
+
+                // Store public key and user data
+                localStorage.setItem('publicKey', user.publicKey);
+                useAuthStore.getState().setUser(user);
+
+                // Bootstrap the app
+                const { initSocketListeners } = (await import('@store/socket')).useSocketStore.getState();
+                initSocketListeners();
+                const { loadConversations } = (await import('@store/conversation')).useConversationStore.getState();
+                await loadConversations();
+
+                setStatus('linked');
+                toast.success('Device linked successfully!');
+                setTimeout(() => navigate('/'), 2000);
+              } catch (err: any) {
+                console.error("Error during linking finalization:", err);
+                setError(err.message || 'Failed to finalize linking.');
+                setStatus('failed');
+              }
             });
-
-            if (!response.ok) {
-              throw new Error('Failed to finalize linking on server.');
-            }
-
-            setStatus('linked');
-            await bootstrap();
-            setTimeout(() => navigate('/'), 2000);
-
-          } catch (decryptionError) {
-            setError('Failed to process linking payload.');
+          } catch (decryptionError: any) {
+            console.error("Error during linking payload processing:", decryptionError);
+            setError(decryptionError.message || 'Failed to process linking payload.');
             setStatus('failed');
           }
         });
-
       } catch (err: any) {
         setError(err.message || 'Failed to generate linking info.');
         setStatus('failed');
