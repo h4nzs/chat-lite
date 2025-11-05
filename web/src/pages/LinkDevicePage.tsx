@@ -78,18 +78,11 @@ export default function LinkDevicePage() {
                 localStorage.setItem('encryptedPrivateKey', encryptedKeyForStorage);
 
                 // Finalize the linking process with the server
-                const response = await fetch('/api/auth/finalize-linking', {
+                const { api } = await import('@lib/api');
+                const { user } = await api<{ user: any }>('/api/auth/finalize-linking', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ linkingToken: payload.linkingToken }),
                 });
-
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  throw new Error(errorData.error || 'Failed to finalize linking on server.');
-                }
-
-                const { user } = await response.json();
 
                 // Store public key and user data
                 localStorage.setItem('publicKey', user.publicKey);

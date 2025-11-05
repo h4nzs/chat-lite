@@ -1,126 +1,135 @@
-# Chat-Lite Deployment Guide
+# Chat-Lite Deployment Guide (Updated)
+
+Panduan ini berisi instruksi untuk men-deploy aplikasi Chat-Lite ke lingkungan produksi.
 
 ## 📋 Prerequisites
 
-Before deploying Chat-Lite, ensure you have the following installed:
-- Node.js (version 18 or newer)
-- pnpm (recommended) or npm/yarn
-- PostgreSQL (version 12 or newer)
+- Node.js (v18 atau lebih baru)
+- pnpm (atau npm/yarn)
+- PostgreSQL (v12 atau lebih baru)
+- **Redis** (v6 atau lebih baru)
 - Git
 
-## 🗄️ Database Setup
+## 🗄️ Initial Setup
 
-### 1. PostgreSQL Installation
+### 1. PostgreSQL & Redis Installation
+
 ```bash
 # Ubuntu/Debian
 sudo apt update
-sudo apt install postgresql postgresql-contrib
+sudo apt install postgresql postgresql-contrib redis-server
 
 # macOS (with Homebrew)
-brew install postgresql
+brew install postgresql redis
 
-# Start PostgreSQL service
-sudo systemctl start postgresql
+# Start services (jika belum berjalan otomatis)
+sudo systemctl start postgresql redis-server
 ```
 
 ### 2. Database Creation
+
 ```bash
-# Switch to postgres user
+# Buka shell psql
 sudo -u postgres psql
 
-# Create database and user
+# Buat database dan user
 CREATE DATABASE chatlite;
 CREATE USER chatlite_user WITH PASSWORD 'your_secure_password';
 GRANT ALL PRIVILEGES ON DATABASE chatlite TO chatlite_user;
-ALTER USER chatlite_user WITH SUPERUSER;
 
-# Exit PostgreSQL
+# Keluar dari psql
 \q
 ```
 
 ### 3. Environment Configuration
-Create `.env` files in both `server/` and `web/` directories:
 
-**server/.env:**
+Buat file `.env` di direktori `server/`.
+
+**`server/.env`:**
 ```env
+# Pastikan ini diatur ke 'production'
+NODE_ENV=production
+
+# URL untuk koneksi ke database PostgreSQL Anda
 DATABASE_URL="postgresql://chatlite_user:your_secure_password@localhost:5432/chatlite?schema=public"
-JWT_SECRET="your_jwt_secret_here"
-JWT_REFRESH_SECRET="your_jwt_refresh_secret_here"
+
+# URL untuk koneksi ke server Redis Anda
+REDIS_URL="redis://localhost:6379"
+
+# Secret untuk menandatangani token JWT (gunakan string acak yang kuat)
+JWT_SECRET="ganti_dengan_jwt_secret_yang_sangat_aman"
+JWT_REFRESH_SECRET="ganti_dengan_jwt_refresh_secret_yang_sangat_aman"
+
+# Port untuk server backend
 PORT=4000
-CORS_ORIGIN="http://yourdomain.com"
+
+# Domain frontend Anda (tanpa trailing slash)
+CORS_ORIGIN="https://yourdomain.com"
+
+# Direktori untuk file upload
 UPLOAD_DIR="uploads"
+
+# Kunci VAPID untuk Notifikasi Push (generate sekali, misal dengan `npx web-push generate-vapid-keys`)
+VAPID_SUBJECT="mailto:admin@yourdomain.com"
+VAPID_PUBLIC_KEY="your_vapid_public_key"
+VAPID_PRIVATE_KEY="your_vapid_private_key"
 ```
 
-**web/.env:**
+Buat file `.env.production` di direktori `web/`.
+
+**`web/.env.production`:**
 ```env
-VITE_API_URL="http://yourdomain.com:4000"
-VITE_WS_URL="http://yourdomain.com:4000"
+# URL ini harus menunjuk ke domain publik Anda, Nginx akan menangani proxy
+VITE_API_URL="https://yourdomain.com"
+VITE_WS_URL="https://yourdomain.com"
 ```
 
 ## 🚀 Backend Deployment
 
-### 1. Install Dependencies
 ```bash
+# Masuk ke direktori server
 cd server
-pnpm install
-```
 
-### 2. Database Migration
-```bash
-# Apply database migrations
+# Install dependencies
+pnpm install --production
+
+# Jalankan migrasi database untuk produksi
 pnpm prisma migrate deploy
 
 # Generate Prisma client
 pnpm prisma generate
-```
 
-### 3. Build Application
-```bash
+# Build aplikasi TypeScript
 pnpm build
-```
 
-### 4. Start Server
-```bash
-# Production mode
-pnpm start
-
-# Development mode
-pnpm dev
+# Mulai server menggunakan process manager seperti PM2
+pm2 start dist/index.js --name chat-lite-backend
 ```
 
 ## 🌐 Frontend Deployment
 
-### 1. Install Dependencies
 ```bash
+# Masuk ke direktori web
 cd web
-pnpm install
-```
 
-### 2. Build Application
-```bash
+# Install dependencies
+pnpm install
+
+# Build aplikasi untuk produksi
 pnpm build
 ```
+Output build akan ada di direktori `web/dist/`. Direktori ini yang akan di-serve oleh Nginx.
 
-### 3. Serve Static Files
-The build output will be in the `dist/` directory. You can serve these files using any web server:
+## ⚙️ Nginx Configuration (Reverse Proxy)
 
-```bash
-# Using serve (install globally first)
-npm install -g serve
-serve -s dist -l 3000
+Contoh konfigurasi Nginx untuk produksi. Simpan di `/etc/nginx/sites-available/yourdomain.com`.
 
-# Using nginx (example configuration below)
-```
-
-## ⚙️ Nginx Configuration
-
-### Sample nginx.conf for Production
 ```nginx
 server {
     listen 80;
     server_name yourdomain.com;
     
-    # Redirect all HTTP to HTTPS
+    # Redirect semua HTTP ke HTTPS
     return 301 https://$server_name$request_uri;
 }
 
@@ -128,380 +137,172 @@ server {
     listen 443 ssl http2;
     server_name yourdomain.com;
     
-    # SSL Configuration (using Let's Encrypt)
-    ssl_certificate /path/to/fullchain.pem;
-    ssl_certificate_key /path/to/privkey.pem;
+    # Konfigurasi SSL (misal dengan Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
     
-    # Security headers
+    # Security Headers (beberapa sekarang ditangani oleh aplikasi)
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    # CATATAN: Content-Security-Policy (CSP) sekarang diatur oleh backend (via Helmet)
+    # untuk kebijakan yang lebih dinamis. Jangan atur di sini untuk menghindari konflik.
     
-    # Frontend (React app)
+    # Lokasi root untuk file frontend
     location / {
         root /path/to/chat-lite/web/dist;
         index index.html;
         try_files $uri $uri/ /index.html;
     }
     
-    # Backend API proxy
+    # Proxy untuk semua rute API
     location /api/ {
         proxy_pass http://localhost:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
     
-    # WebSocket proxy
+    # Proxy untuk koneksi WebSocket
     location /socket.io/ {
         proxy_pass http://localhost:4000/socket.io/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
     
-    # File uploads
+    # Proxy untuk file upload
     location /uploads/ {
         proxy_pass http://localhost:4000/uploads/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-## 🔐 SSL Certificate Setup (Let's Encrypt)
+## 🔧 Penyesuaian Kode untuk Produksi
 
-### 1. Install Certbot
-```bash
-# Ubuntu/Debian
-sudo apt install certbot python3-certbot-nginx
+Satu perubahan manual diperlukan di kode sebelum build backend untuk produksi.
 
-# macOS (with Homebrew)
-brew install certbot
-```
+- **Lokasi:** `server/src/app.ts`
+- **Tugas:** Di dalam konfigurasi `helmet`, temukan baris `connectSrc` dan ganti URL WebSocket.
 
-### 2. Obtain Certificate
-```bash
-sudo certbot --nginx -d yourdomain.com
-```
+  ```typescript
+  // Ganti baris ini:
+  connectSrc: ["'self'", "ws://localhost:4000"],
 
-### 3. Auto-renewal
-```bash
-# Test renewal
-sudo certbot renew --dry-run
+  // Menjadi (sesuaikan dengan domain Anda):
+  connectSrc: ["'self'", "wss://yourdomain.com"],
+  ```
 
-# Add to crontab for automatic renewal
-sudo crontab -e
-# Add this line:
-# 0 12 * * * /usr/bin/certbot renew --quiet
-```
+## 🐳 Docker Deployment (Optional & Updated)
 
-## 🐳 Docker Deployment (Optional)
-
-### Dockerfile for Backend
+### `server/Dockerfile`
 ```dockerfile
 FROM node:18-alpine
 
 WORKDIR /app
 
-COPY server/package*.json ./
-RUN npm install
+# Install pnpm
+RUN npm install -g pnpm
 
-COPY server/ .
+COPY package*.json ./
+COPY prisma ./prisma/
 
-RUN npm run build
+RUN pnpm install --production
+
+COPY . .
+
+RUN pnpm prisma generate
+RUN pnpm build
 
 EXPOSE 4000
 
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
 ```
 
-### Dockerfile for Frontend
+### `web/Dockerfile`
 ```dockerfile
 FROM node:18-alpine as build
 
 WORKDIR /app
 
-COPY web/package*.json ./
-RUN npm install
+RUN npm install -g pnpm
 
-COPY web/ .
+COPY package*.json ./
 
-RUN npm run build
+RUN pnpm install
 
+COPY . .
+
+RUN pnpm build
+
+# Production stage
 FROM nginx:alpine
 
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy Nginx config
+# Pastikan Anda memiliki file nginx.conf yang sesuai untuk Docker
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy built assets
+COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-### docker-compose.yml
+### `docker-compose.yml`
 ```yaml
 version: '3.8'
 
 services:
   db:
-    image: postgres:12
+    image: postgres:14
     environment:
       POSTGRES_DB: chatlite
       POSTGRES_USER: chatlite_user
       POSTGRES_PASSWORD: your_secure_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
 
   backend:
     build: ./server
     environment:
+      NODE_ENV: production
       DATABASE_URL: "postgresql://chatlite_user:your_secure_password@db:5432/chatlite?schema=public"
+      REDIS_URL: "redis://redis:6379"
       JWT_SECRET: "your_jwt_secret_here"
       JWT_REFRESH_SECRET: "your_jwt_refresh_secret_here"
       PORT: 4000
-      CORS_ORIGIN: "http://localhost:3000"
+      CORS_ORIGIN: "https://yourdomain.com"
+      VAPID_SUBJECT: "mailto:admin@yourdomain.com"
+      VAPID_PUBLIC_KEY: "your_vapid_public_key"
+      VAPID_PRIVATE_KEY: "your_vapid_private_key"
     ports:
       - "4000:4000"
     depends_on:
       - db
+      - redis
+    restart: unless-stopped
 
   frontend:
     build: ./web
     ports:
-      - "3000:80"
+      - "80:80"
+      - "443:443"
+    # Anda perlu menangani SSL di dalam container Nginx ini atau di proxy terluar
     depends_on:
       - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:
 ```
-
-To run with Docker:
-```bash
-docker-compose up -d
-```
-
-## 🔧 Environment Variables
-
-### Backend (.env)
-| Variable | Description | Required |
-|----------|-------------|----------|
-| DATABASE_URL | PostgreSQL connection string | Yes |
-| JWT_SECRET | Secret for signing access tokens | Yes |
-| JWT_REFRESH_SECRET | Secret for signing refresh tokens | Yes |
-| PORT | Server port (default: 4000) | No |
-| CORS_ORIGIN | Allowed origins for CORS | Yes |
-| UPLOAD_DIR | Directory for file uploads (default: uploads) | No |
-
-### Frontend (.env)
-| Variable | Description | Required |
-|----------|-------------|----------|
-| VITE_API_URL | Backend API URL | Yes |
-| VITE_WS_URL | WebSocket server URL | Yes |
-
-## 📊 Monitoring and Logging
-
-### 1. Application Logs
-```bash
-# Backend logs
-cd server
-tail -f logs/app.log
-
-# Frontend logs (browser console)
-# Open Developer Tools → Console tab
-```
-
-### 2. Database Monitoring
-```bash
-# Monitor PostgreSQL
-sudo -u postgres psql -c "SELECT * FROM pg_stat_activity;"
-```
-
-### 3. Performance Monitoring
-- Use PM2 for process management and monitoring
-- Implement application performance monitoring (APM) tools
-- Set up log aggregation with ELK stack or similar
-
-## 🔁 CI/CD Pipeline (GitHub Actions Example)
-
-```yaml
-name: Deploy Chat-Lite
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v2
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '18'
-        
-    - name: Install pnpm
-      run: npm install -g pnpm
-      
-    - name: Install backend dependencies
-      run: |
-        cd server
-        pnpm install
-        
-    - name: Build backend
-      run: |
-        cd server
-        pnpm build
-        
-    - name: Install frontend dependencies
-      run: |
-        cd web
-        pnpm install
-        
-    - name: Build frontend
-      run: |
-        cd web
-        pnpm build
-        
-    - name: Deploy to server
-      # Add your deployment steps here
-      run: echo "Deploying..."
-```
-
-## 🛡️ Security Hardening
-
-### 1. Firewall Configuration
-```bash
-# UFW example
-sudo ufw allow ssh
-sudo ufw allow http
-sudo ufw allow https
-sudo ufw enable
-```
-
-### 2. Fail2Ban Setup
-```bash
-# Install fail2ban
-sudo apt install fail2ban
-
-# Configure jail.local
-sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-```
-
-### 3. Regular Security Updates
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt upgrade
-
-# Check for security advisories regularly
-```
-
-## 📈 Performance Tuning
-
-### 1. Database Optimization
-```sql
--- Add indexes for frequently queried columns
-CREATE INDEX idx_messages_conversation_id ON "Message"(conversationId);
-CREATE INDEX idx_messages_created_at ON "Message"(createdAt);
-CREATE INDEX idx_participants_user_id ON "Participant"(userId);
-CREATE INDEX idx_participants_conversation_id ON "Participant"(conversationId);
-```
-
-### 2. Server Configuration
-- Adjust Node.js memory limits if needed
-- Configure connection pooling for PostgreSQL
-- Optimize nginx worker processes
-
-### 3. Caching Strategy
-- Implement Redis for session storage
-- Add CDN for static assets
-- Use browser caching for frontend assets
-
-## 🆘 Troubleshooting
-
-### Common Issues and Solutions
-
-#### 1. Database Connection Failed
-```bash
-# Check if PostgreSQL is running
-sudo systemctl status postgresql
-
-# Verify connection settings
-psql -h localhost -U chatlite_user -d chatlite
-```
-
-#### 2. CORS Errors
-- Check `CORS_ORIGIN` in `.env` file
-- Verify nginx proxy configuration
-- Ensure frontend and backend URLs match
-
-#### 3. WebSocket Connection Issues
-- Check nginx WebSocket proxy configuration
-- Verify firewall settings
-- Ensure port 4000 is accessible
-
-#### 4. File Upload Failures
-- Check permissions on `uploads/` directory
-- Verify `UPLOAD_DIR` environment variable
-- Check nginx file size limits
-
-#### 5. Authentication Problems
-- Verify JWT secrets in `.env` files
-- Check cookie settings and SameSite attributes
-- Ensure HTTPS in production environments
-
-## 🔄 Backup and Recovery
-
-### 1. Database Backup
-```bash
-# Create backup
-pg_dump -U chatlite_user -h localhost chatlite > chatlite_backup.sql
-
-# Restore backup
-psql -U chatlite_user -h localhost chatlite < chatlite_backup.sql
-```
-
-### 2. File Backup
-```bash
-# Backup uploads directory
-tar -czf uploads_backup.tar.gz uploads/
-```
-
-### 3. Automated Backups
-```bash
-# Add to crontab for daily backups
-0 2 * * * pg_dump -U chatlite_user -h localhost chatlite > /backups/chatlite_$(date +\%Y\%m\%d).sql
-```
-
-## 📞 Support
-
-For issues not covered in this guide:
-
-1. Check the [GitHub Issues](https://github.com/h4nzs/chat-lite/issues)
-2. Join our [Discord Community](https://discord.gg/example)
-3. Contact support team at support@chatlite.app
-
----
-
-*Deployment guide last updated: October 2025*

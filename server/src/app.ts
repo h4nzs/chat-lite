@@ -38,8 +38,25 @@ webpush.setVapidDetails(
 const app = express();
 
 // === SECURITY / CORS ===
+const isProd = env.nodeEnv === 'production';
+
 // Gunakan Helmet untuk header keamanan dasar
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      // 'unsafe-eval' diperlukan untuk hot-reloading di mode development
+      scriptSrc: ["'self'", isProd ? '' : "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // Diperlukan untuk styling dinamis
+      imgSrc: ["'self'", "data:", "blob:"], // blob: diperlukan untuk avatar preview
+      // TODO: Ganti ws://localhost:4000 dengan URL WebSocket produksi Anda
+      connectSrc: ["'self'", "ws://localhost:4000"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"], // Mencegah clickjacking
+      ...(isProd && { upgradeInsecureRequests: [] }),
+    },
+  },
+}));
 // Hapus header X-Powered-By untuk menyembunyikan detail teknologi server
 app.disable('x-powered-by');
 
