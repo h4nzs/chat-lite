@@ -86,8 +86,59 @@ export function registerSocket(httpServer: HttpServer) {
 
     socket.on("message:send", async (data, cb) => {
       try {
+        const senderId = socket.user.id;
+        let conversationId = data.conversationId;
+        let conversation;
+
+        // If no conversationId, find or create a 1-on-1 chat
+        if (!conversationId && data.recipientId) {
+          const recipientId = data.recipientId;
+
+          // Find existing 1-on-1 conversation
+          const existingConvo = await prisma.conversation.findFirst({
+            where: {
+              isGroup: false,
+              participants: {
+                every: {
+                  userId: { in: [senderId, recipientId] },
+                },
+              },
+            },
+          });
+
+          if (existingConvo) {
+            conversationId = existingConvo.id;
+            conversation = existingConvo;
+          } else {
+            // Or create a new one
+            const newConversation = await prisma.conversation.create({
+              data: {
+                isGroup: false,
+                participants: {
+                  create: [
+                    { userId: senderId, role: "MEMBER" },
+                    { userId: recipientId, role: "MEMBER" },
+                  ],
+                },
+              },
+              include: { 
+                participants: { include: { user: true } },
+                creator: true,
+              },
+            });
+            conversationId = newConversation.id;
+            conversation = newConversation;
+
+            // --- THIS IS THE FIX ---
+            // Notify the recipient that a new conversation has been created for them
+            io.to(recipientId).emit("conversation:new", newConversation);
+          }
+        } else if (!conversationId) {
+          throw new Error("Missing conversationId or recipientId");
+        }
+
         const participants = await prisma.participant.findMany({
-          where: { conversationId: data.conversationId },
+          where: { conversationId: conversationId },
           select: { userId: true },
         });
 
@@ -115,20 +166,20 @@ export function registerSocket(httpServer: HttpServer) {
 
         const newMessage = await prisma.message.create({
           data: {
-            conversationId: data.conversationId,
-            senderId: socket.user.id,
+            conversationId: conversationId,
+            senderId: senderId,
             content: data.content,
             fileUrl: data.fileUrl,
             fileName: data.fileName,
             fileType: data.fileType,
             fileSize: data.fileSize,
-            sessionId: data.sessionId, // Add session ID for E2EE
+            sessionId: data.sessionId,
             repliedToId: data.repliedToId,
             linkPreview: linkPreviewData,
             statuses: {
               create: participants.map(p => ({
                 userId: p.userId,
-                status: p.userId === socket.user.id ? 'READ' : 'SENT',
+                status: p.userId === senderId ? 'READ' : 'SENT',
               })),
             },
           },
@@ -145,41 +196,25 @@ export function registerSocket(httpServer: HttpServer) {
         });
 
         const messageToBroadcast = {
-          id: newMessage.id,
-          conversationId: newMessage.conversationId,
-          senderId: newMessage.senderId,
-          content: newMessage.content,
-          fileUrl: newMessage.fileUrl,
-          fileName: newMessage.fileName,
-          fileType: newMessage.fileType,
-          fileSize: newMessage.fileSize,
-          createdAt: newMessage.createdAt,
-          sender: newMessage.sender,
-          reactions: newMessage.reactions,
-          statuses: newMessage.statuses,
-          repliedTo: newMessage.repliedTo,
-          linkPreview: newMessage.linkPreview, // Explicitly include linkPreview
-          sessionId: newMessage.sessionId, // Broadcast the session ID
+          ...newMessage,
           tempId: data.tempId,
         };
 
-        io.to(data.conversationId).emit("message:new", messageToBroadcast);
+        io.to(conversationId).emit("message:new", messageToBroadcast);
 
         await prisma.conversation.update({
-          where: { id: data.conversationId },
+          where: { id: conversationId },
           data: { lastMessageAt: newMessage.createdAt },
         });
 
-        const pushRecipients = await prisma.participant.findMany({
-          where: { conversationId: data.conversationId, userId: { not: socket.user.id } },
-          select: { userId: true },
-        });
+        const pushRecipients = participants.filter(p => p.userId !== senderId);
         const payload = { title: `New message from ${socket.user.username}`, body: data.content || 'File received' };
         pushRecipients.forEach(p => sendPushNotification(p.userId, payload));
 
         cb?.({ ok: true, msg: newMessage });
       } catch (error) {
-        cb?.({ ok: false, error: "Failed to save message" });
+        console.error("Message send error:", error);
+        cb?.({ ok: false, error: "Failed to save or send message" });
       }
     });
 

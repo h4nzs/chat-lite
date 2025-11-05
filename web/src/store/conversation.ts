@@ -122,12 +122,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       // Safely decrypt messages one by one to prevent a single failure from stopping the entire load
       for (const c of conversations) {
         if (c.lastMessage?.content) {
-          try {
-            c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id);
-          } catch (e) {
-            console.warn(`Could not decrypt last message for convo ${c.id}:`, e);
-            c.lastMessage.content = "[Encrypted Message]";
-          }
+          c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id, c.lastMessage.sessionId);
         }
         if (c.lastMessage) {
           c.lastMessage = withPreview(c.lastMessage);

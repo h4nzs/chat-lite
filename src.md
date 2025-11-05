@@ -11,19 +11,19 @@ Berikut adalah daftar tugas yang direkomendasikan untuk meningkatkan keamanan, k
 
 ### 2. Keandalan & Skalabilitas (Prioritas Tinggi)
 
-- **[ ] Gunakan Redis untuk Penyimpanan Token Penautan:**
+- **[ done ] Gunakan Redis untuk Penyimpanan Token Penautan:**
   - **Lokasi:** `server/src/socket.ts` dan `server/src/routes/auth.ts`
   - **Tugas:** Ganti penyimpanan `linkingToken` dari `Map` di memori server ke **Redis**.
   - **Alasan:** `Map` di memori tidak akan berfungsi di lingkungan produksi dengan lebih dari satu server (scaling) dan tidak andal jika server di-restart. Redis adalah solusi standar industri untuk ini.
 
 ### 3. Peningkatan Real-time & Pengalaman Pengguna
 
-- **[ ] Tangani Pembuatan Obrolan 1-on-1 via Pesan Baru:**
+- **[ done ] Tangani Pembuatan Obrolan 1-on-1 via Pesan Baru:**
   - **Lokasi:** `server/src/routes/messages.ts` (perlu diverifikasi)
   - **Tugas:** Periksa logika pengiriman pesan. Jika sebuah pesan dikirim ke pengguna yang belum pernah berinteraksi sebelumnya, sebuah percakapan 1-on-1 baru kemungkinan dibuat secara implisit. Pastikan event socket `conversation:new` juga dikirim ke penerima dalam kasus ini.
   - **Alasan:** Agar percakapan baru langsung muncul di daftar obrolan penerima secara real-time, sama seperti saat ditambahkan ke grup.
 
-- **[ ] Penanganan Error Enkripsi yang Lebih Baik:**
+- **[ done ] Penanganan Error Enkripsi yang Lebih Baik:**
   - **Lokasi:** Di seluruh aplikasi klien (misalnya, `web/src/store/conversation.ts`).
   - **Tugas:** Jika sebuah pesan gagal didekripsi, jangan hanya menampilkan `[Encrypted Message]`. Berikan pesan error yang lebih informatif kepada pengguna, seperti "Kunci enkripsi untuk pesan ini tidak ditemukan."
   - **Alasan:** Meningkatkan pengalaman pengguna dan mempermudah debugging masalah E2EE.
