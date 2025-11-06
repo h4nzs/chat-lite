@@ -87,10 +87,10 @@ const DynamicIsland = () => {
         {currentActivity && (
           <motion.div
             key={currentActivity.id}
-            initial={{ opacity: 0, scale: 0.8, y: -20, x: "-50%" }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: "-50%" }}
-            exit={{ opacity: 0, scale: 0.8, y: -20, x: "-50%" }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            initial={{ opacity: 0, scale: 0.7, x: "-50%" }}
+            animate={{ opacity: 1, scale: 1, x: "-50%" }}
+            exit={{ opacity: 0, scale: 0.7, x: "-50%" }}
+            transition={{ type: "spring", damping: 15, stiffness: 300 }}
             className="absolute left-1/2 min-w-[280px] max-w-sm pointer-events-auto shadow-lg"
           >
             {renderActivity(currentActivity)}

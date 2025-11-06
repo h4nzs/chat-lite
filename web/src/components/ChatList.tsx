@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useConversationStore } from '@store/conversation';
 import { useMessageStore } from '@store/message';
@@ -12,7 +12,7 @@ import { toAbsoluteUrl } from '@utils/url';
 import { useModalStore } from '@store/modal';
 import NotificationBell from './NotificationBell';
 import { api } from '@lib/api';
-import { Virtuoso } from 'react-virtuoso';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { debounce } from 'lodash';
 import clsx from 'clsx';
 
@@ -93,6 +93,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const showConfirm = useModalStore(state => state.showConfirm);
   const openProfileModal = useModalStore(state => state.openProfileModal);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   const handleSearch = useCallback(debounce(async (query: string) => {
     if (!query.trim()) {
@@ -112,9 +114,44 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     }
   }, 300), []);
 
+  const filteredConversations = conversations.filter(c => {
+    const title = c.title || c.participants?.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
+    return title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const showSearchResults = searchQuery.trim().length > 0;
+
   useEffect(() => {
     handleSearch(searchQuery);
   }, [searchQuery, handleSearch]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (showSearchResults || filteredConversations.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = (selectedIndex + 1) % filteredConversations.length;
+        setSelectedIndex(nextIndex);
+        virtuosoRef.current?.scrollToIndex({ index: nextIndex, align: 'center' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const nextIndex = (selectedIndex - 1 + filteredConversations.length) % filteredConversations.length;
+        setSelectedIndex(nextIndex);
+        virtuosoRef.current?.scrollToIndex({ index: nextIndex, align: 'center' });
+      } else if (e.key === 'Enter') {
+        if (selectedIndex >= 0 && selectedIndex < filteredConversations.length) {
+          e.preventDefault();
+          onOpen(filteredConversations[selectedIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedIndex, filteredConversations, onOpen, showSearchResults]);
 
   const handleSelectUser = async (userId: string) => {
     const conversationId = await startConversation(userId);
@@ -150,13 +187,6 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }, []);
 
-  const filteredConversations = conversations.filter(c => {
-    const title = c.title || c.participants?.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
-    return title.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  const showSearchResults = searchQuery.trim().length > 0;
-
   return (
     <div className="h-full flex flex-col">
       <UserProfile />
@@ -166,6 +196,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
           <input 
+            id="global-search-input" // ID for global shortcut
             type="text" 
             placeholder="Search or start new chat..." 
             className="w-full p-3 pl-10 pr-12 bg-bg-surface rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-accent transition-all shadow-neumorphic-concave"
@@ -192,6 +223,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
           <SearchResults results={searchResults} onSelect={handleSelectUser} />
         ) : (
           <Virtuoso
+            ref={virtuosoRef}
             style={{ height: '100%' }}
             data={filteredConversations}
             components={{
@@ -200,6 +232,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
             }}
             itemContent={(index, c) => {
               const isActive = c.id === activeId;
+              const isSelected = index === selectedIndex;
               const peerUser = !c.isGroup ? c.participants?.find(p => p.id !== meId) : null;
               const title = c.isGroup ? c.title : peerUser?.name || 'Conversation';
               const isOnline = peerUser ? presence.includes(peerUser.id) : false;
@@ -214,6 +247,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 {
                   'bg-bg-surface shadow-neumorphic-pressed': isActive,
                   'shadow-neumorphic-convex hover:shadow-neumorphic-pressed': !isActive,
+                  'ring-2 ring-accent ring-offset-2 ring-offset-bg-main': isSelected,
                 }
               );
 
@@ -264,7 +298,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                         </button>
                       </DropdownMenu.Trigger>
                       <DropdownMenu.Portal>
-                        <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-surface/80 backdrop-blur-sm border border-border rounded-md shadow-lg z-50 p-1">
+                        <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-surface/80 backdrop-blur-sm rounded-md shadow-lg z-50 p-1">
                           {c.isGroup ? (
                             <DropdownMenu.Item 
                               onSelect={() => handleDeleteGroup(c.id)}

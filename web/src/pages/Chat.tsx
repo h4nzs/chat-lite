@@ -100,7 +100,7 @@ export default function Chat() {
 
       {/* Desktop Sidebar (Left) */}
       {isDesktopLayout && (
-        <aside className="hidden md:absolute md:top-0 md:left-0 md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 2xl:w-1/5 h-full bg-bg-surface/80 backdrop-blur-sm flex-col border-r border-border z-10">
+        <aside className="hidden md:absolute md:top-0 md:left-0 md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 2xl:w-1/5 h-full bg-bg-surface/80 backdrop-blur-sm flex-col z-10 shadow-2xl">
           <ChatList 
             activeId={activeId} 
             onOpen={handleSelectConversation}

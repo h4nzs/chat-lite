@@ -32,7 +32,7 @@
     --grad-end: 263 100% 37%;   /* Deep Indigo */
 
     /* Neumorphism Shadows */
-    --shadow-light: 215 25% 18%; /* Lighter version of surface - Made more subtle */
+    --shadow-light: 215 25% 16%; /* Lighter version of surface - Made more subtle */
     --shadow-dark: 222 47% 8%;   /* Darker version of surface */
   }
 

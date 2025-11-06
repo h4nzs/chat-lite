@@ -232,7 +232,7 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content sideOffset={5} align="center" className="min-w-[150px] bg-surface/80 backdrop-blur-sm border border-border rounded-md shadow-lg z-50 p-1">
+              <DropdownMenu.Content sideOffset={5} align="center" className="min-w-[150px] bg-surface/80 backdrop-blur-sm rounded-md shadow-lg z-50 p-1">
                 <DropdownMenu.Item onSelect={() => setReplyingTo(message)} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-secondary rounded cursor-pointer outline-none">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
                   Reply

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2025-11-06
+
+This release introduces major keyboard navigation enhancements for a faster, more accessible user experience, and fixes bugs related to their implementation.
+
+### Added
+
+- **Keyboard Navigation:** Implemented comprehensive keyboard navigation features:
+  - **Chat List Navigation:** Users can now navigate the conversation list using the `Arrow Up` and `Arrow Down` keys and open a chat by pressing `Enter`.
+  - **Global Escape:** Pressing the `Escape` key now closes any open modal or side panel, providing a consistent way to exit views.
+  - **Quick Search Shortcut:** Added a global `Ctrl+K` (or `Cmd+K` on Mac) shortcut to immediately focus the main search bar from anywhere in the app.
+
+### Fixed
+
+- **Keyboard Navigation Bugs:** Resolved several reference and syntax errors in the `ChatList` component that occurred during the implementation of keyboard navigation, ensuring the feature is stable.
+
 ## [1.0.3] - 2025-11-06
 
 This release addresses a critical message loading bug and includes several UI refinements and fixes based on user feedback after the Neumorphic redesign.

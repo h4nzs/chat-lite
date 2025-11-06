@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX } from 'react-icons/fi';
 import React from 'react';
+import { useGlobalEscape } from '../../hooks/useGlobalEscape';
 
 interface ModalBaseProps {
   isOpen: boolean;
@@ -35,6 +36,8 @@ const dropIn = {
 };
 
 const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children, footer }) => {
+  useGlobalEscape(onClose);
+
   return (
     <AnimatePresence>
       {isOpen && (

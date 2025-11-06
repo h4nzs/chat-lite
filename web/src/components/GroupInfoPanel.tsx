@@ -8,6 +8,7 @@ import { api } from '@lib/api';
 import toast from 'react-hot-toast';
 import { toAbsoluteUrl } from '@utils/url';
 import { FiEdit2, FiLogOut, FiPlus, FiX } from 'react-icons/fi';
+import { useGlobalEscape } from '../hooks/useGlobalEscape';
 
 const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; onClose: () => void; }) => {
   const { conversation } = useConversationStore(state => ({
@@ -29,6 +30,8 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
     setIsPanelOpen(false);
     setTimeout(onClose, 300);
   };
+
+  useGlobalEscape(handleClose);
 
   if (!conversation || !conversation.isGroup) {
     return null;

@@ -22,10 +22,19 @@ import DynamicIsland from './components/DynamicIsland';
 import ConnectionStatusBanner from './components/ConnectionStatusBanner'; // Import ConnectionStatusBanner
 import { useThemeStore } from './store/theme';
 import { getSocket } from './lib/socket';
+import { useGlobalShortcut } from './hooks/useGlobalShortcut';
 
 export default function App() {
   const { theme } = useThemeStore();
   const { bootstrap, logout, user } = useAuthStore();
+
+  const focusSearch = () => {
+    const searchInput = document.getElementById('global-search-input');
+    searchInput?.focus();
+  };
+
+  useGlobalShortcut(['Control', 'k'], focusSearch);
+  useGlobalShortcut(['Meta', 'k'], focusSearch); // For macOS
 
   useEffect(() => {
     // This is now the single entry point for app initialization.
