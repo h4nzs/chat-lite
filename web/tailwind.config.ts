@@ -18,6 +18,9 @@ export default {
         'soft': '0 1px 3px 0 hsl(var(--shadow-color) / 0.1), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06)',
         'card': '0 4px 12px hsl(var(--shadow-color) / 0.15)',
       },
+      backgroundImage: {
+        'aurora-gradient': 'linear-gradient(to right, hsl(var(--grad-start)), hsl(var(--grad-end)))',
+      },
       colors: {
         border: 'hsl(var(--border) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',

@@ -215,6 +215,15 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
       decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       set({ messages: { [id]: decryptedItems } });
+
+      // If the first page was not a full page, there are no more messages.
+      if (decryptedItems.length < 50) {
+        set(state => ({ hasMore: { ...state.hasMore, [id]: false } }));
+      } else {
+        // Immediately try to load the previous page to ensure the screen is filled
+        // enough to allow scrolling, which will then trigger further pagination.
+        await get().loadPreviousMessages(id);
+      }
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
       set(state => ({ messages: { ...state.messages, [id]: [] } }));

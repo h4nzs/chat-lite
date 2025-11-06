@@ -29,7 +29,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
   <button
     type="button"
     onClick={onChange}
-    className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full bg-bg-surface shadow-neumorphic-concave transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent`}
+    className={`relative inline-flex items-center h-7 w-12 flex-shrink-0 cursor-pointer rounded-full bg-bg-surface shadow-neumorphic-concave transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent`}
     role="switch"
     aria-checked={checked}
   >
