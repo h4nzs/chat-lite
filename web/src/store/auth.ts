@@ -20,6 +20,7 @@ export type User = {
   description?: string | null;
   avatarUrl?: string | null;
   showEmailToOthers?: boolean;
+  hasCompletedOnboarding?: boolean;
 };
 
 type State = {

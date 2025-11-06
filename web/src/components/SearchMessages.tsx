@@ -42,7 +42,11 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
 
   return (
     <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-text-secondary hover:text-text-primary">
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        aria-label={isOpen ? "Close search" : "Search messages in this conversation"}
+        className="p-2 text-text-secondary hover:text-text-primary"
+      >
         {isOpen ? <FiX /> : <FiSearch />}
       </button>
 

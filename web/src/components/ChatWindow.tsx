@@ -82,10 +82,10 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   return (
     <div className="flex items-center justify-between p-3 border-b border-border">
       <div className="flex items-center gap-3">
-        <button onClick={onMenuClick} className="md:hidden p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
+        <button onClick={onMenuClick} aria-label="Open menu" className="md:hidden p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
-        <button onClick={onBack} className="hidden md:block p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
+        <button onClick={onBack} aria-label="Back to conversation list" className="hidden md:block p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left p-2 -ml-2 rounded-lg transition-colors">
@@ -105,7 +105,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       </div>
       <div className="flex items-center gap-2">
         <SearchMessages conversationId={conversation.id} />
-        <button onClick={openChatInfoModal} className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
+        <button onClick={openChatInfoModal} aria-label="View conversation information" className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         </button>
       </div>
@@ -131,6 +131,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
           <button 
             onClick={() => setReplyingTo(null)} 
+            aria-label="Cancel reply"
             className="absolute top-1 right-1 p-1 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -231,12 +232,12 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           </div>
         )}
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <button type="button" onClick={() => fileInputRef.current?.click()} className={fileButtonClasses}>
+          <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className={fileButtonClasses}>
             <motion.svg 
               whileHover={{ scale: 1.1, rotate: -15 }}
               xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
           </button>
-          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={fileButtonClasses}>
+          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Open emoji picker" className={fileButtonClasses}>
             <motion.div whileHover={{ scale: 1.1 }}>
               <FiSmile size={22} />
             </motion.div>
@@ -260,6 +261,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
             onMouseDown={() => hasText && setIsPressed(true)}
             onMouseUp={() => setIsPressed(false)}
             onMouseLeave={() => setIsPressed(false)}
+            aria-label="Send message"
             className={sendButtonClasses}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>

@@ -43,7 +43,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: (req as any).user.id },
-      select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true, showEmailToOthers: true },
+      select: { id: true, email: true, username: true, name: true, avatarUrl: true, description: true, showEmailToOthers: true, hasCompletedOnboarding: true },
     });
     res.json(user);
   } catch (error) {
@@ -197,5 +197,18 @@ router.get(
     }
   }
 );
+
+// === POST: Mark onboarding as complete ===
+router.post("/me/complete-onboarding", requireAuth, async (req, res, next) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { hasCompletedOnboarding: true },
+    });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

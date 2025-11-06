@@ -70,7 +70,7 @@
   }
   .light[data-accent='blue'] {
     --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 222 47% 11%; /* FIX: Dark text for better contrast */
   }
 
   /* Green */
@@ -90,7 +90,7 @@
   }
   .light[data-accent='purple'] {
     --accent: 262 80% 64%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 222 47% 11%; /* FIX: Dark text for better contrast */
   }
 
   /* Orange */

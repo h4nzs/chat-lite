@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2025-11-06
+
+This release introduces a crucial onboarding experience for new users to familiarize them with the app's key security concepts.
+
+### Added
+
+- **New User Onboarding Tour:** Implemented a multi-step guided tour for first-time users that explains core security features like the Recovery Phrase and Safety Numbers.
+- **Backend Support for Onboarding:** Added a `hasCompletedOnboarding` flag to the user model in the database and created a new API endpoint to track the tour's completion status.
+
+### Fixed
+
+- **Onboarding API Call:** Fixed a `TypeError` that occurred when finishing the tour by correcting the API call syntax.
+- **Server-Side Rendering Issues:** Resolved an issue where a server restart was required for new backend changes to take effect.
+- **Database Schema Validation:** Corrected multiple validation errors in the Prisma schema that were preventing database migrations.
+- **Broken Registration Route:** Restored critical logic in the `/register` API endpoint that was accidentally deleted in a previous modification.
+
 ## [1.0.7] - 2025-11-06
 
 This release introduces theme customization, allowing users to personalize the application by choosing their preferred accent color. It also includes several critical bug fixes for recently added features.

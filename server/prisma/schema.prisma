@@ -19,6 +19,7 @@ model User {
   publicKey        String?
   recoveryPhraseHash String?
   showEmailToOthers Boolean          @default(false)
+  hasCompletedOnboarding Boolean    @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

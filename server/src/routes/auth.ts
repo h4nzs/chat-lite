@@ -99,6 +99,7 @@ router.post(
           username: user.username,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          hasCompletedOnboarding: user.hasCompletedOnboarding,
         },
       });
     } catch (e: any) {
@@ -140,6 +141,7 @@ router.post(
           username: user.username,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          hasCompletedOnboarding: user.hasCompletedOnboarding,
         },
       });
     } catch (e) {
@@ -428,6 +430,7 @@ router.post(
           name: user.name,
           avatarUrl: user.avatarUrl,
           publicKey: user.publicKey,
+          hasCompletedOnboarding: user.hasCompletedOnboarding,
         },
       });
 

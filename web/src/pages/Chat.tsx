@@ -4,9 +4,10 @@ import GroupInfoPanel from '@components/GroupInfoPanel';
 import UserInfoPanel from '@components/UserInfoPanel';
 import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrientation } from '@hooks/useOrientation';
+import OnboardingTour from '@components/OnboardingTour';
 
 export default function Chat() {
   const {
@@ -26,11 +27,19 @@ export default function Chat() {
   }));
   const { user } = useAuthStore(state => ({ user: state.user }));
   const { isLandscape } = useOrientation();
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   const activeConversation = conversations.find(c => c.id === activeId);
   const peerUser = activeConversation && !activeConversation.isGroup 
     ? activeConversation.participants.find(p => p.id !== user?.id) 
     : null;
+
+  // Check if onboarding tour needs to be shown
+  useEffect(() => {
+    if (user && user.hasCompletedOnboarding === false) {
+      setIsTourOpen(true);
+    }
+  }, [user]);
 
   // Load initial conversations and open the last active one
   useEffect(() => {
@@ -62,6 +71,10 @@ export default function Chat() {
       toggleSidebar();
     }
   };
+
+  const handleCloseTour = useCallback(() => {
+    setIsTourOpen(false);
+  }, []);
 
   const isDesktopLayout = window.innerWidth >= 1024 || (window.innerWidth >= 768 && isLandscape);
 
@@ -150,6 +163,8 @@ export default function Chat() {
           </motion.aside>
         )}
       </AnimatePresence>
+
+      <OnboardingTour isOpen={isTourOpen} onClose={handleCloseTour} />
     </div>
   );
 }
