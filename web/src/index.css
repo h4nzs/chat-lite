@@ -26,6 +26,10 @@
     --destructive-foreground: 210 40% 98%;
 
     --shadow-color: 222 47% 5%;
+
+    /* New Aurora Gradient */
+    --grad-start: 180 100% 33%; /* Teal */
+    --grad-end: 263 100% 37%;   /* Deep Indigo */
   }
 
   .light {
@@ -50,6 +54,10 @@
     --destructive-foreground: 210 40% 98%;
 
     --shadow-color: 220 20% 80%;
+
+    /* New Aurora Gradient */
+    --grad-start: 180 100% 33%; /* Teal */
+    --grad-end: 263 100% 37%;   /* Deep Indigo */
   }
 
   html, body, #root {
@@ -88,7 +96,8 @@
 
   /* Primary Button (Accent) */
   .btn-primary {
-    @apply btn bg-accent text-accent-foreground hover:bg-accent/90;
+    @apply btn text-accent-foreground hover:opacity-90;
+    background-image: linear-gradient(to right, hsl(var(--grad-start)), hsl(var(--grad-end)));
   }
 
   /* Secondary Button */

@@ -161,7 +161,7 @@ export default function Settings() {
             </div>
           </div>
           <div className="bg-background p-4 flex justify-end">
-            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center">
+            <button type="submit" disabled={isLoading} className="btn btn-primary">
               {isLoading && <Spinner size="sm" className="mr-2" />} 
               {isLoading ? 'Saving...' : 'Save Profile'}
             </button>
@@ -206,7 +206,7 @@ export default function Settings() {
           </Link>
         </div>
         <div className="bg-background p-4 flex justify-end">
-            <button onClick={handlePrivacySubmit} className="px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center">
+            <button onClick={handlePrivacySubmit} className="btn btn-primary">
               Save Privacy Settings
             </button>
           </div>
@@ -217,7 +217,7 @@ export default function Settings() {
         <div className="p-6">
           <h3 className="text-lg font-semibold text-text-primary mb-2">Notifications</h3>
           <SettingsRow title="Push Notifications" description="Receive notifications for new messages on this device.">
-            <button onClick={handleSubscribePush} className="px-3 py-1.5 text-sm rounded-lg bg-accent text-accent-foreground font-semibold hover:bg-accent/90">
+            <button onClick={handleSubscribePush} className="btn btn-primary px-3 py-1.5 text-sm">
               Enable
             </button>
           </SettingsRow>

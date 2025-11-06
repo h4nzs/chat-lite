@@ -55,7 +55,7 @@ export default function PasswordPromptModal() {
             </button>
             <button
               type="submit"
-              className="w-full py-2 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
+              className="w-full btn btn-primary"
             >
               Continue
             </button>

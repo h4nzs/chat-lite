@@ -74,7 +74,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       />
 
       <button
-        className="w-full py-3 rounded-lg bg-accent text-accent-foreground font-semibold shadow-md hover:bg-accent/90 transition"
+        className="w-full btn btn-primary"
         aria-label={button}
       >
         {button}

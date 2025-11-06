@@ -97,7 +97,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <div>
             <div className="flex items-center gap-2">
               <p className="text-lg font-semibold text-text-primary">{title}</p>
-              {isConvVerified && <FiShield className="text-accent" title="Verified Contact" />} 
+              {isConvVerified && <FiShield className="text-[hsl(var(--grad-start))]" title="Verified Contact" />} 
             </div>
             <p className="text-xs text-text-secondary">{getStatus()}</p>
           </div>
@@ -190,11 +190,9 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   }
 
   const sendButtonClasses = clsx(
-    'p-3 rounded-full text-accent-foreground transition-all duration-200',
+    'btn btn-primary rounded-full p-3 transition-all duration-200',
     {
-      'translate-y-px': isPressed && hasText,
-      'bg-accent': !isPressed,
-      'bg-accent/90': isPressed,
+      'translate-y-px brightness-95': isPressed && hasText,
       'shadow-soft': !isPressed,
       'shadow-inner': isPressed,
       'scale-100 opacity-100': hasText,
@@ -353,6 +351,9 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="flex flex-col h-full bg-gradient-to-b from-bg-main to-bg-surface relative"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}
       >
         {(() => {
           if (error) {

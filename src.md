@@ -1,75 +1,41 @@
-# Roadmap Peningkatan UI/UX
+# Advanced Layout & Composition Roadmap
 
-Dokumen ini menguraikan rencana untuk meningkatkan antarmuka pengguna (UI) dan pengalaman pengguna (UX) aplikasi agar lebih modern, profesional, dan menyenangkan untuk digunakan. Fondasi aplikasi sudah baik, dan sekarang kita akan fokus pada lapisan "poles".
-
----
-
-## 1. Membangun Sistem Desain yang Konsisten
-
-Tujuan: Menciptakan tampilan yang kohesif dan konsisten di seluruh aplikasi.
-
-- **[ ] Definisikan Palet Warna Profesional:**
-  - **Tugas:** Tinjau dan perbarui `tailwind.config.ts`. Definisikan palet warna yang jelas untuk mode terang dan gelap, termasuk warna primer (aksen), sekunder, latar belakang (utama, permukaan), teks (primer, sekunder), dan border.
-  - **Alasan:** Konsistensi warna adalah fondasi dari desain yang baik dan meningkatkan keterbacaan.
-
-- **[ ] Standarisasi Tipografi:**
-  - **Tugas:** Tetapkan skala tipografi yang jelas untuk berbagai elemen teks (judul halaman, nama di daftar obrolan, isi pesan, label tombol). Tentukan ukuran font, ketebalan (font-weight), dan tinggi baris (line-height).
-  - **Alasan:** Tipografi yang konsisten meningkatkan hierarki visual dan membuat konten lebih mudah dibaca.
-
-- **[ ] Terapkan Skala Spasi (Spacing Scale):**
-  - **Tugas:** Gunakan skala spasi yang konsisten (misalnya, kelipatan 4px atau 8px) untuk semua `margin`, `padding`, dan `gap`. Ini dapat dikonfigurasi di `tailwind.config.ts`.
-  - **Alasan:** Menciptakan ritme visual yang teratur dan membuat tata letak terlihat lebih rapi dan terstruktur.
+This document outlines the plan to evolve the application's layout from a standard design to a unique, adaptive, and premium experience across all devices.
 
 ---
 
-## 2. Mendesain Ulang Komponen Kunci
+### **Phase 1: "Floating Glass" Sidebar & Dynamic Background**
 
-Tujuan: Membuat komponen inti lebih menarik secara visual dan lebih informatif.
+**Goal:** To create a sense of depth and a modern aesthetic that becomes the application's signature visual identity.
 
-- **[ ] `ChatItem` (Item dalam Daftar Obrolan):**
-  - **Tugas:** Desain ulang tampilan setiap item. Pertimbangkan untuk menggunakan gradien halus atau bayangan untuk item yang aktif. Tambahkan efek `hover` yang lebih terlihat. Buat indikator "belum dibaca" lebih menonjol.
-  - **Alasan:** Memudahkan pengguna untuk memindai daftar obrolan mereka dan menemukan percakapan yang relevan dengan cepat.
-
-- **[ ] `MessageBubble` (Gelembung Pesan):**
-  - **Tugas:** Perhalus tampilan gelembung pesan. Tambahkan "ekor" pada gelembung untuk menunjukkan arah pesan. Perbaiki spasi di dalam gelembung dan tingkatkan tampilan status pesan (terkirim, dibaca).
-  - **Alasan:** Meningkatkan estetika inti dari aplikasi obrolan dan kejelasan status pesan.
-
-- **[ ] `ChatWindow` (Jendela Obrolan):**
-  - **Tugas:** Desain ulang header `ChatWindow` agar lebih menarik, mungkin dengan menyatukan avatar dan nama dengan lebih baik. Tambahkan latar belakang yang halus (subtle pattern atau gradien) pada area obrolan.
-  - **Alasan:** Membuat area interaksi utama lebih menarik secara visual.
-
-- **[ ] Formulir & Tombol:**
-  - **Tugas:** Standarisasi tampilan semua tombol (primer, sekunder, destruktif) dan input field. Pastikan status `hover`, `focus`, dan `disabled` terlihat jelas dan konsisten.
-  - **Alasan:** Meningkatkan kegunaan dan memberikan umpan balik visual yang jelas kepada pengguna.
+- **Tasks:**
+  1.  **Glass Sidebar:** Transform the `ChatList` (sidebar) on desktop/tablet views into a semi-transparent "glass" panel. This will utilize a `backdrop-blur` effect, allowing the main chat window's background pattern to be subtly visible behind it.
+  2.  **Floating Position:** Position the sidebar to "float" on top of the `ChatWindow`, rather than pushing it to the side. The `ChatWindow` will span the full width of the screen behind the sidebar.
+  3.  **Subtle Background Pattern:** Add a very subtle, repeating SVG pattern to the `ChatWindow` background. This will provide texture and enhance the depth effect when viewed through the glass sidebar.
+- **Reason:** This "glassmorphism" approach is highly modern and will immediately give the app a sophisticated and unique look, setting it apart from other chat applications.
 
 ---
 
-## 3. Menambahkan Interaksi Mikro & Animasi
+### **Phase 2: The Three-Column "Command Center" Layout (for Ultrawide Monitors)**
 
-Tujuan: Membuat aplikasi terasa lebih hidup, responsif, dan modern.
+**Goal:** To leverage extra horizontal screen real estate for an efficient "power user" experience.
 
-- **[ ] Transisi Halus:**
-  - **Tugas:** Terapkan `transition` CSS pada semua elemen interaktif (tombol, tautan, input) untuk perubahan warna dan bayangan yang mulus saat hover atau focus.
-  - **Alasan:** Memberikan pengalaman yang lebih halus dan profesional.
-
-- **[ ] Animasi dengan `framer-motion`:**
-  - **Tugas:** Manfaatkan `framer-motion` (yang sudah menjadi dependensi) untuk menambahkan animasi yang berarti:
-    - Animasi `layout` saat daftar obrolan diurutkan ulang.
-    - Animasi `fade-in` dan `slide-up` saat pesan baru muncul.
-    - Animasi `scale` dan `fade` saat modal muncul dan menghilang.
-    - Animasi saat sidebar mobile terbuka dan tertutup.
-  - **Alasan:** Meningkatkan UX secara signifikan dengan memberikan umpan balik visual yang dinamis dan memandu perhatian pengguna.cd ch  -
+- **Tasks:**
+  1.  **New Breakpoint:** Define a new breakpoint in Tailwind CSS for ultrawide screens (e.g., `2xl`).
+  2.  **Contextual Third Column:** At this new breakpoint, activate a three-column layout:
+      - **Column 1 (Left):** The floating `ChatList` sidebar.
+      - **Column 2 (Center):** The main `ChatWindow`.
+      - **Column 3 (Right):** A context-aware information panel. This panel will automatically display the `GroupInfoPanel` when a group chat is open, or a `UserInfo` panel for direct messages.
+- **Reason:** This drastically reduces the number of clicks needed to access important information and creates a highly productive and immersive desktop experience.
 
 ---
 
-## 4. Peningkatan Aksesibilitas (a11y)
+### **Phase 3: The "Hybrid" Tablet Experience**
 
-Tujuan: Memastikan aplikasi dapat digunakan oleh sebanyak mungkin orang.
+**Goal:** To optimize the user experience on tablets, which are often awkward with standard responsive web layouts.
 
-- **[ ] Status Fokus yang Jelas:**
-  - **Tugas:** Pastikan semua elemen interaktif (tombol, input, tautan) memiliki indikator fokus yang jelas (misalnya, cincin fokus atau outline) saat dinavigasi menggunakan keyboard. Gunakan `focus-visible` dari Tailwind.
-  - **Alasan:** Penting untuk pengguna yang mengandalkan navigasi keyboard.
-
-- **[ ] Kontras Warna:**
-  - **Tugas:** Setelah palet warna baru didefinisikan, periksa kembali rasio kontras antara teks dan latar belakang untuk memastikan keterbacaan, terutama untuk teks sekunder.
-  - **Alasan:** Membantu pengguna dengan gangguan penglihatan untuk menggunakan aplikasi dengan nyaman.
+- **Tasks:**
+  1.  **Orientation Detection:** Implement a React hook to detect the device's orientation (portrait or landscape).
+  2.  **Portrait Mode:** In portrait mode, the app will behave like the mobile layout (single column, slide-out sidebar).
+  3.  **Landscape Mode:** In landscape mode, the app will adopt the new "Floating Glass" desktop layout, providing a richer experience.
+- **Reason:** Instead of simply stretching the mobile layout or shrinking the desktop one, this hybrid approach provides the most optimal and "native" feeling experience for each tablet orientation.

@@ -4,7 +4,7 @@ import { FiShield, FiKey, FiAlertTriangle, FiZap, FiLock, FiHelpCircle } from 'r
 
 const InfoSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-4">
-    <div className="flex-shrink-0 text-accent mt-1">{icon}</div>
+    <div className="flex-shrink-0 text-[hsl(var(--grad-start))] mt-1">{icon}</div>
     <div>
       <h3 className="font-semibold text-text-primary">{title}</h3>
       <div className="text-sm text-text-secondary space-y-2">{children}</div>

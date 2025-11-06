@@ -67,7 +67,7 @@ export default function SafetyNumberModal({
           ) : (
             <button 
               onClick={onVerify}
-              className="w-full mt-4 py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
+              className="w-full mt-4 btn btn-primary"
             >
               Mark as Verified
             </button>

@@ -43,7 +43,7 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-md text-text-primary bg-secondary hover:bg-secondary/80">
             Cancel
           </button>
-          <button type="submit" form="edit-group-form" disabled={isLoading} className="px-4 py-2 rounded-md text-accent-foreground bg-accent hover:bg-accent/90 disabled:opacity-50 flex items-center">
+          <button type="submit" form="edit-group-form" disabled={isLoading} className="btn btn-primary">
             {isLoading && <Spinner size="sm" className="mr-2" />} 
             Save Changes
           </button>

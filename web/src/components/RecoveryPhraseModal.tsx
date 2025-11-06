@@ -64,7 +64,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
       </div>
       <button
         onClick={() => setStep(2)}
-        className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
+        className="w-full btn btn-primary"
       >
         I Understand, Show My Phrase
       </button>
@@ -97,7 +97,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
       </div>
       <button
         onClick={() => setStep(3)}
-        className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold"
+        className="w-full btn btn-primary"
       >
         I've Saved It, Now Verify
       </button>
@@ -133,7 +133,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
         <button
           onClick={handleVerify}
           disabled={userInput.length !== words.length}
-          className="w-full py-3 px-4 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors font-semibold disabled:opacity-50"
+          className="w-full btn btn-primary disabled:opacity-50"
         >
           Verify
         </button>

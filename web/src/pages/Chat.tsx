@@ -1,5 +1,7 @@
 import ChatList from '@components/ChatList';
 import ChatWindow from '@components/ChatWindow';
+import GroupInfoPanel from '@components/GroupInfoPanel';
+import UserInfoPanel from '@components/UserInfoPanel';
 import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { useEffect } from 'react';
@@ -22,6 +24,11 @@ export default function Chat() {
     toggleSidebar: state.toggleSidebar,
   }));
   const { user } = useAuthStore(state => ({ user: state.user }));
+
+  const activeConversation = conversations.find(c => c.id === activeId);
+  const peerUser = activeConversation && !activeConversation.isGroup 
+    ? activeConversation.participants.find(p => p.id !== user?.id) 
+    : null;
 
   // Load initial conversations and open the last active one
   useEffect(() => {
@@ -87,16 +94,16 @@ export default function Chat() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 h-full bg-bg-surface flex-col border-r border-border">
+      {/* Desktop Sidebar (Left) */}
+      <aside className="hidden md:absolute md:top-0 md:left-0 md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 2xl:w-1/5 h-full bg-bg-surface/80 backdrop-blur-sm flex-col border-r border-border z-10">
         <ChatList 
           activeId={activeId} 
           onOpen={handleSelectConversation}
         />
       </aside>
 
-      <main className="flex-1 flex flex-col h-full">
-        {activeId && conversations.some(c => c.id === activeId) ? (
+      <main className="w-full flex-1 flex flex-col h-full md:pl-[33.333333%] lg:pl-[25%] 2xl:pl-[20%]">
+        {activeId && activeConversation ? (
           <ChatWindow key={activeId} id={activeId} onMenuClick={toggleSidebar} />
         ) : (
           <div className="flex-1 flex flex-col h-full">
@@ -116,6 +123,25 @@ export default function Chat() {
           </div>
         )}
       </main>
+
+      {/* Command Center Panel (Right) */}
+      <AnimatePresence>
+        {activeId && activeConversation && (
+           <motion.aside 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="hidden 2xl:flex 2xl:w-1/4 h-full bg-bg-surface flex-col border-l border-border"
+          >
+            {activeConversation.isGroup ? (
+              <GroupInfoPanel conversationId={activeId} onClose={() => {}} />
+            ) : ( peerUser && 
+              <UserInfoPanel userId={peerUser.id} />
+            )}
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

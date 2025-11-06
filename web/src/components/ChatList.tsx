@@ -158,7 +158,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const showSearchResults = searchQuery.trim().length > 0;
 
   return (
-    <div className="h-full flex flex-col bg-bg-surface">
+    <div className="h-full flex flex-col">
       <UserProfile />
       <div className="p-4 border-b border-border">
         <div className="relative flex items-center">
@@ -177,7 +177,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               onClick={openCreateGroupModal} 
               title="New Group Chat" // Tooltip on hover
               aria-label="Create new group chat"
-              className="p-2 rounded-full bg-accent text-accent-foreground hover:bg-accent/80 transition-colors shadow-soft"
+              className="btn btn-primary rounded-full p-2 shadow-soft"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
             </button>
@@ -212,7 +212,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
               const itemClasses = clsx(
                 'relative flex items-center justify-between mx-3 my-2 rounded-lg transition-all duration-200 bg-surface shadow-soft hover:bg-secondary',
                 {
-                  'bg-gradient-to-r from-accent/10 to-surface border-l-4 border-accent shadow-card': isActive,
+                  'bg-gradient-to-r from-[hsl(var(--grad-start)/0.15)] to-surface border-l-4 border-[hsl(var(--grad-start))] shadow-card': isActive,
                 }
               );
 
