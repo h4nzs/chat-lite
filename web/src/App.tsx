@@ -12,7 +12,7 @@ import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/auth';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import ConfirmModal from './components/ConfirmModal';
 import UserInfoModal from './components/UserInfoModal';
 import PasswordPromptModal from './components/PasswordPromptModal';
@@ -27,7 +27,7 @@ import CommandPalette from './components/CommandPalette';
 import { FiLogOut, FiSettings } from 'react-icons/fi';
 
 const AppContent = () => {
-  const { theme } = useThemeStore();
+  const { theme, accent } = useThemeStore();
   const { bootstrap, logout, user } = useAuthStore();
   const openCommandPalette = useCommandPaletteStore(s => s.open);
   const { addCommands, removeCommands } = useCommandPaletteStore(s => ({
@@ -35,6 +35,9 @@ const AppContent = () => {
     removeCommands: s.removeCommands,
   }));
   const navigate = useNavigate();
+
+  const settingsAction = useCallback(() => navigate('/settings'), [navigate]);
+  const logoutAction = useCallback(() => logout(), [logout]);
 
   useGlobalShortcut(['Control', 'k'], openCommandPalette);
   useGlobalShortcut(['Meta', 'k'], openCommandPalette); // For macOS
@@ -44,7 +47,7 @@ const AppContent = () => {
       {
         id: 'settings',
         name: 'Settings',
-        action: () => navigate('/settings'),
+        action: settingsAction,
         icon: <FiSettings />,
         section: 'Navigation',
         keywords: 'preferences options configuration',
@@ -52,7 +55,7 @@ const AppContent = () => {
       {
         id: 'logout',
         name: 'Logout',
-        action: () => logout(),
+        action: logoutAction,
         icon: <FiLogOut />,
         section: 'General',
         keywords: 'sign out exit leave',
@@ -60,7 +63,7 @@ const AppContent = () => {
     ];
     addCommands(commands);
     return () => removeCommands(commands.map(c => c.id));
-  }, [addCommands, removeCommands, navigate, logout]);
+  }, [addCommands, removeCommands, settingsAction, logoutAction]);
 
   useEffect(() => {
     bootstrap();
@@ -81,7 +84,8 @@ const AppContent = () => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
-  }, [theme]);
+    root.dataset.accent = accent;
+  }, [theme, accent]);
 
   return (
     <>

@@ -19,9 +19,6 @@
     --secondary: 217 33% 25%;
     --secondary-foreground: 210 40% 98%;
 
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
-
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
@@ -51,9 +48,6 @@
     --secondary: 220 20% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
-
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
@@ -66,6 +60,47 @@
     /* Neumorphism Shadows */
     --shadow-light: 0 0% 100%;    /* White */
     --shadow-dark: 220 20% 85%;   /* Darker version of surface */
+  }
+
+  /* Accent Color Themes */
+  /* Blue (Default) */
+  :root[data-accent='blue'] {
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
+  }
+  .light[data-accent='blue'] {
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
+  }
+
+  /* Green */
+  :root[data-accent='green'] {
+    --accent: 142 76% 36%;
+    --accent-foreground: 210 40% 98%;
+  }
+  .light[data-accent='green'] {
+    --accent: 142 76% 42%;
+    --accent-foreground: 210 40% 98%;
+  }
+
+  /* Purple */
+  :root[data-accent='purple'] {
+    --accent: 262 80% 58%;
+    --accent-foreground: 210 40% 98%;
+  }
+  .light[data-accent='purple'] {
+    --accent: 262 80% 64%;
+    --accent-foreground: 210 40% 98%;
+  }
+
+  /* Orange */
+  :root[data-accent='orange'] {
+    --accent: 25 95% 53%;
+    --accent-foreground: 210 40% 98%;
+  }
+  .light[data-accent='orange'] {
+    --accent: 25 95% 53%;
+    --accent-foreground: 222 47% 11%; /* Dark text for light mode orange */
   }
 
   html, body, #root {

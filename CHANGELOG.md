@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2025-11-06
+
+This release introduces theme customization, allowing users to personalize the application by choosing their preferred accent color. It also includes several critical bug fixes for recently added features.
+
+### Added
+
+- **Accent Color Customization:** Users can now select their preferred accent color from a palette in the Settings page under the 'Appearance' section. The chosen color is applied across the entire application and is saved for future sessions.
+
+### Fixed
+
+- **Infinite Loop in Components:** Resolved a critical `Maximum update depth exceeded` error by wrapping function declarations in `useCallback` within `App.tsx` and `ChatList.tsx`, preventing infinite re-render loops.
+- **Missing React Import:** Fixed a `ReferenceError` by adding a missing `useCallback` import in `App.tsx`.
+- **Theme Picker UI:** Corrected a UI bug in the Settings page where color swatches were not displaying correctly. The implementation was changed to use inline styles for better reliability.
+
 ## [1.0.6] - 2025-11-06
 
 This release upgrades the `Ctrl+K` shortcut into a full-featured Command Palette, allowing for quick execution of commands from anywhere in the application.

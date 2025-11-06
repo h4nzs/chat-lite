@@ -102,6 +102,8 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     removeCommands: s.removeCommands 
   }));
 
+  const openCreateGroupModal = useCallback(() => setShowGroupModal(true), [setShowGroupModal]);
+
   useEffect(() => {
     const commands = [
       {
@@ -180,8 +182,6 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
     setSearchQuery('');
     setSearchResults([]);
   };
-
-  const openCreateGroupModal = () => setShowGroupModal(true);
 
   const handleDeleteGroup = (id: string) => {
     showConfirm(

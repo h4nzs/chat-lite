@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast';
 import { Spinner } from './Spinner';
 import { toAbsoluteUrl } from '@utils/url';
 import { requestPushPermission } from '@hooks/usePushNotifications';
-import { useThemeStore } from '@store/theme';
+import { useThemeStore, ACCENT_COLORS, AccentColor } from '@store/theme';
 import { FiChevronRight, FiEdit2 } from 'react-icons/fi';
 
 // Reusable component for a single setting row
@@ -42,7 +42,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
 
 export default function Settings() {
   const { user, updateProfile, updateAvatar, sendReadReceipts, setReadReceipts } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme, toggleTheme, accent, setAccent } = useThemeStore();
 
   const [name, setName] = useState(user?.name || '');
   const [description, setDescription] = useState(user?.description || '');
@@ -52,6 +52,13 @@ export default function Settings() {
   const [readReceipts, setReadReceiptsState] = useState(sendReadReceipts);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const colorMap: Record<AccentColor, string> = {
+    blue: 'hsl(217 91% 60%)',
+    green: 'hsl(142 76% 42%)',
+    purple: 'hsl(262 80% 64%)',
+    orange: 'hsl(25 95% 53%)',
+  };
 
   useEffect(() => {
     if (user) {
@@ -177,6 +184,22 @@ export default function Settings() {
           <h3 className="text-lg font-semibold text-text-primary mb-2">Appearance</h3>
           <SettingsRow title="Theme" description="Switch between light and dark mode.">
             <ToggleSwitch checked={theme === 'dark'} onChange={toggleTheme} />
+          </SettingsRow>
+          <div className="border-t border-border my-4"></div>
+          <SettingsRow title="Accent Color" description="Choose your preferred accent color.">
+            <div className="flex items-center gap-3">
+              {ACCENT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setAccent(color)}
+                  style={{ backgroundColor: colorMap[color] }}
+                  className={`w-8 h-8 rounded-full transition-all shadow-neumorphic-convex active:shadow-neumorphic-pressed ${
+                    accent === color ? 'ring-2 ring-offset-2 ring-offset-bg-surface ring-text-primary' : ''
+                  }`}
+                  aria-label={`Set accent color to ${color}`}
+                />
+              ))}
+            </div>
           </SettingsRow>
         </div>
       </SettingsCard>
