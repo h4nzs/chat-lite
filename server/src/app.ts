@@ -85,6 +85,8 @@ app.use(cookieParser());
 app.use(express.json({ limit: "10mb" })); // Naikkan limit untuk payload JSON jika perlu
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/api/sessions", sessionsRouter);
+
 // === CSRF Protection ===
 const csrfProtection = csrf({
   cookie: { httpOnly: true, sameSite: "strict", secure: env.nodeEnv === "production" }

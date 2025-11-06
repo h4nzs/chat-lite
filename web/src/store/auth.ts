@@ -156,12 +156,9 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
     const publicKeyB64 = sodium.to_base64(publicKeyBytes, sodium.base64_variants.ORIGINAL);
 
-    // Hash the phrase for server-side verification
-    const phraseHash = sodium.to_base64(sodium.crypto_generichash(64, phrase));
-
     const res = await api<{ user: User }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhraseHash: phraseHash }),
+      body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhrase: phrase }),
     });
 
     set({ user: res.user });

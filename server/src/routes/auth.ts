@@ -20,6 +20,8 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 
+import sodium from "libsodium-wrappers";
+
 const router = Router();
 
 // WebAuthn
@@ -80,15 +82,23 @@ router.post(
       password: z.string().min(8).max(128),
       name: z.string().min(1).max(80),
       publicKey: z.string(),
-      recoveryPhraseHash: z.string(),
+      recoveryPhrase: z.string(), // Expect the raw phrase from the client
     }),
   }),
   async (req, res, next) => {
     try {
-      const { email, username, password, name, publicKey, recoveryPhraseHash } = req.body;
-      const hash = await bcrypt.hash(password, 10);
+      const { email, username, password, name, publicKey, recoveryPhrase } = req.body;
+
+      // Hash the password for storage
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Hash the recovery phrase and encode it to Base64 for storage
+      await sodium.ready;
+      const phraseHashBytes = sodium.crypto_generichash(64, recoveryPhrase);
+      const recoveryPhraseHash = sodium.to_base64(phraseHashBytes, sodium.base64_variants.ORIGINAL);
+
       const user = await prisma.user.create({
-        data: { email, username, passwordHash: hash, name, publicKey, recoveryPhraseHash },
+        data: { email, username, passwordHash, name, publicKey, recoveryPhraseHash },
       });
       const tokens = await issueTokens(user, req);
       setAuthCookies(res, tokens);
