@@ -6,6 +6,7 @@ import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useOrientation } from '@hooks/useOrientation';
 
 export default function Chat() {
   const {
@@ -24,6 +25,7 @@ export default function Chat() {
     toggleSidebar: state.toggleSidebar,
   }));
   const { user } = useAuthStore(state => ({ user: state.user }));
+  const { isLandscape } = useOrientation();
 
   const activeConversation = conversations.find(c => c.id === activeId);
   const peerUser = activeConversation && !activeConversation.isGroup 
@@ -61,10 +63,12 @@ export default function Chat() {
     }
   };
 
+  const isDesktopLayout = window.innerWidth >= 1024 || (window.innerWidth >= 768 && isLandscape);
+
   return (
     <div className="h-screen w-screen flex bg-bg-main text-text-primary font-sans overflow-hidden">
       <AnimatePresence>
-        {isSidebarOpen && (
+        {isSidebarOpen && !isDesktopLayout && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -78,7 +82,7 @@ export default function Chat() {
 
       {/* Mobile Sidebar */}
       <AnimatePresence>
-        {isSidebarOpen && (
+        {isSidebarOpen && !isDesktopLayout && (
           <motion.aside 
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
@@ -95,25 +99,29 @@ export default function Chat() {
       </AnimatePresence>
 
       {/* Desktop Sidebar (Left) */}
-      <aside className="hidden md:absolute md:top-0 md:left-0 md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 2xl:w-1/5 h-full bg-bg-surface/80 backdrop-blur-sm flex-col border-r border-border z-10">
-        <ChatList 
-          activeId={activeId} 
-          onOpen={handleSelectConversation}
-        />
-      </aside>
+      {isDesktopLayout && (
+        <aside className="hidden md:absolute md:top-0 md:left-0 md:flex w-full max-w-sm md:w-1/3 lg:w-1/4 2xl:w-1/5 h-full bg-bg-surface/80 backdrop-blur-sm flex-col border-r border-border z-10">
+          <ChatList 
+            activeId={activeId} 
+            onOpen={handleSelectConversation}
+          />
+        </aside>
+      )}
 
-      <main className="w-full flex-1 flex flex-col h-full md:pl-[33.333333%] lg:pl-[25%] 2xl:pl-[20%]">
+      <main className={`w-full flex-1 flex flex-col h-full ${isDesktopLayout ? 'md:pl-[33.333333%] lg:pl-[25%] 2xl:pl-[20%]' : ''}`}>
         {activeId && activeConversation ? (
           <ChatWindow key={activeId} id={activeId} onMenuClick={toggleSidebar} />
         ) : (
           <div className="flex-1 flex flex-col h-full">
             {/* Mobile-only header with toggle */}
-            <div className="md:hidden p-4 border-b border-border flex items-center flex-shrink-0">
-              <button onClick={toggleSidebar} className="p-2 text-text-secondary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-              </button>
-              <p className="ml-4 font-semibold">Conversations</p>
-            </div>
+            {!isDesktopLayout && (
+              <div className="md:hidden p-4 border-b border-border flex items-center flex-shrink-0">
+                <button onClick={toggleSidebar} className="p-2 text-text-secondary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <p className="ml-4 font-semibold">Conversations</p>
+              </div>
+            )}
 
             {/* Placeholder Content */}
             <div className="flex-1 flex flex-col gap-4 items-center justify-center text-text-secondary">
@@ -126,7 +134,7 @@ export default function Chat() {
 
       {/* Command Center Panel (Right) */}
       <AnimatePresence>
-        {activeId && activeConversation && (
+        {activeId && activeConversation && isDesktopLayout && (
            <motion.aside 
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
