@@ -33,21 +33,21 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
         <>
           <input
             aria-label="Name"
-            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
             placeholder="Name"
             value={name}
             onChange={(e) => setE(e.target.value)}
           />
           <input
             aria-label="Email"
-            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
             placeholder="Email"
             value={email}
             onChange={(e) => setC(e.target.value)}
           />
           <input
             aria-label="Username"
-            className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
             placeholder="Username"
             value={username}
             onChange={(e) => setD(e.target.value)}
@@ -56,7 +56,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       ) : (
         <input
           aria-label="Email or Username"
-          className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
           placeholder="Email or Username"
           value={emailOrUsername}
           onChange={(e) => setA(e.target.value)}
@@ -66,7 +66,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       <input
         aria-label="Password"
         minLength={8}
-        className="w-full p-3 rounded-lg border bg-background border-border focus:outline-none focus:ring-2 focus:ring-accent"
+        className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
         placeholder="Password"
         type="password"
         value={password}
@@ -74,7 +74,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
       />
 
       <button
-        className="w-full btn btn-primary"
+        className="w-full p-3 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-surface focus:ring-accent"
         aria-label={button}
       >
         {button}

@@ -104,23 +104,23 @@ export default function UserInfoPanel({ userId }: { userId: string }) {
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="p-4 border-b border-border text-center">
+        <div className="p-4 text-center">
             <h2 className="text-lg font-semibold">About {user?.name || 'User'}</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
             {renderContent()}
         </div>
         {user && (
-            <div className="p-4 border-t border-border space-y-2">
+            <div className="p-4 space-y-2">
                 <button
                 onClick={handleViewProfile}
-                className="w-full btn btn-primary"
+                className="w-full p-3 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
                 >
                 View Full Profile
                 </button>
                 <button
                 onClick={handleVerifySecurity}
-                className="w-full btn btn-secondary"
+                className="w-full p-3 rounded-lg font-semibold text-text-primary bg-bg-surface shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
                 >
                 Verify Security
                 </button>

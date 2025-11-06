@@ -39,10 +39,9 @@ export default function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-background text-text-primary p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-surface rounded-2xl shadow-card p-8">
-          <h1 className="text-3xl font-bold text-center text-foreground mb-6">Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-bg-main p-4">
+      <div className="w-full max-w-md bg-bg-surface rounded-xl p-8 shadow-neumorphic-concave">
+        <h1 className="text-3xl font-bold text-center text-foreground mb-6">Login</h1>
           <AuthForm 
             onSubmit={handleLogin}
             button="Login"
@@ -58,18 +57,17 @@ export default function Login() {
               <span>Login with Biometrics</span>
             </button>
           )}
-        </div>
 
-        <div className="text-center mt-6">
-          <p className="text-text-secondary">
-            Don't have an account? <Link to="/register" className="font-semibold text-accent hover:underline">Sign up</Link>
-          </p>
-          <div className="flex justify-center gap-4 mt-4">
-            <Link to="/restore" className="text-sm text-accent hover:underline">Restore from phrase</Link>
-            <Link to="/link-device" className="text-sm text-accent hover:underline">Link a new device</Link>
+          <div className="text-center mt-6">
+            <p className="text-text-secondary">
+              Don't have an account? <Link to="/register" className="font-semibold text-accent hover:underline">Sign up</Link>
+            </p>
+            <div className="flex justify-center gap-4 mt-4">
+              <Link to="/restore" className="text-sm text-accent hover:underline">Restore from phrase</Link>
+              <Link to="/link-device" className="text-sm text-accent hover:underline">Link a new device</Link>
+            </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }

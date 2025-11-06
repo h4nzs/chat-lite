@@ -30,6 +30,10 @@
     /* New Aurora Gradient */
     --grad-start: 180 100% 33%; /* Teal */
     --grad-end: 263 100% 37%;   /* Deep Indigo */
+
+    /* Neumorphism Shadows */
+    --shadow-light: 215 25% 18%; /* Lighter version of surface - Made more subtle */
+    --shadow-dark: 222 47% 8%;   /* Darker version of surface */
   }
 
   .light {
@@ -58,6 +62,10 @@
     /* New Aurora Gradient */
     --grad-start: 180 100% 33%; /* Teal */
     --grad-end: 263 100% 37%;   /* Deep Indigo */
+
+    /* Neumorphism Shadows */
+    --shadow-light: 0 0% 100%;    /* White */
+    --shadow-dark: 220 20% 85%;   /* Darker version of surface */
   }
 
   html, body, #root {
@@ -90,7 +98,7 @@
 @layer components {
   /* Base Button Style */
   .btn {
-    @apply px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors duration-200 flex items-center justify-center;
+    @apply px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors transition-shadow duration-200 flex items-center justify-center;
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
@@ -98,11 +106,19 @@
   .btn-primary {
     @apply btn text-accent-foreground hover:opacity-90;
     background-image: linear-gradient(to right, hsl(var(--grad-start)), hsl(var(--grad-end)));
+    box-shadow: 5px 5px 10px hsl(var(--shadow-dark)), -5px -5px 10px hsl(var(--shadow-light));
+  }
+  .btn-primary:active {
+    box-shadow: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
   }
 
   /* Secondary Button */
   .btn-secondary {
-    @apply btn bg-secondary text-text-primary hover:bg-secondary/80;
+    @apply btn bg-bg-surface text-text-primary hover:bg-secondary/80;
+    box-shadow: 5px 5px 10px hsl(var(--shadow-dark)), -5px -5px 10px hsl(var(--shadow-light));
+  }
+  .btn-secondary:active {
+    box-shadow: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
   }
 
   /* Destructive Button */
@@ -122,3 +138,5 @@
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-bg-surface;
   }
 }
+
+/* Force cache invalidation */

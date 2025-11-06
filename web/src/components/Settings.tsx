@@ -21,7 +21,7 @@ const SettingsRow = ({ title, description, children }: { title: string; descript
 
 // Reusable component for a settings card
 const SettingsCard = ({ children }: { children: React.ReactNode }) => (
-  <div className="bg-surface rounded-xl shadow-soft divide-y divide-border">{children}</div>
+  <div className="bg-bg-surface rounded-xl shadow-neumorphic-concave">{children}</div>
 );
 
 // Toggle Switch Component
@@ -29,13 +29,13 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
   <button
     type="button"
     onClick={onChange}
-    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${checked ? 'bg-accent' : 'bg-secondary'}`}
+    className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full bg-bg-surface shadow-neumorphic-concave transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent`}
     role="switch"
     aria-checked={checked}
   >
     <span
       aria-hidden="true"
-      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'}`}
+      className={`inline-block h-5 w-5 transform rounded-full bg-bg-surface shadow-neumorphic-convex ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-6' : 'translate-x-1'}`}
     />
   </button>
 );
@@ -124,47 +124,49 @@ export default function Settings() {
       {/* Profile Card */}
       <form onSubmit={handleProfileSubmit}>
         <SettingsCard>
-          <div className="p-6 flex items-center gap-6">
-            <div className="relative">
-              <img 
-                src={previewUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
-                alt="Avatar Preview"
-                className="w-24 h-24 rounded-full bg-secondary object-cover border-2 border-border"
-              />
-              <button 
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 bg-accent text-accent-foreground p-2 rounded-full hover:bg-accent/90 transition-opacity"
-                aria-label="Change avatar"
-              >
-                <FiEdit2 size={16} />
+          <div className="p-6 space-y-4">
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <img 
+                  src={previewUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${user.name}`}
+                  alt="Avatar Preview"
+                  className="w-24 h-24 rounded-full bg-secondary object-cover"
+                />
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 bg-bg-surface text-text-primary p-2 rounded-full transition-all shadow-neumorphic-convex active:shadow-neumorphic-pressed"
+                  aria-label="Change avatar"
+                >
+                  <FiEdit2 size={16} />
+                </button>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/gif" className="hidden" />
+              </div>
+              <div className="flex-1 space-y-2">
+                 <input 
+                  type="text"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2 text-xl font-bold bg-bg-surface rounded-lg focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave transition-colors"
+                />
+                <textarea 
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  maxLength={150}
+                  className="w-full p-2 text-sm bg-bg-surface rounded-lg focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave transition-colors resize-none"
+                  placeholder="About me..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                {isLoading && <Spinner size="sm" className="mr-2" />} 
+                {isLoading ? 'Saving...' : 'Save Profile'}
               </button>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/gif" className="hidden" />
             </div>
-            <div className="flex-1 space-y-2">
-               <input 
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-2 text-xl font-bold bg-transparent border-b border-transparent focus:border-border focus:outline-none transition-colors"
-              />
-              <textarea 
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                maxLength={150}
-                className="w-full p-2 text-sm bg-transparent border-b border-transparent focus:border-border focus:outline-none transition-colors resize-none"
-                placeholder="About me..."
-              />
-            </div>
-          </div>
-          <div className="bg-background p-4 flex justify-end">
-            <button type="submit" disabled={isLoading} className="btn btn-primary">
-              {isLoading && <Spinner size="sm" className="mr-2" />} 
-              {isLoading ? 'Saving...' : 'Save Profile'}
-            </button>
           </div>
         </SettingsCard>
       </form>
@@ -181,35 +183,37 @@ export default function Settings() {
 
       {/* Privacy & Security Card */}
       <SettingsCard>
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-2">Privacy & Security</h3>
-          <SettingsRow title="Send Read Receipts" description="Let others know you have read their messages.">
-            <ToggleSwitch checked={readReceipts} onChange={() => setReadReceiptsState(!readReceipts)} />
-          </SettingsRow>
-          <SettingsRow title="Show Email Address" description="Allow others to see your email on your profile.">
-            <ToggleSwitch checked={showEmail} onChange={() => setShowEmail(!showEmail)} />
-          </SettingsRow>
-          <Link to="/settings/keys" className="block w-full text-left">
-            <SettingsRow title="Encryption Keys" description="Manage your end-to-end encryption keys.">
-              <FiChevronRight size={20} className="text-text-secondary" />
+        <div className="p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Privacy & Security</h3>
+            <SettingsRow title="Send Read Receipts" description="Let others know you have read their messages.">
+              <ToggleSwitch checked={readReceipts} onChange={() => setReadReceiptsState(!readReceipts)} />
             </SettingsRow>
-          </Link>
-          <Link to="/settings/sessions" className="block w-full text-left">
-            <SettingsRow title="Active Sessions" description="View and manage where your account is logged in.">
-              <FiChevronRight size={20} className="text-text-secondary" />
+            <SettingsRow title="Show Email Address" description="Allow others to see your email on your profile.">
+              <ToggleSwitch checked={showEmail} onChange={() => setShowEmail(!showEmail)} />
             </SettingsRow>
-          </Link>
-          <Link to="/settings/link-device" className="block w-full text-left">
-            <SettingsRow title="Link a New Device" description="Connect a new device to your account by scanning a QR code.">
-              <FiChevronRight size={20} className="text-text-secondary" />
-            </SettingsRow>
-          </Link>
-        </div>
-        <div className="bg-background p-4 flex justify-end">
-            <button onClick={handlePrivacySubmit} className="btn btn-primary">
-              Save Privacy Settings
-            </button>
+            <Link to="/settings/keys" className="block w-full text-left">
+              <SettingsRow title="Encryption Keys" description="Manage your end-to-end encryption keys.">
+                <FiChevronRight size={20} className="text-text-secondary" />
+              </SettingsRow>
+            </Link>
+            <Link to="/settings/sessions" className="block w-full text-left">
+              <SettingsRow title="Active Sessions" description="View and manage where your account is logged in.">
+                <FiChevronRight size={20} className="text-text-secondary" />
+              </SettingsRow>
+            </Link>
+            <Link to="/settings/link-device" className="block w-full text-left">
+              <SettingsRow title="Link a New Device" description="Connect a new device to your account by scanning a QR code.">
+                <FiChevronRight size={20} className="text-text-secondary" />
+              </SettingsRow>
+            </Link>
           </div>
+          <div className="flex justify-end">
+              <button onClick={handlePrivacySubmit} className="px-4 py-2 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
+                Save Privacy Settings
+              </button>
+            </div>
+        </div>
       </SettingsCard>
       
       {/* Notifications Card */}
@@ -217,7 +221,7 @@ export default function Settings() {
         <div className="p-6">
           <h3 className="text-lg font-semibold text-text-primary mb-2">Notifications</h3>
           <SettingsRow title="Push Notifications" description="Receive notifications for new messages on this device.">
-            <button onClick={handleSubscribePush} className="btn btn-primary px-3 py-1.5 text-sm">
+            <button onClick={handleSubscribePush} className="px-4 py-2 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all text-sm">
               Enable
             </button>
           </SettingsRow>

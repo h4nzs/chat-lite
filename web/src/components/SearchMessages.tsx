@@ -47,7 +47,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
       </button>
 
       {isOpen && (
-        <div className="absolute top-12 right-0 w-72 rounded-lg border border-border bg-bg-surface/80 backdrop-blur-lg shadow-lg z-50">
+        <div className="absolute top-12 right-0 w-72 rounded-lg bg-bg-surface shadow-neumorphic-convex z-50">
           <form onSubmit={(e) => e.preventDefault()} className="p-2 border-b border-border">
             <input
               ref={inputRef}
@@ -55,7 +55,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
               value={searchQuery}
               onChange={handleSearchChange}
               placeholder="Search messages..."
-              className="w-full bg-bg-primary px-3 py-2 rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-color"
+              className="w-full bg-transparent p-3 rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave"
             />
           </form>
           <div className="max-h-80 overflow-y-auto">

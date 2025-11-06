@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2025-11-06
+
+This release completes the transition to a full Neumorphic design system, ensuring a consistent and tactile UI across the entire application. It also includes several configuration and bug fixes.
+
+### Changed (Improvements & Refactors)
+
+- **Neumorphic Design System:** Completed the full implementation of the Neumorphic design system, replacing all remaining standard UI elements.
+- **Component Styling:** Refactored all major components to use `convex` (protruding) and `concave` (recessed) neumorphic styles, including: Modals, Panels, Cards, List Items, Message Bubbles, Buttons, and Input Fields.
+- **Toggle Switch Redesign:** Rebuilt all Toggle Switches to be fully neumorphic, with a concave track and a convex handle for a more tactile feel.
+- **Dark Mode Tuning:** Fine-tuned dark mode neumorphic shadows to be more subtle and visually pleasing based on user feedback.
+
+### Fixed
+
+- **Build Failure:** Fixed a build error caused by a missing `colors` definition in the Tailwind CSS configuration.
+- **JSX Syntax Errors:** Corrected JSX parsing errors in `Register.tsx` and `Login.tsx` that prevented the application from loading.
+- **Corrupted Component:** Repaired the `MessageBubble.tsx` component file which contained duplicate, conflicting code.
+
 ## [1.0.1] - 2025-11-06
 
 This release focuses on a significant UI/UX overhaul, introducing a unique visual identity and advanced responsive layouts.

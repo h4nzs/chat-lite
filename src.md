@@ -1,41 +1,53 @@
-# Advanced Layout & Composition Roadmap
+# Roadmap Implementasi: "Neumorphism Gradien"
 
-This document outlines the plan to evolve the application's layout from a standard design to a unique, adaptive, and premium experience across all devices.
-
----
-
-### **Phase 1: "Floating Glass" Sidebar & Dynamic Background**
-
-**Goal:** To create a sense of depth and a modern aesthetic that becomes the application's signature visual identity.
-
-- **Tasks:**
-  1.  **Glass Sidebar:** Transform the `ChatList` (sidebar) on desktop/tablet views into a semi-transparent "glass" panel. This will utilize a `backdrop-blur` effect, allowing the main chat window's background pattern to be subtly visible behind it.
-  2.  **Floating Position:** Position the sidebar to "float" on top of the `ChatWindow`, rather than pushing it to the side. The `ChatWindow` will span the full width of the screen behind the sidebar.
-  3.  **Subtle Background Pattern:** Add a very subtle, repeating SVG pattern to the `ChatWindow` background. This will provide texture and enhance the depth effect when viewed through the glass sidebar.
-- **Reason:** This "glassmorphism" approach is highly modern and will immediately give the app a sophisticated and unique look, setting it apart from other chat applications.
+Tujuan dari fase ini adalah untuk mengintegrasikan prinsip-prinsip desain Neumorphism ke dalam UI aplikasi, menciptakan tampilan yang taktil, modern, dan menyatu dengan baik dengan efek "Floating Glass" dan tema gradien "Aurora" yang sudah ada.
 
 ---
 
-### **Phase 2: The Three-Column "Command Center" Layout (for Ultrawide Monitors)**
+### **Fase 1: Definisikan Utilitas Bayangan Neumorphic**
 
-**Goal:** To leverage extra horizontal screen real estate for an efficient "power user" experience.
+**Tujuan:** Membuat kelas utilitas di Tailwind CSS untuk menerapkan efek neumorphism dengan mudah di seluruh aplikasi.
 
-- **Tasks:**
-  1.  **New Breakpoint:** Define a new breakpoint in Tailwind CSS for ultrawide screens (e.g., `2xl`).
-  2.  **Contextual Third Column:** At this new breakpoint, activate a three-column layout:
-      - **Column 1 (Left):** The floating `ChatList` sidebar.
-      - **Column 2 (Center):** The main `ChatWindow`.
-      - **Column 3 (Right):** A context-aware information panel. This panel will automatically display the `GroupInfoPanel` when a group chat is open, or a `UserInfo` panel for direct messages.
-- **Reason:** This drastically reduces the number of clicks needed to access important information and creates a highly productive and immersive desktop experience.
+- **Tugas:**
+  1.  **Analisis Warna Bayangan:** Untuk setiap warna latar (`--bg-surface`, `--bg-main`), kita perlu mendefinisikan versi yang sedikit lebih gelap dan sedikit lebih terang untuk digunakan sebagai bayangan.
+  2.  **Buat Utilitas di `tailwind.config.ts`:**
+      - `shadow-neumorphic-convex`: Untuk elemen yang "menonjol". Ini akan menerapkan `box-shadow` dengan dua bayangan (gelap di kanan bawah, terang di kiri atas).
+      - `shadow-neumorphic-concave`: Untuk elemen yang "tenggelam". Ini akan menerapkan `box-shadow` inset (bayangan ke dalam).
+      - `shadow-neumorphic-pressed`: Varian dari `concave` untuk status tombol saat ditekan.
+- **Alasan:** Dengan mendefinisikan ini sebagai utilitas, kita dapat menerapkan gaya yang kompleks dan konsisten hanya dengan menambahkan satu kelas, membuat proses refactoring komponen menjadi cepat dan efisien.
 
 ---
 
-### **Phase 3: The "Hybrid" Tablet Experience**
+### **Fase 2: Refactor Komponen "Tenggelam" (Concave)**
 
-**Goal:** To optimize the user experience on tablets, which are often awkward with standard responsive web layouts.
+**Tujuan:** Menerapkan efek "tenggelam" pada semua elemen input dan kontainer statis.
 
-- **Tasks:**
-  1.  **Orientation Detection:** Implement a React hook to detect the device's orientation (portrait or landscape).
-  2.  **Portrait Mode:** In portrait mode, the app will behave like the mobile layout (single column, slide-out sidebar).
-  3.  **Landscape Mode:** In landscape mode, the app will adopt the new "Floating Glass" desktop layout, providing a richer experience.
-- **Reason:** Instead of simply stretching the mobile layout or shrinking the desktop one, this hybrid approach provides the most optimal and "native" feeling experience for each tablet orientation.
+- **Tugas:**
+  1.  **Input Pesan & Pencarian:** Ubah `MessageInput` dan `Search` bar di `ChatList` untuk menggunakan `shadow-neumorphic-concave`. Latar belakangnya akan dibuat sama dengan latar belakang utama (`bg-main` atau `bg-surface`), dan bentuknya akan diciptakan oleh bayangan ke dalam.
+  2.  **Kartu (Cards):** Terapkan efek `concave` pada `SettingsCard` dan kartu utama di halaman `Login`/`Register`. Ini akan membuat mereka terlihat seperti "terukir" di latar belakang.
+  3.  **Area Balasan Pesan:** Kontainer yang menampilkan pesan yang sedang dibalas (`ReplyPreview`) juga akan menggunakan gaya `concave`.
+- **Alasan:** Ini akan menciptakan hierarki visual di mana elemen interaktif (input) dan kontainer informasi terlihat berbeda dari tombol aksi.
+
+---
+
+### **Fase 3: Refactor Komponen "Menonjol" (Convex)**
+
+**Tujuan:** Menerapkan efek "menonjol" pada semua tombol aksi dan elemen interaktif.
+
+- **Tugas:**
+  1.  **Tombol Utama:** Ubah semua tombol (`.btn-primary`, `.btn-secondary`) untuk menggunakan `shadow-neumorphic-convex`. Gradien "Aurora" akan tetap ada di `.btn-primary`, menciptakan efek tombol gradien yang menonjol.
+  2.  **Gelembung Pesan (`MessageBubble`):** Terapkan efek `convex` pada gelembung pesan. Ini akan membuat setiap pesan terlihat seperti objek fisik yang lembut di layar.
+  3.  **Item Daftar (`ChatItem`):** Berikan `ChatItem` di `ChatList` efek `convex` yang halus. Saat aktif, kita bisa mengubah bayangannya agar terlihat lebih menonjol.
+  4.  **Tombol Ikon:** Tombol "Kirim", "Emoji", "File", dan tombol ikon lainnya akan menjadi target utama untuk efek `convex`.
+- **Alasan:** Ini akan memberikan umpan balik taktil yang jelas kepada pengguna, di mana tombol-tombol terlihat seolah-olah mereka dapat benar-benar ditekan.
+
+---
+
+### **Fase 4: Status "Pressed" & Transisi**
+
+**Tujuan:** Menyempurnakan interaksi dengan menambahkan status "ditekan" yang memuaskan.
+
+- **Tugas:**
+  1.  **Implementasi Status `:active`:** Untuk semua tombol `convex`, saat `:active` (ditekan), ganti `shadow-neumorphic-convex` dengan `shadow-neumorphic-pressed`.
+  2.  **Transisi Halus:** Pastikan ada `transition` yang mulus pada properti `box-shadow` sehingga perubahan dari menonjol ke ditekan terasa seperti animasi yang lembut.
+- **Alasan:** Umpan balik visual saat menekan tombol sangat penting dalam desain neumorphic untuk meniru interaksi dengan objek fisik.

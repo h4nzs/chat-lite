@@ -80,8 +80,8 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
         aria-hidden="true"
       ></div>
 
-      <div className={`absolute top-0 right-0 h-full w-full max-w-md bg-bg-surface border-l border-border z-50 flex flex-col transition-transform duration-300 ease-in-out ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <header className="p-4 border-b border-border flex items-center flex-shrink-0">
+      <div className={`absolute top-0 right-0 h-full w-full max-w-md bg-bg-surface shadow-neumorphic-convex z-50 flex flex-col transition-transform duration-300 ease-in-out ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <header className="p-4 flex items-center flex-shrink-0">
           <button onClick={handleClose} className="p-2 -ml-2 mr-2 text-text-secondary hover:text-text-primary">
             <FiX size={24} />
           </button>
@@ -90,7 +90,7 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
 
         <main className="flex-1 overflow-y-auto bg-bg-main p-4 md:p-6 space-y-6">
           {/* Group Identity Card */}
-          <div className="bg-bg-surface rounded-xl shadow-soft p-6 text-center relative">
+          <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex p-6 text-center relative">
             <div className="relative w-24 h-24 mx-auto mb-4">
               <img 
                 src={avatarSrc}
@@ -116,13 +116,13 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
           </div>
 
           {/* Members Card */}
-          <div className="bg-bg-surface rounded-xl shadow-soft">
+          <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
             <div className="p-6 border-b border-border">
               <h4 className="text-lg font-semibold text-text-primary">{conversation.participants.length} Members</h4>
               {amIAdmin && (
                 <button 
                   onClick={() => setIsAddParticipantModalOpen(true)}
-                  className="w-full flex items-center justify-center p-2 mt-4 rounded-lg bg-transparent border border-dashed border-border text-accent-color hover:bg-secondary transition-colors"
+                  className="w-full flex items-center justify-center p-3 mt-4 rounded-lg text-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
                 >
                   <FiPlus className="mr-2" />
                   <span>Add Participants</span>
@@ -133,13 +133,13 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
           </div>
 
           {/* Actions Card */}
-          <div className="bg-bg-surface rounded-xl shadow-soft">
+          <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
              <button 
               onClick={handleLeaveGroup}
-              className="w-full flex items-center p-4 text-red-500 hover:bg-red-500/10 transition-colors rounded-xl"
+              className="w-full flex items-center justify-center p-4 font-semibold text-red-500 shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all rounded-xl"
             >
               <FiLogOut className="mr-3" />
-              <span className="font-semibold">Leave Group</span>
+              <span>Leave Group</span>
             </button>
           </div>
         </main>

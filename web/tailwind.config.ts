@@ -11,6 +11,13 @@ export default {
       '2xl': '1920px',
     },
     extend: {
+      boxShadow: {
+        'neumorphic-convex': '5px 5px 10px hsl(var(--shadow-dark)), -5px -5px 10px hsl(var(--shadow-light))',
+        'neumorphic-concave': 'inset 5px 5px 10px hsl(var(--shadow-dark)), inset -5px -5px 10px hsl(var(--shadow-light))',
+        'neumorphic-pressed': 'inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light))',
+        'soft': '0 1px 3px 0 hsl(var(--shadow-color) / 0.1), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06)',
+        'card': '0 4px 12px hsl(var(--shadow-color) / 0.15)',
+      },
       colors: {
         border: 'hsl(var(--border) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
@@ -39,10 +46,6 @@ export default {
         'bg-surface': 'hsl(var(--bg-surface) / <alpha-value>)',
         'text-primary': 'hsl(var(--text-primary) / <alpha-value>)',
         'text-secondary': 'hsl(var(--text-secondary) / <alpha-value>)',
-      },
-      boxShadow: {
-        'soft': '0 1px 3px 0 hsl(var(--shadow-color) / 0.1), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06)',
-        'card': '0 4px 12px hsl(var(--shadow-color) / 0.15)',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

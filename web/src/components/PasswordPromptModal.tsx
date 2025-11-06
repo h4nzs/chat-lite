@@ -36,13 +36,11 @@ export default function PasswordPromptModal() {
           <div className="mb-4">
             <label htmlFor="password-prompt" className="sr-only">Password</label>
             <input
-              id="password-prompt"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent text-text-primary"
-              placeholder="Enter your password..."
-              autoFocus
+              className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave mb-4"
+              placeholder="Enter your password"
             />
           </div>
           <div className="flex gap-3">

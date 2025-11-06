@@ -47,15 +47,13 @@ export default function Register() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background text-text-primary p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-surface rounded-2xl shadow-card p-8">
-          <h1 className="text-3xl font-bold text-center text-foreground mb-6">Sign Up</h1>
-          <AuthForm 
-            onSubmit={handleRegister}
-            button="Sign Up"
-          />
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-bg-main p-4">
+      <div className="w-full max-w-md bg-bg-surface rounded-xl p-8 shadow-neumorphic-concave">
+        <h1 className="text-3xl font-bold text-center text-foreground mb-6">Register</h1>
+        <AuthForm 
+          onSubmit={handleRegister}
+          button="Sign Up"
+        />
         <div className="text-center mt-6">
           <p className="text-text-secondary">
             Already have an account? <Link to="/login" className="font-semibold text-accent hover:underline">Login</Link>

@@ -99,12 +99,12 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
       )}
     >
       <div className="flex flex-col gap-4">
-        <input
-          type="text"
+        <input 
+          type="text" 
+          placeholder="Group Name"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Group Name"
-          className="w-full p-3 border border-border bg-background text-text-primary rounded-lg"
+          className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave mb-4"
         />
         
         <div className="relative">

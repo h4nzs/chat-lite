@@ -82,13 +82,13 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   return (
     <div className="flex items-center justify-between p-3 border-b border-border">
       <div className="flex items-center gap-3">
-        <button onClick={onMenuClick} className="md:hidden p-2 rounded-full hover:bg-secondary">
+        <button onClick={onMenuClick} className="md:hidden p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
-        <button onClick={onBack} className="hidden md:block p-2 rounded-full hover:bg-secondary">
+        <button onClick={onBack} className="hidden md:block p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left p-2 -ml-2 rounded-lg hover:bg-secondary transition-colors">
+        <button onClick={handleHeaderClick} className="flex items-center gap-3 text-left p-2 -ml-2 rounded-lg transition-colors">
           <img
             src={toAbsoluteUrl(avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`}
             alt="Avatar"
@@ -105,7 +105,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       </div>
       <div className="flex items-center gap-2">
         <SearchMessages conversationId={conversation.id} />
-        <button onClick={openChatInfoModal} className="p-2 rounded-full hover:bg-secondary">
+        <button onClick={openChatInfoModal} className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         </button>
       </div>
@@ -126,12 +126,12 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   
     return (
       <div className="px-4 pt-3">
-        <div className="relative bg-secondary p-2 rounded-lg border-l-4 border-accent">
-          <p className="text-xs font-bold text-accent">Replying to {authorName}</p>
+        <div className="relative bg-bg-surface p-2 rounded-lg shadow-neumorphic-concave">
+          <p className="text-xs font-bold text-accent border-l-4 border-accent pl-2">Replying to {authorName}</p>
           <p className="text-sm text-text-secondary truncate">{contentPreview}</p>
           <button 
             onClick={() => setReplyingTo(null)} 
-            className="absolute top-1 right-1 p-1 rounded-full hover:bg-secondary"
+            className="absolute top-1 right-1 p-1 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
@@ -190,26 +190,25 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   }
 
   const sendButtonClasses = clsx(
-    'btn btn-primary rounded-full p-3 transition-all duration-200',
+    'bg-accent text-white rounded-full p-3 transition-all duration-200 shadow-neumorphic-convex',
     {
       'translate-y-px brightness-95': isPressed && hasText,
-      'shadow-soft': !isPressed,
-      'shadow-inner': isPressed,
+      'active:shadow-neumorphic-pressed': hasText,
       'scale-100 opacity-100': hasText,
       'scale-90 opacity-60 cursor-not-allowed': !hasText,
     }
   );
 
   const textInputClasses = clsx(
-    'flex-1 bg-secondary px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent',
-    'shadow-inner' // Use inner shadow for recessed look
+    'flex-1 bg-bg-surface px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent',
+    'shadow-neumorphic-concave' // Use inner shadow for recessed look
   );
 
   const fileButtonClasses = clsx(
     'p-2 rounded-full text-text-secondary transition-all duration-150',
     'hover:text-accent',
-    'shadow-soft', // Use soft shadow for elevated look
-    'active:shadow-inner' // Use inner shadow for pressed state
+    'shadow-neumorphic-convex', // Use soft shadow for elevated look
+    'active:shadow-neumorphic-pressed' // Use inner shadow for pressed state
   );
 
   return (
@@ -220,7 +219,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <LinkPreviewCard preview={typingLinkPreview} />
         </div>
       )}
-      <div className="p-4 bg-bg-surface shadow-card rounded-t-xl relative"> {/* Added relative positioning */}
+      <div className="p-4 bg-bg-surface shadow-neumorphic-convex rounded-t-xl relative"> {/* Added relative positioning */}
         {showEmojiPicker && (
           <div ref={emojiPickerRef} className="absolute bottom-full mb-2">
             <EmojiPicker 

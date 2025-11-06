@@ -51,16 +51,16 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
-            className="relative w-full max-w-md bg-bg-surface rounded-xl shadow-card flex flex-col max-h-[90vh]"
+            className="relative w-full max-w-md bg-bg-surface rounded-xl shadow-neumorphic-convex flex flex-col max-h-[90vh]"
             onMouseDown={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center justify-between p-4">
               <h2 id="modal-title" className="text-lg font-semibold text-text-primary">{title}</h2>
               <button 
                 onClick={onClose} 
                 aria-label="Close modal"
-                className="p-1 rounded-full text-text-secondary hover:bg-secondary"
+                className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
               >
                 <FiX size={20} />
               </button>
@@ -73,7 +73,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
 
             {/* Footer */}
             {footer && (
-              <div className="flex justify-end gap-3 p-4 border-t border-border bg-background rounded-b-xl">
+              <div className="flex justify-end gap-3 p-4 bg-bg-surface rounded-b-xl">
                 {footer}
               </div>
             )}
