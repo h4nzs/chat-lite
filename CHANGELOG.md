@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2025-11-06
+
+This release focuses on improving UI clarity and accessibility.
+
+### Changed
+
+- **Message Bubble Styling:** Adjusted the styling of self-sent messages. The chosen accent color is now applied to the message bubble's background instead of the text, improving visual distinction.
+
+### Fixed
+
+- **Accessibility:** 
+  - Added descriptive `aria-label` attributes to all icon-only buttons across the application to improve screen reader compatibility.
+  - Fixed color contrast issues in the light theme for the blue and purple accent colors to ensure text remains readable.
+- **Performance:** Resolved a critical performance issue that caused high CPU usage when the onboarding modal was displayed by fixing a re-render loop.
+
 ## [1.0.8] - 2025-11-06
 
 This release introduces a crucial onboarding experience for new users to familiarize them with the app's key security concepts.

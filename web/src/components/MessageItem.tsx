@@ -71,7 +71,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
     'relative max-w-md md:max-w-lg',
     hasBubbleStyle && `px-4 py-2.5 shadow-neumorphic-convex`,
     {
-      'bg-bg-surface text-accent': mine,
+      'bg-accent text-accent-foreground': mine,
       'bg-bg-surface text-text-primary': !mine,
       // Add a "tail" to the last message in a sequence
       'rounded-t-2xl': true,
