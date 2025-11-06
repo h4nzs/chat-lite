@@ -85,21 +85,15 @@ app.use(cookieParser());
 app.use(express.json({ limit: "10mb" })); // Naikkan limit untuk payload JSON jika perlu
 app.use(express.urlencoded({ extended: true }));
 
+// Public routes that don't need CSRF protection
+app.use("/api/keys", keysRouter);
 app.use("/api/sessions", sessionsRouter);
 
 // === CSRF Protection ===
 const csrfProtection = csrf({
   cookie: { httpOnly: true, sameSite: "strict", secure: env.nodeEnv === "production" }
 });
-
-// Apply CSRF protection conditionally, exempting the public key verification route
-app.use((req, res, next) => {
-  const exemptedPaths = ['/api/keys/verify', '/api/auth/finalize-linking'];
-  if (exemptedPaths.includes(req.originalUrl)) {
-    return next();
-  }
-  csrfProtection(req, res, next);
-});
+app.use(csrfProtection);
 
 // === ROUTE FOR CSRF TOKEN ===
 app.get("/api/csrf-token", (req: Request, res: Response) => {
@@ -137,7 +131,6 @@ app.use("/api/users", usersRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/uploads", uploadsRouter);
-app.use("/api/keys", keysRouter);
 app.use("/api/previews", previewsRouter);
 app.use("/api/session-keys", sessionKeysRouter);
 app.use("/api/sessions", sessionsRouter);

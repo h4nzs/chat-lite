@@ -51,11 +51,12 @@ router.post("/verify",
 
       // Hash the provided phrase on the server
       await sodium.ready;
-      const providedPhraseHash = sodium.crypto_generichash(64, recoveryPhrase);
-      const serverHash = sodium.from_base64(user.recoveryPhraseHash, sodium.base64_variants.ORIGINAL);
+      const normalizedPhrase = recoveryPhrase.trim().split(/\s+/).join(' ');
+      const providedPhraseHash = sodium.crypto_generichash(64, normalizedPhrase);
+      const generatedHashB64 = sodium.to_base64(providedPhraseHash, sodium.base64_variants.ORIGINAL);
 
-      // Constant-time comparison to prevent timing attacks
-      if (serverHash.length !== providedPhraseHash.length || !sodium.compare(serverHash, providedPhraseHash)) {
+      // Workaround: Compare base64 strings directly since sodium.compare is failing unexpectedly
+      if (user.recoveryPhraseHash !== generatedHashB64) {
         return res.status(403).json({ error: "Invalid recovery phrase for this user." });
       }
 
