@@ -10,6 +10,7 @@ import SafetyNumberModal from './SafetyNumberModal';
 import { useConversationStore } from '@store/conversation';
 import { useVerificationStore } from '@store/verification';
 import ModalBase from './ui/ModalBase';
+import MediaGallery from './MediaGallery';
 
 // The user type for the profile modal can have an optional email and public key
 type ProfileUser = User & { email?: string; publicKey?: string };
@@ -24,6 +25,7 @@ export default function UserInfoModal() {
   const [error, setError] = useState<string | null>(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyNumber, setSafetyNumber] = useState('');
+  const [activeTab, setActiveTab] = useState('about');
 
   const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
 
@@ -111,24 +113,53 @@ export default function UserInfoModal() {
         isOpen={isProfileModalOpen}
         onClose={closeProfileModal}
         title={user?.name || 'User Profile'}
-        footer={user && (
-          <div className="w-full flex flex-col space-y-2">
+      >
+        <div className="flex flex-col gap-4">
+          {/* Tab Switcher */}
+          <div className="flex space-x-2 bg-bg-main p-1 rounded-full shadow-neumorphic-concave">
             <button
-              onClick={handleViewProfile}
-              className="w-full px-4 py-2 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
+              onClick={() => setActiveTab('about')}
+              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'about' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
             >
-              View Full Profile
+              About
             </button>
             <button
-              onClick={handleVerifySecurity}
-              className="w-full px-4 py-2 rounded-md bg-secondary text-text-primary hover:bg-secondary/80 transition-colors"
+              onClick={() => setActiveTab('media')}
+              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'media' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
             >
-              Verify Security
+              Media
             </button>
           </div>
-        )}
-      >
-        {renderContent()}
+
+          {/* Tab Content */}
+          {activeTab === 'about' && (
+            <>
+              {renderContent()}
+              {user && (
+                <div className="w-full flex flex-col space-y-2 pt-4 border-t border-border">
+                  <button
+                    onClick={handleViewProfile}
+                    className="w-full p-3 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                  >
+                    View Full Profile
+                  </button>
+                  <button
+                    onClick={handleVerifySecurity}
+                    className="w-full p-3 rounded-lg font-semibold text-text-primary bg-bg-surface shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                  >
+                    Verify Security
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'media' && activeId && (
+            <div className="min-h-[300px]">
+              <MediaGallery conversationId={activeId} />
+            </div>
+          )}
+        </div>
       </ModalBase>
       
       {showSafetyModal && user && (

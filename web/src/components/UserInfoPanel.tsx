@@ -8,7 +8,6 @@ import { generateSafetyNumber, importPublicKey } from '@utils/keyManagement';
 import SafetyNumberModal from './SafetyNumberModal';
 import { useConversationStore } from '@store/conversation';
 import { useVerificationStore } from '@store/verification';
-import MediaGallery from './MediaGallery';
 
 // The user type for the profile panel can have an optional email and public key
 type ProfileUser = User & { email?: string; publicKey?: string };
@@ -22,7 +21,6 @@ export default function UserInfoPanel({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyNumber, setSafetyNumber] = useState('');
-  const [activeTab, setActiveTab] = useState('about');
 
   const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
 
@@ -106,57 +104,28 @@ export default function UserInfoPanel({ userId }: { userId: string }) {
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="p-4 text-center border-b border-border">
+        <div className="p-4 text-center">
             <h2 className="text-lg font-semibold">About {user?.name || 'User'}</h2>
         </div>
-
-        <div className="p-4">
-          <div className="flex space-x-2 bg-bg-main p-1 rounded-full shadow-neumorphic-concave">
-            <button
-              onClick={() => setActiveTab('about')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'about' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-            >
-              About
-            </button>
-            <button
-              onClick={() => setActiveTab('media')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'media' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-            >
-              Media
-            </button>
-          </div>
+        <div className="flex-1 overflow-y-auto">
+            {renderContent()}
         </div>
-
-        {activeTab === 'about' && (
-          <>
-            <div className="flex-1 overflow-y-auto">
-                {renderContent()}
+        {user && (
+            <div className="p-4 space-y-2">
+                <button
+                onClick={handleViewProfile}
+                className="w-full p-3 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                >
+                View Full Profile
+                </button>
+                <button
+                onClick={handleVerifySecurity}
+                className="w-full p-3 rounded-lg font-semibold text-text-primary bg-bg-surface shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                >
+                Verify Security
+                </button>
             </div>
-            {user && (
-                <div className="p-4 space-y-2 border-t border-border">
-                    <button
-                    onClick={handleViewProfile}
-                    className="w-full p-3 rounded-lg font-semibold text-white bg-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
-                    >
-                    View Full Profile
-                    </button>
-                    <button
-                    onClick={handleVerifySecurity}
-                    className="w-full p-3 rounded-lg font-semibold text-text-primary bg-bg-surface shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
-                    >
-                    Verify Security
-                    </button>
-                </div>
-            )}
-          </>
         )}
-
-        {activeTab === 'media' && activeId && (
-          <div className="flex-1 overflow-y-auto">
-            <MediaGallery conversationId={activeId} />
-          </div>
-        )}
-
       </div>
       
       {showSafetyModal && user && (
