@@ -15,6 +15,8 @@ import { api } from '@lib/api';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { debounce } from 'lodash';
 import clsx from 'clsx';
+import { useCommandPaletteStore } from '@store/commandPalette';
+import { FiUsers } from 'react-icons/fi';
 
 interface ChatListProps {
   onOpen: (id: string) => void;
@@ -95,6 +97,25 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
   const openProfileModal = useModalStore(state => state.openProfileModal);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const { addCommands, removeCommands } = useCommandPaletteStore(s => ({ 
+    addCommands: s.addCommands, 
+    removeCommands: s.removeCommands 
+  }));
+
+  useEffect(() => {
+    const commands = [
+      {
+        id: 'new-group',
+        name: 'New Group',
+        action: openCreateGroupModal,
+        icon: <FiUsers />,
+        section: 'General',
+        keywords: 'create group chat conversation',
+      },
+    ];
+    addCommands(commands);
+    return () => removeCommands(commands.map(c => c.id));
+  }, [addCommands, removeCommands, openCreateGroupModal]);
 
   const handleSearch = useCallback(debounce(async (query: string) => {
     if (!query.trim()) {

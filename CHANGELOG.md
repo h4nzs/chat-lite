@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2025-11-06
+
+This release upgrades the `Ctrl+K` shortcut into a full-featured Command Palette, allowing for quick execution of commands from anywhere in the application.
+
+### Added
+
+- **Command Palette:** Implemented a Command Palette (`Ctrl+K` or `Cmd+K`) for quick access to actions.
+  - Includes initial commands: 'Settings', 'Logout', and 'New Group' (contextual).
+  - Features include real-time filtering, keyboard navigation (Arrow keys & Enter), and a scalable command registration system.
+
+### Fixed
+
+- **Build Errors:** Resolved multiple build errors related to duplicate declarations and incorrect import paths that arose during the command palette implementation.
+
 ## [1.0.5] - 2025-11-06
 
 This release introduces significant enhancements to file sharing, including a media gallery to browse all shared files in a conversation and rich previews for PDFs, videos, and audio files.
