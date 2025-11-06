@@ -210,7 +210,7 @@ export default function ChatList({ onOpen, activeId }: ChatListProps) {
                 : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
 
               const itemClasses = clsx(
-                'relative flex items-center justify-between mx-3 my-2 rounded-lg transition-all duration-200 bg-surface shadow-soft hover:bg-secondary',
+                'relative flex items-center justify-between mx-3 my-2 rounded-lg transition-all duration-200 shadow-soft hover:bg-secondary',
                 {
                   'bg-gradient-to-r from-[hsl(var(--grad-start)/0.15)] to-surface border-l-4 border-[hsl(var(--grad-start))] shadow-card': isActive,
                 }
