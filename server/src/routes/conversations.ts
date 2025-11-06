@@ -533,4 +533,70 @@ router.post("/:id/read", async (req, res, next) => {
   }
 });
 
+// GET /api/conversations/:id/media
+// Fetches all media messages for a conversation
+router.get('/:id/media', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        participants: {
+          some: {
+            userId: req.user.id,
+          },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found or you are not a member.' });
+    }
+
+    const mediaResults = await prisma.message.findMany({
+      where: {
+        conversationId: id,
+        OR: [
+          { imageUrl: { not: null } },
+          { fileUrl: { not: null } },
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        imageUrl: true,
+        fileUrl: true,
+        fileName: true,
+        fileType: true,
+      }
+    });
+
+    const formattedMedia = mediaResults.map(msg => {
+      const isImage = !!msg.imageUrl;
+      let type = 'DOCUMENT';
+      if (isImage) {
+        type = 'IMAGE';
+      } else if (msg.fileType) {
+        if (msg.fileType.startsWith('video')) type = 'VIDEO';
+        else if (msg.fileType.startsWith('audio')) type = 'AUDIO';
+        // The frontend FileAttachment component will handle PDF detection by fileName
+      }
+      
+      return {
+        id: msg.id,
+        content: msg.imageUrl || msg.fileUrl,
+        type: type,
+        fileName: msg.fileName,
+      };
+    });
+
+    res.json(formattedMedia);
+
+  } catch (error) {
+    console.error('Failed to fetch media:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 export default router;

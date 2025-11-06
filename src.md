@@ -1,53 +1,96 @@
-# Roadmap Implementasi: "Neumorphism Gradien"
+# Saran dan Rekomendasi untuk Aplikasi Chat-Lite
 
-Tujuan dari fase ini adalah untuk mengintegrasikan prinsip-prinsip desain Neumorphism ke dalam UI aplikasi, menciptakan tampilan yang taktil, modern, dan menyatu dengan baik dengan efek "Floating Glass" dan tema gradien "Aurora" yang sudah ada.
+Dokumen ini berisi saran dan ide untuk pengembangan aplikasi Chat-Lite di masa depan. Rekomendasi ini didasarkan pada analisis arsitektur saat ini, fitur yang ada, dan potensi untuk pertumbuhan.
 
----
+## Ringkasan
 
-### **Fase 1: Definisikan Utilitas Bayangan Neumorphic**
-
-**Tujuan:** Membuat kelas utilitas di Tailwind CSS untuk menerapkan efek neumorphism dengan mudah di seluruh aplikasi.
-
-- **Tugas:**
-  1.  **Analisis Warna Bayangan:** Untuk setiap warna latar (`--bg-surface`, `--bg-main`), kita perlu mendefinisikan versi yang sedikit lebih gelap dan sedikit lebih terang untuk digunakan sebagai bayangan.
-  2.  **Buat Utilitas di `tailwind.config.ts`:**
-      - `shadow-neumorphic-convex`: Untuk elemen yang "menonjol". Ini akan menerapkan `box-shadow` dengan dua bayangan (gelap di kanan bawah, terang di kiri atas).
-      - `shadow-neumorphic-concave`: Untuk elemen yang "tenggelam". Ini akan menerapkan `box-shadow` inset (bayangan ke dalam).
-      - `shadow-neumorphic-pressed`: Varian dari `concave` untuk status tombol saat ditekan.
-- **Alasan:** Dengan mendefinisikan ini sebagai utilitas, kita dapat menerapkan gaya yang kompleks dan konsisten hanya dengan menambahkan satu kelas, membuat proses refactoring komponen menjadi cepat dan efisien.
+Aplikasi ini memiliki fondasi yang sangat kuat: arsitektur modern (React, Node.js, TypeScript), manajemen state yang baik (Zustand), enkripsi End-to-End (E2EE) dengan Libsodium, dan fungsionalitas real-time melalui WebSockets. Desain Neumorphic yang baru juga memberikan tampilan yang unik dan modern. Saran berikut bertujuan untuk membangun di atas fondasi yang sudah solid ini.
 
 ---
 
-### **Fase 2: Refactor Komponen "Tenggelam" (Concave)**
+## 1. Peningkatan Fitur Inti (Core Features)
 
-**Tujuan:** Menerapkan efek "tenggelam" pada semua elemen input dan kontainer statis.
+Fitur-fitur ini akan memperkaya pengalaman pengguna dan membuat aplikasi lebih kompetitif.
 
-- **Tugas:**
-  1.  **Input Pesan & Pencarian:** Ubah `MessageInput` dan `Search` bar di `ChatList` untuk menggunakan `shadow-neumorphic-concave`. Latar belakangnya akan dibuat sama dengan latar belakang utama (`bg-main` atau `bg-surface`), dan bentuknya akan diciptakan oleh bayangan ke dalam.
-  2.  **Kartu (Cards):** Terapkan efek `concave` pada `SettingsCard` dan kartu utama di halaman `Login`/`Register`. Ini akan membuat mereka terlihat seperti "terukir" di latar belakang.
-  3.  **Area Balasan Pesan:** Kontainer yang menampilkan pesan yang sedang dibalas (`ReplyPreview`) juga akan menggunakan gaya `concave`.
-- **Alasan:** Ini akan menciptakan hierarki visual di mana elemen interaktif (input) dan kontainer informasi terlihat berbeda dari tombol aksi.
+- **Balasan Pesan (Message Replies):**
+  - **Konsep:** Memungkinkan pengguna untuk membalas pesan tertentu, membuat alur percakapan lebih mudah diikuti.
+  - **Implementasi:** Menambahkan tombol "Balas" pada gelembung pesan. Saat dibalas, pesan asli akan dikutip di atas pesan baru. Ini memerlukan pembaruan pada model data pesan (misalnya, `replyingToMessageId`).
+
+- **Reaksi Pesan (Message Reactions):**
+  - **Konsep:** Memberi pengguna kemampuan untuk bereaksi terhadap pesan dengan emoji. Komponen `Reactions.tsx` sudah ada dan bisa menjadi dasar.
+  - **Implementasi:** Mengizinkan pengguna memilih emoji apa pun dari *emoji picker*, tidak hanya set yang telah ditentukan. Data reaksi perlu disimpan dan disinkronkan secara real-time.
+
+- **Peningkatan Berbagi File:**
+  - **Konsep:** Memperluas kemampuan berbagi file saat ini.
+  - **Implementasi:** 
+    - Dukungan untuk pratinjau file PDF atau pemutaran video/audio langsung di dalam aplikasi.
+    - Membuat tab "Media" di panel info chat untuk menampilkan semua gambar, video, dan dokumen yang pernah dibagikan dalam satu galeri.
+
+- **Status Pengguna Kustom:**
+  - **Konsep:** Selain hanya "online/offline", izinkan pengguna mengatur status kustom (misalnya, "Sedang rapat", "Sibuk", atau emoji).
+  - **Implementasi:** Menambahkan input status di halaman profil atau pengaturan, dan menampilkannya di samping nama pengguna.
+
+- **Panggilan Suara/Video (Voice/Video Calls):**
+  - **Konsep:** Ini adalah langkah besar berikutnya untuk aplikasi obrolan. Menambahkan kemampuan panggilan suara atau video 1-on-1 yang juga dienkripsi E2EE.
+  - **Implementasi:** Memerlukan integrasi dengan teknologi **WebRTC**.
 
 ---
 
-### **Fase 3: Refactor Komponen "Menonjol" (Convex)**
+## 2. Peningkatan UI/UX
 
-**Tujuan:** Menerapkan efek "menonjol" pada semua tombol aksi dan elemen interaktif.
+Peningkatan ini berfokus pada penyempurnaan pengalaman pengguna dan aksesibilitas.
 
-- **Tugas:**
-  1.  **Tombol Utama:** Ubah semua tombol (`.btn-primary`, `.btn-secondary`) untuk menggunakan `shadow-neumorphic-convex`. Gradien "Aurora" akan tetap ada di `.btn-primary`, menciptakan efek tombol gradien yang menonjol.
-  2.  **Gelembung Pesan (`MessageBubble`):** Terapkan efek `convex` pada gelembung pesan. Ini akan membuat setiap pesan terlihat seperti objek fisik yang lembut di layar.
-  3.  **Item Daftar (`ChatItem`):** Berikan `ChatItem` di `ChatList` efek `convex` yang halus. Saat aktif, kita bisa mengubah bayangannya agar terlihat lebih menonjol.
-  4.  **Tombol Ikon:** Tombol "Kirim", "Emoji", "File", dan tombol ikon lainnya akan menjadi target utama untuk efek `convex`.
-- **Alasan:** Ini akan memberikan umpan balik taktil yang jelas kepada pengguna, di mana tombol-tombol terlihat seolah-olah mereka dapat benar-benar ditekan.
+- **Command Palette (`Ctrl+K`):**
+  - **Konsep:** Mengembangkan shortcut `Ctrl+K` yang ada dari sekadar fokus pencarian menjadi *command palette* penuh (seperti di VS Code, Slack, atau Discord).
+  - **Implementasi:** Pengguna bisa mengetik perintah seperti "/newgroup", "/settings", "/logout" untuk menjalankan aksi dengan cepat.
+
+- **Kustomisasi Tema:**
+  - **Konsep:** Memberi pengguna lebih banyak kontrol atas tampilan aplikasi.
+  - **Implementasi:** Menambahkan pilihan untuk mengubah warna aksen aplikasi di halaman pengaturan.
+
+- **Peningkatan Aksesibilitas (A11y):**
+  - **Konsep:** Melanjutkan pekerjaan pada navigasi keyboard.
+  - **Implementasi:** Memastikan semua elemen interaktif memiliki `aria-label` yang sesuai, dan memeriksa kembali kontras warna di semua tema untuk keterbacaan.
+
+- **Onboarding & Bantuan:**
+  - **Konsep:** Untuk aplikasi yang berfokus pada keamanan, alur orientasi bagi pengguna baru sangatlah penting.
+  - **Implementasi:** Membuat tur singkat saat pertama kali login yang menjelaskan konsep kunci seperti *Recovery Phrase*, *Safety Number*, dan pentingnya verifikasi keamanan.
 
 ---
 
-### **Fase 4: Status "Pressed" & Transisi**
+## 3. Peningkatan Teknis & Refactoring
 
-**Tujuan:** Menyempurnakan interaksi dengan menambahkan status "ditekan" yang memuaskan.
+Peningkatan di balik layar untuk menjaga kualitas kode dan kemudahan pemeliharaan.
 
-- **Tugas:**
-  1.  **Implementasi Status `:active`:** Untuk semua tombol `convex`, saat `:active` (ditekan), ganti `shadow-neumorphic-convex` dengan `shadow-neumorphic-pressed`.
-  2.  **Transisi Halus:** Pastikan ada `transition` yang mulus pada properti `box-shadow` sehingga perubahan dari menonjol ke ditekan terasa seperti animasi yang lembut.
-- **Alasan:** Umpan balik visual saat menekan tombol sangat penting dalam desain neumorphic untuk meniru interaksi dengan objek fisik.
+- **Ekstraksi Logika Komponen:**
+  - **Masalah:** Beberapa komponen seperti `ChatList.tsx` memiliki banyak logika di dalamnya.
+  - **Solusi:** Mengekstrak lebih banyak logika ke dalam *custom hooks* terpisah. Ini akan membuat komponen lebih bersih dan fokus pada rendering (tampilan).
+
+- **Peningkatan Test Coverage:**
+  - **Masalah:** Direktori `tests/` ada tetapi cakupannya masih bisa ditingkatkan.
+  - **Solusi:** Menambahkan lebih banyak *unit test* dan *integration test*, terutama untuk alur kerja penting seperti E2EE (enkripsi), otentikasi, dan logika state management di Zustand.
+
+- **Manajemen Dependensi:**
+  - **Solusi:** Secara berkala meninjau dan memperbarui *library* (NPM packages) yang digunakan untuk mendapatkan fitur terbaru dan, yang lebih penting, patch keamanan.
+
+---
+
+## 4. Peningkatan Keamanan & Stabilitas
+
+Memperkuat fondasi keamanan aplikasi.
+
+- **Alur Verifikasi Keamanan (E2EE):**
+  - **Konsep:** Membuat proses verifikasi "Safety Number" lebih mudah dan menarik bagi pengguna.
+  - **Implementasi:** Menambahkan opsi verifikasi dengan memindai **kode QR** antar perangkat, yang jauh lebih cepat daripada membandingkan angka secara manual.
+
+- **Rate Limiting di Backend:**
+  - **Konsep:** Mencegah serangan *brute-force* atau spam.
+  - **Implementasi:** Menerapkan pembatasan jumlah permintaan (rate limiting) pada endpoint API kritis di sisi server, seperti `/login`, `/register`, dan pengiriman pesan.
+
+- **Validasi Input di Backend:**
+  - **Konsep:** Menganggap semua input dari pengguna sebagai tidak tepercaya.
+  - **Implementasi:** Memastikan semua data yang dikirim ke server (pesan, nama grup, deskripsi profil) divalidasi dan disanitasi secara ketat di backend untuk mencegah serangan seperti XSS (Cross-Site Scripting).
+
+## Kesimpulan
+
+Aplikasi ini berada di jalur yang benar untuk menjadi aplikasi obrolan yang aman dan modern. Dengan fokus pada penambahan fitur inti yang diminta pengguna dan terus memperkuat aspek teknis serta keamanan, aplikasi ini memiliki potensi besar untuk berkembang.

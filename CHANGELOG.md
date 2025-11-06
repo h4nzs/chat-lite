@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2025-11-06
+
+This release introduces significant enhancements to file sharing, including a media gallery to browse all shared files in a conversation and rich previews for PDFs, videos, and audio files.
+
+### Added
+
+- **Media Gallery:** Added a 'Media' tab to the Group Info and User Info panels, allowing users to easily view all images, videos, and documents shared in a conversation.
+- **Rich File Previews:** File attachments in chats now show rich previews:
+  - **PDFs:** Display a preview of the first page directly in the chat.
+  - **Video & Audio:** Embed a playable media player for video and audio files.
+
+### Fixed
+
+- **Backend API:** Fixed a 500 Internal Server Error on the new `/media` API endpoint by correcting the database query to use the proper schema fields (`fileType`, `fileUrl`, `imageUrl`).
+- **PDF Preview Rendering:** Resolved a build error and a runtime warning related to the `react-pdf` library in Vite by correcting CSS import paths and self-hosting the required PDF worker script.
+
 ## [1.0.4] - 2025-11-06
 
 This release introduces major keyboard navigation enhancements for a faster, more accessible user experience, and fixes bugs related to their implementation.

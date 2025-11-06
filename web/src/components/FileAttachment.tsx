@@ -1,5 +1,12 @@
-import type { Message } from "@store/chat";
+import type { Message } from "@store/message";
 import { toAbsoluteUrl } from "@utils/url";
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+import { Spinner } from "./Spinner";
+
+// Configure the PDF worker
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -14,32 +21,90 @@ interface FileAttachmentProps {
   message: Message;
 }
 
+const PdfPreview = ({ fileUrl, fileName }: { fileUrl: string, fileName?: string }) => (
+  <a 
+    href={fileUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    download={fileName || 'download'}
+    className="block p-2 rounded-lg bg-black/20 hover:bg-black/30 transition-colors my-2 max-w-sm"
+  >
+    <div className="bg-white rounded-md overflow-hidden pointer-events-none">
+      <Document
+        file={fileUrl}
+        loading={<div className="flex justify-center items-center h-40"><Spinner /></div>}
+        error={<div className="text-center text-sm text-destructive p-4">Failed to load PDF preview.</div>}
+      >
+        <Page pageNumber={1} width={300} />
+      </Document>
+    </div>
+    <div className="mt-2 px-1">
+      <p className="font-semibold text-white truncate">{fileName || 'File'}</p>
+    </div>
+  </a>
+);
+
+const VideoPlayer = ({ fileUrl, fileName }: { fileUrl: string, fileName?: string }) => (
+  <div className="my-2 max-w-sm">
+    <video controls className="w-full rounded-lg">
+      <source src={fileUrl} />
+      Your browser does not support the video tag.
+    </video>
+    <p className="text-xs text-text-secondary mt-1 px-1">{fileName}</p>
+  </div>
+);
+
+const AudioPlayer = ({ fileUrl, fileName }: { fileUrl: string, fileName?: string }) => (
+  <div className="my-2 w-full max-w-sm">
+    <p className="text-sm text-text-primary font-semibold mb-1 px-1">{fileName}</p>
+    <audio controls className="w-full">
+      <source src={fileUrl} />
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+);
+
+const GenericFile = ({ message }: { message: Message }) => (
+  <a 
+    href={toAbsoluteUrl(message.fileUrl!)}
+    target="_blank"
+    rel="noopener noreferrer"
+    download={message.fileName || 'download'}
+    className="flex items-center gap-3 p-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors my-2 max-w-sm"
+  >
+    <div className="flex-shrink-0 p-2 bg-gray-600 rounded-full">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </div>
+    <div className="min-w-0">
+      <p className="font-semibold text-white truncate">{message.fileName || 'File'}</p>
+      {message.fileSize && <p className="text-xs text-gray-400">{formatBytes(message.fileSize)}</p>}
+    </div>
+    <div className="ml-auto p-2 text-gray-400">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="m8 12 4 4 4-4"/></svg>
+    </div>
+  </a>
+);
+
 export default function FileAttachment({ message }: FileAttachmentProps) {
   if (!message.fileUrl) return null;
 
-  return (
-    <a 
-      href={toAbsoluteUrl(message.fileUrl)}
-      target="_blank"
-      rel="noopener noreferrer"
-      download={message.fileName || 'download'}
-      className="flex items-center gap-3 p-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors my-2"
-    >
-      <div className="flex-shrink-0 p-2 bg-gray-600 rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="12" y1="18" x2="12" y2="12"/>
-          <line x1="9" y1="15" x2="15" y2="15"/>
-        </svg>
-      </div>
-      <div className="min-w-0">
-        <p className="font-semibold text-white truncate">{message.fileName || 'File'}</p>
-        {message.fileSize && <p className="text-xs text-text-secondary">{formatBytes(message.fileSize)}</p>}
-      </div>
-      <div className="ml-auto p-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="m8 12 4 4 4-4"/></svg>
-      </div>
-    </a>
-  );
+  const fileName = message.fileName?.toLowerCase() || '';
+  const absoluteUrl = toAbsoluteUrl(message.fileUrl);
+
+  if (fileName.endsWith('.pdf')) {
+    return <PdfPreview fileUrl={absoluteUrl} fileName={message.fileName} />;
+  }
+  
+  if (fileName.match(/\.(mp4|webm|mov)$/)) {
+    return <VideoPlayer fileUrl={absoluteUrl} fileName={message.fileName} />;
+  }
+
+  if (fileName.match(/\.(mp3|ogg|wav|m4a)$/)) {
+    return <AudioPlayer fileUrl={absoluteUrl} fileName={message.fileName} />;
+  }
+
+  return <GenericFile message={message} />;
 }
