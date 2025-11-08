@@ -122,36 +122,47 @@ export function registerSocket(httpServer: HttpServer) {
           }
         }
 
-        const newMessage = await prisma.message.create({
-          data: {
-            conversationId: conversationId,
-            senderId: senderId,
-            content: data.content,
-            fileUrl: data.fileUrl,
-            fileName: data.fileName,
-            fileType: data.fileType,
-            fileSize: data.fileSize,
-            sessionId: data.sessionId,
-            repliedToId: data.repliedToId,
-            linkPreview: linkPreviewData,
-            statuses: {
-              create: participants.map(p => ({
-                userId: p.userId,
-                status: p.userId === senderId ? 'READ' : 'SENT',
-              })),
+        // --- FIX: Use a transaction to ensure atomicity ---
+        const newMessage = await prisma.$transaction(async (tx) => {
+          const msg = await tx.message.create({
+            data: {
+              conversationId: conversationId,
+              senderId: senderId,
+              content: data.content,
+              fileUrl: data.fileUrl,
+              fileName: data.fileName,
+              fileType: data.fileType,
+              fileSize: data.fileSize,
+              sessionId: data.sessionId,
+              repliedToId: data.repliedToId,
+              linkPreview: linkPreviewData,
+              statuses: {
+                create: participants.map(p => ({
+                  userId: p.userId,
+                  status: p.userId === senderId ? 'READ' : 'SENT',
+                })),
+              },
             },
-          },
-          include: { 
-            sender: true, 
-            reactions: { include: { user: true } },
-            statuses: true,
-            repliedTo: { 
-              include: {
-                sender: { select: { id: true, name: true, username: true } }
+            include: { 
+              sender: true, 
+              reactions: { include: { user: true } },
+              statuses: true,
+              repliedTo: { 
+                include: {
+                  sender: { select: { id: true, name: true, username: true } }
+                }
               }
-            }
-          }, 
+            }, 
+          });
+
+          await tx.conversation.update({
+            where: { id: conversationId },
+            data: { lastMessageAt: msg.createdAt },
+          });
+
+          return msg;
         });
+        // --- END FIX ---
 
         const messageToBroadcast = {
           ...newMessage,
@@ -159,11 +170,6 @@ export function registerSocket(httpServer: HttpServer) {
         };
 
         io.to(conversationId).emit("message:new", messageToBroadcast);
-
-        await prisma.conversation.update({
-          where: { id: conversationId },
-          data: { lastMessageAt: newMessage.createdAt },
-        });
 
         const pushRecipients = participants.filter(p => p.userId !== senderId);
         const payload = { title: `New message from ${socket.user.username}`, body: data.content || 'File received' };

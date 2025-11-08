@@ -62,7 +62,7 @@ Peningkatan ini berfokus pada penyempurnaan pengalaman pengguna dan aksesibilita
 
 Peningkatan di balik layar untuk menjaga kualitas kode dan kemudahan pemeliharaan.
 
-- **Ekstraksi Logika Komponen:**
+- **done Ekstraksi Logika Komponen:**
   - **Masalah:** Beberapa komponen seperti `ChatList.tsx` memiliki banyak logika di dalamnya.
   - **Solusi:** Mengekstrak lebih banyak logika ke dalam *custom hooks* terpisah. Ini akan membuat komponen lebih bersih dan fokus pada rendering (tampilan).
 

@@ -6,7 +6,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
 
 ## 1. Arsitektur & Risiko Masa Depan
 
-### [RISIKO] Kompleksitas State Management (Zustand)
+### [done] Kompleksitas State Management (Zustand)
 - **Lokasi:** `web/src/store/conversation.ts`, `web/src/store/message.ts`
 - **Deskripsi:** Seperti yang telah diidentifikasi sebelumnya, file-file store Zustand, terutama `message.ts`, telah menjadi sangat besar dan menangani terlalu banyak tanggung jawab (mengelola state pesan, logika pengiriman, unggah file, pencarian, dll.). Seiring bertambahnya fitur, file ini akan semakin sulit dipelihara, di-debug, dan dites.
 - **Rekomendasi:**
