@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useMessageStore } from '@store/message';
+import { useMessageSearchStore } from '@store/messageSearch';
 import { FiSearch, FiX } from 'react-icons/fi';
 
 interface SearchMessagesProps {
@@ -14,7 +14,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
     searchMessages,
     clearSearch,
     setHighlightedMessageId,
-  } = useMessageStore(state => ({
+  } = useMessageSearchStore(state => ({
     searchQuery: state.searchQuery,
     searchResults: state.searchResults,
     searchMessages: state.searchMessages,

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import type { Message, Conversation } from "@store/conversation";
 import { useAuthStore } from "@store/auth";
-import { useMessageStore } from "@store/message";
+import { useMessageInputStore } from "@store/messageInput";
 import { getSocket } from "@lib/socket";
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { api } from "@lib/api";
@@ -19,7 +19,7 @@ import { FaCheck, FaCheckDouble } from 'react-icons/fa';
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
-  const retrySendMessage = useMessageStore(s => s.retrySendMessage);
+  const retrySendMessage = useMessageInputStore(s => s.retrySendMessage);
 
   if (message.senderId !== meId) return null;
   if (message.error) {
@@ -152,7 +152,7 @@ interface MessageItemProps {
 
 const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFirstInSequence, isLastInSequence }: MessageItemProps) => {
   const meId = useAuthStore((s) => s.user?.id);
-  const setReplyingTo = useMessageStore(state => state.setReplyingTo);
+  const setReplyingTo = useMessageInputStore(state => state.setReplyingTo);
   const showConfirm = useModalStore(state => state.showConfirm);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);

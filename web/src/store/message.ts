@@ -35,9 +35,6 @@ export async function decryptMessageObject(message: Message): Promise<Message> {
 type State = {
   messages: Record<string, Message[]>;
   replyingTo: Message | null;
-  searchResults: Message[];
-  highlightedMessageId: string | null;
-  searchQuery: string;
   isFetchingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
   typingLinkPreview: any | null; // For live link previews
@@ -50,9 +47,6 @@ type State = {
   uploadFile: (conversationId: string, file: File) => Promise<void>;
   loadMessagesForConversation: (id: string) => Promise<void>;
   loadPreviousMessages: (conversationId: string) => Promise<void>;
-  searchMessages: (query: string, conversationId: string) => Promise<void>;
-  setHighlightedMessageId: (messageId: string | null) => void;
-  clearSearch: () => void;
   addOptimisticMessage: (conversationId: string, message: Message) => void;
   addIncomingMessage: (conversationId: string, message: Message) => void;
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
@@ -70,128 +64,8 @@ type State = {
 
 export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   messages: {},
-  replyingTo: null,
-  searchResults: [],
-  highlightedMessageId: null,
-  searchQuery: '',
   isFetchingMore: {},
   hasMore: {},
-  typingLinkPreview: null,
-
-  setReplyingTo: (message) => set({ replyingTo: message }),
-
-  fetchTypingLinkPreview: async (text) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urls = text.match(urlRegex);
-    if (urls && urls.length > 0) {
-      try {
-        const preview = await api("/api/previews", {
-          method: "POST",
-          body: JSON.stringify({ url: urls[0] }),
-        });
-        set({ typingLinkPreview: preview });
-      } catch (error) {
-        set({ typingLinkPreview: null });
-      }
-    } else {
-      set({ typingLinkPreview: null });
-    }
-  },
-
-  clearTypingLinkPreview: () => set({ typingLinkPreview: null }),
-
-  sendMessage: async (conversationId, data) => {
-    const tempId = Date.now();
-    const me = useAuthStore.getState().user;
-    const { replyingTo, addOptimisticMessage, setReplyingTo } = get();
-
-    let payload: Partial<Message> = { ...data };
-
-    if (data.content) {
-      try {
-        const { ciphertext, sessionId } = await encryptMessage(data.content, conversationId);
-        payload.content = ciphertext;
-        payload.sessionId = sessionId;
-      } catch (e: any) {
-        toast.error(`Encryption failed: ${e.message}`);
-        return;
-      }
-    }
-
-    const optimisticMessage: Message = {
-      id: `temp-${tempId}`,
-      tempId,
-      conversationId,
-      senderId: me!.id,
-      sender: me!,
-      createdAt: new Date().toISOString(),
-      optimistic: true,
-      ...data, // Use original, unencrypted content for optimistic UI
-      repliedTo: replyingTo || undefined,
-    };
-
-    addOptimisticMessage(conversationId, optimisticMessage);
-    
-    const socket = getSocket();
-    const finalPayload = { 
-      ...payload, 
-      repliedToId: replyingTo?.id,
-    };
-
-    socket.emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
-      if (!ack.ok) {
-        toast.error(`Failed to send message: ${ack.error || 'Unknown error'}`);
-        set(state => ({
-          messages: {
-            ...state.messages,
-            [conversationId]: state.messages[conversationId].map(m =>
-              m.tempId === tempId ? { ...m, error: true, optimistic: false } : m
-            ),
-          },
-        }));
-      }
-    });
-
-    setReplyingTo(null);
-  },
-
-  uploadFile: async (conversationId, file) => {
-    const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
-    
-    const activityId = addActivity({
-      type: 'upload',
-      fileName: file.name,
-      progress: 0,
-    });
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-
-      const { file: fileData } = await apiUpload<{ file: any }>({
-        path: `/api/uploads/${conversationId}/upload`,
-        formData: form,
-        onUploadProgress: (progress) => {
-          updateActivity(activityId, { progress });
-        },
-      });
-      
-      // Keep it for a second to show 100%
-      setTimeout(() => removeActivity(activityId), 1000); 
-
-      get().sendMessage(conversationId, { 
-        fileUrl: fileData.url, 
-        fileName: fileData.filename, 
-        fileType: fileData.mimetype, 
-        fileSize: fileData.size, 
-        content: '' 
-      });
-    } catch (uploadError: any) {
-      const errorMsg = handleApiError(uploadError);
-      toast.error(`Upload failed: ${errorMsg}`);
-      removeActivity(activityId);
-    }
-  },
 
   loadMessagesForConversation: async (id) => {
     if (get().messages[id]?.length > 0) return;
@@ -278,20 +152,6 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       set(state => ({ isFetchingMore: { ...state.isFetchingMore, [conversationId]: false } }));
     }
   },
-
-  searchMessages: async (query, conversationId) => {
-    set({ searchQuery: query });
-    if (!query.trim()) {
-      set({ searchResults: [] });
-      return;
-    }
-    const allMessages = get().messages[conversationId] || [];
-    const results = allMessages.filter(m => m.content && m.content.toLowerCase().includes(query.toLowerCase()));
-    set({ searchResults: results });
-  },
-
-  setHighlightedMessageId: (messageId) => set({ highlightedMessageId: messageId }),
-  clearSearch: () => set({ searchResults: [], searchQuery: '', highlightedMessageId: null }),
 
   // --- Actions to be called by socket store ---
   addOptimisticMessage: (conversationId, message) => {

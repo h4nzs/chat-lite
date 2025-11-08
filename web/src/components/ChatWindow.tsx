@@ -6,9 +6,12 @@ import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
 import { Spinner } from "./Spinner";
 import { useConversationStore, type Conversation } from "@store/conversation";
-import { useMessageStore } from "@store/message";
+import { useMessageInputStore as useTypingStore } from '@store/messageInput'; // Alias for clarity
+import { useMessageInputStore } from '@store/messageInput';
+import { useMessageSearchStore } from '@store/messageSearch';
 import { usePresenceStore } from "@store/presence";
 import { useThemeStore } from "@store/theme";
+import useDynamicIslandStore from "@store/dynamicIsland";
 import { toAbsoluteUrl } from "@utils/url";
 import { useModalStore } from "@store/modal";
 import SearchMessages from './SearchMessages';
@@ -114,7 +117,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   };
   
   const ReplyPreview = () => {
-    const { replyingTo, setReplyingTo } = useMessageStore(state => ({
+    const { replyingTo, setReplyingTo } = useMessageInputStore(state => ({
       replyingTo: state.replyingTo,
       setReplyingTo: state.setReplyingTo,
     }));
@@ -147,7 +150,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageStore();
+  const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageInputStore();
 
   const hasText = text.trim().length > 0;
 
@@ -286,21 +289,34 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     messages, 
     isLoading, 
     error, 
-    sendMessage, 
-    uploadFile, 
+    actions,
     isFetchingMore, 
-    loadPreviousMessages 
   } = useConversation(id);
   
-  const { highlightedMessageId, setHighlightedMessageId } = useMessageStore(state => ({
+  const { highlightedMessageId, setHighlightedMessageId } = useMessageSearchStore(state => ({
     highlightedMessageId: state.highlightedMessageId,
     setHighlightedMessageId: state.setHighlightedMessageId,
   }));
+  const { replyingTo, setReplyingTo } = useMessageInputStore(state => ({
+    replyingTo: state.replyingTo,
+    setReplyingTo: state.setReplyingTo,
+  }));
+  const { typingLinkPreview, clearTypingLinkPreview } = useTypingStore(state => ({
+    typingLinkPreview: state.typingLinkPreview,
+    clearTypingLinkPreview: state.clearTypingLinkPreview,
+  }));
+  const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore();
   const typing = usePresenceStore(state => state.typing);
   
   const virtuosoRef = useRef<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      actions.loadMessages();
+    }
+  }, [id, actions]);
 
   const handleImageClick = (src: string) => setLightboxSrc(src);
 
@@ -332,14 +348,14 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   }, [id]);
 
   const handleSendMessage = (data: { content: string }) => {
-    sendMessage(data);
+    actions.sendMessage(data);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     getSocket().emit("typing:stop", { conversationId: id });
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      uploadFile(e.target.files[0]);
+      actions.uploadFile(e.target.files[0]);
     }
   };
 
@@ -387,7 +403,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                   ref={virtuosoRef}
                   initialTopMostItemIndex={messages.length - 1}
                   data={messages}
-                  startReached={loadPreviousMessages}
+                  startReached={actions.loadPrevious}
                   components={{ Header: () => isFetchingMore ? <ChatSpinner /> : null }}
                   itemContent={(index, message) => {
                     const prevMessage = messages[index - 1];

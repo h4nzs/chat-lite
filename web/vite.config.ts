@@ -34,6 +34,9 @@ export default defineConfig({
     'global.Buffer': ['buffer', 'Buffer'],
   },
   server: {
+    fs: {
+      allow: ['..']
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
