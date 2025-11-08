@@ -1,14 +1,11 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { api } from "@lib/api";
+import { api, apiUpload, handleApiError } from "@lib/api";
 import { getSocket } from "@lib/socket";
 import { encryptMessage, decryptMessage, ensureAndRatchetSession } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation"; // Import type from conversation store
-import axios from 'axios';
 import useDynamicIslandStore from './dynamicIsland';
-
-const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
 // --- Helper Functions ---
 
@@ -162,44 +159,29 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     });
 
     try {
-      // 1. Fetch the CSRF token first
-      const { data: csrfData } = await axios.get<{ csrfToken: string }>(
-        `${API_URL}/api/csrf-token`,
-        { withCredentials: true }
-      );
-      const csrfToken = csrfData.csrfToken;
-
-      if (!csrfToken) {
-        throw new Error('Could not retrieve CSRF token.');
-      }
-
-      // 2. Perform the upload with the token
       const form = new FormData();
       form.append("file", file);
 
-      const response = await axios.post<{ file: any }>(
-        `${API_URL}/api/uploads/${conversationId}/upload`,
-        form,
-        {
-          withCredentials: true,
-          headers: {
-            'CSRF-Token': csrfToken,
-          },
-          onUploadProgress: (progressEvent) => {
-            const progress = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-            updateActivity(activityId, { progress });
-          },
-        }
-      );
-
-      const { file: fileData } = response.data;
+      const { file: fileData } = await apiUpload<{ file: any }>({
+        path: `/api/uploads/${conversationId}/upload`,
+        formData: form,
+        onUploadProgress: (progress) => {
+          updateActivity(activityId, { progress });
+        },
+      });
       
-      updateActivity(activityId, { progress: 100 });
-      setTimeout(() => removeActivity(activityId), 1000); // Keep it for a second to show 100%
+      // Keep it for a second to show 100%
+      setTimeout(() => removeActivity(activityId), 1000); 
 
-      get().sendMessage(conversationId, { fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: '' });
+      get().sendMessage(conversationId, { 
+        fileUrl: fileData.url, 
+        fileName: fileData.filename, 
+        fileType: fileData.mimetype, 
+        fileSize: fileData.size, 
+        content: '' 
+      });
     } catch (uploadError: any) {
-      const errorMsg = uploadError.response?.data?.error || uploadError.message || "Upload failed";
+      const errorMsg = handleApiError(uploadError);
       toast.error(`Upload failed: ${errorMsg}`);
       removeActivity(activityId);
     }

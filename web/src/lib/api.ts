@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
 // Cache untuk token CSRF
@@ -20,13 +22,10 @@ export async function getCsrfToken(): Promise<string> {
     return csrfTokenCache!;
   } catch (error) {
     console.error("Error fetching CSRF token:", error);
-    // Reset cache jika terjadi error
     csrfTokenCache = null;
     throw error;
   }
 }
-
-// ... (sisa kode api.ts, termasuk class ApiError)
 
 export class ApiError extends Error {
   constructor(
@@ -47,9 +46,7 @@ export async function api<T = any>(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  // Tambahkan token CSRF ke header untuk request yang mengubah state
   if (options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
-    // Jangan tambahkan Content-Type untuk FormData, browser akan menentukannya sendiri
     if (!(options.body instanceof FormData)) {
         headers['Content-Type'] = 'application/json';
     }
@@ -69,14 +66,12 @@ export async function api<T = any>(
 
   if (!res.ok) {
     const text = await res.text();
-    // Jika token CSRF tidak valid, bersihkan cache agar request selanjutnya mengambil token baru
     if (res.status === 403 && text.includes('invalid csrf token')) {
         csrfTokenCache = null;
     }
     throw new ApiError(res.status, res.statusText, text);
   }
 
-  // Handle response tanpa body (misal: 204 No Content)
   if (res.status === 204) {
     return {} as T;
   }
@@ -84,10 +79,6 @@ export async function api<T = any>(
   return res.json();
 }
 
-/**
- * Wrapper untuk request yang butuh auth.
- * Jika 401 → coba refresh token sekali.
- */
 export async function authFetch<T>(
   url: string,
   options: RequestInit = {}
@@ -100,19 +91,15 @@ export async function authFetch<T>(
       (err.status === 401 || /Unauthorized/i.test(err.message))
     ) {
       try {
-        // coba refresh
         const refreshRes = await api<{ ok: boolean }>("/api/auth/refresh", {
           method: "POST",
         });
 
         if (refreshRes.ok) {
-          // ulang sekali
           return await api<T>(url, options);
         }
-        // If refresh fails, just throw the original error
         throw err;
       } catch {
-        // If the refresh call itself fails, throw the original error
         throw err;
       }
     }
@@ -120,9 +107,6 @@ export async function authFetch<T>(
   }
 }
 
-/**
- * Helper untuk mapping error ke pesan user-friendly.
- */
 export function handleApiError(e: unknown): string {
   if (e instanceof ApiError) {
     switch (e.status) {
@@ -145,4 +129,45 @@ export function handleApiError(e: unknown): string {
 
   if (e instanceof Error) return e.message;
   return "Something went wrong";
+}
+
+export async function apiUpload<T = any>({
+  path,
+  formData,
+  onUploadProgress,
+}: {
+  path: string;
+  formData: FormData;
+  onUploadProgress: (progress: number) => void;
+}): Promise<T> {
+  try {
+    const csrfToken = await getCsrfToken();
+
+    const response = await axios.post<T>(
+      API_URL + path,
+      formData,
+      {
+        withCredentials: true,
+        headers: {
+          'CSRF-Token': csrfToken,
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+          );
+          onUploadProgress(progress);
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw new ApiError(
+        error.response.status,
+        error.response.data?.error || error.message,
+        error.response.data
+      );
+    }
+    throw error;
+  }
 }
