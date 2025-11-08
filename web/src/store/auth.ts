@@ -164,6 +164,12 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
       throw new Error("FATAL: Generated recovery phrase is invalid.");
     }
 
+    // Encrypt and store the private key LOCALLY first, using the original password.
+    const encryptedPrivateKey = await storePrivateKey(privateKeyBytes, data.password);
+    localStorage.setItem('publicKey', publicKeyB64);
+    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
+
+    // NOW, send the registration data to the server.
     const res = await api<{ user: User }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhrase: phrase }),
@@ -171,10 +177,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     set({ user: res.user });
     localStorage.setItem("user", JSON.stringify(res.user));
-
-    const encryptedPrivateKey = await storePrivateKey(privateKeyBytes, data.password);
-    localStorage.setItem('publicKey', publicKeyB64);
-    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
 
     get().ensureSocket();
     return phrase;

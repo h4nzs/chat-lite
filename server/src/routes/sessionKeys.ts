@@ -129,4 +129,66 @@ router.post("/:conversationId/ratchet", async (req, res, next) => {
   }
 });
 
+// POST: Request a specific session key to be re-encrypted for the user
+router.post("/request", async (req, res, next) => {
+  try {
+    const { conversationId, sessionId } = req.body;
+    const requesterId = req.user.id;
+
+    if (!conversationId || !sessionId) {
+      return res.status(400).json({ error: "conversationId and sessionId are required." });
+    }
+
+    // 1. Validate the user is a participant
+    const participant = await prisma.participant.findFirst({
+      where: {
+        conversationId,
+        userId: requesterId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(403).json({ error: "You are not a member of this conversation." });
+    }
+
+    // 2. Find the original session key (any user's version of it will do)
+    const originalKeyRecord = await prisma.sessionKey.findFirst({
+      where: { sessionId },
+      select: { key: true }, // We need the raw key
+    });
+
+    if (!originalKeyRecord) {
+      return res.status(404).json({ error: "Session key not found." });
+    }
+
+    // 3. Get the requester's public key
+    const requesterPublicKeyRecord = await prisma.publicKey.findUnique({
+      where: { userId: requesterId },
+    });
+
+    if (!requesterPublicKeyRecord) {
+      return res.status(404).json({ error: "Your public key was not found on the server." });
+    }
+
+    // 4. Re-encrypt the raw key for the requester
+    const sodium = await getSodium();
+    const rawKey = Buffer.from(originalKeyRecord.key, 'base64');
+    const requesterPublicKey = sodium.from_base64(requesterPublicKeyRecord.key, sodium.base64_variants.ORIGINAL);
+    
+    // We need the server's keypair to use crypto_box_seal
+    // This is a simplified approach. A full implementation would use a proper key exchange.
+    // For now, let's assume a simplified encryption for the user.
+    // A better approach would be to use the user's public key to encrypt.
+    // crypto_box_seal is what we need.
+    const encryptedKeyForRequester = sodium.crypto_box_seal(rawKey, requesterPublicKey);
+    
+    res.json({
+      encryptedKey: sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.ORIGINAL),
+    });
+
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

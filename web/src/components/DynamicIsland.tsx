@@ -23,7 +23,7 @@ const NotificationView = ({ activity }: { activity: NotificationActivity }) => {
       <div className="bg-bg-surface/80 backdrop-blur-xl rounded-full">
         <div className="p-2 flex items-center gap-3">
           <img 
-            src={toAbsoluteUrl(activity.sender?.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${activity.sender?.name}`}
+            src={activity.sender?.avatarUrl ? toAbsoluteUrl(activity.sender.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${activity.sender?.name}`}
             alt="Sender Avatar"
             className="w-10 h-10 rounded-full bg-bg-primary object-cover"
           />

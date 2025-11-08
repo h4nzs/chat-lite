@@ -91,26 +91,62 @@ Memperkuat fondasi keamanan aplikasi.
   - **Konsep:** Menganggap semua input dari pengguna sebagai tidak tepercaya.
   - **Implementasi:** Memastikan semua data yang dikirim ke server (pesan, nama grup, deskripsi profil) divalidasi dan disanitasi secara ketat di backend untuk mencegah serangan seperti XSS (Cross-Site Scripting).
 
-**Masalah: Obrolan Grup (Group Chat)**
+---
 
-  Implementasi saat ini (crypto_box_easy) dirancang untuk
-  komunikasi antara dua orang (1-on-1). Skema ini tidak efisien
-  dan tidak cocok untuk obrolan grup. Untuk mengirim pesan ke 5
-  orang, aplikasi harus mengenkripsi pesan yang sama sebanyak 5
-  kali, satu untuk setiap penerima.
+### Rencana Implementasi Fitur "Lupa Password"
 
-  Standar industri untuk E2EE dalam obrolan grup (seperti yang
-  digunakan oleh Signal) adalah:
-   1. Kunci Sesi: Pengirim membuat sebuah kunci simetris acak
-      (misalnya, kunci AES).
-   2. Enkripsi Pesan: Pesan dienkripsi satu kali saja menggunakan
-      kunci simetris tersebut.
-   3. Distribusi Kunci: Kunci simetris itu kemudian dienkripsi unk
-      setiap anggota grup menggunakan kunci publik masing-masing
-      anggota.
-   4. Pengiriman: Pengirim mengirim satu paket berisi pesan yang
-      terenkripsi dan kumpulan kunci sesi yang sudah terenkripsi
-      untuk tiap anggota.
+Fitur ini memberikan jalan keluar bagi pengguna yang lupa password dan frasa pemulihan, dengan konsekuensi riwayat pesan lama tidak bisa didekripsi.
+
+#### 1. Komponen Layanan Email
+Kita akan menggunakan layanan pihak ketiga untuk mengirim email reset.
+
+*   **Library:** **`Nodemailer`** untuk Node.js.
+*   **Layanan Pengembangan:** **Mailtrap.io** untuk menangkap email keluar selama pengembangan tanpa mengirim ke inbox asli.
+*   **Layanan Produksi:** **SendGrid** atau **Mailgun** (memiliki *free tier* yang cukup).
+*   **Aksi:** Instal library di direktori `server`:
+    ```bash
+    npm install nodemailer
+    npm install -D @types/nodemailer
+    ```
+
+#### 2. Komponen Backend (Server)
+
+*   **Modifikasi Skema Database (`prisma/schema.prisma`):**
+    Tambahkan kolom opsional pada model `User` untuk menyimpan token reset.
+    ```prisma
+    model User {
+      // ... kolom yang sudah ada
+      passwordResetToken   String?   @unique
+      passwordResetExpires DateTime?
+    }
+    ```
+
+*   **Endpoint API Baru (`server/src/routes/auth.ts`):**
+    1.  `POST /api/auth/forgot-password`:
+        - Menerima `email` pengguna.
+        - Membuat token reset yang aman dan unik.
+        - Menyimpan *hash* dari token dan waktu kedaluwarsanya di database.
+        - Menggunakan `Nodemailer` untuk mengirim email berisi link reset ke pengguna.
+    2.  `POST /api/auth/reset-password`:
+        - Menerima `token` dan `newPassword`.
+        - Memverifikasi token dan masa berlakunya.
+        - Jika valid, perbarui password pengguna dan hapus token dari database.
+
+*   **Utilitas Email (`server/src/utils/sendEmail.ts`):**
+    - Buat fungsi terpusat untuk mengonfigurasi dan mengirim email menggunakan `Nodemailer`.
+
+#### 3. Komponen Frontend (Klien)
+
+*   **Halaman Baru:**
+    1.  **`web/src/pages/ForgotPassword.tsx`**: Form sederhana untuk pengguna memasukkan email mereka dan meminta link reset.
+    2.  **`web/src/pages/ResetPassword.tsx`**: Form untuk memasukkan password baru, diakses dari link di email. Halaman ini akan mengambil `token` dari parameter URL.
+
+*   **Logika Penghapusan Kunci Lama:**
+    - Setelah pengguna berhasil login dengan password baru hasil reset, aplikasi perlu menangani kunci enkripsi lama yang tidak bisa lagi didekripsi.
+    - **Alur:**
+        1.  Setelah login, aplikasi mencoba mendekripsi kunci privat utama dan gagal.
+        2.  Tangani kegagalan ini dengan memunculkan **modal peringatan** yang jelas: *"Kami mendeteksi Anda baru saja mereset password. Untuk melanjutkan, kunci enkripsi baru akan dibuat. **Semua riwayat pesan lama Anda tidak akan bisa dibaca lagi.**"*
+        3.  Setelah pengguna menekan "Setuju", panggil fungsi `regenerateKeys(newPassword)` yang sudah ada di `web/src/store/auth.ts` untuk menghapus kunci lama dan membuat yang baru.
 
 ## Kesimpulan
 

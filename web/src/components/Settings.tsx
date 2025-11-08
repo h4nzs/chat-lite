@@ -35,7 +35,9 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
   >
     <span
       aria-hidden="true"
-      className={`inline-block h-5 w-5 transform rounded-full bg-bg-surface shadow-neumorphic-convex ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-6' : 'translate-x-1'}`}
+      className={`inline-block h-5 w-5 transform rounded-full shadow-neumorphic-convex ring-0 transition duration-200 ease-in-out ${
+        checked ? 'translate-x-6 bg-accent' : 'translate-x-1 bg-bg-surface'
+      }`}
     />
   </button>
 );

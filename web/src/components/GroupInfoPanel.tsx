@@ -10,6 +10,8 @@ import { toAbsoluteUrl } from '@utils/url';
 import { FiEdit2, FiLogOut, FiPlus, FiX } from 'react-icons/fi';
 import { useGlobalEscape } from '../hooks/useGlobalEscape';
 import MediaGallery from './MediaGallery';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedTabs } from './ui/AnimatedTabs';
 
 const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; onClose: () => void; }) => {
   const { conversation } = useConversationStore(state => ({
@@ -22,6 +24,11 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // State for tabs
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const tabs = [
+    { id: 'details', label: 'Details' },
+    { id: 'media', label: 'Media' },
+  ];
 
   useEffect(() => {
     const timer = setTimeout(() => setIsPanelOpen(true), 10);
@@ -93,85 +100,92 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
           <h2 className="text-xl font-bold text-text-primary">Group Info</h2>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-bg-main p-4 md:p-6 space-y-6">
+        <main className="relative flex-1 overflow-y-auto bg-bg-main p-4 md:p-6 space-y-6">
           <div className="px-4 md:px-0 mb-4">
-            <div className="flex space-x-2 bg-bg-main p-1 rounded-full shadow-neumorphic-concave">
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'details' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-              >
-                Details
-              </button>
-              <button
-                onClick={() => setActiveTab('media')}
-                className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'media' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-              >
-                Media
-              </button>
-            </div>
+            <AnimatedTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
 
-          {activeTab === 'details' && (
-            <div className="space-y-6">
-              {/* Group Identity Card */}
-              <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex p-6 text-center relative">
-                <div className="relative w-24 h-24 mx-auto mb-4">
-                  <img 
-                    src={avatarSrc}
-                    alt="Group Avatar"
-                    className="w-full h-full rounded-full object-cover bg-bg-primary"
-                  />
-                  {amIAdmin && (
-                    <>
-                      <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 bg-accent-gradient rounded-full p-2 text-white hover:opacity-90" aria-label="Change group avatar">
-                        <FiEdit2 size={16} />
+          <AnimatePresence mode="wait">
+            {activeTab === 'details' && (
+              <motion.div
+                key="group-details"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-24 left-0 w-full px-4 md:px-6" // Adjust top based on header/tab height
+              >
+                <div className="space-y-6">
+                  {/* Group Identity Card */}
+                  <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex p-6 text-center relative">
+                    <div className="relative w-24 h-24 mx-auto mb-4">
+                      <img
+                        src={avatarSrc}
+                        alt="Group Avatar"
+                        className="w-full h-full rounded-full object-cover bg-bg-primary"
+                      />
+                      {amIAdmin && (
+                        <>
+                          <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 bg-accent-gradient rounded-full p-2 text-white hover:opacity-90" aria-label="Change group avatar">
+                            <FiEdit2 size={16} />
+                          </button>
+                          <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
+                        </>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-bold text-text-primary">{conversation.title}</h3>
+                    <p className="text-text-secondary mt-1">{conversation.description || 'No description'}</p>
+                    {amIAdmin && (
+                      <button onClick={() => setIsEditing(true)} className="absolute top-4 right-4 text-text-secondary hover:text-accent-color">
+                        <FiEdit2 size={20} />
                       </button>
-                      <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
-                    </>
-                  )}
-                </div>
-                <h3 className="text-2xl font-bold text-text-primary">{conversation.title}</h3>
-                <p className="text-text-secondary mt-1">{conversation.description || 'No description'}</p>
-                {amIAdmin && (
-                  <button onClick={() => setIsEditing(true)} className="absolute top-4 right-4 text-text-secondary hover:text-accent-color">
-                    <FiEdit2 size={20} />
-                  </button>
-                )}
-              </div>
+                    )}
+                  </div>
 
-              {/* Members Card */}
-              <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
-                <div className="p-6 border-b border-border">
-                  <h4 className="text-lg font-semibold text-text-primary">{conversation.participants.length} Members</h4>
-                  {amIAdmin && (
-                    <button 
-                      onClick={() => setIsAddParticipantModalOpen(true)}
-                      className="w-full flex items-center justify-center p-3 mt-4 rounded-lg text-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                  {/* Members Card */}
+                  <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
+                    <div className="p-6 border-b border-border">
+                      <h4 className="text-lg font-semibold text-text-primary">{conversation.participants.length} Members</h4>
+                      {amIAdmin && (
+                        <button
+                          onClick={() => setIsAddParticipantModalOpen(true)}
+                          className="w-full flex items-center justify-center p-3 mt-4 rounded-lg text-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+                        >
+                          <FiPlus className="mr-2" />
+                          <span>Add Participants</span>
+                        </button>
+                      )}
+                    </div>
+                    <ParticipantList conversationId={conversation.id} participants={conversation.participants} amIAdmin={amIAdmin} />
+                  </div>
+
+                  {/* Actions Card */}
+                  <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
+                    <button
+                      onClick={handleLeaveGroup}
+                      className="w-full flex items-center justify-center p-4 font-semibold text-red-500 shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all rounded-xl"
                     >
-                      <FiPlus className="mr-2" />
-                      <span>Add Participants</span>
+                      <FiLogOut className="mr-3" />
+                      <span>Leave Group</span>
                     </button>
-                  )}
+                  </div>
                 </div>
-                <ParticipantList conversationId={conversation.id} participants={conversation.participants} amIAdmin={amIAdmin} />
-              </div>
+              </motion.div>
+            )}
 
-              {/* Actions Card */}
-              <div className="bg-bg-surface rounded-xl shadow-neumorphic-convex">
-                <button 
-                  onClick={handleLeaveGroup}
-                  className="w-full flex items-center justify-center p-4 font-semibold text-red-500 shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all rounded-xl"
-                >
-                  <FiLogOut className="mr-3" />
-                  <span>Leave Group</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'media' && (
-            <MediaGallery conversationId={conversation.id} />
-          )}
+            {activeTab === 'media' && (
+              <motion.div
+                key="group-media"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-24 left-0 w-full px-4 md:px-6" // Adjust top based on header/tab height
+              >
+                <MediaGallery conversationId={conversation.id} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
 
         {isEditing && (

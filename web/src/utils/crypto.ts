@@ -145,12 +145,19 @@ export async function decryptMessage(
   }
 
   const sodium = await getSodium();
-  const key = await getKeyFromDb(conversationId, sessionId);
+  let key = await getKeyFromDb(conversationId, sessionId);
 
   if (!key) {
-    // We don't have the key for this session. This can happen if the user
-    // cleared their storage or is on a new device.
-    return '[Decryption key not found for this message]';
+    console.warn(`Key for session ${sessionId} not found locally. Attempting to fetch from server...`);
+    try {
+      key = await requestMissingKeyFromServer(conversationId, sessionId);
+      if (!key) {
+        return '[Decryption key not found for this message]';
+      }
+    } catch (error) {
+      console.error(`Failed to fetch missing key for session ${sessionId}:`, error);
+      return '[Failed to retrieve decryption key]';
+    }
   }
 
   try {
@@ -169,3 +176,28 @@ export async function decryptMessage(
     return '[Failed to decrypt message]';
   }
 }
+
+/**
+ * Requests a specific session key from the server, decrypts it, and stores it.
+ * This is used when a message needs a key that isn't available locally.
+ */
+async function requestMissingKeyFromServer(conversationId: string, sessionId: string): Promise<Uint8Array | null> {
+  const { encryptedKey } = await api<{ encryptedKey: string }>(`/api/session-keys/request`, {
+    method: 'POST',
+    body: { conversationId, sessionId },
+  });
+
+  if (!encryptedKey) {
+    throw new Error('Server did not return an encrypted key.');
+  }
+
+  const { publicKey, privateKey } = await getMyKeyPair();
+  const sodium = await getSodium();
+  const sessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
+
+  await addSessionKey(conversationId, sessionId, sessionKey);
+  console.log(`Successfully fetched and stored missing session key ${sessionId} for ${conversationId}`);
+  
+  return sessionKey;
+}
+    

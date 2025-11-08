@@ -15,6 +15,7 @@ import clsx from 'clsx';
 import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
 import { FiRefreshCw } from 'react-icons/fi'; // Import retry icon
 import { getUserColor } from '@utils/color';
+import { FaCheck, FaCheckDouble } from 'react-icons/fa';
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -34,7 +35,7 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
 
   const otherParticipants = conversation?.participants?.filter(p => p.id !== meId) || [];
   if (otherParticipants.length === 0) {
-    return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+    return <FaCheck title="Sent" size={16} />;
   }
 
   const statuses = message.statuses || [];
@@ -43,10 +44,18 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   );
 
   if (isReadAll) {
-    return <svg title="Read by all" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+    return <FaCheckDouble title="Read by all" size={16} className="text-green-500" />;
   }
 
-  return <svg title="Sent" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+  const isDeliveredAll = otherParticipants.every(p => 
+    statuses.some(s => s.userId === p.id && s.status === 'DELIVERED')
+  );
+
+  if (isDeliveredAll) {
+    return <FaCheckDouble title="Delivered to all" size={16} />;
+  }
+
+  return <FaCheck title="Sent" size={16} />;
 };
 
 const ReplyQuote = ({ message }: { message: Message }) => {

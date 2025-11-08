@@ -205,7 +205,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   },
 
   loadMessagesForConversation: async (id) => {
-    if (get().messages[id]) return;
+    if (get().messages[id]?.length > 0) return;
 
     // Ensure a session key exists before fetching messages
     try {
@@ -223,17 +223,35 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       }));
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
-      decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      set({ messages: { [id]: decryptedItems } });
+      
+      set(state => {
+        const existingMessages = state.messages[id] || [];
+        const messageMap = new Map(existingMessages.map(m => [m.id, m]));
+        decryptedItems.forEach(m => messageMap.set(m.id, m));
+        
+        const allMessages = Array.from(messageMap.values());
+        allMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-      // If the first page was not a full page, there are no more messages.
-      if (decryptedItems.length < 50) {
-        set(state => ({ hasMore: { ...state.hasMore, [id]: false } }));
-      } else {
-        // Immediately try to load the previous page to ensure the screen is filled
-        // enough to allow scrolling, which will then trigger further pagination.
-        await get().loadPreviousMessages(id);
-      }
+        const newState = {
+          ...state,
+          messages: {
+            ...state.messages,
+            [id]: allMessages,
+          },
+          hasMore: {
+            ...state.hasMore,
+            [id]: decryptedItems.length >= 50,
+          }
+        };
+
+        // Immediately try to load the previous page if the screen isn't full
+        if (decryptedItems.length >= 50) {
+          get().loadPreviousMessages(id);
+        }
+        
+        return newState;
+      });
+
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
       set(state => ({ messages: { ...state.messages, [id]: [] } }));

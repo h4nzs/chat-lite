@@ -163,13 +163,27 @@ router.post("/", async (req, res, next) => {
     // Create and distribute session keys for the new conversation
     await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
 
+    // --- FIX: Transform the conversation object to match client-side expectations ---
+    const transformedConversation = {
+      ...newConversation,
+      participants: newConversation.participants.map(p => ({
+        ...p.user,
+        role: p.role
+      })),
+      unreadCount: 1, // For the recipient
+      lastMessage: null, // A new conversation has no last message
+    };
+    // --- END FIX ---
+
     const io = getIo();
     const otherParticipants = allUserIds.filter(uid => uid !== creatorId);
     otherParticipants.forEach(userId => {
-      io.to(userId).emit("conversation:new", newConversation);
+      io.to(userId).emit("conversation:new", transformedConversation);
     });
 
-    res.status(201).json(newConversation);
+    // Also respond to the initiator with the transformed object for consistency
+    const initiatorConversation = { ...transformedConversation, unreadCount: 0 };
+    res.status(201).json(initiatorConversation);
   } catch (error) {
     next(error);
   }
