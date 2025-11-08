@@ -8,8 +8,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrientation } from '@hooks/useOrientation';
 import OnboardingTour from '@components/OnboardingTour';
+import { useParams, useNavigate } from 'react-router-dom';
 
 export default function Chat() {
+  const { conversationId } = useParams<{ conversationId: string }>();
+  const navigate = useNavigate();
+
   const {
     activeId,
     openConversation,
@@ -34,6 +38,20 @@ export default function Chat() {
     ? activeConversation.participants.find(p => p.id !== user?.id) 
     : null;
 
+  // Load initial conversations
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    }
+  }, [user, loadConversations]);
+
+  // Sync activeId from URL to store
+  useEffect(() => {
+    if (conversationId && conversationId !== activeId) {
+      openConversation(conversationId);
+    }
+  }, [conversationId, activeId, openConversation]);
+
   // Check if onboarding tour needs to be shown
   useEffect(() => {
     if (user && user.hasCompletedOnboarding === false) {
@@ -41,31 +59,8 @@ export default function Chat() {
     }
   }, [user]);
 
-  // Load initial conversations and open the last active one
-  useEffect(() => {
-    if (user) {
-      loadConversations().then(() => {
-        const savedId = localStorage.getItem("activeId");
-        if (savedId) {
-          openConversation(savedId);
-        }
-      });
-    }
-  }, [user, loadConversations, openConversation]);
-
-  // Check if activeId is valid, otherwise reset and open sidebar
-  useEffect(() => {
-    if (activeId && conversations.length > 0) {
-      const conversationExists = conversations.some(c => c.id === activeId);
-      if (!conversationExists) {
-        useConversationStore.setState({ activeId: null, isSidebarOpen: true });
-        localStorage.removeItem("activeId");
-      }
-    }
-  }, [activeId, conversations]);
-
   const handleSelectConversation = (id: string) => {
-    openConversation(id);
+    navigate(`/chat/${id}`);
     // On mobile, hide the sidebar after selecting a conversation
     if (window.innerWidth < 768 && isSidebarOpen) {
       toggleSidebar();

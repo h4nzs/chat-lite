@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Restore from './pages/Restore';
@@ -26,8 +26,33 @@ import { useCommandPaletteStore } from './store/commandPalette';
 import CommandPalette from './components/CommandPalette';
 import { FiLogOut, FiSettings } from 'react-icons/fi';
 import { syncSessionKeys } from './utils/sessionSync';
+import { useConversationStore } from './store/conversation';
 
 let isSyncing = false;
+
+// New component to handle root navigation
+const Home = () => {
+  const { conversations, loading } = useConversationStore(state => ({
+    conversations: state.conversations,
+    loading: state.loading,
+  }));
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center">
+        {/* You can replace this with a proper Spinner component */}
+        <p>Loading conversations...</p>
+      </div>
+    );
+  }
+
+  if (conversations.length > 0) {
+    return <Navigate to={`/chat/${conversations[0].id}`} replace />;
+  }
+
+  // If there are no conversations, render the Chat page in a welcome/empty state
+  return <Chat />;
+};
 
 const AppContent = () => {
   const { theme, accent } = useThemeStore();
@@ -134,7 +159,8 @@ const AppContent = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/restore" element={<Restore />} />
         <Route path="/link-device" element={<LinkDevicePage />} />
-        <Route path="/" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/chat/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
         <Route path="/settings/sessions" element={<ProtectedRoute><SessionManagerPage /></ProtectedRoute>} />

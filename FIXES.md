@@ -51,7 +51,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
     1.  **Hapus Inisialisasi dari `localStorage`:** Hentikan pembacaan `localStorage` saat store diinisialisasi.
     2.  **Gunakan URL sebagai Sumber Kebenaran:** Jadikan URL sebagai satu-satunya sumber kebenaran untuk percakapan aktif. Misalnya, gunakan rute seperti `/chat/:conversationId`. Saat aplikasi dimuat, ambil `conversationId` dari parameter URL untuk menentukan `activeId`. Ini adalah pola yang lebih standar dan kuat di aplikasi React.
 
-### [ERROR] Penanganan Error yang Kurang Baik pada `loadConversations`
+### [done] Penanganan Error yang Kurang Baik pada `loadConversations`
 - **Lokasi:** `web/src/store/conversation.ts`
 - **Deskripsi:** Di dalam `loadConversations`, jika panggilan API gagal, state `error` diatur, tetapi tidak ada mekanisme untuk membersihkan error tersebut atau mencoba lagi. Pengguna mungkin akan melihat pesan error selamanya tanpa bisa melakukan apa-apa.
 - **Rekomendasi:**

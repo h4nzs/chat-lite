@@ -71,11 +71,14 @@ const withPreview = (msg: Message): Message => {
 
 // --- State Type ---
 
+// --- State Type ---
+
 type State = {
   conversations: Conversation[];
   activeId: string | null;
   isSidebarOpen: boolean;
   error: string | null;
+  loading: boolean;
 
   // Actions
   loadConversations: () => Promise<void>;
@@ -95,15 +98,14 @@ type State = {
   clearError: () => void;
 };
 
-const initialActiveId = typeof window !== 'undefined' ? localStorage.getItem("activeId") : null;
-
 // --- Zustand Store ---
 
 export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   conversations: [],
-  activeId: initialActiveId,
+  activeId: null,
   isSidebarOpen: false,
   error: null,
+  loading: false,
 
   clearError: () => set({ error: null }),
 
@@ -114,7 +116,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
 
   loadConversations: async () => {
     try {
-      set({ error: null });
+      set({ loading: true, error: null });
       const rawConversations = await api<any[]>("/api/conversations");
       const conversations: Conversation[] = rawConversations.map(c => ({
         ...c,
@@ -145,6 +147,8 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
     } catch (error) {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
+    } finally {
+      set({ loading: false });
     }
   },
 
@@ -157,7 +161,6 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
         c.id === id ? { ...c, unreadCount: 0 } : c
       ),
     }));
-    localStorage.setItem("activeId", id);
 
     // Inform the backend that the conversation has been read
     authFetch(`/api/conversations/${id}/read`, { method: 'POST' }).catch(console.error);
@@ -188,7 +191,6 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
     set(state => {
       const wasActive = state.activeId === conversationId;
       if (wasActive) {
-        localStorage.removeItem("activeId");
         return {
           conversations: state.conversations.filter(c => c.id !== conversationId),
           activeId: null,
