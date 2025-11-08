@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useConversationStore } from '@store/conversation';
 import { usePresenceStore } from '@store/presence';
 import { useAuthStore, type User } from '@store/auth';
-import { api } from '@lib/api';
+import { authFetch } from '@lib/api';
 import { debounce } from 'lodash';
 
 export function useChatList() {
@@ -45,7 +45,7 @@ export function useChatList() {
       }
       setIsSearching(true);
       try {
-        const users = await api<User[]>(`/api/users/search?q=${query}`);
+        const users = await authFetch<User[]>(`/api/users/search?q=${query}`);
         setSearchResults(users);
       } catch (err) {
         console.error("Search failed", err);

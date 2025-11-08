@@ -167,15 +167,25 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
     authFetch(`/api/conversations/${id}/read`, { method: 'POST' }).catch(console.error);
   },
 
-  deleteConversation: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
-  deleteGroup: async (id) => { await api(`/api/conversations/${id}`, { method: 'DELETE' }); },
+  deleteConversation: async (id) => { 
+    await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+    get().removeConversation(id);
+  },
+  deleteGroup: async (id) => { 
+    await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+    get().removeConversation(id);
+  },
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
 
   startConversation: async (peerId) => {
-    const conv = await api<Conversation>("/api/conversations", {
+    const conv = await authFetch<Conversation>("/api/conversations", {
       method: "POST",
       body: JSON.stringify({ userIds: [peerId], isGroup: false }),
     });
+    
+    // Join the socket room for real-time updates
+    getSocket().emit("conversation:join", conv.id);
+
     get().addOrUpdateConversation(conv);
     set({ activeId: conv.id, isSidebarOpen: false });
     return conv.id;

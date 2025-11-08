@@ -49,7 +49,15 @@ export function getSocket() {
       const userId = useAuthStore.getState().user?.id;
       if (userId) {
         socket?.emit("presence:update", { userId, online: true });
-      }
+      });
+    });
+
+    socket.on("conversation:new", (newConversation) => {
+      console.log("[Socket] Received new conversation:", newConversation);
+      useConversationStore.getState().addOrUpdateConversation(newConversation);
+      // Also join the room for this new conversation
+      socket?.emit("conversation:join", newConversation.id);
+      toast.success(`You've been added to "${newConversation.title || 'a new chat'}"`);
     });
 
     // --- Listener for Key Recovery ---

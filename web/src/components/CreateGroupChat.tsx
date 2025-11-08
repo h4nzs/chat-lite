@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useConversationStore, type Conversation } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
-import { api } from '@lib/api';
+import { authFetch } from '@lib/api';
 import toast from 'react-hot-toast';
 import ModalBase from './ui/ModalBase';
 
@@ -31,7 +31,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     }
     const timer = setTimeout(async () => {
       try {
-        const results = await api<UserSearchResult[]>(`/api/users/search?q=${searchQuery}`);
+        const results = await authFetch<UserSearchResult[]>(`/api/users/search?q=${searchQuery}`);
         const selectedIds = selectedUsers.map(u => u.id);
         setUserList(results.filter(u => u.id !== me?.id && !selectedIds.includes(u.id)));
       } catch {
@@ -55,8 +55,11 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
       return toast.error("Group name and at least one member are required.");
     }
     setLoading(true);
+import { getSocket } from '@lib/socket';
+
+// ... (inside handleCreateGroup function)
     try {
-      const newConversation = await api<Conversation>("/api/conversations", {
+      const newConversation = await authFetch<Conversation>("/api/conversations", {
         method: "POST",
         body: JSON.stringify({
           title: title.trim(),
@@ -64,6 +67,9 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
           isGroup: true,
         }),
       });
+
+      // Join the socket room for real-time updates
+      getSocket().emit("conversation:join", newConversation.id);
 
       addOrUpdateConversation(newConversation);
       openConversation(newConversation.id);
