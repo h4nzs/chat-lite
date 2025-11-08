@@ -1,7 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { api } from "@lib/api";
 import { getSocket } from "@lib/socket";
-import { encryptMessage, decryptMessage } from "@utils/crypto";
+import { encryptMessage, decryptMessage, ensureAndRatchetSession } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation"; // Import type from conversation store
@@ -206,6 +206,16 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
 
   loadMessagesForConversation: async (id) => {
     if (get().messages[id]) return;
+
+    // Ensure a session key exists before fetching messages
+    try {
+      await ensureAndRatchetSession(id);
+    } catch (ratchetError) {
+      console.error("Failed to establish session, decryption may fail:", ratchetError);
+      toast.error("Could not establish a secure session. Messages may not decrypt.");
+      // We can still try to load messages, they will just fail to decrypt individually
+    }
+
     try {
       set(state => ({ 
         hasMore: { ...state.hasMore, [id]: true },

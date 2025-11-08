@@ -156,6 +156,14 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
     const publicKeyB64 = sodium.to_base64(publicKeyBytes, sodium.base64_variants.ORIGINAL);
 
+    // --- Definitive Validation Step ---
+    if (!publicKeyB64 || typeof publicKeyB64 !== 'string') {
+      throw new Error("FATAL: Generated public key is invalid.");
+    }
+    if (!phrase || typeof phrase !== 'string') {
+      throw new Error("FATAL: Generated recovery phrase is invalid.");
+    }
+
     const res = await api<{ user: User }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhrase: phrase }),

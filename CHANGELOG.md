@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2025-11-08
+
+This release introduces a complete and robust account restore flow, ensuring users can access their full, decrypted message history on a new device. It also fixes critical bugs related to the restore process.
+
+### Added
+
+- **Full History Sync on Restore:** When restoring an account with a recovery phrase, the application now automatically fetches, decrypts, and stores the entire history of message encryption keys. This allows users to seamlessly view their old, encrypted messages on a new device.
+- **Backend Sync Endpoint:** Created a new, secure API endpoint (`/api/session-keys/sync`) to facilitate the secure transfer of historical keys to a newly restored device.
+
+### Fixed
+
+- **Failed Decryption on New Device:** Fixed the critical bug where messages in existing conversations would fail to decrypt after restoring an account.
+- **Stuck "Syncing" Notification:** Resolved an issue where the "Syncing message keys..." notification would get stuck in a loading state. This was traced to a race condition in React's Strict Mode and has been fixed by preventing concurrent synchronization processes.
+
+### Changed
+
+- **Code Cleanup:** Removed an obsolete and unused encryption utility file (`web/src/utils/e2ee.ts`) to reduce technical debt and improve clarity.
+
 ## [1.0.9] - 2025-11-06
 
 This release focuses on improving UI clarity and accessibility.

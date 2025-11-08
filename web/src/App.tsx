@@ -25,6 +25,9 @@ import { useGlobalShortcut } from './hooks/useGlobalShortcut';
 import { useCommandPaletteStore } from './store/commandPalette';
 import CommandPalette from './components/CommandPalette';
 import { FiLogOut, FiSettings } from 'react-icons/fi';
+import { syncSessionKeys } from './utils/sessionSync';
+
+let isSyncing = false;
 
 const AppContent = () => {
   const { theme, accent } = useThemeStore();
@@ -68,6 +71,26 @@ const AppContent = () => {
   useEffect(() => {
     bootstrap();
   }, [bootstrap]);
+
+  // --- NEW: Trigger key sync after user is loaded and UI is ready ---
+  useEffect(() => {
+    const sync = async () => {
+      if (user && sessionStorage.getItem('keys_synced') !== 'true' && !isSyncing) {
+        try {
+          isSyncing = true;
+          await syncSessionKeys();
+          sessionStorage.setItem('keys_synced', 'true');
+        } catch (error) {
+          console.error("An error occurred during key synchronization:", error);
+          // The toast in syncSessionKeys should handle user feedback
+        } finally {
+          isSyncing = false;
+        }
+      }
+    };
+    sync();
+  }, [user]);
+  // --- END NEW ---
 
   useEffect(() => {
     if (user) {

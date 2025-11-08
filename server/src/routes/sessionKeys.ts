@@ -8,6 +8,54 @@ import { createAndDistributeSessionKeys } from "../utils/sessionKeys.js";
 const router = Router();
 router.use(requireAuth);
 
+// GET all encrypted session keys for a user across ALL conversations
+router.get("/sync", async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // 1. Find all conversations the user is a participant in
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: { some: { userId } },
+      },
+      select: { id: true },
+    });
+
+    const conversationIds = conversations.map(c => c.id);
+
+    // 2. Fetch all session keys for this user in those conversations
+    const allKeys = await prisma.sessionKey.findMany({
+      where: {
+        userId,
+        conversationId: { in: conversationIds },
+      },
+      select: {
+        conversationId: true,
+        sessionId: true,
+        encryptedKey: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // 3. Group keys by conversationId
+    const groupedKeys = allKeys.reduce((acc, key) => {
+      if (!acc[key.conversationId]) {
+        acc[key.conversationId] = [];
+      }
+      acc[key.conversationId].push({
+        sessionId: key.sessionId,
+        encryptedKey: key.encryptedKey,
+      });
+      return acc;
+    }, {} as Record<string, { sessionId: string; encryptedKey: string }[]>);
+
+    res.json(groupedKeys);
+
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET all encrypted session keys for a user in a conversation
 router.get("/:conversationId", async (req, res, next) => {
   try {

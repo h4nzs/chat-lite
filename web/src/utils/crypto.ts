@@ -39,7 +39,7 @@ async function getPassword(): Promise<string> {
   });
 }
 
-async function getMyKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
+export async function getMyKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
   if (userPrivateKey && userPublicKey) {
     return { publicKey: userPublicKey, privateKey: userPrivateKey };
   }

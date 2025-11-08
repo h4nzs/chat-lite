@@ -28,7 +28,7 @@ export default function Restore() {
       return;
     }
 
-    const trimmedPhrase = phrase.trim().replace(/\s+/g, ' ');
+    const trimmedPhrase = phrase.trim();
     const wordCount = trimmedPhrase.split(' ').length;
 
     if (wordCount !== 24) {

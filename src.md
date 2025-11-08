@@ -91,6 +91,27 @@ Memperkuat fondasi keamanan aplikasi.
   - **Konsep:** Menganggap semua input dari pengguna sebagai tidak tepercaya.
   - **Implementasi:** Memastikan semua data yang dikirim ke server (pesan, nama grup, deskripsi profil) divalidasi dan disanitasi secara ketat di backend untuk mencegah serangan seperti XSS (Cross-Site Scripting).
 
+**Masalah: Obrolan Grup (Group Chat)**
+
+  Implementasi saat ini (crypto_box_easy) dirancang untuk
+  komunikasi antara dua orang (1-on-1). Skema ini tidak efisien
+  dan tidak cocok untuk obrolan grup. Untuk mengirim pesan ke 5
+  orang, aplikasi harus mengenkripsi pesan yang sama sebanyak 5
+  kali, satu untuk setiap penerima.
+
+  Standar industri untuk E2EE dalam obrolan grup (seperti yang
+  digunakan oleh Signal) adalah:
+   1. Kunci Sesi: Pengirim membuat sebuah kunci simetris acak
+      (misalnya, kunci AES).
+   2. Enkripsi Pesan: Pesan dienkripsi satu kali saja menggunakan
+      kunci simetris tersebut.
+   3. Distribusi Kunci: Kunci simetris itu kemudian dienkripsi unk
+      setiap anggota grup menggunakan kunci publik masing-masing
+      anggota.
+   4. Pengiriman: Pengirim mengirim satu paket berisi pesan yang
+      terenkripsi dan kumpulan kunci sesi yang sudah terenkripsi
+      untuk tiap anggota.
+
 ## Kesimpulan
 
 Aplikasi ini berada di jalur yang benar untuk menjadi aplikasi obrolan yang aman dan modern. Dengan fokus pada penambahan fitur inti yang diminta pengguna dan terus memperkuat aspek teknis serta keamanan, aplikasi ini memiliki potensi besar untuk berkembang.
