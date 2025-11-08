@@ -11,6 +11,7 @@ import { useConversationStore } from '@store/conversation';
 import { useVerificationStore } from '@store/verification';
 import ModalBase from './ui/ModalBase';
 import MediaGallery from './MediaGallery';
+import { AnimatedTabs } from './ui/AnimatedTabs';
 
 // The user type for the profile modal can have an optional email and public key
 type ProfileUser = User & { email?: string; publicKey?: string };
@@ -26,6 +27,11 @@ export default function UserInfoModal() {
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyNumber, setSafetyNumber] = useState('');
   const [activeTab, setActiveTab] = useState('about');
+
+  const tabs = [
+    { id: 'about', label: 'About' },
+    { id: 'media', label: 'Media' },
+  ];
 
   const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
 
@@ -116,19 +122,8 @@ export default function UserInfoModal() {
       >
         <div className="flex flex-col gap-4">
           {/* Tab Switcher */}
-          <div className="flex space-x-2 bg-bg-main p-1 rounded-full shadow-neumorphic-concave">
-            <button
-              onClick={() => setActiveTab('about')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'about' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-            >
-              About
-            </button>
-            <button
-              onClick={() => setActiveTab('media')}
-              className={`w-full py-2 px-4 rounded-full text-sm font-semibold transition-all ${activeTab === 'media' ? 'bg-accent text-white shadow-neumorphic-convex' : 'text-text-secondary'}`}
-            >
-              Media
-            </button>
+          <div className="px-4 md:px-0">
+            <AnimatedTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
 
           {/* Tab Content */}

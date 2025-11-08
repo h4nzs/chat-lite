@@ -5,9 +5,9 @@
 @layer base {
   /* New Professional Color Palette (Dark Mode Default) */
   :root {
-    --bg-main: 222 47% 11%;      /* Slate 900 */
-    --bg-surface: 222 47% 15%;    /* Slate 850 */
-    --border: 217 33% 25%;       /* Slate 700 */
+    --bg-main: 0 0% 10%;          /* Neutral Dark Gray */
+    --bg-surface: 0 0% 13%;    /* Slightly Lighter Gray */
+    --border: 0 0% 20%;       /* Brighter Gray for borders */
     --ring: 217 91% 60%;         /* Blue 500 */
 
     --text-primary: 210 40% 98%;   /* Slate 50 */
@@ -16,7 +16,7 @@
     --primary: 210 40% 98%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 217 33% 25%;
+    --secondary: 0 0% 20%;       /* Match border color */
     --secondary-foreground: 210 40% 98%;
 
     --destructive: 0 72% 51%;
@@ -29,18 +29,18 @@
     --grad-end: 263 100% 37%;   /* Deep Indigo */
 
     /* Neumorphism Shadows */
-    --shadow-light: 215 25% 16%; /* Lighter version of surface - Made more subtle */
-    --shadow-dark: 222 47% 8%;   /* Darker version of surface */
+    --shadow-light: 0 0% 25%; /* Subtle brighter gray for highlight */
+    --shadow-dark: 0 0% 4%;   /* Near-black for deep shadow */
   }
 
   .light {
     --bg-main: 220 16% 90%;      /* Slate 200 - Softer Gray */
-    --bg-surface: 220 20% 96%;    /* Slate 100 - Lighter Gray for elements */
+    --bg-surface: 220 16% 90%;    /* Slate 200 - Same as main for soft UI */
     --border: 215 20% 65%;       /* Slate 400 - Much darker for contrast */
     --ring: 217 91% 60%;         /* Blue 500 */
 
     --text-primary: 222 47% 11%;   /* Slate 900 */
-    --text-secondary: 215 28% 40%; /* Slate 600 */
+    --text-secondary: 215 25% 50%; /* Slate 500 - Darker for contrast */
 
     --primary: 222 47% 11%;
     --primary-foreground: 210 40% 98%;
@@ -59,7 +59,7 @@
 
     /* Neumorphism Shadows */
     --shadow-light: 0 0% 100%;    /* White */
-    --shadow-dark: 220 10% 84%;   /* A darker gray for contrast */
+    --shadow-dark: 220 10% 82%;   /* Darker gray for soft shadow */
   }
 
   /* Accent Color Themes */

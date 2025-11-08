@@ -8,6 +8,12 @@ This is a major architectural release focused on improving the long-term maintai
 
 ### Changed
 
+- **Theming:**
+  - Overhauled the color palettes for both light and dark modes to create a more authentic and cohesive Neumorphic aesthetic.
+  - Dark mode now uses a neutral dark gray theme, removing all blue tints for a "true black" feel.
+  - Light mode now uses a softer, off-gray background for both the main view and component surfaces, creating a more subtle "soft UI" effect.
+  - Adjusted all shadow and border colors to complement the new palettes and enhance the 3D effect.
+
 - **Major State Management Refactor:** The monolithic `useMessageStore` has been broken down into smaller, more focused stores (`useMessageStore`, `useMessageInputStore`, `useMessageSearchStore`) to improve separation of concerns and simplify state management.
 - **Component Logic Extraction:** Refactored the `ChatList` component into a purely presentational component. All of its business logic, state selection, and side effects have been extracted into a new, dedicated `useChatList` custom hook.
 - **Conversation Creation Flow:** Moved 1-on-1 conversation creation logic from a WebSocket event (`message:send`) to the `POST /api/conversations` REST endpoint, making the creation process more explicit and robust.
