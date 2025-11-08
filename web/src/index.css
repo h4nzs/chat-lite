@@ -34,9 +34,9 @@
   }
 
   .light {
-    --bg-main: 220 20% 96%;      /* Slate 100 */
-    --bg-surface: 0 0% 100%;       /* White */
-    --border: 214 32% 91%;       /* Slate 200 */
+    --bg-main: 220 16% 90%;      /* Slate 200 - Softer Gray */
+    --bg-surface: 220 20% 96%;    /* Slate 100 - Lighter Gray for elements */
+    --border: 215 20% 65%;       /* Slate 400 - Much darker for contrast */
     --ring: 217 91% 60%;         /* Blue 500 */
 
     --text-primary: 222 47% 11%;   /* Slate 900 */
@@ -59,7 +59,7 @@
 
     /* Neumorphism Shadows */
     --shadow-light: 0 0% 100%;    /* White */
-    --shadow-dark: 220 20% 85%;   /* Darker version of surface */
+    --shadow-dark: 220 10% 84%;   /* A darker gray for contrast */
   }
 
   /* Accent Color Themes */
