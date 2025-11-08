@@ -2,10 +2,26 @@ import { io, Socket } from "socket.io-client";
 import { toast } from "react-hot-toast";
 import { useAuthStore } from "@store/auth";
 import { useConversationStore } from "@store/conversation";
+import { fulfillKeyRequest } from "@utils/crypto";
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;
 let connectionTimeout: number | null = null;
+
+// --- Emitters for Key Recovery ---
+export function emitSessionKeyRequest(conversationId: string, sessionId: string) {
+  getSocket()?.emit('session:request_key', { conversationId, sessionId });
+}
+
+export function emitSessionKeyFulfillment(payload: {
+  requesterId: string;
+  conversationId: string;
+  sessionId: string;
+  encryptedKey: string;
+}) {
+  getSocket()?.emit('session:fulfill_response', payload);
+}
+
 
 export function getSocket() {
   if (!socket) {
@@ -34,6 +50,17 @@ export function getSocket() {
       if (userId) {
         socket?.emit("presence:update", { userId, online: true });
       }
+    });
+
+    // --- Listener for Key Recovery ---
+    socket.on('session:fulfill_request', (data) => {
+      console.log('[Socket] Received request to fulfill a session key:', data);
+      // This is a fire-and-forget call. The fulfillKeyRequest function will
+      // handle getting the key, re-encrypting it, and emitting the fulfillment event.
+      fulfillKeyRequest(data).catch(error => {
+        console.error('Failed to fulfill key request:', error);
+        // Optionally, emit a failure event back to the server
+      });
     });
 
     socket.on("connect_error", (err: any) => {

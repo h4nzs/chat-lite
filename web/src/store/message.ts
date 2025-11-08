@@ -60,6 +60,7 @@ type State = {
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
   retrySendMessage: (message: Message) => void;
+  redecryptMessages: (conversationId: string) => Promise<void>;
 };
 
 // --- Zustand Store ---
@@ -451,5 +452,19 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
 
     // Kirim ulang pesan
     get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
+  },
+
+  redecryptMessages: async (conversationId: string) => {
+    console.log(`Redecrypting messages for conversation ${conversationId} by re-fetching...`);
+    
+    // Clear the current messages for the conversation to force a full reload
+    set(state => ({
+      messages: { ...state.messages, [conversationId]: [] }
+    }));
+
+    // Call the existing function to load messages, which will now use the new keys
+    await get().loadMessagesForConversation(conversationId);
+    
+    toast.success('Messages re-decrypted!');
   },
 }));

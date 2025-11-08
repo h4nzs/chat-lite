@@ -6,8 +6,8 @@ import {
   addSessionKey,
   getSessionKey as getKeyFromDb,
   getLatestSessionKey,
-  clearAllKeys as clearKeychainDb,
 } from '@lib/keychainDb';
+import { emitSessionKeyFulfillment, emitSessionKeyRequest } from '@lib/socket';
 
 // --- User Private Key Cache (in-memory for one session) ---
 let userPublicKey: Uint8Array | null = null;
@@ -140,24 +140,20 @@ export async function decryptMessage(
   }
   
   if (!sessionId) {
-    // This is likely an old message from before the ratcheting system was implemented.
     return '[Message from an old session, cannot be decrypted]';
   }
 
   const sodium = await getSodium();
-  let key = await getKeyFromDb(conversationId, sessionId);
+  const key = await getKeyFromDb(conversationId, sessionId);
 
   if (!key) {
-    console.warn(`Key for session ${sessionId} not found locally. Attempting to fetch from server...`);
-    try {
-      key = await requestMissingKeyFromServer(conversationId, sessionId);
-      if (!key) {
-        return '[Decryption key not found for this message]';
-      }
-    } catch (error) {
-      console.error(`Failed to fetch missing key for session ${sessionId}:`, error);
-      return '[Failed to retrieve decryption key]';
-    }
+    // Key not found. This happens when receiving messages from a session started while offline.
+    // We will request the key from another online user in the conversation.
+    console.warn(`Key for session ${sessionId} not found locally. Emitting request...`);
+    emitSessionKeyRequest(conversationId, sessionId);
+    
+    // Return a temporary message. The UI will need to re-render when the key arrives.
+    return '[Requesting key to decrypt...]';
   }
 
   try {
@@ -169,35 +165,56 @@ export async function decryptMessage(
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
 
-    const decrypted = sodium.crypto_secretbox_open_easy(encrypted, nonce, key);
-    return sodium.to_string(decrypted);
+    const decrypted = sodium.to_string(sodium.crypto_secretbox_open_easy(encrypted, nonce, key));
+    return decrypted;
   } catch (error) {
     console.error(`Decryption failed for convo ${conversationId}, session ${sessionId}:`, error);
     return '[Failed to decrypt message]';
   }
 }
 
-/**
- * Requests a specific session key from the server, decrypts it, and stores it.
- * This is used when a message needs a key that isn't available locally.
- */
-async function requestMissingKeyFromServer(conversationId: string, sessionId: string): Promise<Uint8Array | null> {
-  const { encryptedKey } = await api<{ encryptedKey: string }>(`/api/session-keys/request`, {
-    method: 'POST',
-    body: { conversationId, sessionId },
-  });
+// --- Key Recovery (Fulfiller Side) ---
 
-  if (!encryptedKey) {
-    throw new Error('Server did not return an encrypted key.');
+interface FulfillRequestPayload {
+  conversationId: string;
+  sessionId: string;
+  requesterId: string;
+  requesterPublicKey: string;
+}
+
+/**
+ * Handles a request from another user to re-encrypt a session key.
+ * This is triggered by a socket event.
+ */
+export async function fulfillKeyRequest(payload: FulfillRequestPayload): Promise<void> {
+  const { conversationId, sessionId, requesterId, requesterPublicKey: requesterPublicKeyB64 } = payload;
+
+  console.log(`Fulfilling key request for session ${sessionId} from user ${requesterId}`);
+
+  // 1. Get the session key from our local DB
+  const key = await getKeyFromDb(conversationId, sessionId);
+  if (!key) {
+    console.error(`Cannot fulfill request: Key for session ${sessionId} not found in our keychain.`);
+    return;
   }
 
-  const { publicKey, privateKey } = await getMyKeyPair();
+  // 2. Re-encrypt it for the requester
   const sodium = await getSodium();
-  const sessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
-
-  await addSessionKey(conversationId, sessionId, sessionKey);
-  console.log(`Successfully fetched and stored missing session key ${sessionId} for ${conversationId}`);
+  const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants.ORIGINAL);
   
-  return sessionKey;
+  // crypto_box_seal_open requires our full keypair, but we are SEALING for them.
+  // We just need their public key.
+  const encryptedKeyForRequester = sodium.crypto_box_seal(key, requesterPublicKey);
+  const encryptedKeyB64 = sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.ORIGINAL);
+
+  // 3. Emit the fulfillment event back
+  emitSessionKeyFulfillment({
+    requesterId,
+    conversationId,
+    sessionId,
+    encryptedKey: encryptedKeyB64,
+  });
+
+  console.log(`Successfully fulfilled and sent re-encrypted key for session ${sessionId} to ${requesterId}`);
 }
     

@@ -247,6 +247,10 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
         const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
         await addSessionKey(conversationId, sessionId, newSessionKey);
         console.log(`Successfully stored new session key ${sessionId}`);
+
+        // Trigger re-decryption for the conversation
+        getStores().msg.redecryptMessages(conversationId);
+        
       } catch (error) {
         console.error("Failed to process new session key:", error);
       }

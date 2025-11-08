@@ -275,6 +275,71 @@ export function registerSocket(httpServer: HttpServer) {
         console.error('Failed to mark message as read:', error);
       }
     });
+
+    // --- Handlers for E2EE Key Recovery ---
+
+    socket.on('session:request_key', async ({ conversationId, sessionId }) => {
+      if (!userId || !conversationId || !sessionId) return;
+
+      try {
+        // 1. Find other online participants in the same conversation
+        const participants = await prisma.participant.findMany({
+          where: {
+            conversationId,
+            userId: { not: userId }, // Exclude the requester
+          },
+          select: { userId: true },
+        });
+
+        const onlineParticipants = participants.filter(p => onlineUsers.has(p.userId));
+
+        if (onlineParticipants.length === 0) {
+          console.log(`[Key Request] No online users found in convo ${conversationId} to fulfill key request for ${sessionId}`);
+          // Optional: could emit an event back to the requester indicating failure
+          return;
+        }
+
+        // 2. Pick one online user to be the fulfiller (e.g., the first one)
+        const fulfillerId = onlineParticipants[0].userId;
+
+        // 3. Get the requester's public key
+        const requester = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { publicKey: true },
+        });
+
+        if (!requester?.publicKey) {
+          console.error(`[Key Request] Requester ${userId} has no public key.`);
+          return;
+        }
+
+        // 4. Emit an event to the fulfiller, asking them to re-encrypt the key
+        console.log(`[Key Request] Asking ${fulfillerId} to fulfill key request for ${userId} (session: ${sessionId})`);
+        io.to(fulfillerId).emit('session:fulfill_request', {
+          conversationId,
+          sessionId,
+          requesterId: userId,
+          requesterPublicKey: requester.publicKey,
+        });
+
+      } catch (error) {
+        console.error('[Key Request] Error processing session:request_key', error);
+      }
+    });
+
+    socket.on('session:fulfill_response', ({ requesterId, conversationId, sessionId, encryptedKey }) => {
+      if (!userId || !requesterId || !encryptedKey) return;
+
+      // The fulfiller (current socket user) is sending a key for the requester.
+      // Simply relay it to the requester.
+      console.log(`[Key Fulfill] Relaying key for session ${sessionId} from ${userId} to ${requesterId}`);
+      io.to(requesterId).emit('session:new_key', {
+        conversationId,
+        sessionId,
+        encryptedKey,
+      });
+    });
+
   });
 
   return io;

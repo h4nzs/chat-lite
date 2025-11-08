@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2025-11-08
+
+This release focuses on enhancing user experience with smoother UI transitions and a critical improvement to end-to-end encryption key recovery for offline messages.
+
+### Added
+
+- **Real-time E2EE Key Recovery:** Implemented a robust client-to-client key recovery mechanism via WebSocket. When a user comes online and encounters messages encrypted with a session key they don't possess (e.g., sent while offline), the client now securely requests the missing key from another online participant in the conversation.
+  - Server-side Socket.IO now orchestrates key requests and fulfillment between clients.
+  - Client-side Socket.IO handles emitting key requests and fulfilling requests from other clients.
+  - Client-side cryptographic logic (`crypto.ts`) now non-blockingly requests keys and re-encrypts keys for other clients.
+  - Client-side message store (`message.ts`) now re-decrypts messages after a missing key is successfully received.
+
+### Changed
+
+- **Animated Tab Indicators:** Refactored tab components (`GroupInfoPanel`, `UserInfoPanel`) to use a new `AnimatedTabs` component. The active tab indicator now slides smoothly between tabs using `framer-motion`'s `tween` transition, providing a more dynamic and responsive UI.
+- **Backdrop Contrast Improvement:** Adjusted the styling of `backdrop-blur` elements to ensure better color contrast in both light and and dark themes, making blurred backgrounds darker in light mode and lighter in dark mode.
+
 ## [1.1.0] - 2025-11-08
 
 This release introduces a complete and robust account restore flow, ensuring users can access their full, decrypted message history on a new device. It also fixes critical bugs related to the restore process.
