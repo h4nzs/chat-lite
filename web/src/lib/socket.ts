@@ -49,7 +49,7 @@ export function getSocket() {
       const userId = useAuthStore.getState().user?.id;
       if (userId) {
         socket?.emit("presence:update", { userId, online: true });
-      });
+      }
     });
 
     socket.on("conversation:new", (newConversation) => {

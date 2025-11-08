@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useConversationStore, type Conversation } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
 import { authFetch } from '@lib/api';
+import { getSocket } from '@lib/socket';
 import toast from 'react-hot-toast';
 import ModalBase from './ui/ModalBase';
 
@@ -54,12 +55,8 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
     if (!title.trim() || selectedUsers.length === 0) {
       return toast.error("Group name and at least one member are required.");
     }
-    setLoading(true);
-import { getSocket } from '@lib/socket';
-
-// ... (inside handleCreateGroup function)
-    try {
-      const newConversation = await authFetch<Conversation>("/api/conversations", {
+        setLoading(true);
+        try {      const newConversation = await authFetch<Conversation>("/api/conversations", {
         method: "POST",
         body: JSON.stringify({
           title: title.trim(),
