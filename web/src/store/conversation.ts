@@ -19,6 +19,7 @@ export type Message = {
   fileType?: string;
   fileSize?: number;
   sessionId?: string | null;
+  ciphertext?: string | null; // To store the original encrypted content
   createdAt: string;
   error?: boolean;
   preview?: string;

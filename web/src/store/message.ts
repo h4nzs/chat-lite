@@ -10,17 +10,23 @@ import useDynamicIslandStore from './dynamicIsland';
 // --- Helper Functions ---
 
 export async function decryptMessageObject(message: Message): Promise<Message> {
+  const decryptedMsg = { ...message };
   try {
-    if (message.content) {
-      message.content = await decryptMessage(message.content, message.conversationId, (message as any).sessionId);
+    if (decryptedMsg.content) {
+      // Store original ciphertext before attempting decryption
+      decryptedMsg.ciphertext = decryptedMsg.content;
+      decryptedMsg.content = await decryptMessage(decryptedMsg.content, decryptedMsg.conversationId, decryptedMsg.sessionId);
     }
-    if (message.repliedTo?.content) {
-      message.repliedTo.content = await decryptMessage(message.repliedTo.content, message.conversationId, (message.repliedTo as any).sessionId);
+    // Also handle repliedTo content if it exists
+    if (decryptedMsg.repliedTo?.content) {
+      // No need to store ciphertext for replies, they are just for display
+      decryptedMsg.repliedTo.content = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
     }
-    return message;
-  } catch {
-    message.content = '[Failed to decrypt message]';
-    return message;
+    return decryptedMsg;
+  } catch (e) {
+    console.error("Decryption failed in decryptMessageObject", e);
+    decryptedMsg.content = '[Failed to decrypt message]';
+    return decryptedMsg;
   }
 }
 
@@ -437,16 +443,29 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   },
 
   redecryptMessages: async (conversationId: string) => {
-    console.log(`Redecrypting messages for conversation ${conversationId} by re-fetching...`);
-    
-    // Clear the current messages for the conversation to force a full reload
-    set(state => ({
-      messages: { ...state.messages, [conversationId]: [] }
-    }));
+    const { messages, updateMessage } = get();
+    const conversationMessages = messages[conversationId] || [];
 
-    // Call the existing function to load messages, which will now use the new keys
-    await get().loadMessagesForConversation(conversationId);
-    
-    toast.success('Messages re-decrypted!');
+    const messagesToRedecrypt = conversationMessages.filter(
+      m => m.content === '[Requesting key to decrypt...]' && m.ciphertext
+    );
+
+    if (messagesToRedecrypt.length === 0) return;
+
+    console.log(`Attempting to re-decrypt ${messagesToRedecrypt.length} messages for conversation ${conversationId}`);
+
+    // Decrypt messages one by one and update the store
+    for (const message of messagesToRedecrypt) {
+      try {
+        const decryptedContent = await decryptMessage(message.ciphertext!, message.conversationId, message.sessionId);
+        // Update the specific message in the store
+        updateMessage(conversationId, message.id, { content: decryptedContent });
+      } catch (error) {
+        console.error(`Failed to re-decrypt message ${message.id}:`, error);
+        // Optionally update the message with a permanent error state
+        updateMessage(conversationId, message.id, { content: '[Failed to decrypt message]' });
+      }
+    }
+    toast.success(`${messagesToRedecrypt.length} message(s) successfully decrypted!`);
   },
 }));

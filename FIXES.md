@@ -16,7 +16,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
         - `useMessageSearchStore`: Untuk logika pencarian pesan.
     2.  Gunakan *middleware* Zustand (seperti `immer`) untuk menyederhanakan logika pembaruan state yang kompleks.
 
-### [RISIKO] Alur Dekripsi yang Tidak Efisien Saat Kunci Baru Diterima
+### [done] Alur Dekripsi yang Tidak Efisien Saat Kunci Baru Diterima
 - **Lokasi:** `web/src/store/message.ts` (fungsi `redecryptMessages`)
 - **Deskripsi:** Implementasi `redecryptMessages` saat ini, yang memuat ulang *semua* pesan dari server saat kunci baru diterima, adalah solusi sementara yang tidak efisien. Ini akan menyebabkan lonjakan lalu lintas jaringan dan UI yang berkedip (karena daftar pesan dikosongkan lalu diisi ulang).
 - **Rekomendasi:**
@@ -58,7 +58,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
     1.  **Tambahkan Aksi `clearError`:** Buat aksi baru di store untuk membersihkan pesan error.
     2.  **Tampilkan Tombol "Coba Lagi":** Di UI, jika `error` ada, tampilkan pesan error tersebut beserta tombol "Coba Lagi" yang akan memanggil kembali `loadConversations`.
 
-### [INKONSISTENSI] Penggunaan `axios` dan `api`
+### [done] Penggunaan `axios` dan `api`
 - **Lokasi:** `web/src/store/message.ts` (fungsi `uploadFile`)
 - **Deskripsi:** Sebagian besar aplikasi menggunakan *helper* `api` atau `authFetch` untuk panggilan jaringan. Namun, fungsi `uploadFile` menggunakan `axios` secara langsung. Ini menciptakan inkonsistensi dan membuat penanganan error atau *interceptors* menjadi lebih sulit dikelola secara terpusat.
 - **Rekomendasi:**
