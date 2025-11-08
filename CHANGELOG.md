@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-11-08
+
+This is a major architectural release focused on improving the long-term maintainability, stability, and performance of the application by refactoring core components and fixing critical real-time functionality bugs.
+
+### Changed
+
+- **Major State Management Refactor:** The monolithic `useMessageStore` has been broken down into smaller, more focused stores (`useMessageStore`, `useMessageInputStore`, `useMessageSearchStore`) to improve separation of concerns and simplify state management.
+- **Component Logic Extraction:** Refactored the `ChatList` component into a purely presentational component. All of its business logic, state selection, and side effects have been extracted into a new, dedicated `useChatList` custom hook.
+- **Conversation Creation Flow:** Moved 1-on-1 conversation creation logic from a WebSocket event (`message:send`) to the `POST /api/conversations` REST endpoint, making the creation process more explicit and robust.
+- **Centralized File Uploads:** Consolidated file upload logic into a new `apiUpload` helper function, removing direct `axios` usage from the stores and ensuring consistent authentication handling.
+
+### Fixed
+
+- **Real-time Connection for New Chats:**
+  - Fixed a critical bug where the creator of a new group or 1-on-1 chat would not receive real-time messages until refreshing. The client now immediately joins the new conversation's socket room.
+  - Fixed an issue where users added to a new conversation would not receive real-time updates. The client now correctly handles the `conversation:new` socket event and joins the room.
+- **Server Race Condition:** Fixed a `P2003 Foreign key constraint violated` error on the server that occurred when marking a message as read too quickly. Message creation is now wrapped in a database transaction to ensure atomicity.
+- **UI & Data Sync:**
+  - Fixed a bug where deleting a group or conversation would not be reflected in the UI until a page refresh.
+  - Fixed the user search functionality within the "Create Group" modal, which was failing due to an authentication issue.
+  - Fixed a UI bug where the sender's name in group chats was invisible in dark mode by applying a theme-aware CSS filter.
+- **General Stability:**
+  - Fixed a bug where the initial page load would get stuck in a loading state indefinitely.
+  - Resolved a Vite configuration error (`fs.allow`) that prevented `react-pdf` styles from loading.
+  - Corrected multiple JavaScript `ReferenceError` and syntax errors (`Unexpected ")"`, misplaced `import`) that were introduced during the extensive refactoring process.
+
 ## [1.1.2] - 2025-11-08
 
 This release addresses critical backend architecture and frontend user experience issues, improving application stability and robustness.

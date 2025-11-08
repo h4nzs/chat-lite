@@ -174,4 +174,12 @@
   }
 }
 
+/* Custom utility for user name colors */
+.user-color-name {
+  color: var(--user-color);
+}
+.dark .user-color-name {
+  filter: brightness(1.5);
+}
+
 /* Force cache invalidation */

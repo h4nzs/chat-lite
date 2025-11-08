@@ -224,8 +224,8 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
         <div className="flex flex-col">
           {!mine && conversation?.isGroup && message.sender?.name && (
             <p 
-              className="text-xs font-semibold mb-1" 
-              style={{ color: getUserColor(message.senderId) }}
+              className="text-xs font-semibold mb-1 user-color-name" 
+              style={{ '--user-color': getUserColor(message.senderId) } as React.CSSProperties}
             >
               {message.sender.name}
             </p>
