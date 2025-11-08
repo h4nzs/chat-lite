@@ -9,10 +9,6 @@ import { redisClient } from "./lib/redis.js";
 
 export let io: Server;
 
-const onlineUsers = new Set<string>();
-
-
-
 export function getIo() {
   if (!io) {
     throw new Error("Socket.IO not initialized!");
@@ -30,15 +26,17 @@ export function registerSocket(httpServer: HttpServer) {
 
   io.use(socketAuthMiddleware);
 
-  io.on("connection", (socket: any) => {
+  io.on("connection", async (socket: any) => {
     const userId = socket.user?.id;
 
     // Handle authenticated users
     if (userId) {
       socket.join(userId);
       console.log(`[Socket Connect] User connected: ${userId}`);
-      onlineUsers.add(userId);
-      socket.emit("presence:init", Array.from(onlineUsers));
+      await redisClient.sAdd('online_users', userId);
+      
+      const onlineUserIds = await redisClient.sMembers('online_users');
+      socket.emit("presence:init", onlineUserIds);
       socket.broadcast.emit("presence:user_joined", userId);
     } else {
       console.log(`[Socket Connect] Guest connected: ${socket.id}`);
@@ -70,10 +68,10 @@ export function registerSocket(httpServer: HttpServer) {
       });
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       if (userId) {
         console.log(`[Socket Disconnect] User disconnected: ${userId}`);
-        onlineUsers.delete(userId);
+        await redisClient.sRem('online_users', userId);
         io.emit("presence:user_left", userId);
       } else {
         console.log(`[Socket Disconnect] Guest disconnected: ${socket.id}`);
@@ -282,7 +280,7 @@ export function registerSocket(httpServer: HttpServer) {
       if (!userId || !conversationId || !sessionId) return;
 
       try {
-        // 1. Find other online participants in the same conversation
+        // 1. Find other participants in the same conversation
         const participants = await prisma.participant.findMany({
           where: {
             conversationId,
@@ -291,7 +289,10 @@ export function registerSocket(httpServer: HttpServer) {
           select: { userId: true },
         });
 
-        const onlineParticipants = participants.filter(p => onlineUsers.has(p.userId));
+        // 2. Find which of them are online by checking against Redis
+        const allOnlineUsers = await redisClient.sMembers('online_users');
+        const allOnlineUsersSet = new Set(allOnlineUsers);
+        const onlineParticipants = participants.filter(p => allOnlineUsersSet.has(p.userId));
 
         if (onlineParticipants.length === 0) {
           console.log(`[Key Request] No online users found in convo ${conversationId} to fulfill key request for ${sessionId}`);
@@ -299,7 +300,7 @@ export function registerSocket(httpServer: HttpServer) {
           return;
         }
 
-        // 2. Pick one online user to be the fulfiller (e.g., the first one)
+        // 3. Pick one online user to be the fulfiller (e.g., the first one)
         const fulfillerId = onlineParticipants[0].userId;
 
         // 3. Get the requester's public key

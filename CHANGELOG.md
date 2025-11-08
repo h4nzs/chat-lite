@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2025-11-08
+
+This release addresses critical backend architecture and frontend user experience issues, improving application stability and robustness.
+
+### Fixed
+
+- **Online Status Race Condition:** Migrated the online presence tracking system from a local in-memory `Set` to a centralized Redis set. This resolves a potential race condition and ensures that the presence status and the E2EE key recovery mechanism work reliably across multiple server instances.
+- **Conversation Load Error Handling:** Improved the user experience for data loading errors. The conversation list now displays a descriptive error message and a "Retry" button if conversations fail to load, allowing users to recover from network failures without a full page refresh.
+
 ## [1.1.1] - 2025-11-08
 
 This release focuses on enhancing user experience with smoother UI transitions and a critical improvement to end-to-end encryption key recovery for offline messages.

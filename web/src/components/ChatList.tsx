@@ -79,168 +79,354 @@ const SearchResults = ({ results, onSelect }: { results: User[], onSelect: (user
 };
 
 export default function ChatList({ onOpen, activeId }: ChatListProps) {
-  const { conversations, deleteGroup, deleteConversation, startConversation, error } = useConversationStore(state => ({
+
+  const { conversations, deleteGroup, deleteConversation, startConversation, error, loadConversations } = useConversationStore(state => ({
+
     conversations: state.conversations,
+
     deleteGroup: state.deleteGroup,
+
     deleteConversation: state.deleteConversation,
+
     startConversation: state.startConversation,
+
     error: state.error,
+
+    loadConversations: state.loadConversations,
+
   }));
+
   const loadMessagesForConversation = useMessageStore(s => s.loadMessagesForConversation);
+
   const presence = usePresenceStore(state => state.presence);
+
   const meId = useAuthStore((s) => s.user?.id);
+
   const [searchQuery, setSearchQuery] = useState('');
+
   const [searchResults, setSearchResults] = useState<User[]>([]);
+
   const [isSearching, setIsSearching] = useState(false);
+
   const [showGroupModal, setShowGroupModal] = useState(false);
+
   const showConfirm = useModalStore(state => state.showConfirm);
+
   const openProfileModal = useModalStore(state => state.openProfileModal);
+
   const [selectedIndex, setSelectedIndex] = useState(-1);
+
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const { addCommands, removeCommands } = useCommandPaletteStore(s => ({ 
-    addCommands: s.addCommands, 
-    removeCommands: s.removeCommands 
+
+  const { addCommands, removeCommands } = useCommandPaletteStore(s => ({
+
+    addCommands: s.addCommands,
+
+    removeCommands: s.addCommands
+
   }));
+
+
 
   const openCreateGroupModal = useCallback(() => setShowGroupModal(true), [setShowGroupModal]);
 
+
+
   useEffect(() => {
+
     const commands = [
+
       {
+
         id: 'new-group',
+
         name: 'New Group',
+
         action: openCreateGroupModal,
+
         icon: <FiUsers />,
+
         section: 'General',
+
         keywords: 'create group chat conversation',
+
       },
+
     ];
+
     addCommands(commands);
+
     return () => removeCommands(commands.map(c => c.id));
+
   }, [addCommands, removeCommands, openCreateGroupModal]);
 
+
+
   const handleSearch = useCallback(debounce(async (query: string) => {
+
     if (!query.trim()) {
+
       setSearchResults([]);
+
       setIsSearching(false);
+
       return;
+
     }
+
     setIsSearching(true);
+
     try {
+
       const users = await api<User[]>(`/api/users/search?q=${query}`);
+
       setSearchResults(users);
+
     } catch (err) {
+
       console.error("Search failed", err);
+
       setSearchResults([]);
+
     } finally {
+
       setIsSearching(false);
+
     }
+
   }, 300), []);
 
+
+
   const filteredConversations = conversations.filter(c => {
+
     const title = c.title || c.participants?.filter(p => p.id !== meId).map(p => p.name).join(', ') || 'Conversation';
+
     return title.toLowerCase().includes(searchQuery.toLowerCase());
+
   });
+
+
 
   const showSearchResults = searchQuery.trim().length > 0;
 
+
+
   useEffect(() => {
+
     handleSearch(searchQuery);
+
   }, [searchQuery, handleSearch]);
 
+
+
   useEffect(() => {
+
     const handleKeyDown = (e: KeyboardEvent) => {
+
       if (showSearchResults || filteredConversations.length === 0) return;
 
+
+
       if (e.key === 'ArrowDown') {
+
         e.preventDefault();
+
         const nextIndex = (selectedIndex + 1) % filteredConversations.length;
+
         setSelectedIndex(nextIndex);
+
         virtuosoRef.current?.scrollToIndex({ index: nextIndex, align: 'center' });
+
       } else if (e.key === 'ArrowUp') {
+
         e.preventDefault();
+
         const nextIndex = (selectedIndex - 1 + filteredConversations.length) % filteredConversations.length;
+
         setSelectedIndex(nextIndex);
+
         virtuosoRef.current?.scrollToIndex({ index: nextIndex, align: 'center' });
+
       } else if (e.key === 'Enter') {
+
         if (selectedIndex >= 0 && selectedIndex < filteredConversations.length) {
+
           e.preventDefault();
+
           onOpen(filteredConversations[selectedIndex].id);
+
         }
+
       }
+
     };
+
+
 
     window.addEventListener('keydown', handleKeyDown);
+
     return () => {
+
       window.removeEventListener('keydown', handleKeyDown);
+
     };
+
   }, [selectedIndex, filteredConversations, onOpen, showSearchResults]);
 
+
+
   const handleSelectUser = async (userId: string) => {
+
     const conversationId = await startConversation(userId);
+
     onOpen(conversationId);
+
     setSearchQuery('');
+
     setSearchResults([]);
+
   };
+
+
 
   const handleDeleteGroup = (id: string) => {
+
     showConfirm(
+
       'Delete Group',
+
       'Are you sure you want to permanently delete this group? This action cannot be undone.',
+
       () => deleteGroup(id)
+
     );
+
   };
+
+
 
   const handleDeleteConversation = (id: string) => {
+
     showConfirm(
+
       'Delete Chat',
+
       'Are you sure you want to hide this chat? It will be removed from your conversation list.',
+
       () => deleteConversation(id)
+
     );
+
   };
 
+
+
   const formatConversationTime = useCallback((timestamp: string) => {
+
     const date = new Date(timestamp);
+
     const now = new Date();
+
     const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
     if (diffInDays === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     if (diffInDays === 1) return 'Yesterday';
+
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
   }, []);
 
+
+
   return (
+
     <div className="h-full flex flex-col">
+
       <UserProfile />
+
       <div className="p-4 border-b border-border">
+
         <div className="relative flex items-center">
+
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary z-10">
+
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+
           </div>
+
           <input 
+
             id="global-search-input" // ID for global shortcut
+
             type="text" 
+
             placeholder="Search or start new chat..." 
+
             className="w-full p-3 pl-10 pr-12 bg-bg-surface rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-accent transition-all shadow-neumorphic-concave"
+
             value={searchQuery}
+
             onChange={(e) => setSearchQuery(e.target.value)}
+
           />
+
           <div className="absolute right-2 top-1/2 -translate-y-1/2">
+
             <button 
+
               onClick={openCreateGroupModal} 
+
               title="New Group Chat" // Tooltip on hover
+
               aria-label="Create new group chat"
+
               className="p-2 rounded-full bg-accent text-white shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
+
             >
+
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+
             </button>
+
           </div>
+
         </div>
+
       </div>
 
+
+
       <div className="flex-1 overflow-y-auto">
-        {error && <div className="p-2 text-center text-destructive bg-destructive/20 rounded-lg">{error}</div>}
+
+        {error && (
+
+          <div className="p-4 m-3 text-center text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
+
+            <p className="mb-2 text-sm">{error}</p>
+
+            <button 
+
+              onClick={() => loadConversations()}
+
+              className="px-3 py-1 text-sm font-semibold bg-destructive/80 text-white rounded-md hover:bg-destructive"
+
+            >
+
+              Retry
+
+            </button>
+
+          </div>
+
+        )}
+
         
+
         {showSearchResults ? (
+
+
           <SearchResults results={searchResults} onSelect={handleSelectUser} />
         ) : (
           <Virtuoso

@@ -1,104 +1,65 @@
-# Project Change Log
+# Audit Aplikasi & Rekomendasi Perbaikan
 
-This file contains the last 100 commits, showing the history of fixes, features, and refactoring.
+Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, error, inkonsistensi, dan risiko arsitektural di masa depan. Setiap temuan disertai dengan deskripsi dan rekomendasi perbaikan.
 
-- 8172097 - bttr ui/ux (47 minutes ago)
-- 482bd03 - new ui/ux (5 hours ago)
-- 5aa7b62 - new ui/ux (5 hours ago)
-- 669f7bc - new ui/ux (6 hours ago)
-- 99e87a5 - new info (6 hours ago)
-- 47aa849 - stable7 (7 hours ago)
-- 9abbfe1 - fix error decrypt (7 hours ago)
-- 7041c81 - add redis (7 hours ago)
-- f2c4cb4 - fix (7 hours ago)
-- 37eb95a - better socket for realtime (7 hours ago)
-- 08d59f3 - new linked device (8 hours ago)
-- f111fbc - new flow for user account master key (10 hours ago)
-- 2c6f748 - new session manage (19 hours ago)
-- 13b46dd - bttr guide (24 hours ago)
-- a0ff4c4 - new modal for guide (24 hours ago)
-- 5ae46b8 - new emot pick (25 hours ago)
-- 1955960 - fix mobile screen (32 hours ago)
-- dacc836 - fix upload (33 hours ago)
-- f601fb6 - fix layout (33 hours ago)
-- 02f7aa0 - update layout (33 hours ago)
-- d5c1140 - new layout (33 hours ago)
-- d343f04 - stable ui/ux (33 hours ago)
-- 56094f6 - update ui/ux (33 hours ago)
-- b4f3c5d - update ui/ux (34 hours ago)
-- 32b79a5 - new ui/ux (34 hours ago)
-- 8f0a465 - fix worker service (34 hours ago)
-- dc25eb5 - new worker service (35 hours ago)
-- 0e3a0ff - new virtuso render (35 hours ago)
-- 8c1b2f7 - bttr socket conn (35 hours ago)
-- 955946b - new biometric sys (2 days ago)
-- 4a9f7ad - new restore func (2 days ago)
-- 0f7baa6 - new restore func (2 days ago)
-- 2e765ba - new renew key for group (2 days ago)
-- 7e6b76b - new ratcheting and chain session key stable (2 days ago)
-- 8dbb3f0 - new ratcheting and chain session key (2 days ago)
-- abb10ab - stable verif contact (2 days ago)
-- dd5fe01 - new key verif (2 days ago)
-- 5a8618c - new bc key with fhrase e2ee (2 days ago)
-- 5c00b46 - stable e2ee (2 days ago)
-- 0604780 - new e2ee implementations test (3 days ago)
-- 4127e19 - fix token unauth (3 days ago)
-- 404f898 - fix stable6 (3 days ago)
-- 4f6dbad - stable6 (3 days ago)
-- 061f047 - stable show email (4 days ago)
-- ac2156d - new show email (4 days ago)
-- 8e36440 - stable profile view (4 days ago)
-- 407d54f - fix sum profile view (4 days ago)
-- f298ef1 - new profile view (4 days ago)
-- f97a1e1 - new user desc (4 days ago)
-- 5792fdc - stable5. (4 days ago)
-- a7953f7 - stable5 (4 days ago)
-- 3ac7abc - bttr bubble (5 days ago)
-- 5990fae - theme key update (5 days ago)
-- 2c71190 - theme update (5 days ago)
-- afb8cd3 - theme stable (5 days ago)
-- 781a24f - theme stable (5 days ago)
-- ce675bd - fix bttr theme (5 days ago)
-- 5251bd7 - fix popup theme (5 days ago)
-- 4c28a44 - fix theme (5 days ago)
-- ad498ca - (rollback 120359b)new theme (5 days ago)
-- 120359b - bttr input form (5 days ago)
-- 4aff648 - bttr send bttn (5 days ago)
-- f342a6a - bttr auth form (5 days ago)
-- b839e03 - fix popup (5 days ago)
-- bff1f3a - popup notif center (5 days ago)
-- 841de8c - popup notif bttr (5 days ago)
-- 77c6cb1 - popup notif (5 days ago)
-- 47c43bf - add in app notif stable5 (5 days ago)
-- cd6f4e8 - stable5 (5 days ago)
-- e1d69ab - bttr ux modal (5 days ago)
-- 7e2d8f7 - fix add new confirm modal (5 days ago)
-- 63ada2e - fix auth 1-1 after group stable (5 days ago)
-- 708662e - group stable2 (5 days ago)
-- 34913b5 - group stable (5 days ago)
-- 30220fd - fix chat history group uaer as joinedAt (5 days ago)
-- 040e182 - fix chat history group as joinedAt (5 days ago)
-- 099e237 - new group util stable (5 days ago)
-- b057d12 - fix socket emit room (5 days ago)
-- 95f2257 - fix clean socket (5 days ago)
-- 72442cf - stable unread count, read recipt (5 days ago)
-- 556f272 - (rollback fa953ae) fix recipt rt (6 days ago)
-- fa953ae - fix any stable4 (6 days ago)
-- 50bbaa0 - fix stable4 (6 days ago)
-- c87b29b - stable4 (6 days ago)
-- 06bd023 - fixed stable4 (6 days ago)
-- f962e88 - fixed stable (6 days ago)
-- 7331c62 - fixed shallow stable (6 days ago)
-- feae885 - fix more shallow stable (6 days ago)
-- 2327990 - fix shallow stable (6 days ago)
-- 8246fd7 - fix etc stable (6 days ago)
-- 272badf - fix refactor usechatstore stable (6 days ago)
-- 719ef1f - fix socket duplikat stable (6 days ago)
-- 2b0d7ac - fix decrypt logic stable (6 days ago)
-- be7dbee - fix anotasi any stable (6 days ago)
-- 6a4af0c - fix validation zod stable (6 days ago)
-- 17b01e4 - audit fix stable (6 days ago)
-- 55dc2d0 - fix preview media. stable3 (6 days ago)
-- 7994713 - stable search, previews, new reply (8 days ago)
-- c7c8541 - stable search, previews (8 days ago)
-- 9d2faea - bttr search fix (8 days ago)
+---
+
+## 1. Arsitektur & Risiko Masa Depan
+
+### [RISIKO] Kompleksitas State Management (Zustand)
+- **Lokasi:** `web/src/store/conversation.ts`, `web/src/store/message.ts`
+- **Deskripsi:** Seperti yang telah diidentifikasi sebelumnya, file-file store Zustand, terutama `message.ts`, telah menjadi sangat besar dan menangani terlalu banyak tanggung jawab (mengelola state pesan, logika pengiriman, unggah file, pencarian, dll.). Seiring bertambahnya fitur, file ini akan semakin sulit dipelihara, di-debug, dan dites.
+- **Rekomendasi:**
+    1.  **Pecah Store:** Refactor `useMessageStore` menjadi beberapa *store* yang lebih kecil dan terfokus. Contohnya:
+        - `useMessageStore`: Hanya untuk state pesan (CRUD).
+        - `useMessageSenderStore`: Untuk logika pengiriman pesan dan unggah file.
+        - `useMessageSearchStore`: Untuk logika pencarian pesan.
+    2.  Gunakan *middleware* Zustand (seperti `immer`) untuk menyederhanakan logika pembaruan state yang kompleks.
+
+### [RISIKO] Alur Dekripsi yang Tidak Efisien Saat Kunci Baru Diterima
+- **Lokasi:** `web/src/store/message.ts` (fungsi `redecryptMessages`)
+- **Deskripsi:** Implementasi `redecryptMessages` saat ini, yang memuat ulang *semua* pesan dari server saat kunci baru diterima, adalah solusi sementara yang tidak efisien. Ini akan menyebabkan lonjakan lalu lintas jaringan dan UI yang berkedip (karena daftar pesan dikosongkan lalu diisi ulang).
+- **Rekomendasi:**
+    1.  **Simpan Ciphertext Asli:** Modifikasi tipe data `Message` di state Zustand untuk menyimpan *ciphertext* asli di samping konten yang sudah didekripsi (atau yang gagal didekripsi).
+    2.  **Dekripsi Ulang di Tempat:** Ubah `redecryptMessages` agar tidak lagi memuat ulang dari server. Sebaliknya, ia harus mengiterasi pesan-pesan yang ada, mengambil *ciphertext* asli dari state, mencoba mendekripsinya dengan kunci baru, dan memperbarui konten pesan satu per satu di dalam state.
+
+---
+
+## 2. Backend
+
+### [done] Potensi Race Condition pada Status Online
+- **Lokasi:** `server/src/socket.ts`
+- **Deskripsi:** Status online pengguna (`onlineUsers`) saat ini disimpan dalam sebuah `Set` di memori server. Jika server di-deploy di lebih dari satu *instance* (misalnya, untuk *load balancing*), setiap *instance* akan memiliki daftar `onlineUsers`-nya sendiri yang tidak sinkron. Ini akan menyebabkan fitur status online dan permintaan kunci sesi menjadi tidak andal.
+- **Rekomendasi:**
+    1.  **Pindahkan State ke Redis:** Pindahkan manajemen status online dari `Set` di memori ke Redis. Gunakan perintah Redis seperti `SADD`, `SREM`, dan `SMEMBERS` untuk mengelola daftar ID pengguna yang online. Ini memastikan semua *instance* server berbagi satu sumber kebenaran yang sama.
+
+### [MISMATCH] Logika Pembuatan Percakapan 1-on-1
+- **Lokasi:** `server/src/socket.ts` (event `message:send`)
+- **Deskripsi:** Saat ini, percakapan 1-on-1 baru dibuat secara implisit ketika seorang pengguna mengirim pesan pertama ke pengguna lain. Logika ini tersembunyi di dalam event `message:send`. Ini kurang intuitif dan mencampurkan dua tanggung jawab yang berbeda (membuat pesan dan membuat percakapan).
+- **Rekomendasi:**
+    1.  **Buat Endpoint Eksplisit:** Pindahkan logika pembuatan percakapan 1-on-1 ke endpoint REST API-nya sendiri, misalnya `POST /api/conversations`.
+    2.  **Ubah Alur Klien:** Di klien, sebelum mengirim pesan pertama ke pengguna baru, panggil dulu endpoint `POST /api/conversations` untuk membuat atau mendapatkan ID percakapan, baru kemudian kirim pesan ke ID tersebut. Ini membuat alur lebih jelas dan mudah di-debug.
+
+---
+
+## 3. Frontend
+
+### [BUG] Ketergantungan pada `localStorage` untuk `activeId`
+- **Lokasi:** `web/src/store/conversation.ts`
+- **Deskripsi:** `activeId` (ID percakapan yang sedang aktif) diinisialisasi dari `localStorage`. Ini dapat menyebabkan *mismatch* antara state yang dirender di server (jika menggunakan SSR di masa depan) dan di klien. Selain itu, ini membuat state menjadi kurang terprediksi karena bergantung pada data di luar aplikasi React.
+- **Rekomendasi:**
+    1.  **Hapus Inisialisasi dari `localStorage`:** Hentikan pembacaan `localStorage` saat store diinisialisasi.
+    2.  **Gunakan URL sebagai Sumber Kebenaran:** Jadikan URL sebagai satu-satunya sumber kebenaran untuk percakapan aktif. Misalnya, gunakan rute seperti `/chat/:conversationId`. Saat aplikasi dimuat, ambil `conversationId` dari parameter URL untuk menentukan `activeId`. Ini adalah pola yang lebih standar dan kuat di aplikasi React.
+
+### [ERROR] Penanganan Error yang Kurang Baik pada `loadConversations`
+- **Lokasi:** `web/src/store/conversation.ts`
+- **Deskripsi:** Di dalam `loadConversations`, jika panggilan API gagal, state `error` diatur, tetapi tidak ada mekanisme untuk membersihkan error tersebut atau mencoba lagi. Pengguna mungkin akan melihat pesan error selamanya tanpa bisa melakukan apa-apa.
+- **Rekomendasi:**
+    1.  **Tambahkan Aksi `clearError`:** Buat aksi baru di store untuk membersihkan pesan error.
+    2.  **Tampilkan Tombol "Coba Lagi":** Di UI, jika `error` ada, tampilkan pesan error tersebut beserta tombol "Coba Lagi" yang akan memanggil kembali `loadConversations`.
+
+### [INKONSISTENSI] Penggunaan `axios` dan `api`
+- **Lokasi:** `web/src/store/message.ts` (fungsi `uploadFile`)
+- **Deskripsi:** Sebagian besar aplikasi menggunakan *helper* `api` atau `authFetch` untuk panggilan jaringan. Namun, fungsi `uploadFile` menggunakan `axios` secara langsung. Ini menciptakan inkonsistensi dan membuat penanganan error atau *interceptors* menjadi lebih sulit dikelola secara terpusat.
+- **Rekomendasi:**
+    1.  **Refactor `uploadFile`:** Ubah fungsi `uploadFile` agar menggunakan *helper* `api` atau `authFetch` yang sudah ada, sama seperti bagian lain dari aplikasi. Jika `axios` diperlukan secara spesifik untuk *progress bar* unggahan, bungkus `axios` di dalam *helper* `api` agar konfigurasinya tetap terpusat.
