@@ -89,54 +89,10 @@ export function registerSocket(httpServer: HttpServer) {
 
       try {
         const senderId = socket.user.id;
-        let conversationId = data.conversationId;
-        let conversation;
+        const conversationId = data.conversationId;
 
-        // If no conversationId, find or create a 1-on-1 chat
-        if (!conversationId && data.recipientId) {
-          const recipientId = data.recipientId;
-
-          // Find existing 1-on-1 conversation
-          const existingConvo = await prisma.conversation.findFirst({
-            where: {
-              isGroup: false,
-              participants: {
-                every: {
-                  userId: { in: [senderId, recipientId] },
-                },
-              },
-            },
-          });
-
-          if (existingConvo) {
-            conversationId = existingConvo.id;
-            conversation = existingConvo;
-          } else {
-            // Or create a new one
-            const newConversation = await prisma.conversation.create({
-              data: {
-                isGroup: false,
-                participants: {
-                  create: [
-                    { userId: senderId, role: "MEMBER" },
-                    { userId: recipientId, role: "MEMBER" },
-                  ],
-                },
-              },
-              include: { 
-                participants: { include: { user: true } },
-                creator: true,
-              },
-            });
-            conversationId = newConversation.id;
-            conversation = newConversation;
-
-            // --- THIS IS THE FIX ---
-            // Notify the recipient that a new conversation has been created for them
-            io.to(recipientId).emit("conversation:new", newConversation);
-          }
-        } else if (!conversationId) {
-          throw new Error("Missing conversationId or recipientId");
+        if (!conversationId) {
+          throw new Error("conversationId is required to send a message.");
         }
 
         const participants = await prisma.participant.findMany({

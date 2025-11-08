@@ -33,7 +33,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
 - **Rekomendasi:**
     1.  **Pindahkan State ke Redis:** Pindahkan manajemen status online dari `Set` di memori ke Redis. Gunakan perintah Redis seperti `SADD`, `SREM`, dan `SMEMBERS` untuk mengelola daftar ID pengguna yang online. Ini memastikan semua *instance* server berbagi satu sumber kebenaran yang sama.
 
-### [MISMATCH] Logika Pembuatan Percakapan 1-on-1
+### [done] Logika Pembuatan Percakapan 1-on-1
 - **Lokasi:** `server/src/socket.ts` (event `message:send`)
 - **Deskripsi:** Saat ini, percakapan 1-on-1 baru dibuat secara implisit ketika seorang pengguna mengirim pesan pertama ke pengguna lain. Logika ini tersembunyi di dalam event `message:send`. Ini kurang intuitif dan mencampurkan dua tanggung jawab yang berbeda (membuat pesan dan membuat percakapan).
 - **Rekomendasi:**
@@ -44,7 +44,7 @@ Dokumen ini berisi hasil audit menyeluruh pada aplikasi, mencakup potensi bug, e
 
 ## 3. Frontend
 
-### [BUG] Ketergantungan pada `localStorage` untuk `activeId`
+### [done] Ketergantungan pada `localStorage` untuk `activeId`
 - **Lokasi:** `web/src/store/conversation.ts`
 - **Deskripsi:** `activeId` (ID percakapan yang sedang aktif) diinisialisasi dari `localStorage`. Ini dapat menyebabkan *mismatch* antara state yang dirender di server (jika menggunakan SSR di masa depan) dan di klien. Selain itu, ini membuat state menjadi kurang terprediksi karena bergantung pada data di luar aplikasi React.
 - **Rekomendasi:**
