@@ -21,7 +21,7 @@ const SessionCard = ({ session, onLogout, isCurrent }: { session: any, onLogout:
   const Icon = os === 'Mobile' ? FiSmartphone : FiMonitor;
 
   return (
-    <div className="bg-bg-surface p-4 rounded-xl shadow-soft flex items-center justify-between">
+    <div className="bg-bg-surface p-4 rounded-xl shadow-neumorphic-convex flex items-center justify-between">
       <div className="flex items-center gap-4">
         <Icon size={24} className="text-text-secondary" />
         <div>
@@ -35,7 +35,7 @@ const SessionCard = ({ session, onLogout, isCurrent }: { session: any, onLogout:
       {!isCurrent && (
         <button 
           onClick={() => onLogout(session.jti)} 
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+          className="btn-flat flex items-center gap-2 px-3 py-2 rounded-lg text-destructive hover:bg-destructive/20 transition-colors"
         >
           <FiLogOut />
           <span>Logout</span>
@@ -77,7 +77,7 @@ export default function SessionManagerPage() {
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-main text-text-primary font-sans">
       <header className="p-4 border-b border-border flex items-center gap-4 flex-shrink-0">
-        <Link to="/settings" className="p-2 -ml-2 text-text-secondary hover:text-text-primary">
+        <Link to="/settings" className="btn btn-secondary p-2 h-10 w-10 rounded-full justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         </Link>
         <h1 className="text-xl font-bold text-text-primary">Active Sessions</h1>

@@ -169,6 +169,15 @@
     @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
   }
 
+  /* Neumorphic Destructive Button */
+  .btn-destructive-neumorphic {
+    @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
+    box-shadow: 5px 5px 10px hsl(var(--shadow-dark)), -5px -5px 10px hsl(var(--shadow-light));
+  }
+  .btn-destructive-neumorphic:active {
+    box-shadow: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
+  }
+
   /* Global Focus-Visible Styles for Accessibility */
   .btn, 
   button, 

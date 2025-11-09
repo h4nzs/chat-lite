@@ -109,7 +109,7 @@ export default function KeyManagementPage() {
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-bg-main text-text-primary p-4">
       <div className="w-full max-w-2xl bg-bg-surface rounded-lg shadow-lg p-8 border border-border">
         <div className="flex items-center gap-4 mb-6">
-          <FiKey className="text-accent-color text-3xl" />
+          <FiKey className="text-accent text-3xl" />
           <h1 className="text-2xl font-bold text-text-primary">Encryption Key Management</h1>
         </div>
         <p className="text-text-secondary mb-6">
@@ -118,15 +118,15 @@ export default function KeyManagementPage() {
         </p>
         
         <div className="space-y-4">
-          <button onClick={handleShowRecovery} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleShowRecovery} disabled={isProcessing} className="btn btn-secondary w-full justify-center gap-3">
             {isProcessing ? <Spinner size="sm" /> : <FiShield />}
             <span>{isProcessing ? 'Processing...' : 'Show Recovery Phrase'}</span>
           </button>
-          <button onClick={handleRegisterDevice} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-secondary hover:bg-secondary/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleRegisterDevice} disabled={isProcessing} className="btn btn-secondary w-full justify-center gap-3">
             {isProcessing ? <Spinner size="sm" /> : <IoFingerPrint />}
             <span>{isProcessing ? 'Processing...' : 'Register This Device for Biometric Login'}</span>
           </button>
-          <button onClick={handleGenerateNew} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 text-left p-4 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleGenerateNew} disabled={isProcessing} className="btn-destructive-neumorphic w-full justify-center gap-3">
             {isProcessing ? <Spinner size="sm" /> : <FiRefreshCw />}
             <span>{isProcessing ? 'Generating...' : 'Generate New Keys'}</span>
           </button>
