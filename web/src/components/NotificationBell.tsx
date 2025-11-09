@@ -34,7 +34,7 @@ const NotificationBell = () => {
   return (
     <Popover.Root onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-secondary text-text-secondary hover:text-text-primary transition-colors">
+        <button className="btn-flat relative p-2 rounded-full text-text-secondary hover:text-text-primary">
           <motion.div animate={controls}>
             <FiBell />
           </motion.div>

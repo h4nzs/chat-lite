@@ -45,7 +45,7 @@ export default function SearchMessages({ conversationId }: SearchMessagesProps) 
       <button 
         onClick={() => setIsOpen(!isOpen)} 
         aria-label={isOpen ? "Close search" : "Search messages in this conversation"}
-        className="p-2 text-text-secondary hover:text-text-primary"
+        className="p-2 rounded-full text-text-secondary hover:text-text-primary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all"
       >
         {isOpen ? <FiX /> : <FiSearch />}
       </button>

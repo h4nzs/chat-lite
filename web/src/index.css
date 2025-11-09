@@ -156,6 +156,14 @@
     box-shadow: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
   }
 
+  /* Flat Button with Pressed Effect */
+  .btn-flat {
+    @apply transition-shadow duration-150;
+  }
+  .btn-flat:active {
+    box-shadow: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
+  }
+
   /* Destructive Button */
   .btn-destructive {
     @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
