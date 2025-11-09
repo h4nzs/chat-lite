@@ -146,8 +146,11 @@ export default function LinkDevicePage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-background text-text-primary p-4">
-      <div className="bg-bg-surface p-8 rounded-xl shadow-soft text-center max-w-md w-full">
+    <div className="relative flex flex-col items-center justify-center h-screen bg-bg-main text-text-primary p-4">
+      <Link to="/login" aria-label="Go back to login" className="btn btn-secondary p-2 h-10 w-10 rounded-full justify-center absolute top-4 left-4">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </Link>
+      <div className="bg-bg-surface p-8 rounded-xl shadow-neumorphic-convex text-center max-w-md w-full">
         <h1 className="text-2xl font-bold mb-4">Link a New Device</h1>
         <p className="text-text-secondary mb-6">
           Scan this QR code with an already logged-in device to securely link this new device.

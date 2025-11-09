@@ -94,7 +94,7 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: string; o
 
       <div className={`absolute top-0 right-0 h-full w-full max-w-md bg-bg-surface shadow-neumorphic-convex z-50 flex flex-col transition-transform duration-300 ease-in-out ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <header className="p-4 flex items-center flex-shrink-0">
-          <button onClick={handleClose} className="p-2 -ml-2 mr-2 text-text-secondary hover:text-text-primary">
+          <button onClick={handleClose} className="btn-flat p-2 rounded-full text-text-secondary mr-2">
             <FiX size={24} />
           </button>
           <h2 className="text-xl font-bold text-text-primary">Group Info</h2>

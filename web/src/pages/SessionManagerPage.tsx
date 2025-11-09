@@ -52,8 +52,22 @@ export default function SessionManagerPage() {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const data = await api('/api/sessions');
-        setSessions(data.sessions);
+        const data = await api<{ sessions: any[] }>('/api/sessions');
+        
+        // Deduplicate sessions, keeping only the most recent for each user agent
+        const uniqueSessions = new Map<string, any>();
+        for (const session of data.sessions) {
+          const existing = uniqueSessions.get(session.userAgent);
+          if (!existing || new Date(session.lastUsedAt) > new Date(existing.lastUsedAt)) {
+            uniqueSessions.set(session.userAgent, session);
+          }
+        }
+        
+        const processedSessions = Array.from(uniqueSessions.values())
+          .sort((a, b) => new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime());
+
+        setSessions(processedSessions);
+
       } catch (error) {
         toast.error('Failed to load active sessions.');
       } finally {

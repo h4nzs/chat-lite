@@ -132,13 +132,13 @@ export default function DeviceScannerPage() {
   return (
     <div className="flex flex-col h-screen bg-background text-text-primary">
       <header className="p-4 border-b border-border flex items-center gap-4 flex-shrink-0">
-        <Link to="/settings" className="p-2 -ml-2 text-text-secondary hover:text-text-primary">
+        <Link to="/settings" className="btn btn-secondary p-2 h-10 w-10 rounded-full justify-center">
           <FiChevronLeft size={24} />
         </Link>
         <h1 className="text-xl font-bold text-text-primary">Scan QR Code</h1>
       </header>
       <main className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="bg-bg-surface p-6 rounded-xl shadow-soft text-center max-w-md w-full">
+        <div className="bg-bg-surface p-6 rounded-xl shadow-neumorphic-convex text-center max-w-md w-full">
           <div id={qrcodeRegionId} className="w-full h-64 bg-black rounded-lg overflow-hidden" />
 
           {status === 'processing' && <p className="text-text-secondary mt-4">Processing...</p>}
@@ -155,7 +155,7 @@ export default function DeviceScannerPage() {
               <p className="text-sm text-text-secondary mt-1">{error}</p>
               <button 
                 onClick={() => { setStatus('scanning'); setError(null); }}
-                className="btn-secondary mt-4"
+                className="btn btn-secondary mt-4"
               >
                 Scan Again
               </button>
