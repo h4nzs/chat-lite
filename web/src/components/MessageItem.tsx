@@ -78,7 +78,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
 
   const bubbleClasses = clsx(
     'relative max-w-md md:max-w-lg',
-    hasBubbleStyle && `px-4 py-2.5 shadow-neumorphic-convex`,
+    hasBubbleStyle && `px-4 py-2.5 shadow-neumorphic-bubble`,
     {
       'bg-accent text-accent-foreground': mine,
       'bg-bg-surface text-text-primary': !mine,

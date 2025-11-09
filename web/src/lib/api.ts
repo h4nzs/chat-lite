@@ -69,7 +69,14 @@ export async function api<T = any>(
     if (res.status === 403 && text.includes('invalid csrf token')) {
         csrfTokenCache = null;
     }
-    throw new ApiError(res.status, res.statusText, text);
+    // Try to parse the error details from the response body
+    let details;
+    try {
+      details = JSON.parse(text);
+    } catch (e) {
+      details = { message: text }; // Fallback for non-JSON responses
+    }
+    throw new ApiError(res.status, details.message || res.statusText, details);
   }
 
   if (res.status === 204) {
@@ -109,6 +116,11 @@ export async function authFetch<T>(
 
 export function handleApiError(e: unknown): string {
   if (e instanceof ApiError) {
+    // Prioritize specific error message from the server response body
+    if (e.details?.message) return e.details.message;
+    if (e.details?.error) return e.details.error;
+
+    // Fallback to generic messages based on status code
     switch (e.status) {
       case 0:
         return "Network connection failed. Please check your internet connection.";

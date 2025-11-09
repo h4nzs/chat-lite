@@ -182,4 +182,25 @@
   filter: brightness(1.5);
 }
 
+/* Custom Toast Styling */
+.glass-toast {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  outline: none !important;
+  box-shadow: 5px 5px 10px hsl(var(--shadow-dark)), -5px -5px 10px hsl(var(--shadow-light)) !important;
+}
+
+/* Custom Neumorphic Shadow for small elements */
+.shadow-neumorphic-convex-sm {
+  box-shadow: 2px 2px 4px hsl(var(--shadow-dark));
+}
+.shadow-neumorphic-convex-sm:active {
+  box-shadow: inset 1px 1px 2px hsl(var(--shadow-dark));
+}
+
+/* Custom Neumorphic Shadow for message bubbles */
+.shadow-neumorphic-bubble {
+  box-shadow: 3px 3px 6px hsl(var(--shadow-dark)), -3px -3px 6px hsl(var(--shadow-light));
+}
+
 /* Force cache invalidation */

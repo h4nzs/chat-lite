@@ -149,12 +149,11 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
       </div>
       <div className="absolute right-2 top-1/2 -translate-y-1/2">
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button onClick={(e) => e.stopPropagation()} aria-label="Conversation options" className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
+                                <DropdownMenu.Trigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} aria-label="Conversation options" className="p-2 rounded-full text-text-secondary shadow-neumorphic-convex-sm active:shadow-neumorphic-pressed transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                                  </button>
+                                </DropdownMenu.Trigger>          <DropdownMenu.Portal>
             <DropdownMenu.Content sideOffset={5} align="end" className="min-w-[180px] bg-surface/80 backdrop-blur-sm rounded-md shadow-lg z-50 p-1">
               <DropdownMenu.Item 
                 onSelect={() => onMenuSelect(conversation.isGroup ? 'deleteGroup' : 'deleteChat')}

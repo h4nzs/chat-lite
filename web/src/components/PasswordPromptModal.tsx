@@ -39,7 +39,7 @@ export default function PasswordPromptModal() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 rounded-lg bg-bg-surface focus:outline-none focus:ring-2 focus:ring-accent shadow-neumorphic-concave mb-4"
+              className="w-full p-3 rounded-lg bg-bg-surface text-text-primary placeholder-text-secondary focus:outline-none focus:ring-0 shadow-neumorphic-concave mb-4"
               placeholder="Enter your password"
             />
           </div>

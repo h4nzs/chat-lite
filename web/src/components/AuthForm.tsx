@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Alert from './Alert'
+import { handleApiError } from '@lib/api';
 
 export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: string; b?: string; c?: string; d?: string; name?: string }) => Promise<void>; button: string }) {
   const [emailOrUsername, setA] = useState('')
@@ -19,11 +20,7 @@ export default function AuthForm({ onSubmit, button }: { onSubmit: (v: { a: stri
           await onSubmit({ a: emailOrUsername, b: password, c: email, d: username, name }) 
         }
         catch (ex: unknown) { 
-          if (ex instanceof Error) {
-            setErr(ex.message || 'Failed');
-          } else {
-            setErr('An unknown error occurred');
-          }
+          setErr(handleApiError(ex));
         }
       }}
     >

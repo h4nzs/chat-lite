@@ -137,13 +137,29 @@ const AppContent = () => {
 
   return (
     <>
-      <Toaster 
-        position="top-right"
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
         toastOptions={{
+          duration: 5000,
+          className: 'glass-toast',
           style: {
-            background: 'hsl(var(--card))',
-            color: 'hsl(var(--foreground))',
+            background: 'hsl(var(--bg-surface) / 0.8)',
+            color: 'hsl(var(--text-primary))',
             border: '1px solid hsl(var(--border))',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: 'hsl(var(--accent))',
+              secondary: 'hsl(var(--accent-foreground))',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: 'hsl(var(--destructive))',
+              secondary: 'hsl(var(--destructive-foreground))',
+            },
           },
         }}
       />
