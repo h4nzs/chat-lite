@@ -1,19 +1,95 @@
 import { useState, useRef, useEffect } from 'react';
-import { FiPlay, FiPause } from 'react-icons/fi';
+import { FiPlay, FiPause, FiDownload, FiAlertTriangle } from 'react-icons/fi';
 import { motion } from 'framer-motion';
+import { Message } from '@store/conversation';
+import { decryptMessage, decryptFile } from '@utils/crypto';
+import { toAbsoluteUrl } from '@utils/url';
+import { useKeychainStore } from '@store/keychain';
+import { Spinner } from './Spinner';
 
 interface VoiceMessagePlayerProps {
-  src: string;
-  duration: number;
+  message: Message;
 }
 
-export default function VoiceMessagePlayer({ src, duration }: VoiceMessagePlayerProps) {
+export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
+  const duration = message.duration || 0;
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let isMounted = true;
+
+    const handleDecryption = async () => {
+      if (!message.fileUrl || !message.fileKey || !message.sessionId) {
+        if (isMounted) setError("Incomplete message data for decryption.");
+        return;
+      }
+      
+      if (isMounted) {
+        setIsLoading(true);
+        setError(null);
+      }
+
+      try {
+        let fileKey = message.fileKey;
+
+        // Decrypt the file key ONLY if the message is not optimistic (i.e., from the server)
+        // and the key looks like a long encrypted string. Raw keys are 44 chars.
+        if (!message.optimistic && fileKey && fileKey.length > 50) {
+          fileKey = await decryptMessage(message.fileKey, message.conversationId, message.sessionId);
+        }
+
+        if (!fileKey || fileKey.startsWith('[')) {
+          if (isMounted) setError(fileKey || "Could not retrieve file key.");
+          return;
+        }
+
+        // 2. Fetch the encrypted file
+        const response = await fetch(toAbsoluteUrl(message.fileUrl));
+        if (!response.ok) {
+          throw new Error(`Failed to fetch voice file: ${response.statusText}`);
+        }
+        const encryptedBlob = await response.blob();
+
+        // 3. Decrypt the file blob
+        const decryptedBlob = await decryptFile(encryptedBlob, fileKey, 'audio/webm');
+        
+        if (isMounted) {
+          // 4. Create a playable URL
+          objectUrl = URL.createObjectURL(decryptedBlob);
+          setAudioSrc(objectUrl);
+        }
+      } catch (e: any) {
+        console.error("Voice message decryption failed:", e);
+        if (isMounted) setError(e.message || "Failed to decrypt voice message.");
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    if (message.fileType === 'audio/webm;encrypted=true') {
+      handleDecryption();
+    } else if (message.fileUrl) {
+      // For backward compatibility or unencrypted files
+      setAudioSrc(toAbsoluteUrl(message.fileUrl));
+    }
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [message, lastKeychainUpdate]); // Re-run when a new key might have arrived
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -35,7 +111,7 @@ export default function VoiceMessagePlayer({ src, duration }: VoiceMessagePlayer
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [audioSrc]); // Re-attach listeners if src changes
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -54,9 +130,27 @@ export default function VoiceMessagePlayer({ src, duration }: VoiceMessagePlayer
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-3 w-full max-w-[250px] h-[60px]">
+        <Spinner size="sm" />
+        <span className="text-sm text-text-secondary">Decrypting...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 w-full max-w-[250px] p-2 bg-destructive/10 rounded-lg">
+        <FiAlertTriangle className="text-destructive flex-shrink-0" />
+        <p className="text-xs text-destructive italic">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 w-full max-w-[250px]">
-      <audio ref={audioRef} src={src} preload="metadata" />
+      {audioSrc && <audio ref={audioRef} src={audioSrc} preload="metadata" />}
       <button 
         onClick={togglePlay} 
         disabled={!isLoaded}

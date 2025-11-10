@@ -145,7 +145,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
     );
   };
   
-  const MessageInput = ({ onSend, onTyping, onFileChange, onVoiceSend }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; onVoiceSend: (file: File, duration: number) => void; }) => {
+  const MessageInput = ({ onSend, onTyping, onFileChange, onVoiceSend }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; onVoiceSend: (blob: Blob, duration: number) => void; }) => {
   const [text, setText] = useState('');
   const [isPressed, setIsPressed] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -195,11 +195,11 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, { type: 'audio/webm' });
-        onVoiceSend(audioFile, recordingTime);
+        onVoiceSend(audioBlob, recordingTime);
         
-        // Clean up stream
+        // Clean up stream and reset timer AFTER sending
         stream.getTracks().forEach(track => track.stop());
+        setRecordingTime(0);
       };
 
       mediaRecorderRef.current.start();
@@ -220,7 +220,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
       }
-      setRecordingTime(0);
+      // Timer is now reset in the onstop handler
     }
   };
   // --- End Voice Recording Logic ---
@@ -372,8 +372,8 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     highlightedMessageId: state.highlightedMessageId,
     setHighlightedMessageId: state.setHighlightedMessageId,
   }));
-  const { sendVoiceMessage, replyingTo, setReplyingTo } = useMessageInputStore(state => ({
-    sendVoiceMessage: state.sendVoiceMessage,
+  const { handleStopRecording, replyingTo, setReplyingTo } = useMessageInputStore(state => ({
+    handleStopRecording: state.handleStopRecording,
     replyingTo: state.replyingTo,
     setReplyingTo: state.setReplyingTo,
   }));
@@ -436,8 +436,8 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     }
   };
 
-  const handleVoiceSend = (file: File, duration: number) => {
-    sendVoiceMessage(id, file, duration);
+  const handleVoiceSend = (blob: Blob, duration: number) => {
+    handleStopRecording(id, blob, duration);
   };
 
   return (

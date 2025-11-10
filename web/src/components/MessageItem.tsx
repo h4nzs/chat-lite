@@ -63,7 +63,7 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
 
 const ReplyQuote = ({ message, decryptedContent }: { message: Message, decryptedContent: string | null }) => {
   const authorName = message.sender?.name || 'User';
-  const contentPreview = decryptedContent || (message.fileUrl ? 'File' : '...');
+  const contentPreview = message.duration ? 'Voice Message' : (decryptedContent || (message.fileUrl ? 'File' : '...'));
 
   return (
     <div className="mb-1.5 p-2 rounded-lg bg-black/20 border-l-4 border-accent/50">
@@ -77,39 +77,39 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
   const [decryptedContent, setDecryptedContent] = useState<string | null>(message.content || '');
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
+  // This effect is now ONLY for TEXT messages.
   useEffect(() => {
-    let isMounted = true;
-    const tryDecrypt = async () => {
-      if (message.content && message.sessionId) {
-        // Only try to decrypt if it hasn't been successfully decrypted before,
-        // or if it's still showing a placeholder.
-        if (decryptedContent?.startsWith('[') || !decryptedContent) {
-           try {
-            const decrypted = await decryptMessage(message.content, message.conversationId, message.sessionId);
-            if (isMounted) {
-              setDecryptedContent(decrypted);
-            }
-          } catch (e) {
-            if (isMounted) {
-              // It will remain as the placeholder string from decryptMessage
-              setDecryptedContent(message.content);
+    if (!message.fileUrl) { // DO NOT RUN FOR ANY FILE MESSAGES
+      let isMounted = true;
+      const tryDecrypt = async () => {
+        if (message.content && message.sessionId) {
+          if (decryptedContent?.startsWith('[') || !decryptedContent) {
+             try {
+              const decrypted = await decryptMessage(message.content, message.conversationId, message.sessionId);
+              if (isMounted) {
+                setDecryptedContent(decrypted);
+              }
+            } catch (e) {
+              if (isMounted) {
+                setDecryptedContent(message.content);
+              }
             }
           }
         }
-      }
-    };
+      };
 
-    tryDecrypt();
+      tryDecrypt();
+      return () => { isMounted = false; };
+    }
+  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, decryptedContent, message.fileUrl]);
 
-    return () => { isMounted = false; };
-  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, decryptedContent]);
 
-
-  const hasContent = decryptedContent && !decryptedContent.startsWith('[');
+  const hasTextContent = !!(decryptedContent && !decryptedContent.startsWith('['));
   const isImage = message.fileType?.startsWith('image/');
-  const isVoiceMessage = (message.duration ?? 0) > 0;
+  const isVoiceMessage = message.fileType?.startsWith('audio/webm');
 
-  const hasBubbleStyle = hasContent || (message.fileUrl && !isImage && !isVoiceMessage);
+  // A bubble should only have padding if it's a text-only message or a generic file attachment.
+  const hasBubbleStyle = (hasTextContent && !message.fileUrl) || (message.fileUrl && !isImage && !isVoiceMessage);
 
   const bubbleClasses = clsx(
     'relative max-w-md md:max-w-lg shadow-neumorphic-bubble',
@@ -131,16 +131,16 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       
       {isVoiceMessage && message.fileUrl && (
         <div className="p-2">
-          <VoiceMessagePlayer src={toAbsoluteUrl(message.fileUrl)} duration={message.duration!} />
+          <VoiceMessagePlayer message={message} />
         </div>
       )}
 
       {message.fileUrl && isImage && (
-        <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className={`block w-full ${hasContent ? 'my-2' : ''}`}>
+        <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className="block w-full">
           <LazyImage 
             src={toAbsoluteUrl(message.fileUrl!)} 
             alt={message.fileName || 'Image attachment'}
-            className={`rounded-lg max-h-80 w-full object-cover cursor-pointer ${hasContent ? '' : 'rounded-xl'}`}
+            className="rounded-lg max-h-80 w-full object-cover cursor-pointer"
           />
         </button>
       )}
@@ -149,15 +149,18 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
         <FileAttachment message={message} />
       )}
 
-      {hasContent ? (
-        <p className="text-base whitespace-pre-wrap break-words">{decryptedContent}</p>
-      ) : (
-        <p className="text-base whitespace-pre-wrap break-words italic text-text-secondary">{decryptedContent}</p>
+      {/* Only render text content if it's NOT a file message */}
+      {!message.fileUrl && (
+        hasTextContent ? (
+          <p className="text-base whitespace-pre-wrap break-words">{decryptedContent}</p>
+        ) : (
+          <p className="text-base whitespace-pre-wrap break-words italic text-text-secondary">{decryptedContent}</p>
+        )
       )}
 
       {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}
 
-      <div className={`text-xs mt-1 flex items-center gap-1.5 ${isImage && !hasContent ? 'absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 pointer-events-none' : `justify-end ${mine ? 'text-accent-foreground/60' : 'text-text-secondary/80'}`}`}>
+      <div className={`text-xs mt-1 flex items-center gap-1.5 ${isImage ? 'absolute bottom-2 right-2 bg-black/50 text-white rounded-full px-2 py-1 pointer-events-none' : `justify-end ${mine ? 'text-accent-foreground/60' : 'text-text-secondary/80'}`}`}>
         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         <MessageStatusIcon message={message} conversation={conversation} />
       </div>
