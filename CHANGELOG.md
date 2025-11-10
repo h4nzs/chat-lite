@@ -2,7 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-11-10
+
+This release introduces a comprehensive, professional landing page to serve as the application's public-facing "front door". It also includes numerous UI/UX enhancements and critical routing fixes.
+
+### Added
+- **New Landing Page:** Created a full-featured, animated landing page at the root (`/`) of the application, including:
+  - A hero section with a call-to-action.
+  - An interactive theme comparison slider to showcase light and dark modes.
+  - A "Features" section with animated cards.
+  - A "How It Works" section visually explaining the security flow.
+  - A "Works Everywhere" section displaying the app on multiple devices.
+  - A "Testimonials" section for social proof.
+- **Scroll Animations:** Implemented "fade-in" and "slide-up" animations on all sections of the landing page, triggered as the user scrolls.
+- **Hover Animations:** Added a more dynamic, spring-based "expand and lift" effect to the feature cards on hover.
+
+### Changed
+- **Root Routing:** The application's root route (`/`) now serves the public landing page. The main chat interface is now exclusively accessible via the `/chat` route.
+
+### Fixed
+- **Post-Login Redirect:** Fixed a critical bug where users were redirected to the landing page after logging in, registering, or restoring an account. All authentication flows now correctly redirect to `/chat`.
+- **In-App Back Buttons:** Corrected multiple "back" buttons (e.g., from Settings) to navigate to `/chat` instead of the root landing page.
+- **Landing Page Scrolling:** Fixed a bug where a global `overflow: hidden` style prevented the new landing page from being scrollable.
+- **Component Rendering:** Fixed several React/JSX errors in the landing page that caused build failures or prevented components (like the theme slider and testimonials) from rendering correctly.
+
 ## [1.2.0] - 2025-11-08
+
 
 This is a major architectural release focused on improving the long-term maintainability, stability, and performance of the application by refactoring core components and fixing critical real-time functionality bugs.
 

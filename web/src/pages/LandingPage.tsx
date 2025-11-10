@@ -228,19 +228,37 @@ export default function LandingPage() {
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">Works Everywhere</h2>
                 <p className="text-lg text-text-secondary">Enjoy a consistent experience whether you're on your desktop or on the go, with a fully responsive design that adapts to your screen.</p>
               </motion.div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 items-start">
                 <motion.img 
-                  initial={{ opacity: 0, scale: 0.9, rotate: 3 }}
-                  whileInView={{ opacity: 1, scale: 1, rotate: 3 }}
+                  initial={{ opacity: 0, scale: 0.9, rotate: 2 }}
+                  whileInView={{ opacity: 1, scale: 1, rotate: 2 }}
                   viewport={{ once: true, amount: 0.5 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
                   src="/normal-desktop-dark.png" 
                   alt="Desktop view" 
+                  className="rounded-lg shadow-xl z-10"
+                />
+                <motion.img 
+                  initial={{ opacity: 0, scale: 0.9, rotate: -4, y: 16 }}
+                  whileInView={{ opacity: 1, scale: 1, rotate: -4, y: 16 }}
+                  viewport={{ once: true, amount: 0.5 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  src="/tablet-dark.png" 
+                  alt="Tablet dark mode" 
                   className="rounded-lg shadow-xl"
                 />
                 <motion.img 
-                  initial={{ opacity: 0, scale: 0.9, rotate: -3, y: 32 }}
-                  whileInView={{ opacity: 1, scale: 1, rotate: -3, y: 32 }}
+                  initial={{ opacity: 0, scale: 0.9, rotate: -3, y: -16 }}
+                  whileInView={{ opacity: 1, scale: 1, rotate: -3, y: -16 }}
+                  viewport={{ once: true, amount: 0.5 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  src="/tablet-light-show-sidebar.png" 
+                  alt="Tablet light mode with sidebar" 
+                  className="rounded-lg shadow-xl z-10"
+                />
+                <motion.img 
+                  initial={{ opacity: 0, scale: 0.9, rotate: 5, y: 16 }}
+                  whileInView={{ opacity: 1, scale: 1, rotate: 5, y: 16 }}
                   viewport={{ once: true, amount: 0.5 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
                   src="/mobile-light.png" 
