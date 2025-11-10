@@ -22,7 +22,7 @@ export default function Login() {
       return;
     }
     await login(data.a, data.b);
-    navigate("/");
+    navigate("/chat");
   };
 
   async function handleBiometricLogin(username: string) {
@@ -32,7 +32,7 @@ export default function Login() {
     }
     try {
       await loginWithBiometrics(username);
-      navigate("/");
+      navigate("/chat");
     } catch (err: any) {
       setError(err.message || "Biometric login failed.");
     }

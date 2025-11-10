@@ -71,7 +71,7 @@ export default function Restore() {
       toast.success("Account restored successfully! Attempting to log you in...");
       try {
         await login(username, newPassword);
-        navigate("/");
+        navigate("/chat");
       } catch (loginErr: any) {
         setError(`Your keys have been restored, but auto-login failed. Please go to the login page and log in manually with your new password. Error: ${loginErr.message}`)
         toast.error("Auto-login failed. Please log in manually.");

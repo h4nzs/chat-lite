@@ -43,7 +43,7 @@ export default function Register() {
   }
 
   if (step === 'verify') {
-    return <RecoveryPhraseModal phrase={recoveryPhrase} onClose={() => navigate('/')} />
+    return <RecoveryPhraseModal phrase={recoveryPhrase} onClose={() => navigate('/chat')} />
   }
 
   return (
