@@ -22,6 +22,7 @@ import { useVerificationStore } from '@store/verification';
 import { FiShield, FiSmile } from 'react-icons/fi';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 import LinkPreviewCard from './LinkPreviewCard';
 
@@ -311,6 +312,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const virtuosoRef = useRef<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (id) {
@@ -394,7 +396,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
             <>
               <ChatHeader 
                 conversation={conversation} 
-                onBack={() => openConversation(null)} 
+                onBack={() => navigate('/chat')} 
                 onInfoToggle={() => setIsGroupInfoOpen(true)} 
                 onMenuClick={onMenuClick} // Pass prop down
               />

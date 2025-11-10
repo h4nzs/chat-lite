@@ -45,10 +45,12 @@ export default function Chat() {
     }
   }, [user, loadConversations]);
 
-  // Sync activeId from URL to store
+  // Sync activeId from URL to store, and handle closing conversations
   useEffect(() => {
-    if (conversationId && conversationId !== activeId) {
-      openConversation(conversationId);
+    // This handles both opening a conversation from a URL
+    // and closing a conversation when navigating back to /chat
+    if (conversationId !== activeId) {
+      openConversation(conversationId || null);
     }
   }, [conversationId, activeId, openConversation]);
 
