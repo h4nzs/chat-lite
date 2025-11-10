@@ -136,7 +136,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       )}
 
       {message.fileUrl && isImage && (
-        <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className="block w-full">
+        <button onClick={() => onImageClick(message)} className="block w-full">
           <LazyImage 
             message={message}
             alt={message.fileName || 'Image attachment'}
@@ -190,7 +190,7 @@ interface MessageItemProps {
   message: Message;
   conversation: Conversation | undefined;
   isHighlighted?: boolean;
-  onImageClick: (src: string) => void;
+  onImageClick: (message: Message) => void;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
 }

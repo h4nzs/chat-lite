@@ -385,7 +385,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const typing = usePresenceStore(state => state.typing);
   
   const virtuosoRef = useRef<any>(null);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightboxMessage, setLightboxMessage] = useState<Message | null>(null);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -395,7 +395,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     }
   }, [id, actions]);
 
-  const handleImageClick = (src: string) => setLightboxSrc(src);
+  const handleImageClick = (message: Message) => setLightboxMessage(message);
 
   useEffect(() => {
     if (highlightedMessageId && virtuosoRef.current && messages.length > 0) {
@@ -519,7 +519,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                 )}
               </div>
               <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} onVoiceSend={handleVoiceSend} />
-              {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+              {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}
               {isGroupInfoOpen && <GroupInfoPanel conversationId={id} onClose={() => setIsGroupInfoOpen(false)} />}
             </>
           );
