@@ -96,43 +96,139 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
     set({ replyingTo: null });
   },
   
-  // This function is for generic, unencrypted files.
-  uploadFile: async (conversationId, file) => {
-    const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
-    const activityId = addActivity({ type: 'upload', fileName: file.name, progress: 0 });
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const { file: fileData } = await apiUpload<{ file: any }>({
-        path: `/api/uploads/${conversationId}/upload`,
-        formData: form,
-        onUploadProgress: (progress) => updateActivity(activityId, { progress }),
-      });
-      
-      setTimeout(() => removeActivity(activityId), 1000); 
-
-      const tempId = Date.now();
-      const me = useAuthStore.getState().user;
+    uploadFile: async (conversationId, file) => {
+  
+      const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
+  
+      const activityId = addActivity({ type: 'upload', fileName: `Encrypting ${file.name}...`, progress: 0 });
+  
+      const { replyingTo } = get();
+  
       const { addOptimisticMessage, updateMessage } = useMessageStore.getState();
-      const optimisticMessage: Message = {
-        id: `temp-${tempId}`, tempId, conversationId, senderId: me!.id, sender: me!, createdAt: new Date().toISOString(), optimistic: true,
-        fileUrl: fileData.url, fileName: fileData.filename, fileType: fileData.mimetype, fileSize: fileData.size, content: ''
-      };
-      addOptimisticMessage(conversationId, optimisticMessage);
-      getSocket().emit("message:send", { conversationId, tempId, ...optimisticMessage }, (ack: { ok: boolean, error?: string }) => {
-        if (!ack.ok) {
-          toast.error(`Failed to send file: ${ack.error || 'Unknown error'}`);
-          updateMessage(conversationId, `temp-${tempId}`, { error: true, optimistic: false });
-        }
-      });
-
-    } catch (uploadError: any) {
-      const errorMsg = handleApiError(uploadError);
-      toast.error(`Upload failed: ${errorMsg}`);
-      removeActivity(activityId);
-    }
-  },
+  
+      const me = useAuthStore.getState().user;
+  
+      const tempId = Date.now();
+  
+  
+  
+      try {
+  
+        // 1. Encrypt the file and get the raw key
+  
+        updateActivity(activityId, { progress: 25, fileName: `Encrypting ${file.name}...` });
+  
+        const { encryptedBlob, key: rawFileKey } = await encryptFile(file);
+  
+        
+  
+        // 2. Encrypt the raw key for transmission
+  
+        const { ciphertext: encryptedFileKey, sessionId } = await encryptMessage(rawFileKey, conversationId);
+  
+  
+  
+        // 3. Upload the encrypted file
+  
+        updateActivity(activityId, { progress: 50, fileName: `Uploading ${file.name}...` });
+  
+        const form = new FormData();
+  
+        // Use original file name to preserve extension on the server
+  
+        const encryptedFile = new File([encryptedBlob], file.name, { type: "application/octet-stream" });
+  
+        form.append("file", encryptedFile);
+  
+        const { file: fileData } = await apiUpload<{ file: any }> ({
+  
+          path: `/api/uploads/${conversationId}/upload`,
+  
+          formData: form,
+  
+          onUploadProgress: (progress) => updateActivity(activityId, { progress: 50 + (progress / 2) }),
+  
+        });
+  
+        
+  
+        updateActivity(activityId, { progress: 100, fileName: 'Finishing...' });
+  
+        setTimeout(() => removeActivity(activityId), 1000); 
+  
+  
+  
+        // 4. Create optimistic message with RAW key for local display/decryption
+  
+        const optimisticMessage: Message = {
+  
+          id: `temp-${tempId}`, tempId, conversationId, senderId: me!.id, sender: me!, createdAt: new Date().toISOString(), optimistic: true,
+  
+          fileUrl: fileData.url, fileName: file.name, fileType: `${file.type};encrypted=true`, fileSize: encryptedBlob.size,
+  
+          content: '',
+  
+          fileKey: rawFileKey,
+  
+          sessionId: sessionId,
+  
+          repliedTo: replyingTo || undefined,
+  
+        };
+  
+        addOptimisticMessage(conversationId, optimisticMessage);
+  
+  
+  
+        // 5. Create final payload with ENCRYPTED key for the server
+  
+        const finalPayload = {
+  
+          fileUrl: fileData.url, fileName: file.name, fileType: `${file.type};encrypted=true`, fileSize: encryptedBlob.size,
+  
+          content: '',
+  
+          fileKey: encryptedFileKey,
+  
+          sessionId: sessionId,
+  
+          repliedToId: replyingTo?.id,
+  
+        };
+  
+        
+  
+        // 6. Emit to socket
+  
+        getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
+  
+          if (!ack.ok) {
+  
+            toast.error(`Failed to send file: ${ack.error || 'Unknown error'}`);
+  
+            updateMessage(conversationId, `temp-${tempId}`, { error: true, optimistic: false });
+  
+          }
+  
+        });
+  
+  
+  
+        set({ replyingTo: null });
+  
+  
+  
+      } catch (error: any) {
+  
+        const errorMsg = handleApiError(error);
+  
+        toast.error(`File upload failed: ${errorMsg}`);
+  
+        removeActivity(activityId);
+  
+      }
+  
+    },
 
   // This function is now completely self-contained for sending voice messages.
   handleStopRecording: async (conversationId, blob, duration) => {

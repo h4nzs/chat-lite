@@ -138,7 +138,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       {message.fileUrl && isImage && (
         <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className="block w-full">
           <LazyImage 
-            src={toAbsoluteUrl(message.fileUrl!)} 
+            message={message}
             alt={message.fileName || 'Image attachment'}
             className="rounded-lg max-h-80 w-full object-cover cursor-pointer"
           />
