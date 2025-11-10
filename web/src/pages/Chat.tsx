@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useOrientation } from '@hooks/useOrientation';
 import OnboardingTour from '@components/OnboardingTour';
 import { useParams, useNavigate } from 'react-router-dom';
+import ConnectionStatusBanner from '@components/ConnectionStatusBanner';
 
 export default function Chat() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -77,6 +78,7 @@ export default function Chat() {
 
   return (
     <div className="h-screen w-screen flex bg-bg-main text-text-primary font-sans overflow-hidden">
+      <ConnectionStatusBanner />
       <AnimatePresence>
         {isSidebarOpen && !isDesktopLayout && (
           <motion.div 

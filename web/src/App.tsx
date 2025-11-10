@@ -9,6 +9,7 @@ import SessionManagerPage from './pages/SessionManagerPage';
 import LinkDevicePage from './pages/LinkDevicePage';
 import DeviceScannerPage from './pages/DeviceScannerPage';
 import ProfilePage from './pages/ProfilePage';
+import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/auth';
@@ -163,7 +164,6 @@ const AppContent = () => {
           },
         }}
       />
-      <ConnectionStatusBanner />
       <CommandPalette />
       <ConfirmModal />
       <UserInfoModal />
@@ -171,12 +171,12 @@ const AppContent = () => {
       <ChatInfoModal />
       <DynamicIsland />
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/restore" element={<Restore />} />
         <Route path="/link-device" element={<LinkDevicePage />} />
-        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/chat/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
