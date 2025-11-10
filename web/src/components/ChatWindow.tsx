@@ -19,7 +19,7 @@ import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
 import clsx from "clsx";
 import { useVerificationStore } from '@store/verification';
-import { FiShield, FiSmile } from 'react-icons/fi';
+import { FiShield, FiSmile, FiMic, FiSquare } from 'react-icons/fi';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -145,13 +145,21 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
     );
   };
   
-  const MessageInput = ({ onSend, onTyping, onFileChange }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; }) => {
+  const MessageInput = ({ onSend, onTyping, onFileChange, onVoiceSend }: { onSend: (data: { content: string }) => void; onTyping: () => void; onFileChange: (e: ChangeEvent<HTMLInputElement>) => void; onVoiceSend: (file: File, duration: number) => void; }) => {
   const [text, setText] = useState('');
   const [isPressed, setIsPressed] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageInputStore();
+
+  // --- Voice Recording State ---
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  // --- End Voice Recording State ---
 
   const hasText = text.trim().length > 0;
 
@@ -173,6 +181,49 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // --- Voice Recording Logic ---
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, { type: 'audio/webm' });
+        onVoiceSend(audioFile, recordingTime);
+        
+        // Clean up stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      // You might want to show a toast notification to the user here
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      setRecordingTime(0);
+    }
+  };
+  // --- End Voice Recording Logic ---
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setText(prevText => prevText + emojiData.emoji);
@@ -224,7 +275,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           <LinkPreviewCard preview={typingLinkPreview} />
         </div>
       )}
-      <div className="p-4 bg-bg-surface shadow-neumorphic-convex rounded-t-xl relative"> {/* Added relative positioning */}
+      <div className="p-4 bg-bg-surface shadow-neumorphic-convex rounded-t-xl relative">
         {showEmojiPicker && (
           <div ref={emojiPickerRef} className="absolute bottom-full mb-2">
             <EmojiPicker 
@@ -235,42 +286,65 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
             />
           </div>
         )}
-        <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className={fileButtonClasses}>
-            <motion.svg 
-              whileHover={{ scale: 1.1, rotate: -15 }}
-              xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
-          </button>
-          <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Open emoji picker" className={fileButtonClasses}>
-            <motion.div whileHover={{ scale: 1.1 }}>
-              <FiSmile size={22} />
-            </motion.div>
-          </button>
-          <input 
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={onFileChange}
-          />
-          <input 
-            type="text" 
-            value={text} 
-            onChange={handleTextChange}
-            placeholder="Type a message..."
-            className={textInputClasses}
-          />
-          <button 
-            type="submit" 
-            disabled={!hasText}
-            onMouseDown={() => hasText && setIsPressed(true)}
-            onMouseUp={() => setIsPressed(false)}
-            onMouseLeave={() => setIsPressed(false)}
-            aria-label="Send message"
-            className={sendButtonClasses}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-        </form>
+        
+        {isRecording ? (
+          <div className="flex items-center gap-3 w-full">
+            <button type="button" onClick={handleStopRecording} aria-label="Stop recording" className={`${fileButtonClasses} bg-red-500 text-white`}>
+              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
+                <FiSquare size={22} />
+              </motion.div>
+            </button>
+            <div className="flex-1 bg-bg-main shadow-neumorphic-concave rounded-full flex items-center px-4">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-3"></div>
+              <p className="text-text-secondary font-mono">{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</p>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex items-center gap-3">
+            <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className={fileButtonClasses}>
+              <motion.svg 
+                whileHover={{ scale: 1.1, rotate: -15 }}
+                xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
+            </button>
+            <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Open emoji picker" className={fileButtonClasses}>
+              <motion.div whileHover={{ scale: 1.1 }}>
+                <FiSmile size={22} />
+              </motion.div>
+            </button>
+            <input 
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={onFileChange}
+            />
+            <input 
+              type="text" 
+              value={text} 
+              onChange={handleTextChange}
+              placeholder="Type a message..."
+              className={textInputClasses}
+            />
+            {hasText ? (
+              <button 
+                type="submit" 
+                disabled={!hasText}
+                onMouseDown={() => hasText && setIsPressed(true)}
+                onMouseUp={() => setIsPressed(false)}
+                onMouseLeave={() => setIsPressed(false)}
+                aria-label="Send message"
+                className={sendButtonClasses}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            ) : (
+              <button type="button" onClick={handleStartRecording} aria-label="Start recording" className={fileButtonClasses}>
+                <motion.div whileHover={{ scale: 1.1 }}>
+                  <FiMic size={22} />
+                </motion.div>
+              </button>
+            )}
+          </form>
+        )}
       </div>
     </div>
   );
@@ -298,7 +372,8 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     highlightedMessageId: state.highlightedMessageId,
     setHighlightedMessageId: state.setHighlightedMessageId,
   }));
-  const { replyingTo, setReplyingTo } = useMessageInputStore(state => ({
+  const { sendVoiceMessage, replyingTo, setReplyingTo } = useMessageInputStore(state => ({
+    sendVoiceMessage: state.sendVoiceMessage,
     replyingTo: state.replyingTo,
     setReplyingTo: state.setReplyingTo,
   }));
@@ -359,6 +434,10 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     if (e.target.files?.[0]) {
       actions.uploadFile(e.target.files[0]);
     }
+  };
+
+  const handleVoiceSend = (file: File, duration: number) => {
+    sendVoiceMessage(id, file, duration);
   };
 
   return (
@@ -439,7 +518,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                    </div>
                 )}
               </div>
-              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} />
+              <MessageInput onSend={handleSendMessage} onTyping={handleTyping} onFileChange={handleFileChange} onVoiceSend={handleVoiceSend} />
               {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
               {isGroupInfoOpen && <GroupInfoPanel conversationId={id} onClose={() => setIsGroupInfoOpen(false)} />}
             </>

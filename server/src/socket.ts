@@ -133,6 +133,7 @@ export function registerSocket(httpServer: HttpServer) {
               fileName: data.fileName,
               fileType: data.fileType,
               fileSize: data.fileSize,
+              duration: data.duration, // Add this line
               sessionId: data.sessionId,
               repliedToId: data.repliedToId,
               linkPreview: linkPreviewData,

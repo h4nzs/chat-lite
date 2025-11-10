@@ -18,6 +18,7 @@ type State = {
   clearTypingLinkPreview: () => void;
   sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
   uploadFile: (conversationId: string, file: File) => Promise<void>;
+  sendVoiceMessage: (conversationId: string, file: File, duration: number) => Promise<void>;
   retrySendMessage: (message: Message) => void;
 };
 
@@ -124,6 +125,44 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
         fileName: fileData.filename, 
         fileType: fileData.mimetype, 
         fileSize: fileData.size, 
+        content: '' 
+      });
+    } catch (uploadError: any) {
+      const errorMsg = handleApiError(uploadError);
+      toast.error(`Upload failed: ${errorMsg}`);
+      removeActivity(activityId);
+    }
+  },
+
+  sendVoiceMessage: async (conversationId, file, duration) => {
+    const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
+    
+    const activityId = addActivity({
+      type: 'upload',
+      fileName: 'Voice Message',
+      progress: 0,
+    });
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const { file: fileData } = await apiUpload<{ file: any }>({
+        path: `/api/uploads/${conversationId}/upload`,
+        formData: form,
+        onUploadProgress: (progress) => {
+          updateActivity(activityId, { progress });
+        },
+      });
+      
+      setTimeout(() => removeActivity(activityId), 1000); 
+
+      get().sendMessage(conversationId, { 
+        fileUrl: fileData.url, 
+        fileName: fileData.filename, 
+        fileType: fileData.mimetype, 
+        fileSize: fileData.size,
+        duration: duration, // Add duration here
         content: '' 
       });
     } catch (uploadError: any) {

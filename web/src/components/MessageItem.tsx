@@ -16,6 +16,7 @@ import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
 import { FiRefreshCw } from 'react-icons/fi'; // Import retry icon
 import { getUserColor } from '@utils/color';
 import { FaCheck, FaCheckDouble } from 'react-icons/fa';
+import VoiceMessagePlayer from './VoiceMessagePlayer'; // Import the new component
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -73,8 +74,9 @@ const ReplyQuote = ({ message }: { message: Message }) => {
 const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversation }: { message: Message; mine: boolean; isLastInSequence: boolean; onImageClick: (src: string) => void; conversation: Conversation | undefined; }) => {
   const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
   const isImage = message.fileType?.startsWith('image/');
+  const isVoiceMessage = (message.duration ?? 0) > 0;
 
-  const hasBubbleStyle = hasContent || (message.fileUrl && !isImage);
+  const hasBubbleStyle = hasContent || (message.fileUrl && !isImage && !isVoiceMessage);
 
   const bubbleClasses = clsx(
     'relative max-w-md md:max-w-lg',
@@ -95,6 +97,12 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
     <div className={bubbleClasses}>
       {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
       
+      {isVoiceMessage && message.fileUrl && (
+        <div className="py-2">
+          <VoiceMessagePlayer src={toAbsoluteUrl(message.fileUrl)} duration={message.duration!} />
+        </div>
+      )}
+
       {message.fileUrl && isImage && (
         <button onClick={() => onImageClick(toAbsoluteUrl(message.fileUrl!))} className={`block w-full ${hasContent ? 'my-2' : ''}`}>
           <LazyImage 
@@ -105,7 +113,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
         </button>
       )}
 
-      {message.fileUrl && !isImage && (
+      {message.fileUrl && !isImage && !isVoiceMessage && (
         <FileAttachment message={message} />
       )}
 
@@ -268,4 +276,3 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
 };
 
 export default memo(MessageItem);
-
