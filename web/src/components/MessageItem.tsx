@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { Message, Conversation } from "@store/conversation";
 import { useAuthStore } from "@store/auth";
 import { useMessageInputStore } from "@store/messageInput";
@@ -12,11 +12,13 @@ import FileAttachment from "./FileAttachment";
 import { useModalStore } from '@store/modal';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import LinkPreviewCard from './LinkPreviewCard'; // Import the new component
-import { FiRefreshCw } from 'react-icons/fi'; // Import retry icon
+import LinkPreviewCard from './LinkPreviewCard';
+import { FiRefreshCw } from 'react-icons/fi';
 import { getUserColor } from '@utils/color';
 import { FaCheck, FaCheckDouble } from 'react-icons/fa';
-import VoiceMessagePlayer from './VoiceMessagePlayer'; // Import the new component
+import VoiceMessagePlayer from './VoiceMessagePlayer';
+import { decryptMessage } from "@utils/crypto";
+import { useKeychainStore } from "@store/keychain";
 
 const MessageStatusIcon = ({ message, conversation }: { message: Message; conversation: Conversation | undefined }) => {
   const meId = useAuthStore((s) => s.user?.id);
@@ -59,9 +61,9 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   return <FaCheck title="Sent" size={16} />;
 };
 
-const ReplyQuote = ({ message }: { message: Message }) => {
+const ReplyQuote = ({ message, decryptedContent }: { message: Message, decryptedContent: string | null }) => {
   const authorName = message.sender?.name || 'User';
-  const contentPreview = message.content || (message.fileUrl ? 'File' : '...');
+  const contentPreview = decryptedContent || (message.fileUrl ? 'File' : '...');
 
   return (
     <div className="mb-1.5 p-2 rounded-lg bg-black/20 border-l-4 border-accent/50">
@@ -72,7 +74,38 @@ const ReplyQuote = ({ message }: { message: Message }) => {
 };
 
 const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversation }: { message: Message; mine: boolean; isLastInSequence: boolean; onImageClick: (src: string) => void; conversation: Conversation | undefined; }) => {
-  const hasContent = message.content && message.content.trim().length > 0 && message.content !== "[This message was deleted]";
+  const [decryptedContent, setDecryptedContent] = useState<string | null>(message.content || '');
+  const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
+
+  useEffect(() => {
+    let isMounted = true;
+    const tryDecrypt = async () => {
+      if (message.content && message.sessionId) {
+        // Only try to decrypt if it hasn't been successfully decrypted before,
+        // or if it's still showing a placeholder.
+        if (decryptedContent?.startsWith('[') || !decryptedContent) {
+           try {
+            const decrypted = await decryptMessage(message.content, message.conversationId, message.sessionId);
+            if (isMounted) {
+              setDecryptedContent(decrypted);
+            }
+          } catch (e) {
+            if (isMounted) {
+              // It will remain as the placeholder string from decryptMessage
+              setDecryptedContent(message.content);
+            }
+          }
+        }
+      }
+    };
+
+    tryDecrypt();
+
+    return () => { isMounted = false; };
+  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, decryptedContent]);
+
+
+  const hasContent = decryptedContent && !decryptedContent.startsWith('[');
   const isImage = message.fileType?.startsWith('image/');
   const isVoiceMessage = (message.duration ?? 0) > 0;
 
@@ -84,7 +117,6 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       'px-4 py-2.5': hasBubbleStyle,
       'bg-accent text-accent-foreground': mine,
       'bg-bg-surface text-text-primary': !mine,
-      // Add a "tail" to the last message in a sequence
       'rounded-t-2xl': true,
       'rounded-bl-2xl': mine,
       'rounded-br-2xl': !mine,
@@ -95,7 +127,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
 
   return (
     <div className={bubbleClasses}>
-      {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
+      {message.repliedTo && <ReplyQuote message={message.repliedTo} decryptedContent={decryptedContent} />}
       
       {isVoiceMessage && message.fileUrl && (
         <div className="p-2">
@@ -117,8 +149,10 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
         <FileAttachment message={message} />
       )}
 
-      {hasContent && (
-        <p className="text-base whitespace-pre-wrap break-words">{message.content}</p>
+      {hasContent ? (
+        <p className="text-base whitespace-pre-wrap break-words">{decryptedContent}</p>
+      ) : (
+        <p className="text-base whitespace-pre-wrap break-words italic text-text-secondary">{decryptedContent}</p>
       )}
 
       {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}

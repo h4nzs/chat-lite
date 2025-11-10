@@ -217,4 +217,29 @@ export async function fulfillKeyRequest(payload: FulfillRequestPayload): Promise
 
   console.log(`Successfully fulfilled and sent re-encrypted key for session ${sessionId} to ${requesterId}`);
 }
+
+// --- Key Recovery (Receiver Side) ---
+
+interface ReceiveKeyPayload {
+  conversationId: string;
+  sessionId: string;
+  encryptedKey: string; // base64
+}
+
+/**
+ * Handles receiving a new session key from a peer, decrypts it with our
+ * private key, and stores it.
+ */
+export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promise<void> {
+  const { conversationId, sessionId, encryptedKey } = payload;
+  console.log(`Received a new key for session ${sessionId}. Storing...`);
+
+  const { publicKey, privateKey } = await getMyKeyPair();
+  const sodium = await getSodium();
+
+  const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
+
+  await addSessionKey(conversationId, sessionId, newSessionKey);
+  console.log(`Successfully stored new key for session ${sessionId}`);
+}
     
