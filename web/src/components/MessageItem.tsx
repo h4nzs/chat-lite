@@ -79,9 +79,9 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
   const hasBubbleStyle = hasContent || (message.fileUrl && !isImage && !isVoiceMessage);
 
   const bubbleClasses = clsx(
-    'relative max-w-md md:max-w-lg',
-    hasBubbleStyle && `px-4 py-2.5 shadow-neumorphic-bubble`,
+    'relative max-w-md md:max-w-lg shadow-neumorphic-bubble',
     {
+      'px-4 py-2.5': hasBubbleStyle,
       'bg-accent text-accent-foreground': mine,
       'bg-bg-surface text-text-primary': !mine,
       // Add a "tail" to the last message in a sequence
@@ -98,7 +98,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
       
       {isVoiceMessage && message.fileUrl && (
-        <div className="py-2">
+        <div className="p-2">
           <VoiceMessagePlayer src={toAbsoluteUrl(message.fileUrl)} duration={message.duration!} />
         </div>
       )}
