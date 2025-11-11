@@ -192,9 +192,25 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
 
   // --- Actions to be called by socket store ---
   addOrUpdateConversation: (conversation) => {
-    set(state => ({ 
-      conversations: sortConversations([conversation, ...state.conversations.filter(c => c.id !== conversation.id)])
-    }));
+    set(state => {
+      const existingConversation = state.conversations.find(c => c.id === conversation.id);
+      let updatedConversation: Conversation;
+
+      if (existingConversation) {
+        // Merge new data into existing conversation
+        updatedConversation = {
+          ...existingConversation,
+          ...conversation,
+        };
+      } else {
+        // This is a new conversation, add it as is
+        updatedConversation = conversation;
+      }
+
+      return {
+        conversations: sortConversations([updatedConversation, ...state.conversations.filter(c => c.id !== conversation.id)])
+      };
+    });
   },
 
   removeConversation: (conversationId) => {

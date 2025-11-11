@@ -14,8 +14,6 @@ import type { Conversation } from '@store/conversation';
 
 import { sanitizeText } from '@utils/sanitize';
 import { toAbsoluteUrl } from '@utils/url';
-import { decryptMessage } from '@utils/crypto';
-import { useKeychainStore } from '@store/keychain';
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FiUsers } from 'react-icons/fi';
@@ -92,44 +90,6 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
   const isUnread = conversation.unreadCount > 0;
 
-  const [decryptedPreview, setDecryptedPreview] = useState<string | null>(null);
-  const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
-
-  useEffect(() => {
-    let isMounted = true;
-    const decryptPreview = async () => {
-      const lastMessage = conversation.lastMessage;
-      // If it's not a text message, use the existing preview (e.g., "📷 Image")
-      if (lastMessage && !lastMessage.content) {
-        if (isMounted) setDecryptedPreview(lastMessage.preview || null);
-        return;
-      }
-
-      // If it is a text message, try to decrypt it.
-      if (lastMessage?.content && lastMessage.sessionId) {
-        try {
-          // Set a temporary loading state
-          if (isMounted) setDecryptedPreview("..."); 
-          const decrypted = await decryptMessage(lastMessage.content, conversation.id, lastMessage.sessionId);
-          if (isMounted) {
-            setDecryptedPreview(decrypted);
-          }
-        } catch (e) {
-          if (isMounted) {
-            setDecryptedPreview('[Failed to decrypt]');
-          }
-        }
-      } else {
-        // No last message or no content
-        if (isMounted) setDecryptedPreview(null);
-      }
-    };
-
-    decryptPreview();
-    return () => { isMounted = false; };
-  }, [conversation.id, conversation.lastMessage, lastKeychainUpdate]);
-
-
   const avatarSrc = conversation.isGroup 
     ? (conversation.avatarUrl ? `${toAbsoluteUrl(conversation.avatarUrl)}?t=${conversation.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${conversation.title}`)
     : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
@@ -152,7 +112,7 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
     }
   );
 
-  const previewText = decryptedPreview ?? 'No messages yet';
+  const previewText = conversation.lastMessage?.content || conversation.lastMessage?.preview || 'No messages yet';
 
   return (
     <motion.div layout key={conversation.id} className={itemClasses}>

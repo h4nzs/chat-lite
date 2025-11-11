@@ -58,7 +58,6 @@ type State = {
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
   retrySendMessage: (message: Message) => void;
-  redecryptMessages: (conversationId: string) => Promise<void>;
 };
 
 // --- Zustand Store ---
@@ -87,12 +86,33 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         isFetchingMore: { ...state.isFetchingMore, [id]: false },
       }));
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
-      const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
+      const fetchedMessages = res.items || [];
+      const processedMessages: Message[] = [];
+      const failedSessionIds = new Set<string>();
+
+      for (const message of fetchedMessages) {
+        try {
+          const decryptedMessage = await decryptMessageObject(message);
+          processedMessages.push(decryptedMessage);
+        } catch (e) {
+          console.error(`Decryption failed for message ${message.id} during initial load. Requesting key.`, e);
+          // Add message with placeholder and mark session for key request
+          processedMessages.push({ ...message, content: '[Requesting key to decrypt...]' });
+          if (message.sessionId) {
+            failedSessionIds.add(message.sessionId);
+          }
+        }
+      }
+
+      // Emit key requests for all unique failed session IDs
+      for (const sessionId of failedSessionIds) {
+        emitSessionKeyRequest(id, sessionId);
+      }
       
       set(state => {
         const existingMessages = state.messages[id] || [];
         const messageMap = new Map(existingMessages.map(m => [m.id, m]));
-        decryptedItems.forEach(m => messageMap.set(m.id, m));
+        processedMessages.forEach(m => messageMap.set(m.id, m));
         
         const allMessages = Array.from(messageMap.values());
         allMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -105,7 +125,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
           },
           hasMore: {
             ...state.hasMore,
-            [id]: decryptedItems.length >= 50,
+            [id]: fetchedMessages.length >= 50,
           },
           hasLoadedHistory: { // Mark history as loaded
             ...state.hasLoadedHistory,
@@ -114,7 +134,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         };
 
         // Immediately try to load the previous page if the screen isn't full
-        if (decryptedItems.length >= 50) {
+        if (fetchedMessages.length >= 50) {
           get().loadPreviousMessages(id);
         }
         
@@ -309,32 +329,5 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
 
     // Kirim ulang pesan
     get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
-  },
-
-  redecryptMessages: async (conversationId: string) => {
-    const { messages, updateMessage } = get();
-    const conversationMessages = messages[conversationId] || [];
-
-    const messagesToRedecrypt = conversationMessages.filter(
-      m => m.content === '[Requesting key to decrypt...]' && m.ciphertext
-    );
-
-    if (messagesToRedecrypt.length === 0) return;
-
-    console.log(`Attempting to re-decrypt ${messagesToRedecrypt.length} messages for conversation ${conversationId}`);
-
-    // Decrypt messages one by one and update the store
-    for (const message of messagesToRedecrypt) {
-      try {
-        const decryptedContent = await decryptMessage(message.ciphertext!, message.conversationId, message.sessionId);
-        // Update the specific message in the store
-        updateMessage(conversationId, message.id, { content: decryptedContent });
-      } catch (error) {
-        console.error(`Failed to re-decrypt message ${message.id}:`, error);
-        // Optionally update the message with a permanent error state
-        updateMessage(conversationId, message.id, { content: '[Failed to decrypt message]' });
-      }
-    }
-    toast.success(`${messagesToRedecrypt.length} message(s) successfully decrypted!`);
   },
 }));
