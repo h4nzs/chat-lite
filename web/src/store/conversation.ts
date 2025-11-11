@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, authFetch } from "@lib/api";
-import { decryptMessage } from "@utils/crypto";
+import { decryptMessageObject } from "./message";
 import { getSocket } from "@lib/socket";
 import { useVerificationStore } from './verification';
 
@@ -120,19 +120,24 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
     try {
       set({ loading: true, error: null });
       const rawConversations = await api<any[]>("/api/conversations");
-      const conversations: Conversation[] = rawConversations.map(c => ({
-        ...c,
-        lastMessage: c.messages?.[0] || null,
-        participants: c.participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role })),
-      }));
-
-      // Generate previews for attachments, but do not decrypt text messages here.
-      // Decryption will be handled lazily by the UI components.
-      for (const c of conversations) {
-        if (c.lastMessage) {
-          c.lastMessage = withPreview(c.lastMessage);
+      const conversations = await Promise.all(rawConversations.map(async c => {
+        let lastMessage = c.messages?.[0] || null;
+        if (lastMessage) {
+          try {
+            lastMessage = await decryptMessageObject(lastMessage);
+          } catch (e) {
+            console.error(`Failed to decrypt last message for convo ${c.id}`, e);
+            lastMessage.content = '[Failed to decrypt]';
+          }
+          lastMessage = withPreview(lastMessage);
         }
-      }
+        
+        return {
+          ...c,
+          lastMessage,
+          participants: c.participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role })),
+        };
+      }));
 
       set({ conversations: sortConversations(conversations) });
 
