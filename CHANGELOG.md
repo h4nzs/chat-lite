@@ -15,10 +15,16 @@ This is a quality-of-life and robustness release focused on polishing the user i
 - **Consistent Modal Language:** All text within the "Security Info" modal (`ChatInfoModal`) has been standardized to English to ensure consistency.
 
 ### Fixed
+- **Incomplete Chat History:** Fixed a critical bug where opening a conversation would sometimes only show the most recent messages instead of the full history. The message loading logic now correctly fetches the complete history the first time a chat is opened.
 - **Voice Message Bubble Width:** Fixed a UI bug where voice message bubbles would shrink, by enforcing a fixed, proportional width for all voice messages.
 - **Voice Message Duration Bug:** Fixed a critical bug where the duration of all voice messages was incorrectly recorded as `0`. This was traced to a stale state issue within an event handler, which has been resolved by using a `useRef` hook to guarantee the correct duration is captured. This fix also corrected the progress bar indicator, which was stuck at the start.
 - **File Deletion on Server:** Fixed a critical bug where deleting a message with a file attached would delete the database record but leave the physical file on the server. The backend logic now correctly reconstructs the file path and deletes the file from storage.
 - **Lightbox Image Overflow:** Fixed a bug where very tall or wide images would overflow the screen in the lightbox view. The component now correctly constrains the image to the viewport while maintaining its aspect ratio and ensuring a consistent margin.
+- **Reply Preview:** Fixed a bug where the reply preview UI would show incorrect information or raw encrypted text. The preview now correctly shows the sender's name and a proper summary for all message types (text, file, voice).
+- **Build Failure:** Fixed a build failure caused by a dangling import to a deleted file (`sanitize.ts`) in `ChatList.tsx`.
+
+### Reverted
+- **Typing Indicator:** Reverted a change that attempted to fix the typing indicator. The implementation caused a regression in the user presence (online/offline) status and has been rolled back to restore the correct presence behavior. The typing indicator remains non-functional and is a known issue.
 
 ## [1.4.0] - 2025-11-10
 
@@ -273,7 +279,7 @@ This release focuses on a significant UI/UX overhaul, introducing a unique visua
 ### Added (New Features)
 
 - **"Aurora" Gradient Theme:** Implemented a distinctive Teal-to-Indigo gradient as the application's new accent color, applied to primary buttons and key UI elements.
-- **Three-Column "Command Center" Layout:** Introduced an adaptive three-column layout for ultrawide monitors, displaying ChatList, ChatWindow, and a contextual info panel (GroupInfoPanel or UserInfoPanel) simultaneously.
+- **"Command Center" Layout:** Introduced an adaptive three-column layout for ultrawide monitors, displaying ChatList, ChatWindow, and a contextual info panel (GroupInfoPanel or UserInfoPanel) simultaneously.
 - **Hybrid Tablet Experience:** Implemented dynamic layout switching for tablets based on orientation (mobile-like in portrait, desktop-like in landscape).
 - **`useOrientation` Hook:** Created a custom React hook to detect and respond to screen orientation changes.
 - **`UserInfoPanel` Component:** Developed a dedicated panel to display user information in the three-column layout.
