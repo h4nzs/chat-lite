@@ -14,6 +14,8 @@ import type { Conversation } from '@store/conversation';
 
 import { sanitizeText } from '@utils/sanitize';
 import { toAbsoluteUrl } from '@utils/url';
+import { decryptMessage } from '@utils/crypto';
+import { useKeychainStore } from '@store/keychain';
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FiUsers } from 'react-icons/fi';
@@ -90,6 +92,35 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
   const isUnread = conversation.unreadCount > 0;
 
+  const [decryptedPreview, setDecryptedPreview] = useState(conversation.lastMessage?.preview || null);
+  const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
+
+  useEffect(() => {
+    let isMounted = true;
+    const decryptPreview = async () => {
+      const lastMessage = conversation.lastMessage;
+      if (lastMessage?.content && !lastMessage.fileUrl) {
+        // Only decrypt if it hasn't been decrypted or if keys have changed
+        if (decryptedPreview === null || decryptedPreview === lastMessage.content) {
+          try {
+            const decrypted = await decryptMessage(lastMessage.content, conversation.id, lastMessage.sessionId);
+            if (isMounted) {
+              setDecryptedPreview(decrypted);
+            }
+          } catch (e) {
+            if (isMounted) {
+              setDecryptedPreview('[Failed to decrypt]');
+            }
+          }
+        }
+      }
+    };
+
+    decryptPreview();
+    return () => { isMounted = false; };
+  }, [conversation.id, conversation.lastMessage, lastKeychainUpdate, decryptedPreview]);
+
+
   const avatarSrc = conversation.isGroup 
     ? (conversation.avatarUrl ? `${toAbsoluteUrl(conversation.avatarUrl)}?t=${conversation.lastUpdated}` : `https://api.dicebear.com/8.x/initials/svg?seed=${conversation.title}`)
     : (peerUser?.avatarUrl ? toAbsoluteUrl(peerUser.avatarUrl) : `https://api.dicebear.com/8.x/initials/svg?seed=${title}`);
@@ -111,6 +142,8 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
       'ring-2 ring-accent ring-offset-2 ring-offset-bg-main': isSelected,
     }
   );
+
+  const previewText = decryptedPreview || conversation.lastMessage?.preview || 'No messages yet';
 
   return (
     <motion.div layout key={conversation.id} className={itemClasses}>
@@ -137,7 +170,7 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
           </div>
           <div className="flex justify-between items-center mt-1">
             <p className={`text-sm truncate ${isUnread ? 'font-bold text-text-primary' : 'text-text-secondary'}`}>
-              {conversation.lastMessage?.preview || sanitizeText(conversation.lastMessage?.content || '') || 'No messages yet'}
+              {previewText}
             </p>
             {isUnread && (
               <span className="bg-accent text-accent-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 ml-2">

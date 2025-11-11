@@ -119,7 +119,7 @@ Semua rute yang memerlukan otentikasi dilindungi oleh middleware yang memverifik
 | **Lampiran File** | ✅ **Berfungsi** | Pengguna dapat mengunggah dan melihat lampiran. |
 | **Pencarian Pesan** | ✅ **Berfungsi** | Fungsionalitas pencarian di dalam percakapan sudah ada. |
 | **UI Responsif** |  **berfungsi** | Tata letak utama sudah responsif, tetapi beberapa modal dan panel mungkin memerlukan penyesuaian lebih lanjut untuk layar yang sangat kecil atau sangat besar. |
-| **Stabilitas Socket** | ⚠️ **Perlu Pengecekan** | Logika *reconnect* sudah ada, tetapi perlu diuji dalam kondisi jaringan yang tidak stabil untuk memastikan tidak ada *race condition* atau kehilangan state. |
+| **Stabilitas Socket** |  **berfungsi** | Logika *reconnect* sudah ada, tetapi perlu diuji dalam kondisi jaringan yang tidak stabil untuk memastikan tidak ada *race condition* atau kehilangan state. |
 
 ### Rekomendasi & Area Risiko
 1.  **Kompleksitas E2EE:** Logika sinkronisasi kunci (`session:request_key`, `session:fulfill_request`, dll.) sangat penting dan rumit. Kesalahan implementasi di sisi klien dapat membahayakan keamanan atau menyebabkan pengguna tidak dapat mendekripsi pesan. Area ini harus diuji secara menyeluruh.

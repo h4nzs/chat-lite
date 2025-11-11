@@ -125,11 +125,9 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
         participants: c.participants.map((p: any) => ({ ...p.user, description: p.user.description, role: p.role })),
       }));
 
-      // Safely decrypt messages one by one to prevent a single failure from stopping the entire load
+      // Generate previews for attachments, but do not decrypt text messages here.
+      // Decryption will be handled lazily by the UI components.
       for (const c of conversations) {
-        if (c.lastMessage?.content) {
-          c.lastMessage.content = await decryptMessage(c.lastMessage.content, c.id, c.lastMessage.sessionId);
-        }
         if (c.lastMessage) {
           c.lastMessage = withPreview(c.lastMessage);
         }
