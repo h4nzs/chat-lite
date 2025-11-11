@@ -92,7 +92,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in p-4 md:p-8"
       onClick={onClose}
     >
       <button 
@@ -105,7 +105,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
         {isLoading && <Spinner size="lg" />}
         {error && !isLoading && <div className="text-white text-center p-4 bg-destructive/50 rounded-lg">{error}</div>}
         {!isLoading && !error && decryptedUrl && (
-          <img src={decryptedUrl} alt="Lightbox view" className="w-full h-full object-contain" />
+          <img src={decryptedUrl} alt="Lightbox view" className="object-contain max-w-full max-h-full" />
         )}
       </div>
     </div>

@@ -130,7 +130,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       {message.repliedTo && <ReplyQuote message={message.repliedTo} decryptedContent={decryptedContent} />}
       
       {isVoiceMessage && message.fileUrl && (
-        <div className="p-2">
+        <div className="p-2 w-[250px]">
           <VoiceMessagePlayer message={message} />
         </div>
       )}

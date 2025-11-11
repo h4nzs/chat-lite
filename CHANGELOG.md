@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2025-11-10
+
+This is a quality-of-life and robustness release focused on polishing the user interface of newly implemented features and hardening the application against potential data inconsistencies.
+
+### Changed
+- **Polished Voice Message Player:** The UI for the voice message player has been significantly improved:
+  - The play button now uses the main theme background color for better contrast against the message bubble.
+  - A "thumb" indicator has been added to the progress bar, providing clearer visual feedback of the current playback position.
+  - The overall layout and styling have been tweaked for a more refined and professional appearance.
+- **Improved Error Handling for Missing Files:** All media components (`VoiceMessagePlayer`, `FileAttachment`, `LazyImage`) now provide a clear, user-friendly error message ("File not found on server.") when they fail to load a file due to a 404 error. This improves the user experience if files are cleaned up from the server.
+- **Consistent Modal Language:** All text within the "Security Info" modal (`ChatInfoModal`) has been standardized to English to ensure consistency.
+
+### Fixed
+- **Voice Message Bubble Width:** Fixed a UI bug where voice message bubbles would shrink, by enforcing a fixed, proportional width for all voice messages.
+- **Voice Message Duration Bug:** Fixed a critical bug where the duration of all voice messages was incorrectly recorded as `0`. This was traced to a stale state issue within an event handler, which has been resolved by using a `useRef` hook to guarantee the correct duration is captured. This fix also corrected the progress bar indicator, which was stuck at the start.
+- **File Deletion on Server:** Fixed a critical bug where deleting a message with a file attached would delete the database record but leave the physical file on the server. The backend logic now correctly reconstructs the file path and deletes the file from storage.
+- **Lightbox Image Overflow:** Fixed a bug where very tall or wide images would overflow the screen in the lightbox view. The component now correctly constrains the image to the viewport while maintaining its aspect ratio and ensuring a consistent margin.
+
 ## [1.4.0] - 2025-11-10
 
 This is a major security and feature release that implements a complete, end-to-end encrypted (E2EE) file sharing system, building upon the robust patterns established in previous versions. All user-uploaded content, including voice messages, images, and documents, is now fully encrypted.

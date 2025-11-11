@@ -56,6 +56,9 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
         // 2. Fetch the encrypted file
         const response = await fetch(toAbsoluteUrl(message.fileUrl));
         if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("File not found on server.");
+          }
           throw new Error(`Failed to fetch voice file: ${response.statusText}`);
         }
         const encryptedBlob = await response.blob();
@@ -149,12 +152,12 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
   }
 
   return (
-    <div className="flex items-center gap-3 w-full max-w-[250px]">
+    <div className="flex items-center gap-3 w-full max-w-[250px] p-1">
       {audioSrc && <audio ref={audioRef} src={audioSrc} preload="metadata" />}
       <button 
         onClick={togglePlay} 
         disabled={!isLoaded}
-        className="p-3 rounded-full bg-accent text-accent-foreground shadow-neumorphic-convex active:shadow-neumorphic-pressed disabled:opacity-50 transition-all"
+        className="p-3 rounded-full bg-bg-surface text-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed disabled:opacity-50 transition-all"
         aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
       >
         <motion.div
@@ -167,15 +170,15 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
         </motion.div>
       </button>
       <div className="flex-1 flex flex-col justify-center gap-1.5">
-        <div className="w-full h-1.5 bg-bg-main shadow-neumorphic-concave rounded-full overflow-hidden">
-          <motion.div 
-            className="h-full bg-accent rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.1, ease: 'linear' }}
-          />
+        <div className="w-full h-1.5 bg-black/20 shadow-neumorphic-concave rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-accent rounded-full relative"
+            style={{ width: `${progress}%` }}
+          >
+            <div className="w-3 h-3 bg-white rounded-full absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 shadow-lg" />
+          </div>
         </div>
-        <span className="text-xs text-text-secondary font-mono self-end">
+        <span className="text-xs text-text-secondary/80 font-mono self-end">
           {formatTime(isPlaying ? currentTime : duration)}
         </span>
       </div>

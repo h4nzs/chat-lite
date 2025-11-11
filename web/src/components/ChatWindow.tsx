@@ -156,6 +156,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   // --- Voice Recording State ---
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const recordingTimeRef = useRef(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -195,17 +196,24 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        onVoiceSend(audioBlob, recordingTime);
+        // Use the ref's value to avoid stale state in the closure
+        onVoiceSend(audioBlob, recordingTimeRef.current);
         
         // Clean up stream and reset timer AFTER sending
         stream.getTracks().forEach(track => track.stop());
         setRecordingTime(0);
+        recordingTimeRef.current = 0;
       };
 
       mediaRecorderRef.current.start();
       setIsRecording(true);
       recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime(prev => {
+          const newTime = prev + 1;
+          // Update both state for UI and ref for the final value
+          recordingTimeRef.current = newTime;
+          return newTime;
+        });
       }, 1000);
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -220,7 +228,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
       }
-      // Timer is now reset in the onstop handler
+      // Timer and ref are now reset in the onstop handler
     }
   };
   // --- End Voice Recording Logic ---

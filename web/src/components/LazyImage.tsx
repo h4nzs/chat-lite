@@ -58,7 +58,12 @@ export default function LazyImage({
         }
 
         const response = await fetch(toAbsoluteUrl(message.fileUrl));
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("File not found on server.");
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const encryptedBlob = await response.blob();
 
         const originalType = message.fileType?.split(';')[0] || 'application/octet-stream';
