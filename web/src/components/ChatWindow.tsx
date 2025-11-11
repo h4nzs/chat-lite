@@ -24,6 +24,7 @@ import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
+import { useConnectionStore } from "@store/connection";
 import LinkPreviewCard from './LinkPreviewCard';
 
 // Helper function to prevent spamming the API
@@ -164,6 +165,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const { typingLinkPreview, fetchTypingLinkPreview, clearTypingLinkPreview } = useMessageInputStore();
+  const { status: connectionStatus } = useConnectionStore();
 
   // --- Voice Recording State ---
   const [isRecording, setIsRecording] = useState(false);
@@ -174,6 +176,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const audioChunksRef = useRef<Blob[]>([]);
   // --- End Voice Recording State ---
 
+  const isConnected = connectionStatus === 'connected';
   const hasText = text.trim().length > 0;
 
   const debouncedFetchPreview = useCallback(
@@ -197,6 +200,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
   // --- Voice Recording Logic ---
   const handleStartRecording = async () => {
+    if (!isConnected) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -252,7 +256,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasText) return;
+    if (!hasText || !isConnected) return;
     onSend({ content: text });
     setText('');
     clearTypingLinkPreview();
@@ -261,8 +265,10 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const handleTextChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newText = e.target.value;
     setText(newText);
-    onTyping();
-    debouncedFetchPreview(newText);
+    if (isConnected) {
+      onTyping();
+      debouncedFetchPreview(newText);
+    }
   }
 
   const sendButtonClasses = clsx(
@@ -271,20 +277,22 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
       'translate-y-px brightness-95': isPressed && hasText,
       'active:shadow-neumorphic-pressed': hasText,
       'scale-100 opacity-100': hasText,
-      'scale-90 opacity-60 cursor-not-allowed': !hasText,
+      'scale-90 opacity-60 cursor-not-allowed': !hasText || !isConnected,
     }
   );
 
   const textInputClasses = clsx(
     'flex-1 bg-bg-surface px-4 py-2.5 rounded-full text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent',
-    'shadow-neumorphic-concave' // Use inner shadow for recessed look
+    'shadow-neumorphic-concave',
+    { 'opacity-50 cursor-not-allowed': !isConnected }
   );
 
   const fileButtonClasses = clsx(
     'p-2 rounded-full text-text-secondary transition-all duration-150',
     'hover:text-accent',
     'shadow-neumorphic-convex', // Use soft shadow for elevated look
-    'active:shadow-neumorphic-pressed' // Use inner shadow for pressed state
+    'active:shadow-neumorphic-pressed', // Use inner shadow for pressed state
+    { 'opacity-50 cursor-not-allowed': !isConnected }
   );
 
   return (
@@ -309,7 +317,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
         
         {isRecording ? (
           <div className="flex items-center gap-3 w-full">
-            <button type="button" onClick={handleStopRecording} aria-label="Stop recording" className={`${fileButtonClasses} bg-red-500 text-white`}>
+            <button type="button" onClick={handleStopRecording} aria-label="Stop recording" className={`${fileButtonClasses} bg-red-500 text-white`} disabled={!isConnected}>
               <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
                 <FiSquare size={22} />
               </motion.div>
@@ -321,12 +329,12 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex items-center gap-3">
-            <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className={fileButtonClasses}>
+            <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className={fileButtonClasses} disabled={!isConnected}>
               <motion.svg 
                 whileHover={{ scale: 1.1, rotate: -15 }}
                 xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></motion.svg>
             </button>
-            <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Open emoji picker" className={fileButtonClasses}>
+            <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Open emoji picker" className={fileButtonClasses} disabled={!isConnected}>
               <motion.div whileHover={{ scale: 1.1 }}>
                 <FiSmile size={22} />
               </motion.div>
@@ -336,18 +344,20 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
               type="file"
               className="hidden"
               onChange={onFileChange}
+              disabled={!isConnected}
             />
             <input 
               type="text" 
               value={text} 
               onChange={handleTextChange}
-              placeholder="Type a message..."
+              placeholder={isConnected ? "Type a message..." : "Disconnected..."}
               className={textInputClasses}
+              disabled={!isConnected}
             />
             {hasText ? (
               <button 
                 type="submit" 
-                disabled={!hasText}
+                disabled={!hasText || !isConnected}
                 onMouseDown={() => hasText && setIsPressed(true)}
                 onMouseUp={() => setIsPressed(false)}
                 onMouseLeave={() => setIsPressed(false)}
@@ -357,7 +367,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             ) : (
-              <button type="button" onClick={handleStartRecording} aria-label="Start recording" className={fileButtonClasses}>
+              <button type="button" onClick={handleStartRecording} aria-label="Start recording" className={fileButtonClasses} disabled={!isConnected}>
                 <motion.div whileHover={{ scale: 1.1 }}>
                   <FiMic size={22} />
                 </motion.div>
