@@ -61,9 +61,19 @@ const MessageStatusIcon = ({ message, conversation }: { message: Message; conver
   return <FaCheck title="Sent" size={16} />;
 };
 
-const ReplyQuote = ({ message, decryptedContent }: { message: Message, decryptedContent: string | null }) => {
+const ReplyQuote = ({ message }: { message: Message }) => {
   const authorName = message.sender?.name || 'User';
-  const contentPreview = message.duration ? 'Voice Message' : (decryptedContent || (message.fileUrl ? 'File' : '...'));
+  
+  let contentPreview: string;
+  if (message.duration) {
+    contentPreview = 'Voice Message';
+  } else if (message.fileName) {
+    contentPreview = message.fileName;
+  } else if (message.fileUrl) {
+    contentPreview = 'File';
+  } else {
+    contentPreview = message.content || '...';
+  }
 
   return (
     <div className="mb-1.5 p-2 rounded-lg bg-black/20 border-l-4 border-accent/50">
@@ -73,7 +83,7 @@ const ReplyQuote = ({ message, decryptedContent }: { message: Message, decrypted
   );
 };
 
-const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversation }: { message: Message; mine: boolean; isLastInSequence: boolean; onImageClick: (src: string) => void; conversation: Conversation | undefined; }) => {
+const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversation }: { message: Message; mine: boolean; isLastInSequence: boolean; onImageClick: (message: Message) => void; conversation: Conversation | undefined; }) => {
   const [decryptedContent, setDecryptedContent] = useState<string | null>(message.content || '');
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
@@ -127,7 +137,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
 
   return (
     <div className={bubbleClasses}>
-      {message.repliedTo && <ReplyQuote message={message.repliedTo} decryptedContent={decryptedContent} />}
+      {message.repliedTo && <ReplyQuote message={message.repliedTo} />}
       
       {isVoiceMessage && message.fileUrl && (
         <div className="p-2 w-[250px]">

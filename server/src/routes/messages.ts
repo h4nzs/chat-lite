@@ -42,7 +42,7 @@ router.get("/:conversationId", requireAuth, async (req: Request, res, next) => {
       }),
       include: {
         sender: {
-          select: { id: true, username: true, avatarUrl: true },
+          select: { id: true, username: true, avatarUrl: true, name: true },
         },
         reactions: {
           include: {

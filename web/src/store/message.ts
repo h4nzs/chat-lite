@@ -38,6 +38,7 @@ type State = {
   isFetchingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
   typingLinkPreview: any | null; // For live link previews
+  hasLoadedHistory: Record<string, boolean>;
   
   // Actions
   setReplyingTo: (message: Message | null) => void;
@@ -66,9 +67,10 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   messages: {},
   isFetchingMore: {},
   hasMore: {},
+  hasLoadedHistory: {},
 
   loadMessagesForConversation: async (id) => {
-    if (get().messages[id]?.length > 0) return;
+    if (get().hasLoadedHistory[id]) return;
 
     // Ensure a session key exists before fetching messages
     try {
@@ -104,6 +106,10 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
           hasMore: {
             ...state.hasMore,
             [id]: decryptedItems.length >= 50,
+          },
+          hasLoadedHistory: { // Mark history as loaded
+            ...state.hasLoadedHistory,
+            [id]: true,
           }
         };
 
@@ -117,7 +123,10 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
 
     } catch (error) {
       console.error(`Failed to load messages for ${id}`, error);
-      set(state => ({ messages: { ...state.messages, [id]: [] } }));
+      set(state => ({ 
+        messages: { ...state.messages, [id]: [] },
+        hasLoadedHistory: { ...state.hasLoadedHistory, [id]: false }, // Allow retry on failure
+      }));
     }
   },
 

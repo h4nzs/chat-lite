@@ -126,7 +126,19 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
     if (!replyingTo) return null;
   
     const authorName = replyingTo.sender?.name || 'User';
-    const contentPreview = replyingTo.content || (replyingTo.fileUrl ? 'File' : '...');
+    
+    let contentPreview: string;
+    if (replyingTo.duration) {
+      contentPreview = 'Voice Message';
+    } else if (replyingTo.fileName) {
+      contentPreview = replyingTo.fileName;
+    } else if (replyingTo.fileUrl) {
+      contentPreview = 'File';
+    } else if (replyingTo.content) {
+      contentPreview = replyingTo.content; // This is ciphertext, but we'll truncate it.
+    } else {
+      contentPreview = '...';
+    }
   
     return (
       <div className="px-4 pt-3">

@@ -40,6 +40,18 @@ const app = express();
 // === SECURITY / CORS ===
 const isProd = env.nodeEnv === 'production';
 
+// Ambil origin untuk WebSocket secara dinamis
+let wsOrigin = 'ws://localhost:4000';
+if (env.appUrl) {
+  try {
+    const url = new URL(env.appUrl);
+    // Gunakan wss:// untuk koneksi https://
+    wsOrigin = `${url.protocol === 'https:' ? 'wss' : 'ws'}://${url.host}`;
+  } catch (e) {
+    console.error("Invalid APP_URL provided for CSP:", env.appUrl);
+  }
+}
+
 // Gunakan Helmet untuk header keamanan dasar
 app.use(helmet({
   contentSecurityPolicy: {
@@ -49,8 +61,7 @@ app.use(helmet({
       scriptSrc: ["'self'", isProd ? '' : "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"], // Diperlukan untuk styling dinamis
       imgSrc: ["'self'", "data:", "blob:"], // blob: diperlukan untuk avatar preview
-      // TODO: Ganti ws://localhost:4000 dengan URL WebSocket produksi Anda
-      connectSrc: ["'self'", "ws://localhost:4000"],
+      connectSrc: ["'self'", wsOrigin],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"], // Mencegah clickjacking
       ...(isProd && { upgradeInsecureRequests: [] }),
