@@ -172,14 +172,17 @@ export function registerSocket(httpServer: HttpServer) {
           tempId: data.tempId,
         };
 
-        io.to(conversationId).emit("message:new", messageToBroadcast);
+        // Broadcast to all OTHER clients in the room
+        socket.broadcast.to(conversationId).emit("message:new", messageToBroadcast);
+
+        // Send the final message back to the sender via acknowledgement
+        cb?.({ ok: true, msg: messageToBroadcast });
 
         const pushRecipients = participants.filter(p => p.userId !== senderId);
         const pushBody = data.fileUrl ? 'You received a file.' : (data.content || '');
         const payload = { title: `New message from ${socket.user.username}`, body: pushBody.substring(0, 200) };
         pushRecipients.forEach(p => sendPushNotification(p.userId, payload));
 
-        cb?.({ ok: true, msg: newMessage });
       } catch (error) {
         console.error("Message send error:", error);
         cb?.({ ok: false, error: "Failed to save or send message" });

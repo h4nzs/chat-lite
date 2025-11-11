@@ -86,8 +86,10 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
       repliedToId: replyingTo?.id,
     };
 
-    socket.emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
-      if (!ack.ok) {
+    socket.emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string, msg?: Message }) => {
+      if (ack.ok && ack.msg) {
+        useMessageStore.getState().replaceOptimisticMessage(conversationId, tempId, ack.msg);
+      } else {
         toast.error(`Failed to send message: ${ack.error || 'Unknown error'}`);
         updateMessage(conversationId, `temp-${tempId}`, { error: true, optimistic: false });
       }
@@ -200,16 +202,13 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
   
         // 6. Emit to socket
   
-        getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
-  
-          if (!ack.ok) {
-  
+        getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string, msg?: Message }) => {
+          if (ack.ok && ack.msg) {
+            useMessageStore.getState().replaceOptimisticMessage(conversationId, tempId, ack.msg);
+          } else {
             toast.error(`Failed to send file: ${ack.error || 'Unknown error'}`);
-  
             updateMessage(conversationId, `temp-${tempId}`, { error: true, optimistic: false });
-  
           }
-  
         });
   
   
@@ -291,8 +290,10 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
       console.log("handleStopRecording: Final payload being sent to server:", finalPayload);
       
       // 6. Emit to socket
-      getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string }) => {
-        if (!ack.ok) {
+      getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string, msg?: Message }) => {
+        if (ack.ok && ack.msg) {
+          useMessageStore.getState().replaceOptimisticMessage(conversationId, tempId, ack.msg);
+        } else {
           toast.error(`Failed to send voice message: ${ack.error || 'Unknown error'}`);
           updateMessage(conversationId, `temp-${tempId}`, { error: true, optimistic: false });
         }

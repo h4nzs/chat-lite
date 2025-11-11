@@ -95,6 +95,7 @@ type State = {
   addParticipants: (conversationId: string, participants: Participant[]) => void;
   removeParticipant: (conversationId: string, userId: string) => void;
   updateParticipantRole: (conversationId: string, userId: string, role: "ADMIN" | "MEMBER") => void;
+  updateConversationLastMessage: (conversationId: string, message: Message) => void;
   resyncState: () => Promise<void>;
   clearError: () => void;
 };
@@ -273,5 +274,23 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
         return c;
       }),
     }));
+  },
+
+  updateConversationLastMessage: (conversationId, message) => {
+    set(state => {
+      const conversation = state.conversations.find(c => c.id === conversationId);
+      if (!conversation) return state;
+
+      const updatedConversation = {
+        ...conversation,
+        lastMessage: withPreview(message),
+        unreadCount: state.activeId === conversationId ? 0 : (conversation.unreadCount || 0) + 1,
+      };
+
+      const otherConversations = state.conversations.filter(c => c.id !== conversationId);
+      const newConversations = sortConversations([updatedConversation, ...otherConversations]);
+
+      return { conversations: newConversations };
+    });
   },
 }));

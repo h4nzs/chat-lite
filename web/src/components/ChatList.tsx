@@ -92,33 +92,42 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
   const isOnline = peerUser ? presence.includes(peerUser.id) : false;
   const isUnread = conversation.unreadCount > 0;
 
-  const [decryptedPreview, setDecryptedPreview] = useState(conversation.lastMessage?.preview || null);
+  const [decryptedPreview, setDecryptedPreview] = useState<string | null>(null);
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
   useEffect(() => {
     let isMounted = true;
     const decryptPreview = async () => {
       const lastMessage = conversation.lastMessage;
-      if (lastMessage?.content && !lastMessage.fileUrl) {
-        // Only decrypt if it hasn't been decrypted or if keys have changed
-        if (decryptedPreview === null || decryptedPreview === lastMessage.content) {
-          try {
-            const decrypted = await decryptMessage(lastMessage.content, conversation.id, lastMessage.sessionId);
-            if (isMounted) {
-              setDecryptedPreview(decrypted);
-            }
-          } catch (e) {
-            if (isMounted) {
-              setDecryptedPreview('[Failed to decrypt]');
-            }
+      // If it's not a text message, use the existing preview (e.g., "📷 Image")
+      if (lastMessage && !lastMessage.content) {
+        if (isMounted) setDecryptedPreview(lastMessage.preview || null);
+        return;
+      }
+
+      // If it is a text message, try to decrypt it.
+      if (lastMessage?.content && lastMessage.sessionId) {
+        try {
+          // Set a temporary loading state
+          if (isMounted) setDecryptedPreview("..."); 
+          const decrypted = await decryptMessage(lastMessage.content, conversation.id, lastMessage.sessionId);
+          if (isMounted) {
+            setDecryptedPreview(decrypted);
+          }
+        } catch (e) {
+          if (isMounted) {
+            setDecryptedPreview('[Failed to decrypt]');
           }
         }
+      } else {
+        // No last message or no content
+        if (isMounted) setDecryptedPreview(null);
       }
     };
 
     decryptPreview();
     return () => { isMounted = false; };
-  }, [conversation.id, conversation.lastMessage, lastKeychainUpdate, decryptedPreview]);
+  }, [conversation.id, conversation.lastMessage, lastKeychainUpdate]);
 
 
   const avatarSrc = conversation.isGroup 
@@ -143,7 +152,7 @@ const ConversationItem = ({ conversation, meId, presence, isActive, isSelected, 
     }
   );
 
-  const previewText = decryptedPreview || conversation.lastMessage?.preview || 'No messages yet';
+  const previewText = decryptedPreview ?? 'No messages yet';
 
   return (
     <motion.div layout key={conversation.id} className={itemClasses}>
