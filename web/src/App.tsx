@@ -104,7 +104,7 @@ const AppContent = () => {
 
   useEffect(() => {
     bootstrap();
-  }, [bootstrap]);
+  }, []);
 
   // --- NEW: Centralized connection management ---
   useEffect(() => {
@@ -182,18 +182,25 @@ const AppContent = () => {
       <ChatInfoModal />
       <DynamicIsland />
       <Routes>
+        {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/restore" element={<Restore />} />
         <Route path="/link-device" element={<LinkDevicePage />} />
-        <Route path="/chat" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/chat/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        <Route path="/settings/keys" element={<ProtectedRoute><KeyManagementPage /></ProtectedRoute>} />
-        <Route path="/settings/sessions" element={<ProtectedRoute><SessionManagerPage /></ProtectedRoute>} />
-        <Route path="/settings/link-device" element={<ProtectedRoute><DeviceScannerPage /></ProtectedRoute>} />
-        <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+
+        {/* Protected routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/chat" element={<Home />} />
+          <Route path="/chat/:conversationId" element={<Chat />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/keys" element={<KeyManagementPage />} />
+          <Route path="/settings/sessions" element={<SessionManagerPage />} />
+          <Route path="/settings/link-device" element={<DeviceScannerPage />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} />
+        </Route>
+
+        {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>

@@ -51,7 +51,11 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
     socket.on("reconnect", (attempt) => {
       console.log("🔄 Socket reconnected (store) after", attempt, "attempts");
       set({ isConnected: true });
-      getStores().convo.resyncState(); // Call resync function
+      // Only resync if initial load hasn't completed to prevent loops
+      const { initialLoadCompleted } = getStores().convo;
+      if (!initialLoadCompleted) {
+        getStores().convo.resyncState(); // Call resync function
+      }
     });
 
     // --- Register all other listeners ---

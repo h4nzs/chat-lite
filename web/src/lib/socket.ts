@@ -43,9 +43,13 @@ export function getSocket() {
       toast.success("Connected to chat server");
       setStatus('connected');
 
-      // Resync state to ensure consistency after connection
-      useConversationStore.getState().resyncState();
-      
+      // Resync state to ensure consistency after connection, but only if initial load hasn't completed
+      // This prevents loops on reconnects, especially for users with no conversations
+      const { initialLoadCompleted } = useConversationStore.getState();
+      if (!initialLoadCompleted) {
+        useConversationStore.getState().resyncState();
+      }
+
       const userId = useAuthStore.getState().user?.id;
       if (userId) {
         socket?.emit("presence:update", { userId, online: true });

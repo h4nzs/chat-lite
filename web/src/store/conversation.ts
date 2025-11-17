@@ -80,10 +80,11 @@ type State = {
   isSidebarOpen: boolean;
   error: string | null;
   loading: boolean;
+  initialLoadCompleted: boolean; // Flag to prevent re-loading
 
   // Actions
   loadConversations: () => Promise<void>;
-  openConversation: (id: string) => void;
+  openConversation: (id: string | null) => void;
   deleteConversation: (id: string) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
   toggleSidebar: () => void;
@@ -108,18 +109,30 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   isSidebarOpen: false,
   error: null,
   loading: false,
+  initialLoadCompleted: false, // Default to false
 
   clearError: () => set({ error: null }),
 
   resyncState: async () => {
-    console.log("Resyncing conversation state...");
-    await get().loadConversations();
+    // Only perform a full resync if the initial load has not completed yet.
+    // This prevents a loop on socket reconnects, especially for users with no conversations.
+    if (!get().initialLoadCompleted) {
+      await get().loadConversations();
+    }
   },
 
   loadConversations: async () => {
+    // Prevent multiple simultaneous loads
+    if (get().loading) return;
+
     try {
       set({ loading: true, error: null });
       const rawConversations = await api<any[]>("/api/conversations");
+
+      if (!Array.isArray(rawConversations)) {
+        throw new Error('Invalid data from server.');
+      }
+
       const conversations = await Promise.all(rawConversations.map(async c => {
         let lastMessage = c.messages?.[0] || null;
         if (lastMessage) {
@@ -131,7 +144,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
           }
           lastMessage = withPreview(lastMessage);
         }
-        
+
         return {
           ...c,
           lastMessage,
@@ -153,11 +166,16 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
     } finally {
-      set({ loading: false });
+      set({ loading: false, initialLoadCompleted: true }); // Mark as completed regardless of outcome
     }
   },
 
-  openConversation: (id: string) => {
+  openConversation: (id: string | null) => {
+    if (!id) {
+      set({ activeId: null });
+      return;
+    }
+
     // Optimistically update UI
     set(state => ({
       activeId: id,
