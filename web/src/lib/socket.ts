@@ -122,18 +122,23 @@ export function getSocket() {
     socket.on("user:identity_changed", (data: { userId: string; name: string }) => {
       console.log(`[Socket] Identity changed for user: ${data.name}`);
       
-      // Use a simple, non-JSX toast to avoid build errors in .ts files
-      toast.success(
-        `Security Notice: The key for ${data.name} has changed.`,
-        {
-          duration: 10000,
-          icon: '🛡️', // Use an emoji as an icon
-        }
-      );
+      const message = `The security key for ${data.name} has changed. You may want to verify their identity.`;
+
+      // 1. Show an immediate toast notification
+      toast.success(message, {
+        duration: 10000,
+        icon: '🛡️',
+      });
       
-      // Optional but recommended: Invalidate the cached public key for this user
-      // This would require a function in a key management store, e.g.,
-      // useKeyCacheStore.getState().invalidateKey(data.userId);
+      // 2. Find relevant conversations and add a persistent system message
+      const { conversations } = useConversationStore.getState();
+      const { addSystemMessage } = useMessageStore.getState();
+
+      conversations.forEach(convo => {
+        if (convo.participants.some(p => p.id === data.userId)) {
+          addSystemMessage(convo.id, message);
+        }
+      });
     });
   }
   return socket;
