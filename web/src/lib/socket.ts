@@ -5,7 +5,6 @@ import { useConversationStore } from "@store/conversation";
 import { fulfillKeyRequest, storeReceivedSessionKey } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
 import { useConnectionStore } from "@store/connection"; // Import the new store
-
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;
 
@@ -118,6 +117,23 @@ export function getSocket() {
       toast.error("This session has been logged out remotely.");
       useAuthStore.getState().logout();
       disconnectSocket();
+    });
+
+    socket.on("user:identity_changed", (data: { userId: string; name: string }) => {
+      console.log(`[Socket] Identity changed for user: ${data.name}`);
+      
+      // Use a simple, non-JSX toast to avoid build errors in .ts files
+      toast.success(
+        `Security Notice: The key for ${data.name} has changed.`,
+        {
+          duration: 10000,
+          icon: '🛡️', // Use an emoji as an icon
+        }
+      );
+      
+      // Optional but recommended: Invalidate the cached public key for this user
+      // This would require a function in a key management store, e.g.,
+      // useKeyCacheStore.getState().invalidateKey(data.userId);
     });
   }
   return socket;
