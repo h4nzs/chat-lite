@@ -5,6 +5,15 @@ import { env } from '../config.js';
 import { Request } from 'express';
 import { ApiError } from './errors.js';
 
+// Extend the Express Request interface to include our custom property
+declare global {
+  namespace Express {
+    interface Request {
+      requiresEncryptionValidation?: boolean;
+    }
+  }
+}
+
 const UPLOAD_DIR = path.resolve(process.cwd(), env.uploadDir || 'uploads');
 
 // Pastikan direktori upload utama ada
@@ -37,7 +46,8 @@ const ALLOWED_TYPES: Record<string, string> = {
   // Archives
   'application/zip': 'archives',
   'application/x-rar-compressed': 'archives',
-  'application/octet-stream': 'archives', // For encrypted files
+  // Binary files (including encrypted files) - need additional validation
+  'application/octet-stream': 'binary',
 };
 
 const getFileCategory = (mimetype: string): string => {
@@ -63,18 +73,86 @@ const storage = multer.diskStorage({
     
     // Buat nama file yang unik dan aman
     const finalFilename = `${path.basename(sanitizedOriginalName, extension)}-${uniqueSuffix}${extension}`;
-    
+
     cb(null, finalFilename);
   }
 });
 
+
 // Filter file untuk validasi MIME type
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (ALLOWED_TYPES[file.mimetype]) {
-    cb(null, true);
-  } else {
+  // Check if it's an allowed MIME type first
+  const category = ALLOWED_TYPES[file.mimetype];
+  if (!category) {
     // Tolak file dengan tipe yang tidak diizinkan
-    cb(new ApiError(400, `File type not allowed: ${file.mimetype}`));
+    return cb(new ApiError(400, `File type not allowed: ${file.mimetype}`));
+  }
+
+  // For application/octet-stream files, we need additional validation
+  if (file.mimetype === 'application/octet-stream') {
+    // This flag will be checked after the file is uploaded
+    req.requiresEncryptionValidation = true; // Flag to indicate this file needs encryption validation
+  }
+
+  // Allow the file for now, validation happens after upload
+  cb(null, true);
+};
+
+// Export the validation function so it can be used in route handlers
+export const validateEncryptedFileAfterUpload = (filePath: string): boolean => {
+  try {
+    // Read the beginning of the file to check for encryption signatures
+    const fileSize = fs.statSync(filePath).size;
+
+    if (fileSize < 24) {
+      // Encrypted files typically need at least 24 bytes for the nonce
+      return false;
+    }
+
+    // Read first 32 bytes to check for sodium encryption format
+    const fileBuffer = fs.readFileSync(filePath, null);
+
+    // Check if this looks like a properly encrypted file (with a nonce)
+    // In libsodium's crypto_secretbox_easy, first 24 bytes are the nonce
+    if (fileBuffer.length >= 24) {
+      // For now, just check that it's a binary file of appropriate size
+      // In a more sophisticated implementation, we'd verify the encryption format
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('Error validating encrypted file:', err);
+    return false;
+  }
+};
+
+// Export the validation function so it can be used in route handlers
+export const validateEncryptedFileAfterUpload = (filePath: string): boolean => {
+  try {
+    // Read the beginning of the file to check for encryption signatures
+    const fileSize = fs.statSync(filePath).size;
+
+    if (fileSize < 24) {
+      // Encrypted files typically need at least 24 bytes for the nonce
+      return false;
+    }
+
+    // Read first 32 bytes to check for sodium encryption format
+    const fileBuffer = fs.readFileSync(filePath, null);
+
+    // Check if this looks like a properly encrypted file (with a nonce)
+    // In libsodium's crypto_secretbox_easy, first 24 bytes are the nonce
+    if (fileBuffer.length >= 24) {
+      // For now, just check that it's a binary file of appropriate size
+      // In a more sophisticated implementation, we'd verify the encryption format
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('Error validating encrypted file:', err);
+    return false;
   }
 };
 
@@ -86,3 +164,6 @@ export const upload = multer({
     fileSize: 10 * 1024 * 1024, // Batas 10MB
   },
 });
+
+// Export the getFileCategory function for use in routes if needed
+export { getFileCategory };

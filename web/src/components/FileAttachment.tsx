@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { Message } from "@store/conversation";
 import { toAbsoluteUrl } from "@utils/url";
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -7,9 +7,11 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import { Spinner } from "./Spinner";
 import { decryptFile, decryptMessage } from '@utils/crypto';
 import { useKeychainStore } from '@store/keychain';
-import { FiAlertTriangle } from 'react-icons/fi';
+import { FiAlertTriangle, FiClock } from 'react-icons/fi';
 
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+
+type DecryptionStatus = 'pending' | 'decrypting' | 'succeeded' | 'failed' | 'waiting_for_key';
 
 function formatBytes(bytes: number, decimals = 2) {
   if (!bytes || bytes === 0) return '0 Bytes';
@@ -26,7 +28,7 @@ interface FileAttachmentProps {
 
 export default function FileAttachment({ message }: FileAttachmentProps) {
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
-  const [isDecrypting, setIsDecrypting] = useState(false);
+  const [decryptionStatus, setDecryptionStatus] = useState<DecryptionStatus>('pending');
   const [error, setError] = useState<string | null>(null);
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
@@ -36,12 +38,15 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
 
     const handleDecryption = async () => {
       if (!message.fileUrl || !message.fileKey || !message.sessionId) {
-        if (isMounted) setError("Incomplete file data.");
+        if (isMounted) {
+          setError("Incomplete file data.");
+          setDecryptionStatus('failed');
+        }
         return;
       }
       
       if (isMounted) {
-        setIsDecrypting(true);
+        setDecryptionStatus('decrypting');
         setError(null);
       }
 
@@ -51,15 +56,21 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
           fileKey = await decryptMessage(message.fileKey, message.conversationId, message.sessionId);
         }
 
-        if (!fileKey || fileKey.startsWith('[')) {
-          throw new Error(fileKey || "Could not retrieve file key.");
+        if (!fileKey) {
+          throw new Error("Could not retrieve file key.");
+        }
+        
+        if (fileKey.startsWith('[')) {
+          if (isMounted) {
+            setError(fileKey);
+            setDecryptionStatus('waiting_for_key');
+          }
+          return;
         }
 
         const response = await fetch(toAbsoluteUrl(message.fileUrl));
         if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("File not found on server.");
-          }
+          if (response.status === 404) throw new Error("File not found on server.");
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const encryptedBlob = await response.blob();
@@ -70,12 +81,14 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
         if (isMounted) {
           objectUrl = URL.createObjectURL(decryptedBlob);
           setDecryptedUrl(objectUrl);
+          setDecryptionStatus('succeeded');
         }
       } catch (e: any) {
         console.error("File decryption failed:", e);
-        if (isMounted) setError(e.message || "Failed to decrypt file.");
-      } finally {
-        if (isMounted) setIsDecrypting(false);
+        if (isMounted) {
+          setError(e.message || "Failed to decrypt file.");
+          setDecryptionStatus('failed');
+        }
       }
     };
 
@@ -83,6 +96,7 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
       handleDecryption();
     } else if (message.fileUrl) {
       setDecryptedUrl(toAbsoluteUrl(message.fileUrl));
+      setDecryptionStatus('succeeded');
     }
 
     return () => {
@@ -93,7 +107,7 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
     };
   }, [message, lastKeychainUpdate]);
 
-  if (isDecrypting) {
+  if (decryptionStatus === 'decrypting' || decryptionStatus === 'pending') {
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg bg-black/20 my-2 max-w-sm">
         <Spinner size="sm" />
@@ -102,11 +116,20 @@ export default function FileAttachment({ message }: FileAttachmentProps) {
     );
   }
 
-  if (error) {
+  if (decryptionStatus === 'failed') {
     return (
       <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/20 my-2 max-w-sm text-destructive">
         <FiAlertTriangle />
         <span className="text-sm">{error}</span>
+      </div>
+    );
+  }
+  
+  if (decryptionStatus === 'waiting_for_key') {
+    return (
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/20 my-2 max-w-sm text-yellow-500">
+        <FiClock />
+        <span className="text-sm">{error || 'Requesting decryption key...'}</span>
       </div>
     );
   }

@@ -25,6 +25,7 @@ export type User = {
 
 type State = {
   user: User | null;
+  isBootstrapping: boolean;
   theme: "light" | "dark";
   sendReadReceipts: boolean;
   bootstrap: () => Promise<void>;
@@ -79,6 +80,7 @@ let privateKeyCache: Uint8Array | null = null;
 
 export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
+  isBootstrapping: true,
   theme: (localStorage.getItem("theme") as "light" | "dark") || "light",
   sendReadReceipts: localStorage.getItem('sendReadReceipts') === 'false' ? false : true,
 
@@ -103,6 +105,8 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
       console.error("Bootstrap error:", error);
       set({ user: null });
       localStorage.removeItem("user");
+    } finally {
+      set({ isBootstrapping: false });
     }
   },
 

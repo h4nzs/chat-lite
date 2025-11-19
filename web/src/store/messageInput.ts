@@ -242,11 +242,9 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
       // 1. Encrypt the audio file and get the raw key
       updateActivity(activityId, { progress: 25, fileName: 'Encrypting voice message...' });
       const { encryptedBlob, key: rawFileKey } = await encryptFile(blob);
-      console.log("handleStopRecording: Raw file key for optimistic UI:", rawFileKey);
       
       // 2. Encrypt the raw key for transmission
       const { ciphertext: encryptedFileKey, sessionId } = await encryptMessage(rawFileKey, conversationId);
-      console.log("handleStopRecording: Encrypted file key for server:", encryptedFileKey);
 
       // 3. Upload the encrypted file
       updateActivity(activityId, { progress: 50, fileName: 'Uploading voice message...' });
@@ -287,8 +285,6 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
         repliedToId: replyingTo?.id,
       };
 
-      console.log("handleStopRecording: Final payload being sent to server:", finalPayload);
-      
       // 6. Emit to socket
       getSocket().emit("message:send", { conversationId, tempId, ...finalPayload }, (ack: { ok: boolean, error?: string, msg?: Message }) => {
         if (ack.ok && ack.msg) {

@@ -1,25 +1,24 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuthStore } from '@store/auth';
-import { Spinner } from './Spinner';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuthStore } from "@store/auth";
+import { Spinner } from "./Spinner";
 
-const ProtectedRoute = () => {
-  // Cek langsung dari store. Kita asumsikan bootstrap sudah dipanggil di App.tsx
-  const user = useAuthStore(state => state.user);
+export default function ProtectedRoute() {
+  const { user, isBootstrapping } = useAuthStore(state => ({ 
+    user: state.user,
+    isBootstrapping: state.isBootstrapping 
+  }));
 
-  // Kita bisa anggap loading jika user masih null, karena bootstrap sedang berjalan.
-  // Namun, untuk menghindari flash, kita perlu state loading yang lebih eksplisit.
-  // Untuk saat ini, pengecekan user saja sudah cukup untuk memvalidasi.
-  // Jika `user` null, bootstrap mungkin masih berjalan atau memang user belum login.
-  // `App.tsx` sudah menangani pemanggilan bootstrap sekali.
+  if (isBootstrapping) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-bg-main">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
-  // Jika setelah bootstrap selesai user tetap null, maka arahkan ke login.
-  if (user === null) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
-  // Jika user ada, tampilkan konten rute yang diproteksi.
-  // Outlet akan merender komponen anak dari rute (misal: <Home />, <Chat />)
-  return <Outlet />;
-};
 
-export default ProtectedRoute;
+  return <Outlet />;
+}

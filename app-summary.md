@@ -1,99 +1,76 @@
-Ringkasan Keseluruhan
+# Laporan Status Proyek: Implementasi Ulang E2EE Asinkron
 
-  Aplikasi ini memiliki fondasi yang sangat kokoh dan arsitektur 
-  yang baik. Penggunaan tumpukan teknologi modern (React,
-  TypeScript, Zustand, Node.js, Prisma, Socket.IO) sudah tepat
-  untuk aplikasi chat real-time. Masalah-masalah yang kita
-  temukan sebagian besar adalah bug logika atau implementasi yang
-   belum selesai, bukan masalah arsitektural yang fundamental.
-  Setelah perbaikan yang kita lakukan, aplikasi ini sekarang jauh
-   lebih stabil dan fungsional.
+Dokumen ini merangkum pekerjaan yang telah dilakukan untuk mengimplementasikan kembali enkripsi end-to-end (E2EE) asinkron, status saat ini, dan daftar masalah yang masih ada.
 
-  ---
+## Konteks
 
-  Kekuatan (Hal-hal yang Sudah Baik)
+Proyek ini di-rollback ke commit yang stabil setelah penambahan notifikasi sistem, tetapi sebelum refaktor besar pada sistem E2EE. Tujuannya adalah untuk mengimplementasikan kembali E2EE asinkron dengan benar, menggunakan pendekatan dual-key (X25519 untuk enkripsi, Ed25519 untuk tanda tangan) dan mekanisme Pre-Key Signal (X3DH).
 
-   1. Arsitektur Hybrid yang Efisien: Kombinasi REST API untuk daa
-      awal dan WebSocket (Socket.IO) untuk pembaruan real-time
-      adalah pendekatan yang sangat baik. Ini membuat aplikasi
-      terasa cepat dan responsif tanpa membebani server dengan
-      request yang tidak perlu.
-   2. Keamanan yang Kuat: Implementasi enkripsi End-to-End (E2E)
-      dengan libsodium adalah fitur unggulan yang menunjukkan foks
-      pada privasi pengguna. Ditambah dengan proteksi CSRF, cookie
-      HTTP-only untuk autentikasi, dan helmet, sisi keamanannya
-      sudah dipertimbangkan dengan matang.
-   3. State Management Terpusat: Penggunaan Zustand untuk mengeloa
-      state global adalah pilihan yang bagus. Memisahkan logika ke
-      dalam useAuthStore dan useChatStore membantu organisasi kod,
-      meskipun useChatStore bisa dipecah lebih lanjut.
-   4. Fitur Real-time yang Lengkap: Sebagian besar fitur inti
-      seperti status online, indikator mengetik, reaksi, dan
-      pengiriman pesan sudah berjalan secara real-time dan sinkro.
+## Pekerjaan yang Telah Selesai
 
-  ---
+1.  **Rollback & Persiapan**:
+    *   Kode proyek di-rollback ke basis kode yang lebih stabil.
+    *   Database **tidak** di-rollback dan skemanya (model `User`, `SignedPreKey`, `OneTimePreKey`) sudah sesuai dengan kebutuhan E2EE baru.
 
-  Area untuk Peningkatan (Kelemahan)
+2.  **Backend (Server)**:
+    *   Endpoint registrasi (`/api/auth/register`) diperbarui untuk menerima dan menyimpan `publicKey` (enkripsi) dan `signingKey` (tanda tangan).
+    *   Endpoint untuk mengunggah dan mengambil *pre-key bundle* telah dibuat (`POST /api/keys/prekeys` dan `GET /api/keys/prekey-bundle/:userId`).
+    *   Endpoint untuk membuat percakapan (`POST /api/conversations`) diperbarui untuk menerima *initial session keys* yang dibuat dari *handshake* X3DH.
+    *   Logika distribusi kunci (`sessionKeys.ts`) diperbarui untuk menggunakan kunci publik dari database.
+    *   Implementasi CSRF manual sederhana ditambahkan untuk menggantikan `csurf` yang gagal diinstal.
 
-   1. Kompleksitas `useChatStore`: Seperti yang teridentifikasi
-      sebelumnya, file store/chat.ts telah menjadi sangat besar. i
-       adalah "otak" dari hampir semua logika sisi klien. Seiring
-      bertambahnya fitur, file ini akan semakin sulit untuk
-      dipelihara dan di-debug.
-   2. Alur Pembuatan Grup yang Belum Sempurna: Meskipun sekarang
-      sudah real-time, logika pembaruan UI untuk si pembuat grup
-      masih bergantung pada penambahan manual di sisi klien. Ini
-      bisa disederhanakan di backend agar semua partisipan, termak
-       pembuat, menerima event yang sama.
-   3. **done** Pengambilan Data Awal (Initial Load): Saat aplikasi dimuat,
-      klien melakukan beberapa panggilan API secara berurutan (unk
-       user, lalu percakapan, lalu pesan). Ini bisa dioptimalkan
-      untuk mengurangi waktu muat awal.
-   4. Manajemen Kunci Enkripsi: Alur kerja untuk membuat dan
-      mengelola kunci enkripsi saat ini terikat pada proses
-      login/register. Ini bisa dibuat lebih fleksibel dan ramah
-      pengguna, misalnya dengan halaman pengaturan kunci khusus au
-       opsi backup/restore.
+3.  **Frontend (Web)**:
+    *   Utilitas manajemen kunci (`keyManagement.ts`) ditulis ulang sepenuhnya untuk menangani pembuatan, penyimpanan, dan pemulihan sistem dual-key.
+    *   Alur registrasi dan login (`auth.ts`) diperbarui untuk:
+        *   Membuat *master seed* 32-byte.
+        *   Menderivasi *encryption seed* dan *signing seed* secara deterministik.
+        *   Membuat *key pair* enkripsi dan tanda tangan dari *seed* tersebut.
+        *   Membuat *recovery phrase* (mnemonic) dari *master seed*.
+        *   Secara otomatis membuat dan mengunggah *pre-key bundle* ke server setelah login/registrasi berhasil.
+    *   Alur pemulihan akun (`Restore.tsx`) diperbarui untuk meregenerasi kunci dengan benar dari *recovery phrase*.
+    *   Logika memulai percakapan (`conversation.ts`) ditulis ulang untuk melakukan *handshake* X3DH:
+        1.  Mengambil *pre-key bundle* pengguna lain.
+        2.  Melakukan kalkulasi Diffie-Hellman.
+        3.  Membuat *session key* awal.
+        4.  Mengirim permintaan pembuatan percakapan ke server dengan kunci sesi awal yang sudah dienkripsi untuk kedua belah pihak.
 
-  ---
+## Status Saat Ini: **Banyak Bug Kritis**
 
-  Status Saat Ini (Setelah Perbaikan Kita)
+Meskipun alur utama telah diimplementasikan, aplikasi saat ini tidak dapat digunakan karena serangkaian *error* yang saling terkait, terutama setelah proses registrasi dan saat mencoba memulai percakapan.
 
-   - ✅ Real-time Group Creation: Fitur pembuatan grup sekarang
-     berfungsi secara real-time untuk semua anggota, termasuk si
-     pembuat.
-   - ✅ Real-time Last Message & Sorting: Daftar obrolan sekarang
-     diperbarui dan diurutkan secara real-time setiap kali ada
-     pesan baru masuk.
-   - ✅ Stabilitas UI: Error p.user is undefined yang menyebabkan
-     aplikasi crash telah diperbaiki di ChatList dan ChatWindow.
-   - ✅ Perbaikan Visual: Tampilan hasil pencarian sekarang
-     menggunakan efek glassmorphism yang lebih modern.
+## Daftar Masalah dan Kemungkinan Penyebab
 
-  ---
+Berikut adalah daftar *error* yang telah kita temui secara berurutan setelah *rollback*, yang menunjukkan adanya masalah fundamental dan sistemik:
 
-  Rekomendasi Langkah Berikutnya (Prioritas)
+1.  **`Invalid CSRF token` (Frontend)**
+    *   **Masalah:** *Frontend* gagal melakukan permintaan API karena token CSRF tidak valid. Ini terjadi meskipun *endpoint* dan *middleware* CSRF manual sudah ditambahkan di *backend*.
+    *   **Kemungkinan Penyebab:**
+        *   **Masalah Utama (Sangat Mungkin):** Adanya data pengguna atau sesi yang korup di *database* dari percobaan-percobaan sebelumnya. Meskipun logika sudah benar, data lama yang salah format menyebabkan kegagalan otentikasi atau sesi, yang merusak alur CSRF.
+        *   **Masalah Sekunder:** *Timing issue* di *frontend*, di mana permintaan API dilakukan sebelum token CSRF yang baru berhasil diambil dan disimpan.
 
-   1. Prioritas Utama (Arsitektur): Refactor `useChatStore`.
-       - Pecah useChatStore menjadi beberapa slice atau store yang
-         lebih kecil. Contoh: useConversationStore,
-         useMessageStore, usePresenceStore. Ini akan membuat kode
-         lebih mudah dikelola dan dites di masa depan.
+2.  **`PrismaClientValidationError: Argument 'encryptedKey' is missing` (Backend)**
+    *   **Masalah:** *Error* dari Prisma saat mencoba menyimpan *session key* baru ke *database*.
+    *   **Status:** **Telah Diperbaiki.** Ini adalah kesalahan penamaan properti (`key` vs `encryptedKey`) di `sessionKeys.ts` yang sudah dikoreksi.
 
-   2. **done**Prioritas Menengah (Performa & UX): Optimalkan Initial Load.
-       - Pertimbangkan untuk mengirim batch data awal (misalnya, 5
-          percakapan teratas beserta pesan terakhirnya) langsung
-         setelah koneksi socket berhasil untuk mengurangi jumlah
-         request HTTP di awal.
+3.  **`SyntaxError: does not provide an export named '...'` (Backend)**
+    *   **Masalah:** Serangkaian *error* saat startup server karena impor modul ES yang salah. Contoh: `getSodium`, `authMiddleware`, `handleApiError`, `prisma`.
+    *   **Status:** **Telah Diperbaiki.** Ini disebabkan oleh refaktor yang tidak konsisten dan penggunaan `import default` vs `import { named }`. Semua impor yang diketahui bermasalah telah diperbaiki.
 
-   3. Prioritas Menengah (UX): Tingkatkan Umpan Balik UI.
-       - Tambahkan indikator loading yang lebih konsisten saat daa
-          sedang diambil (misalnya, skeleton UI).
-       - Tampilkan pesan error yang lebih informatif di dalam
-         komponen jika panggilan API atau koneksi socket gagal.
+4.  **`SyntaxError: The requested module '...' doesn't provide an export named '...'` (Frontend)**
+    *   **Masalah:** Serangkaian *error* di *frontend* karena komponen mencoba mengimpor fungsi utilitas kriptografi yang telah dihapus atau diganti nama saat refaktor. Contoh: `decryptSessionKeyForUser`, `storePrivateKey`, `importPublicKey`, `generateSafetyNumber`, `encryptFile`.
+    *   **Status:** **Telah Diperbaiki.** Semua fungsi yang hilang telah ditambahkan kembali atau komponen yang menggunakannya telah diperbarui.
 
-   4. Jangka Panjang (Keamanan & UX): Sempurnakan Manajemen Kunci 
-      E2E.
-       - Buat halaman khusus di "Settings" untuk manajemen kunci,
-         yang memungkinkan pengguna untuk membuat ulang,
-         mencadangkan, atau memulihkan kunci mereka.
+5.  **`Invalid seed length` / `source array is too long` / `Invalid entropy` (Frontend)**
+    *   **Masalah:** Serangkaian *error* kriptografi dari `libsodium` dan `bip39` selama proses registrasi dan pemulihan akun.
+    *   **Status:** **Telah Diperbaiki.** Ini disebabkan oleh pemahaman yang salah tentang panjang *seed* dan kunci yang dibutuhkan oleh `libsodium`. Logika sekarang sudah benar: menggunakan satu *master seed* 32-byte untuk menderivasi semua kunci lain secara deterministik.
+
+## Rekomendasi
+
+Fokus utama saat ini adalah menyelesaikan *error* **`Invalid CSRF token`**. Mengingat riwayat masalah, sangat disarankan untuk memulai dengan **membersihkan total database pengembangan** untuk memastikan tidak ada data korup yang tersisa.
+
+```bash
+# Di dalam direktori /server
+npx prisma migrate reset
+```
+
+Setelah itu, jika masalah masih berlanjut, investigasi harus difokuskan pada alur *fetching* dan *attaching* token CSRF di `web/src/lib/api.ts` dan *middleware* validasi di `server/src/app.ts`.

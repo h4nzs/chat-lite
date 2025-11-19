@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2025-11-19
+
+This is a massive stability and correctness release. Following a rollback that reverted an in-progress E2EE refactor, this release focuses on implementing numerous critical bug fixes, security enhancements, and performance improvements identified by Coderabbit's static analysis. Additionally, the entire test suite for both the frontend and backend has been audited and rewritten for consistency and reliability.
+
+### ⚠️ Breaking Changes & Known Issues
+- **E2EE Refactor Reverted:** A major, in-progress refactor to implement asynchronous E2EE using the Signal Protocol (Pre-Keys) was reverted due to systemic, hard-to-debug issues. The application has been rolled back to the previous, more stable E2EE implementation (real-time session negotiation). All work from this release is built upon that stable foundation.
+
+### 🐛 Bug Fixes & Improvements
+- **Critical E2EE Violation Fixed:** Fixed a critical security flaw where encrypted message content (ciphertext) was being leaked into plaintext push notifications. Push notification bodies are now generic and do not contain any message content.
+- **Robust Decryption & Key Recovery:** The message decryption flow is now significantly more robust. The app now correctly detects when a session key is missing, displays a neutral "waiting for key" status to the user, and automatically triggers a key request from other online participants. This fixes a bug where messages would get permanently stuck in a `[Failed to decrypt]` state.
+- **Race Condition Eliminated:** Fixed a race condition in the conversation loading logic that could cause duplicate API calls when the app was started. The loading state is now managed atomically.
+- **Infinite Loop in Messages:** Fixed an infinite re-render loop in the `MessageItem` component caused by an incorrect `useEffect` dependency, improving performance and stability.
+- **Resource Leak in Voice Recording:** Fixed a critical bug where the microphone would remain active if a user navigated away while recording a voice message. A cleanup effect has been added to properly stop the `MediaRecorder` and release the media stream on unmount.
+-   **Path Traversal Vulnerability Patched:** Hardened the file deletion endpoint on the server with path normalization and validation to prevent potential path traversal attacks.
+- **Stuck "Connecting..." Banner:** Fixed a UI bug where the "Connecting..." status banner would remain visible for logged-out users on public pages.
+- **Client-Side State Preservation:** Refactored the conversation update logic to use a selective merge strategy, preventing incoming server events from accidentally overwriting transient client-side state.
+- **Login/Restore UX Polish:**
+  - The "Account Restored" notification now only appears after a successful login, not before.
+  - The synchronization of historical keys during account restoration is now a best-effort background task and will no longer block the user from accessing the app if it fails.
+  - Fixed a UX "flash" where authenticated users would be briefly redirected to the login page while the app was loading. A proper loading screen is now shown.
+
+### 🧪 Testing
+- **Complete Test Suite Overhaul:** The entire test suite for both the frontend (`vitest`) and backend (`node:test`) has been audited, refactored, and rewritten.
+  - **Standardization:** All backend tests now consistently use the built-in Node.js test runner (`node:test`, `node:assert`).
+  - **Reliability:** All backend API tests were refactored to use a consistent `request.agent()` pattern, which properly handles sessions, cookies, and CSRF tokens, making the tests significantly more reliable than manual token creation. Flaky, complex, or irrelevant tests (e.g., direct socket event listening, testing third-party library functions) were removed or rewritten to focus on business logic and API effects.
+  - **Correctness & Coverage:** All frontend component and store tests were audited. Dozens of tests were either rewritten from scratch or significantly fixed to address incorrect mocking, invalid assertions, state leakage between tests, and a total mismatch between the test code and the actual component implementation. Coverage was improved for `useAuthStore` and `useMessageStore`.
+
+### ♻️ Refactoring & Cleanup
+- **Dead Code Elimination:** Removed numerous instances of dead or unreachable code, including an entire unused `serviceWorkerRegistration.ts` file, example test files, and dangling imports flagged by the linter.
+- **Security:** Removed multiple `console.log` statements that were printing raw and encrypted E2EE keys in development builds.
+- **Code Organization:** Relocated a component test (`OnlineDot.test.tsx`) to be co-located with its component, improving project structure.
+
 ## [1.5.0] - 2025-11-10
 
 This is a quality-of-life and robustness release focused on polishing the user interface of newly implemented features and hardening the application against potential data inconsistencies.

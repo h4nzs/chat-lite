@@ -9,6 +9,8 @@ interface LazyImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>,
   message: Message;
 }
 
+const ENCRYPTED_KEY_MIN_LENGTH = 50;
+
 export default function LazyImage({ 
   message, 
   alt, 
@@ -49,7 +51,7 @@ export default function LazyImage({
         }
 
         let fileKey = message.fileKey;
-        if (!message.optimistic && fileKey.length > 50) {
+        if (!message.optimistic && fileKey.length > ENCRYPTED_KEY_MIN_LENGTH) {
           fileKey = await decryptMessage(message.fileKey, message.conversationId, message.sessionId);
         }
 
@@ -87,7 +89,7 @@ export default function LazyImage({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [message, lastKeychainUpdate]);
+  }, [message.fileUrl, message.fileKey, message.sessionId, message.fileType, message.conversationId, message.optimistic, lastKeychainUpdate]);
 
   useEffect(() => {
     if (!decryptedUrl) return;

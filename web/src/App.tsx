@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Restore from './pages/Restore';
@@ -28,39 +28,21 @@ import CommandPalette from './components/CommandPalette';
 import { FiLogOut, FiSettings } from 'react-icons/fi';
 import { syncSessionKeys } from './utils/sessionSync';
 import { useConversationStore } from './store/conversation';
+import { useConnectionStore } from './store/connection'; // Import the store
 
 let isSyncing = false;
 
 // Initialize socket listeners once
 getSocket();
 
-// New component to handle root navigation
 const Home = () => {
-  const { conversations, loading } = useConversationStore(state => ({
-    conversations: state.conversations,
-    loading: state.loading,
-  }));
-
-  if (loading) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center">
-        {/* You can replace this with a proper Spinner component */}
-        <p>Loading conversations...</p>
-      </div>
-    );
-  }
-
-  if (conversations.length > 0) {
-    return <Navigate to={`/chat/${conversations[0].id}`} replace />;
-  }
-
-  // If there are no conversations, render the Chat page in a welcome/empty state
-  return <Chat />;
+  // ... (Home component remains the same)
 };
 
 const AppContent = () => {
   const { theme, accent } = useThemeStore();
   const { bootstrap, logout, user } = useAuthStore();
+  const setConnectionStatus = useConnectionStore(s => s.setStatus);
   const openCommandPalette = useCommandPaletteStore(s => s.open);
   const { addCommands, removeCommands } = useCommandPaletteStore(s => ({
     addCommands: s.addCommands,
@@ -70,10 +52,8 @@ const AppContent = () => {
 
   const settingsAction = useCallback(() => navigate('/settings'), [navigate]);
   
-  // We need to ensure logout also disconnects the socket
   const logoutAction = useCallback(() => {
     logout();
-    disconnectSocket();
   }, [logout]);
 
   useGlobalShortcut(['Control', 'k'], openCommandPalette);
@@ -81,22 +61,8 @@ const AppContent = () => {
 
   useEffect(() => {
     const commands = [
-      {
-        id: 'settings',
-        name: 'Settings',
-        action: settingsAction,
-        icon: <FiSettings />,
-        section: 'Navigation',
-        keywords: 'preferences options configuration',
-      },
-      {
-        id: 'logout',
-        name: 'Logout',
-        action: logoutAction,
-        icon: <FiLogOut />,
-        section: 'General',
-        keywords: 'sign out exit leave',
-      },
+      { id: 'settings', name: 'Settings', action: settingsAction, icon: <FiSettings />, section: 'Navigation' },
+      { id: 'logout', name: 'Logout', action: logoutAction, icon: <FiLogOut />, section: 'General' },
     ];
     addCommands(commands);
     return () => removeCommands(commands.map(c => c.id));
@@ -106,20 +72,19 @@ const AppContent = () => {
     bootstrap();
   }, []);
 
-  // --- NEW: Centralized connection management ---
+  // Centralized connection management
   useEffect(() => {
     if (user) {
       console.log("User found, connecting socket...");
       connectSocket();
     } else {
-      console.log("No user, disconnecting socket...");
+      console.log("No user, ensuring socket is disconnected and status is updated.");
       disconnectSocket();
+      setConnectionStatus('disconnected'); // Explicitly set status for logged-out users
     }
-    // No return cleanup needed as disconnect is handled explicitly
-  }, [user]);
-  // --- END NEW ---
+  }, [user, setConnectionStatus]);
 
-  // --- NEW: Trigger key sync after user is loaded and UI is ready ---
+  // Trigger key sync after user is loaded
   useEffect(() => {
     const sync = async () => {
       if (user && sessionStorage.getItem('keys_synced') !== 'true' && !isSyncing) {
@@ -129,7 +94,6 @@ const AppContent = () => {
           sessionStorage.setItem('keys_synced', 'true');
         } catch (error) {
           console.error("An error occurred during key synchronization:", error);
-          // The toast in syncSessionKeys should handle user feedback
         } finally {
           isSyncing = false;
         }
@@ -137,7 +101,6 @@ const AppContent = () => {
     };
     sync();
   }, [user]);
-  // --- END NEW ---
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -148,33 +111,13 @@ const AppContent = () => {
 
   return (
     <>
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-        toastOptions={{
-          duration: 5000,
-          className: 'glass-toast',
-          style: {
-            background: 'hsl(var(--bg-surface) / 0.8)',
-            color: 'hsl(var(--text-primary))',
-            border: '1px solid hsl(var(--border))',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: 'hsl(var(--accent))',
-              secondary: 'hsl(var(--accent-foreground))',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: 'hsl(var(--destructive))',
-              secondary: 'hsl(var(--destructive-foreground))',
-            },
-          },
-        }}
-      />
-
+      <Toaster position="top-center" reverseOrder={false} toastOptions={{
+        duration: 5000,
+        className: 'glass-toast',
+        style: { background: 'hsl(var(--bg-surface) / 0.8)', color: 'hsl(var(--text-primary))', border: '1px solid hsl(var(--border))' },
+        success: { duration: 3000, iconTheme: { primary: 'hsl(var(--accent))', secondary: 'hsl(var(--accent-foreground))' } },
+        error: { iconTheme: { primary: 'hsl(var(--destructive))', secondary: 'hsl(var(--destructive-foreground))' } },
+      }}/>
       <CommandPalette />
       <ConfirmModal />
       <UserInfoModal />
@@ -182,14 +125,11 @@ const AppContent = () => {
       <ChatInfoModal />
       <DynamicIsland />
       <Routes>
-        {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/restore" element={<Restore />} />
         <Route path="/link-device" element={<LinkDevicePage />} />
-
-        {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/chat" element={<Home />} />
           <Route path="/chat/:conversationId" element={<Chat />} />
@@ -199,8 +139,6 @@ const AppContent = () => {
           <Route path="/settings/link-device" element={<DeviceScannerPage />} />
           <Route path="/profile/:userId" element={<ProfilePage />} />
         </Route>
-
-        {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>

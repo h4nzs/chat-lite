@@ -12,7 +12,6 @@ import { useAuthStore } from '@store/auth';
 import type { User } from '@store/auth';
 import type { Conversation } from '@store/conversation';
 
-import { sanitizeText } from '@utils/sanitize';
 import { toAbsoluteUrl } from '@utils/url';
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';

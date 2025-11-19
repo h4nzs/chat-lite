@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type ConnectionStatus = 'connected' | 'disconnected' | 'connecting';
+export type ConnectionStatus = 'connected' | 'disconnected' | 'connecting';
 
 interface ConnectionState {
   status: ConnectionStatus;

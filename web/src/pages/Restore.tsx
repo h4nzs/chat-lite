@@ -68,16 +68,21 @@ export default function Restore() {
       localStorage.setItem('publicKey', publicKeyB64);
       localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
       
-      toast.success("Account restored successfully! Syncing history...");
-
-      // 5. Log the user in to get a valid token for the next step
-      // We do this before sync to ensure authFetch works
+      // 5. Log the user in to get a valid token for the next steps
       await login(username, newPassword);
 
-      // 6. Sync historical session keys to decrypt old messages
-      await syncSessionKeys();
+      // 6. Show success message after successful login
+      toast.success("Account restored successfully! Syncing history...");
+      
+      // 7. Best-effort sync of historical session keys
+      try {
+        await syncSessionKeys();
+      } catch (syncError) {
+        console.error("Non-critical error during session key sync:", syncError);
+        // Do not re-throw, the user is already logged in.
+      }
 
-      // 7. Navigate to chat
+      // 8. Navigate to chat regardless of sync outcome
       navigate("/chat");
 
     } catch (err: any) {

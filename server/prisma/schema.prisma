@@ -17,6 +17,7 @@ model User {
   avatarUrl        String?
   description      String?
   publicKey        String?
+  signingKey       String? // <-- ADD THIS
   recoveryPhraseHash String?
   showEmailToOthers Boolean          @default(false)
   hasCompletedOnboarding Boolean    @default(false)
@@ -34,11 +35,34 @@ model User {
   authenticators     Authenticator[]
   currentChallenge String?
 
+  // --- NEW: Pre-key relations ---
+  signedPreKey     SignedPreKey?
+  oneTimePreKeys   OneTimePreKey[]
+
   @@index([email])
   @@index([username])
   @@index([createdAt])
 }
 
+model SignedPreKey {
+  id        Int      @id @default(autoincrement())
+  key       String
+  signature String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+}
+
+model OneTimePreKey {
+  id        Int      @id @default(autoincrement())
+  key       String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  
+  // We don't need a unique constraint on the key itself, 
+  // as they are meant to be used once and deleted.
+  // A composite index is better for performance.
+  @@index([userId])
+}
 
 model Conversation {
   id            String         @id @default(cuid())

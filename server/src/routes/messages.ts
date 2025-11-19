@@ -100,11 +100,19 @@ router.delete("/:messageId", requireAuth, async (req, res, next) => {
         if (relativePathIndex !== -1) {
           const filePathInProject = pathname.substring(relativePathIndex + 1); // uploads/archives/file-123.zip
           const absolutePath = path.join(process.cwd(), filePathInProject);
+          const normalizedPath = path.normalize(absolutePath);
+          const uploadsRoot = path.join(process.cwd(), 'uploads');
           
-          await fs.unlink(absolutePath);
+          // Ensure the resolved path is still within the uploads directory
+          if (!normalizedPath.startsWith(uploadsRoot)) {
+            console.error(`Attempted path traversal detected: ${urlToDelete}`);
+            return;
+          }
+          
+          await fs.unlink(normalizedPath);
         }
       } catch (fileError: any) {
-        // Jangan gagalkan seluruh permintaan jika file tidak ada (mungkin sudah dihapus)
+        // Don't fail the entire request if the file doesn't exist (may have already been deleted)
         if (fileError.code !== 'ENOENT') {
           console.error(`Failed to delete file for URL ${urlToDelete}:`, fileError);
         }

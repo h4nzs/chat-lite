@@ -1,21 +1,18 @@
-import { Workbox } from 'workbox-window';
-import { useConversationStore } from '@store/conversation';
+// This file is intentionally left blank.
+//
+// The service worker is currently being registered manually within the
+// `usePushNotifications.ts` hook. This was likely done to handle push
+// notification logic directly.
+//
+// The previous implementation used Workbox for registration, but it was
+// commented out, leaving this file with dead code. To avoid confusion and
+// potential duplicate service worker registrations, the Workbox-related code
+// has been removed.
+//
+// If a more advanced service worker strategy (e.g., for caching with Workbox)
+// is needed in the future, registration logic should be consolidated into
+// this single file to maintain a clear separation of concerns.
 
 export function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    const wb = new Workbox('/sw.js');
-
-    wb.addEventListener('activated', (event) => {
-      // This event is fired when the new service worker has taken control.
-      // It's a good time to reload data if a new SW has taken over.
-      if (event.isUpdate) {
-        console.log('New service worker has been activated. Resyncing data...');
-        // Use the store action to re-fetch conversations
-        useConversationStore.getState().resyncState();
-      }
-    });
-
-    // Register the service worker.
-    // wb.register();
-  }
+  // No-op
 }

@@ -34,7 +34,10 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
 
     const handleDecryption = async () => {
       if (!message.fileUrl) {
-        if (isMounted) setError("No file URL provided.");
+        if (isMounted) {
+          setError("No file URL provided.");
+          setIsLoading(false);
+        }
         return;
       }
 

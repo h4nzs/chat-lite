@@ -94,15 +94,16 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       let isMounted = true;
       const tryDecrypt = async () => {
         if (message.content && message.sessionId) {
-          if (decryptedContent?.startsWith('[') || !decryptedContent) {
+          // Only attempt to decrypt if the content is encrypted or hasn't been decrypted yet.
+          if (message.content.startsWith('chatlite-encrypted::')) {
              try {
               const decrypted = await decryptMessage(message.content, message.conversationId, message.sessionId);
               if (isMounted) {
-                setDecryptedContent(decrypted);
+                setDecryptedContent(prev => (prev !== decrypted ? decrypted : prev));
               }
             } catch (e) {
               if (isMounted) {
-                setDecryptedContent(message.content);
+                setDecryptedContent(prev => (prev !== message.content ? message.content : prev));
               }
             }
           }
@@ -111,7 +112,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
       tryDecrypt();
       return () => { isMounted = false; };
     }
-  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, decryptedContent, message.fileUrl]);
+  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, message.fileUrl]);
 
   const hasTextContent = !!(decryptedContent && !decryptedContent.startsWith('['));
   const isImage = message.fileType?.startsWith('image/');

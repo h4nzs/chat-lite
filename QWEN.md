@@ -143,3 +143,7 @@ The project includes detailed deployment instructions in `DEPLOYMENT.md` with Ng
 - `src.md`: Development recommendations and future feature suggestions
 - `start-dev.sh`: Script for running both frontend and backend during development
 - Package.json files in both server and web directories for dependency management
+
+## Qwen Added Memories
+- Always read a file's content using `read_file` to get the full context before attempting to modify it with `replace` or `write_file`. This is a strict standard operating procedure to prevent accidental code deletion.
+- Prosedur Operasi Standar untuk Modifikasi Kode: Saat menggunakan tool `replace`, saya harus selalu menyediakan kode yang utuh dan lengkap untuk parameter `old_string` dan `new_string`. Saya TIDAK AKAN PERNAH menggunakan komentar placeholder seperti `// ... (unchanged)` karena praktik ini merusak file dengan menghapus kode. Ini adalah instruksi kritis untuk mencegah pengulangan kesalahan.

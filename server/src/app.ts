@@ -47,7 +47,7 @@ const isProd = env.nodeEnv === 'production';
 
 // Ambil origin untuk WebSocket secara dinamis
 let wsOrigin = 'ws://localhost:4000';
-if (env.appUrl) {
+if (env.appUrl && env.appUrl.trim() !== '') {
   try {
     const url = new URL(env.appUrl);
     // Gunakan wss:// untuk koneksi https://

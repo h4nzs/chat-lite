@@ -1,7 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, authFetch } from "@lib/api";
 import { decryptMessageObject } from "./message";
-import { getSocket } from "@lib/socket";
+import { getSocket, emitSessionKeyRequest } from "@lib/socket";
 import { useVerificationStore } from './verification';
 
 // --- Type Definitions ---
@@ -123,11 +123,21 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   },
 
   loadConversations: async () => {
-    // Prevent multiple simultaneous loads
-    if (get().loading) return;
+    // Atomically check and set the loading state to prevent race conditions.
+    let shouldProceed = false;
+    set(state => {
+      if (state.loading) {
+        return state; // Already loading, do nothing.
+      }
+      shouldProceed = true;
+      return { ...state, loading: true, error: null };
+    });
+
+    if (!shouldProceed) {
+      return; // Abort if another call is already in progress.
+    }
 
     try {
-      set({ loading: true, error: null });
       const rawConversations = await api<any[]>("/api/conversations");
 
       if (!Array.isArray(rawConversations)) {
@@ -141,7 +151,10 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
             lastMessage = await decryptMessageObject(lastMessage);
           } catch (e) {
             console.error(`Failed to decrypt last message for convo ${c.id}`, e);
-            lastMessage.content = '[Failed to decrypt]';
+            if (lastMessage.sessionId) {
+              emitSessionKeyRequest(lastMessage.conversationId, lastMessage.sessionId);
+            }
+            lastMessage.content = '[Requesting key to decrypt...]';
           }
           lastMessage = withPreview(lastMessage);
         }
@@ -217,23 +230,30 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   // --- Actions to be called by socket store ---
   addOrUpdateConversation: (conversation) => {
     set(state => {
-      const existingConversation = state.conversations.find(c => c.id === conversation.id);
-      let updatedConversation: Conversation;
-
-      if (existingConversation) {
-        // Merge new data into existing conversation
-        updatedConversation = {
-          ...existingConversation,
-          ...conversation,
+      const existing = state.conversations.find(c => c.id === conversation.id);
+      
+      if (existing) {
+        // Explicitly merge to avoid overwriting client-side state
+        const updated = {
+          ...existing,
+          title: conversation.title,
+          description: conversation.description,
+          avatarUrl: conversation.avatarUrl,
+          participants: conversation.participants,
+          lastMessage: conversation.lastMessage || existing.lastMessage,
+          updatedAt: conversation.updatedAt,
+          // Explicitly preserve unreadCount from the client state unless provided
+          unreadCount: conversation.unreadCount ?? existing.unreadCount,
+        };
+        return {
+          conversations: sortConversations(state.conversations.map(c => c.id === conversation.id ? updated : c))
         };
       } else {
         // This is a new conversation, add it as is
-        updatedConversation = conversation;
+        return {
+          conversations: sortConversations([conversation, ...state.conversations])
+        };
       }
-
-      return {
-        conversations: sortConversations([updatedConversation, ...state.conversations.filter(c => c.id !== conversation.id)])
-      };
     });
   },
 

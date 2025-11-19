@@ -1,63 +1,49 @@
 import { createWithEqualityFn } from "zustand/traditional";
-import { api, apiUpload, handleApiError } from "@lib/api";
-import { getSocket } from "@lib/socket";
+import { api } from "@lib/api";
+import { getSocket, emitSessionKeyRequest } from "@lib/socket";
 import { encryptMessage, decryptMessage, ensureAndRatchetSession } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation"; // Import type from conversation store
-import useDynamicIslandStore from './dynamicIsland';
 
 // --- Helper Functions ---
 
 export async function decryptMessageObject(message: Message): Promise<Message> {
   const decryptedMsg = { ...message };
-  try {
-    if (decryptedMsg.content) {
-      // Store original ciphertext before attempting decryption
-      decryptedMsg.ciphertext = decryptedMsg.content;
-      decryptedMsg.content = await decryptMessage(decryptedMsg.content, decryptedMsg.conversationId, decryptedMsg.sessionId);
-    }
-    // Also handle repliedTo content if it exists
-    if (decryptedMsg.repliedTo?.content) {
-      // No need to store ciphertext for replies, they are just for display
-      decryptedMsg.repliedTo.content = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
-    }
-    return decryptedMsg;
-  } catch (e) {
-    console.error("Decryption failed in decryptMessageObject", e);
-    decryptedMsg.content = '[Failed to decrypt message]';
-    return decryptedMsg;
+  if (decryptedMsg.content) {
+    // Store original ciphertext before attempting decryption
+    decryptedMsg.ciphertext = decryptedMsg.content;
+    decryptedMsg.content = await decryptMessage(decryptedMsg.content, decryptedMsg.conversationId, decryptedMsg.sessionId);
   }
+  // Also handle repliedTo content if it exists
+  if (decryptedMsg.repliedTo?.content) {
+    // No need to store ciphertext for replies, they are just for display
+    decryptedMsg.repliedTo.content = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
+  }
+  return decryptedMsg;
 }
 
 // --- State Type ---
 
 type State = {
   messages: Record<string, Message[]>;
-  replyingTo: Message | null;
   isFetchingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
-  typingLinkPreview: any | null; // For live link previews
   hasLoadedHistory: Record<string, boolean>;
   
   // Actions
-  setReplyingTo: (message: Message | null) => void;
-  fetchTypingLinkPreview: (text: string) => void;
-  clearTypingLinkPreview: () => void;
-  sendMessage: (conversationId: string, data: Partial<Message>) => Promise<void>;
-  uploadFile: (conversationId: string, file: File) => Promise<void>;
   loadMessagesForConversation: (id: string) => Promise<void>;
   loadPreviousMessages: (conversationId: string) => Promise<void>;
   addOptimisticMessage: (conversationId: string, message: Message) => void;
   addIncomingMessage: (conversationId: string, message: Message) => void;
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
+  removeMessage: (conversationId: string, messageId: string) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
-  removeReaction: (conversationId, string, reactionId: string) => void;
+  removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
-  retrySendMessage: (message: Message) => void;
   addSystemMessage: (conversationId: string, content: string) => void;
 };
 
@@ -89,13 +75,11 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   loadMessagesForConversation: async (id) => {
     if (get().hasLoadedHistory[id]) return;
 
-    // Ensure a session key exists before fetching messages
     try {
       await ensureAndRatchetSession(id);
     } catch (ratchetError) {
       console.error("Failed to establish session, decryption may fail:", ratchetError);
       toast.error("Could not establish a secure session. Messages may not decrypt.");
-      // We can still try to load messages, they will just fail to decrypt individually
     }
 
     try {
@@ -105,27 +89,18 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       }));
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const fetchedMessages = res.items || [];
-      const processedMessages: Message[] = [];
-      const failedSessionIds = new Set<string>();
-
-      for (const message of fetchedMessages) {
+      
+      const processedMessages = await Promise.all(fetchedMessages.map(async (message) => {
         try {
-          const decryptedMessage = await decryptMessageObject(message);
-          processedMessages.push(decryptedMessage);
+          return await decryptMessageObject(message);
         } catch (e) {
-          console.error(`Decryption failed for message ${message.id} during initial load. Requesting key.`, e);
-          // Add message with placeholder and mark session for key request
-          processedMessages.push({ ...message, content: '[Requesting key to decrypt...]' });
+          console.error(`Decryption failed for message ${message.id} during initial load.`, e);
           if (message.sessionId) {
-            failedSessionIds.add(message.sessionId);
+            emitSessionKeyRequest(message.conversationId, message.sessionId);
           }
+          return { ...message, content: '[Requesting key to decrypt...]' };
         }
-      }
-
-      // Emit key requests for all unique failed session IDs
-      for (const sessionId of failedSessionIds) {
-        emitSessionKeyRequest(id, sessionId);
-      }
+      }));
       
       set(state => {
         const existingMessages = state.messages[id] || [];
@@ -145,13 +120,12 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
             ...state.hasMore,
             [id]: fetchedMessages.length >= 50,
           },
-          hasLoadedHistory: { // Mark history as loaded
+          hasLoadedHistory: {
             ...state.hasLoadedHistory,
             [id]: true,
           }
         };
 
-        // Immediately try to load the previous page if the screen isn't full
         if (fetchedMessages.length >= 50) {
           get().loadPreviousMessages(id);
         }
@@ -163,7 +137,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       console.error(`Failed to load messages for ${id}`, error);
       set(state => ({ 
         messages: { ...state.messages, [id]: [] },
-        hasLoadedHistory: { ...state.hasLoadedHistory, [id]: false }, // Allow retry on failure
+        hasLoadedHistory: { ...state.hasLoadedHistory, [id]: false },
       }));
     }
   },
@@ -200,7 +174,6 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     }
   },
 
-  // --- Actions to be called by socket store ---
   addOptimisticMessage: (conversationId, message) => {
     set(state => ({ 
       messages: { 
@@ -213,8 +186,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   addIncomingMessage: (conversationId, message) => {
     set(state => {
       const currentMessages = state.messages[conversationId] || [];
-      if (currentMessages.some(m => m.id === message.id)) return state; // Prevent duplicates
-      // Explicitly build the message object to ensure all properties are kept
+      if (currentMessages.some(m => m.id === message.id)) return state;
       const messageWithPreview = {
         ...message,
         linkPreview: message.linkPreview,
@@ -234,14 +206,13 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         ...state.messages,
         [conversationId]: (state.messages[conversationId] || []).map(m => {
           if (m.tempId === tempId) {
-            // Preserve optimistic data but update with server confirmation
             return { 
               ...m, 
               id: newMessage.id,
               createdAt: newMessage.createdAt,
               optimistic: false, 
               error: false, 
-              linkPreview: newMessage.linkPreview // Explicitly carry over the preview
+              linkPreview: newMessage.linkPreview
             };
           }
           return m;
@@ -258,6 +229,15 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
           m.id === messageId ? { ...m, ...updates } : m
         )
       }
+    }));
+  },
+
+  removeMessage: (conversationId, messageId) => {
+    set(state => ({
+      messages: {
+        ...state.messages,
+        [conversationId]: (state.messages[conversationId] || []).filter(m => m.id !== messageId),
+      },
     }));
   },
 
@@ -330,22 +310,22 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     set(state => {
       const newMessages = { ...state.messages };
       delete newMessages[conversationId];
-      return { messages: newMessages };
+
+      const newHasLoadedHistory = { ...state.hasLoadedHistory };
+      delete newHasLoadedHistory[conversationId];
+
+      const newHasMore = { ...state.hasMore };
+      delete newHasMore[conversationId];
+
+      const newIsFetchingMore = { ...state.isFetchingMore };
+      delete newIsFetchingMore[conversationId];
+
+      return { 
+        messages: newMessages,
+        hasLoadedHistory: newHasLoadedHistory,
+        hasMore: newHasMore,
+        isFetchingMore: newIsFetchingMore,
+      };
     });
-  },
-
-  retrySendMessage: (message: Message) => {
-    const { conversationId, tempId, content, fileUrl, fileName, fileType, fileSize, repliedToId } = message;
-    
-    // Hapus pesan yang gagal dari state
-    set(state => ({
-      messages: {
-        ...state.messages,
-        [conversationId]: state.messages[conversationId]?.filter(m => m.tempId !== tempId) || [],
-      },
-    }));
-
-    // Kirim ulang pesan
-    get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
   },
 }));

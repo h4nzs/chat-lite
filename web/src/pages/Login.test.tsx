@@ -5,24 +5,28 @@ import Login from './Login';
 import { useAuthStore } from '@store/auth';
 import { api } from '@lib/api';
 
-// Mock the entire api module
+// Mock the entire api module (though not directly used by the component, it's a dependency of the store)
 vi.mock('@lib/api', () => ({
   api: vi.fn(),
 }));
 
-// Mock the auth store
+// Mock the auth store's login function
 const mockLogin = vi.fn();
-useAuthStore.setState({ login: mockLogin });
 
 describe('Login Page', () => {
   beforeEach(() => {
-    // Clear mocks before each test
-    vi.mocked(api).mockClear();
-    mockLogin.mockClear();
+    // Reset mocks and store state before each test
+    vi.clearAllMocks();
+    
+    // Set the initial state for the store, including the mocked login function
+    useAuthStore.setState({
+      user: null,
+      login: mockLogin,
+    }, true); // `true` replaces the entire state
   });
 
   const renderComponent = () => {
-    render(
+    return render(
       <MemoryRouter>
         <Login />
       </MemoryRouter>
@@ -50,16 +54,16 @@ describe('Login Page', () => {
     // Simulate form submission
     fireEvent.click(loginButton);
 
-    // Wait for the login function to be called
+    // Wait for the login function to be called and assert directly on the mock
     await waitFor(() => {
-      expect(useAuthStore.getState().login).toHaveBeenCalledWith('testuser', 'password123');
+      expect(mockLogin).toHaveBeenCalledWith('testuser', 'password123');
     });
   });
 
   it('should show an error message on failed login', async () => {
     // Mock a failed login attempt
     const errorMessage = 'Invalid credentials';
-    mockLogin.mockRejectedValue(new Error(errorMessage));
+    mockLogin.mockRejectedValueOnce(new Error(errorMessage));
 
     renderComponent();
 
@@ -68,9 +72,8 @@ describe('Login Page', () => {
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'user' } });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
-    // Wait for the error message to appear
-    await waitFor(() => {
-      expect(screen.getByText(errorMessage)).toBeInTheDocument();
-    });
+    // Wait for the error message to appear in the document
+    const errorElement = await screen.findByText(errorMessage);
+    expect(errorElement).toBeInTheDocument();
   });
 });

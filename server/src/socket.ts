@@ -100,29 +100,6 @@ export function registerSocket(httpServer: HttpServer) {
           select: { userId: true },
         });
 
-        let linkPreviewData: any = null;
-        // Only check for link previews on pure text messages
-        if (data.content && !data.fileUrl) {
-          const urlRegex = /(https?:\/\/[^\s]+)/g;
-          const urls = data.content.match(urlRegex);
-          if (urls && urls.length > 0) {
-            try {
-              const preview = await getLinkPreview(urls[0]);
-              if ('title' in preview && 'description' in preview && 'images' in preview) {
-                linkPreviewData = {
-                  url: preview.url,
-                  title: preview.title,
-                  description: preview.description,
-                  image: preview.images[0],
-                  siteName: preview.siteName,
-                };
-              }
-            } catch (e) {
-              console.error("Failed to get link preview:", e);
-            }
-          }
-        }
-
         // --- FIX: Use a transaction to ensure atomicity ---
         const newMessage = await prisma.$transaction(async (tx) => {
           const msg = await tx.message.create({
@@ -138,7 +115,7 @@ export function registerSocket(httpServer: HttpServer) {
               fileKey: data.fileKey, // Use the new dedicated field
               sessionId: data.sessionId,
               repliedToId: data.repliedToId,
-              linkPreview: linkPreviewData,
+              linkPreview: null, // Link previews are disabled on the server
               statuses: {
                 create: participants.map(p => ({
                   userId: p.userId,
@@ -179,8 +156,9 @@ export function registerSocket(httpServer: HttpServer) {
         cb?.({ ok: true, msg: messageToBroadcast });
 
         const pushRecipients = participants.filter(p => p.userId !== senderId);
-        const pushBody = data.fileUrl ? 'You received a file.' : (data.content || '');
-        const payload = { title: `New message from ${socket.user.username}`, body: pushBody.substring(0, 200) };
+        // Generic push notification to avoid leaking encrypted content
+        const pushBody = data.fileUrl ? `Sent you a ${data.fileName ? 'file' : 'attachment'}` : "Sent you a message";
+        const payload = { title: `${socket.user.username}`, body: pushBody };
         pushRecipients.forEach(p => sendPushNotification(p.userId, payload));
 
       } catch (error) {

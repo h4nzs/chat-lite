@@ -66,6 +66,9 @@ PORT=4000
 # Domain frontend Anda (tanpa trailing slash)
 CORS_ORIGIN="https://yourdomain.com"
 
+# URL aplikasi yang digunakan untuk WebSocket dan keamanan (untuk WebSocket origin)
+APP_URL="https://yourdomain.com"
+
 # Direktori untuk file upload
 UPLOAD_DIR="uploads"
 

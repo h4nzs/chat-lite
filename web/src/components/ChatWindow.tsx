@@ -187,6 +187,19 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   );
 
   useEffect(() => {
+    // This is the cleanup effect for the voice recording.
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop(); // This will trigger the onstop event
+        // The onstop handler will then stop the stream tracks.
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setShowEmojiPicker(false);

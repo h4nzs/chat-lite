@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
-import { FiPlay, FiPause, FiDownload, FiAlertTriangle } from 'react-icons/fi';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { FiPlay, FiPause, FiDownload, FiAlertTriangle, FiClock } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { Message } from '@store/conversation';
 import { decryptMessage, decryptFile } from '@utils/crypto';
 import { toAbsoluteUrl } from '@utils/url';
 import { useKeychainStore } from '@store/keychain';
 import { Spinner } from './Spinner';
+
+type DecryptionStatus = 'pending' | 'decrypting' | 'succeeded' | 'failed' | 'waiting_for_key';
 
 interface VoiceMessagePlayerProps {
   message: Message;
@@ -15,10 +17,9 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [audioSrc, setAudioSrc] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [decryptionStatus, setDecryptionStatus] = useState<DecryptionStatus>('pending');
   const [error, setError] = useState<string | null>(null);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
   const duration = message.duration || 0;
@@ -30,60 +31,63 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
 
     const handleDecryption = async () => {
       if (!message.fileUrl || !message.fileKey || !message.sessionId) {
-        if (isMounted) setError("Incomplete message data for decryption.");
+        if (isMounted) {
+          setError("Incomplete message data for decryption.");
+          setDecryptionStatus('failed');
+        }
         return;
       }
       
       if (isMounted) {
-        setIsLoading(true);
+        setDecryptionStatus('decrypting');
         setError(null);
       }
 
       try {
         let fileKey = message.fileKey;
 
-        // Decrypt the file key ONLY if the message is not optimistic (i.e., from the server)
-        // and the key looks like a long encrypted string. Raw keys are 44 chars.
         if (!message.optimistic && fileKey && fileKey.length > 50) {
           fileKey = await decryptMessage(message.fileKey, message.conversationId, message.sessionId);
         }
 
-        if (!fileKey || fileKey.startsWith('[')) {
-          if (isMounted) setError(fileKey || "Could not retrieve file key.");
+        if (!fileKey) {
+          throw new Error("Could not retrieve file key.");
+        }
+        
+        // Handle the case where a key request is in progress
+        if (fileKey.startsWith('[')) {
+          if (isMounted) {
+            setDecryptionStatus('waiting_for_key');
+            setError(fileKey); // Store the placeholder message
+          }
           return;
         }
 
-        // 2. Fetch the encrypted file
         const response = await fetch(toAbsoluteUrl(message.fileUrl));
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("File not found on server.");
-          }
-          throw new Error(`Failed to fetch voice file: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const encryptedBlob = await response.blob();
 
-        // 3. Decrypt the file blob
         const decryptedBlob = await decryptFile(encryptedBlob, fileKey, 'audio/webm');
         
         if (isMounted) {
-          // 4. Create a playable URL
           objectUrl = URL.createObjectURL(decryptedBlob);
           setAudioSrc(objectUrl);
+          setDecryptionStatus('succeeded');
         }
       } catch (e: any) {
         console.error("Voice message decryption failed:", e);
-        if (isMounted) setError(e.message || "Failed to decrypt voice message.");
-      } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setError(e.message || "Failed to decrypt voice message.");
+          setDecryptionStatus('failed');
+        }
       }
     };
 
-    if (message.fileType === 'audio/webm;encrypted=true') {
+    if (message.fileType?.includes(';encrypted=true')) {
       handleDecryption();
     } else if (message.fileUrl) {
-      // For backward compatibility or unencrypted files
       setAudioSrc(toAbsoluteUrl(message.fileUrl));
+      setDecryptionStatus('succeeded');
     }
 
     return () => {
@@ -92,48 +96,50 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [message, lastKeychainUpdate]); // Re-run when a new key might have arrived
+  }, [message, lastKeychainUpdate]);
+
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play().catch(e => console.error("Audio play failed:", e));
+    } else {
+      audio.pause();
+    }
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleCanPlay = () => setIsLoaded(true);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioSrc]); // Re-attach listeners if src changes
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
+  }, [audioSrc]);
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
     const seconds = Math.floor(timeInSeconds % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
-  if (isLoading) {
+  
+  if (decryptionStatus === 'decrypting' || decryptionStatus === 'pending') {
     return (
       <div className="flex items-center gap-3 w-full max-w-[250px] h-[60px]">
         <Spinner size="sm" />
@@ -142,11 +148,20 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
     );
   }
 
-  if (error) {
+  if (decryptionStatus === 'failed') {
     return (
       <div className="flex items-center gap-2 w-full max-w-[250px] p-2 bg-destructive/10 rounded-lg">
         <FiAlertTriangle className="text-destructive flex-shrink-0" />
         <p className="text-xs text-destructive italic">{error}</p>
+      </div>
+    );
+  }
+
+  if (decryptionStatus === 'waiting_for_key') {
+    return (
+      <div className="flex items-center gap-2 w-full max-w-[250px] p-2 bg-yellow-500/10 rounded-lg">
+        <FiClock className="text-yellow-500 flex-shrink-0" />
+        <p className="text-xs text-yellow-500 italic">{error || 'Waiting for key...'}</p>
       </div>
     );
   }
@@ -156,7 +171,7 @@ export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps)
       {audioSrc && <audio ref={audioRef} src={audioSrc} preload="metadata" />}
       <button 
         onClick={togglePlay} 
-        disabled={!isLoaded}
+        disabled={!audioSrc}
         className="p-3 rounded-full bg-bg-surface text-accent shadow-neumorphic-convex active:shadow-neumorphic-pressed disabled:opacity-50 transition-all"
         aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
       >
