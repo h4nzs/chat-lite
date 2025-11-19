@@ -1,0 +1,15 @@
+review:
+  auto_review: true
+  target_branches:
+    - "main"
+    - "real-e2ee"
+
+comments:
+  inline: true
+  summary: true
+
+block_on:
+  - security
+
+knowledge:
+  enable_team_rules: true
