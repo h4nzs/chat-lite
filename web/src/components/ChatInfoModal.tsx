@@ -12,6 +12,11 @@ const InfoSection = ({ icon, title, children }: { icon: React.ReactNode; title: 
   </div>
 );
 
+/**
+ * Displays an informational modal explaining Chat-Lite security, encryption, key storage, device access, and best practices.
+ *
+ * @returns The modal element containing multiple security info sections for users to read.
+ */
 export default function ChatInfoModal() {
   const { isChatInfoModalOpen, closeChatInfoModal } = useModalStore();
 

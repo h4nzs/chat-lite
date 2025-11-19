@@ -9,6 +9,16 @@ interface LazyImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>,
   message: Message;
 }
 
+/**
+ * Renders an image for a Message, handling encrypted and unencrypted file URLs and showing loading/error states.
+ *
+ * The component displays a centered spinner while the image is being prepared, an error overlay if decryption or loading fails, and the image once ready. For messages that indicate encryption it retrieves and uses the appropriate file key to fetch and decrypt the file, creates an object URL for the decrypted blob, and revokes that URL on unmount.
+ *
+ * @param message - Message object containing fileUrl, fileType, and optional decryption metadata required to fetch and decrypt the image.
+ * @param alt - Alternate text for the rendered <img> element.
+ * @param className - Optional CSS class names applied to the container and image.
+ * @returns A JSX element containing the image with loading and error overlays. 
+ */
 export default function LazyImage({ 
   message, 
   alt, 

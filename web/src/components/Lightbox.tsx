@@ -10,6 +10,16 @@ interface LightboxProps {
   onClose: () => void;
 }
 
+/**
+ * Display a fullscreen lightbox for a message's image, handling optional decryption, loading state, and close interactions.
+ *
+ * If the message contains an encrypted file, the component fetches and decrypts the blob, creates an object URL for display,
+ * and revokes it on unmount. It also closes when Escape is pressed or when the backdrop/close button is clicked.
+ *
+ * @param message - The message containing image data. Expected fields used: `fileUrl`, `fileType` (may include `;encrypted=true`), `fileKey`, `sessionId`, `conversationId`, and `optimistic`. `fileUrl` is required.
+ * @param onClose - Callback invoked to close the lightbox.
+ * @returns The rendered lightbox React element showing a loading spinner, an error message, or the decrypted image.
+ */
 export default function Lightbox({ message, onClose }: LightboxProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

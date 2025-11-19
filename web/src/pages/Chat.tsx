@@ -11,6 +11,13 @@ import OnboardingTour from '@components/OnboardingTour';
 import { useParams, useNavigate } from 'react-router-dom';
 import ConnectionStatusBanner from '@components/ConnectionStatusBanner';
 
+/**
+ * Render the main chat interface (sidebars, message pane, and right-hand info panel) and keep UI state synchronized with route and stores.
+ *
+ * The component loads conversations on first access, syncs the active conversation with the URL, toggles responsive sidebars, and conditionally shows an onboarding tour for new users.
+ *
+ * @returns The rendered chat page as a JSX element
+ */
 export default function Chat() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();

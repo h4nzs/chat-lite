@@ -11,6 +11,15 @@ interface VoiceMessagePlayerProps {
   message: Message;
 }
 
+/**
+ * Render a voice message player with play/pause controls, a progress bar, and a timestamp.
+ *
+ * Loads and, when required, decrypts the message's audio source, manages playback state,
+ * and displays loading or error UI as needed.
+ *
+ * @param message - Message containing audio metadata and file information required to load or decrypt playback (e.g. `fileUrl`, `fileKey`, `fileType`, `sessionId`, `duration`, `optimistic`, `conversationId`).
+ * @returns A JSX element rendering the voice message player UI.
+ */
 export default function VoiceMessagePlayer({ message }: VoiceMessagePlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);

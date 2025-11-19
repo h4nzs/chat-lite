@@ -2,6 +2,13 @@ import { useConnectionStore } from '@store/connection';
 import { Spinner } from './Spinner';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * Displays a top-fixed animated banner when the connection status is `connecting` or `disconnected`.
+ *
+ * Shows a spinner and a contextual message: "Connecting..." for `connecting`, or "Connection lost. Reconnecting..." for `disconnected`.
+ *
+ * @returns The banner JSX element when visible, otherwise `null`.
+ */
 export default function ConnectionStatusBanner() {
   const { status } = useConnectionStore();
 

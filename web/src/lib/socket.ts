@@ -9,11 +9,25 @@ import { useConnectionStore } from "@store/connection"; // Import the new store
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;
 
-// --- Emitters for Key Recovery ---
+/**
+ * Emit a request to retrieve the encrypted session key for a specific conversation session.
+ *
+ * @param conversationId - ID of the conversation to which the key request belongs
+ * @param sessionId - ID of the session whose key is being requested
+ */
 export function emitSessionKeyRequest(conversationId: string, sessionId: string) {
   getSocket()?.emit('session:request_key', { conversationId, sessionId });
 }
 
+/**
+ * Emit a session key fulfillment response to the server for a pending session key request.
+ *
+ * @param payload - The fulfillment payload
+ * @param payload.requesterId - ID of the user who requested the session key
+ * @param payload.conversationId - Conversation identifier the session belongs to
+ * @param payload.sessionId - Session identifier for which the key is being fulfilled
+ * @param payload.encryptedKey - The session key encrypted for the requester
+ */
 export function emitSessionKeyFulfillment(payload: {
   requesterId: string;
   conversationId: string;
@@ -23,6 +37,14 @@ export function emitSessionKeyFulfillment(payload: {
   getSocket()?.emit('session:fulfill_response', payload);
 }
 
+/**
+ * Provide a singleton Socket.IO client configured with lifecycle and application-specific event handlers.
+ *
+ * The socket is lazily initialized on first call and wired with centralized handlers for connection state,
+ * reconnection behavior, conversation events, session key workflows, and force-logout handling.
+ *
+ * @returns The singleton Socket.IO `Socket` instance
+ */
 export function getSocket() {
   // The singleton pattern is kept to ensure only one socket instance
   if (!socket) {
@@ -123,7 +145,11 @@ export function getSocket() {
   return socket;
 }
 
-// --- New connection management functions ---
+/**
+ * Initiates a connection attempt for the module's singleton socket when it exists and is not already connected.
+ *
+ * Sets the global connection status to `'connecting'` and triggers the socket to connect.
+ */
 
 export function connectSocket() {
   if (socket && !socket.connected) {
@@ -132,6 +158,11 @@ export function connectSocket() {
   }
 }
 
+/**
+ * Disconnects the active socket connection if it is currently connected.
+ *
+ * The socket instance is preserved (not set to `null`) so it can be reused for reconnection.
+ */
 export function disconnectSocket() {
   if (socket?.connected) {
     socket.disconnect();

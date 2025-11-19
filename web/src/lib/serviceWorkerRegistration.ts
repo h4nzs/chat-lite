@@ -1,6 +1,11 @@
 import { Workbox } from 'workbox-window';
 import { useConversationStore } from '@store/conversation';
 
+/**
+ * Sets up a Workbox service worker instance and attaches an activation handler that triggers conversation resynchronization when an updated service worker takes control.
+ *
+ * If the browser lacks Service Worker support this is a no-op. The function configures the activated event listener but does not perform registration (the registration call is intentionally disabled).
+ */
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     const wb = new Workbox('/sw.js');

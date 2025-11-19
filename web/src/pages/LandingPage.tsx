@@ -145,6 +145,11 @@ const TestimonialCard = ({ children, author, role }: { children: ReactNode; auth
   </motion.div>
 );
 
+/**
+ * Render the landing page for the Chat Lite application, composing the hero, "Why Chat Lite", features, visuals, how-it-works, testimonials, and footer sections with entrance and interactive animations.
+ *
+ * @returns A React element representing the complete landing page layout, including animated sections, feature cards, theme comparison slider, and footer.
+ */
 export default function LandingPage() {
   return (
     <div className="bg-bg-main min-h-screen font-sans text-text-primary overflow-y-auto relative">

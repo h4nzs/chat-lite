@@ -183,8 +183,13 @@ interface FulfillRequestPayload {
 }
 
 /**
- * Handles a request from another user to re-encrypt a session key.
- * This is triggered by a socket event.
+ * Re-encrypts a stored session key for a requester and emits a session-key fulfillment event.
+ *
+ * Retrieves the session key for the given conversation and session from the local store, encrypts it
+ * (sealed box) for the requester's public key, and emits the fulfillment containing the base64-encoded
+ * sealed key. If the local key is not found, the function logs an error and returns without emitting.
+ *
+ * @param payload - Object containing `conversationId`, `sessionId`, `requesterId`, and `requesterPublicKey` (base64)
  */
 export async function fulfillKeyRequest(payload: FulfillRequestPayload): Promise<void> {
   const { conversationId, sessionId, requesterId, requesterPublicKey: requesterPublicKeyB64 } = payload;
@@ -227,8 +232,9 @@ interface ReceiveKeyPayload {
 }
 
 /**
- * Handles receiving a new session key from a peer, decrypts it with our
- * private key, and stores it.
+ * Decrypts a received session key for this user and stores it for the given conversation session.
+ *
+ * @param payload - Object containing `conversationId`, `sessionId`, and `encryptedKey` (base64-encoded sealed key for this user)
  */
 export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promise<void> {
   const { conversationId, sessionId, encryptedKey } = payload;
@@ -250,9 +256,9 @@ const KEY_LENGTH = 256;
 const IV_LENGTH = 12; // 96 bits, optimal for AES-GCM
 
 /**
- * Encrypts a file blob using a newly generated symmetric key.
- * @param blob The file blob to encrypt.
- * @returns A promise that resolves to an object containing the encrypted blob and the encryption key (as base64).
+ * Encrypts a Blob with a newly generated AES-GCM key.
+ *
+ * @returns An object containing `encryptedBlob` — the ciphertext prefixed with the IV (as an application/octet-stream Blob), and `key` — the raw AES key encoded as a base64 string.
  */
 export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; key: string }> {
   const key = await crypto.subtle.generateKey(
@@ -285,11 +291,12 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
 }
 
 /**
- * Decrypts a file blob using a symmetric key.
- * @param encryptedBlob The blob containing the IV and encrypted data.
- * @param keyB64 The base64 encoded symmetric key.
- * @param originalType The original MIME type of the file.
- * @returns A promise that resolves to the decrypted file blob.
+ * Decrypts a file whose bytes were encrypted with AES-GCM and had the IV prepended.
+ *
+ * @param encryptedBlob - Blob containing the IV (first 12 bytes) followed by AES-GCM ciphertext.
+ * @param keyB64 - Base64-encoded raw AES key used to encrypt the file.
+ * @param originalType - Original MIME type to assign to the resulting Blob.
+ * @returns The decrypted file Blob with the provided MIME type.
  */
 export async function decryptFile(encryptedBlob: Blob, keyB64: string, originalType: string): Promise<Blob> {
   const sodium = await getSodium();

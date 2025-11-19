@@ -386,6 +386,18 @@ const ChatSpinner = () => (
   </div>
 );
 
+/**
+ * Render the chat window UI for a given conversation.
+ *
+ * Displays the conversation header, virtualized message list, typing indicators,
+ * message input (text, file, and voice), image lightbox, and optional group info panel.
+ * Manages message loading, highlighted-message scrolling, typing notifications, file uploads,
+ * and bridging voice recordings into the conversation send flow.
+ *
+ * @param id - The conversation id to render
+ * @param onMenuClick - Callback fired when the header menu button is clicked
+ * @returns The chat window element for the specified conversation, including header, messages, input, lightbox, and group info panel
+ */
 export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClick: () => void }) {
   const meId = useAuthStore((s) => s.user?.id);
   const openConversation = useConversationStore(s => s.openConversation);

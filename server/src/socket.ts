@@ -16,6 +16,16 @@ export function getIo() {
   return io;
 }
 
+/**
+ * Initializes and configures a Socket.IO server bound to the provided HTTP server and registers all socket event handlers.
+ *
+ * Sets up CORS and authentication middleware, presence tracking, linking flows, messaging (including link previews,
+ * transactions for message creation, broadcasting and acknowledgements), typing indicators, push subscription handling,
+ * read receipts, and E2EE key recovery handlers.
+ *
+ * @param httpServer - The HTTP server instance to attach the Socket.IO server to
+ * @returns The initialized Socket.IO `Server` instance
+ */
 export function registerSocket(httpServer: HttpServer) {
   io = new Server(httpServer, {
     cors: {

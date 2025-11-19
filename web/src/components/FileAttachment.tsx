@@ -11,6 +11,13 @@ import { FiAlertTriangle } from 'react-icons/fi';
 
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
+/**
+ * Convert a byte count into a human-readable string with appropriate units.
+ *
+ * @param bytes - Number of bytes to format; zero or falsy values yield "0 Bytes"
+ * @param decimals - Number of digits after the decimal point (default: 2)
+ * @returns The formatted size string, e.g. "1.23 MB"
+ */
 function formatBytes(bytes: number, decimals = 2) {
   if (!bytes || bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -24,6 +31,14 @@ interface FileAttachmentProps {
   message: Message;
 }
 
+/**
+ * Render a file attachment preview or downloadable file card, decrypting and fetching the file when required.
+ *
+ * This component handles encrypted attachments (uses the message's fileKey, sessionId and conversationId to obtain and decrypt the file), shows an in-flight "Decrypting file..." state, displays an error banner on failure, and renders the decrypted content as a PDF preview, video, audio player, or a generic download link depending on the file type.
+ *
+ * @param message - Message object describing the attachment. Expected fields used: `fileUrl`, `fileKey`, `sessionId`, `fileType` (may include `;encrypted=true`), `fileName`, `fileSize`, `optimistic`, `conversationId`, and `duration`.
+ * @returns A React element that previews or links to the attachment, or `null` if there is nothing to display.
+ */
 export default function FileAttachment({ message }: FileAttachmentProps) {
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);

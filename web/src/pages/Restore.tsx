@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/auth";
@@ -11,6 +10,16 @@ import { syncSessionKeys } from "@utils/sessionSync";
 import { api } from "@lib/api";
 import toast from "react-hot-toast";
 
+/**
+ * UI component that restores a user account from a 24-word recovery phrase and signs the user in.
+ *
+ * Verifies and derives keys from the provided mnemonic, updates the server with the new device password,
+ * stores the encrypted private key and public key locally, signs the user in, triggers session key sync
+ * to recover historical message decryption keys, and navigates to the chat view. Shows inline errors and
+ * a success toast when restoration begins.
+ *
+ * @returns The JSX element rendering the restore account form and related UI.
+ */
 export default function Restore() {
   const [username, setUsername] = useState("");
   const [phrase, setPhrase] = useState("");
