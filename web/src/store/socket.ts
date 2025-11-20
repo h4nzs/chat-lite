@@ -250,18 +250,22 @@ export const useSocketStore = createWithEqualityFn<State>((set) => ({
     socket.on('session:new_key', async ({ conversationId, sessionId, encryptedKey }) => {
       try {
         console.log(`Received new session key ${sessionId} for conversation ${conversationId}`);
-        const privateKey = await useAuthStore.getState().getPrivateKey(); // This needs to be implemented
-        const publicKeyB64 = localStorage.getItem('publicKey');
-        if (!privateKey || !publicKeyB64) {
-          throw new Error("User keys not available to decrypt new session key.");
+        if (!localStorage.getItem('encryptedPrivateKeys')) {
+          throw new Error("No encrypted private keys available to decrypt new session key.");
+        }
+        const { privateKey } = await useAuthStore.getState().getEncryptionKeyPair();
+        if (!privateKey) {
+          throw new Error("User private key not available to decrypt new session key.");
         }
         const sodium = await getSodium();
-        const publicKey = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
 
-        const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey, sodium);
+        const newSessionKey = await decryptSessionKeyForUser(encryptedKey, null, privateKey, sodium);
         await addSessionKey(conversationId, sessionId, newSessionKey);
         console.log(`Successfully stored new session key ${sessionId}`);
-        
+
+        // Retry decryption of any pending messages that were waiting for this key
+        useMessageStore.getState().retryPendingDecryptions(conversationId);
+
       } catch (error) {
         console.error("Failed to process new session key:", error);
       }

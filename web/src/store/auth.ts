@@ -9,8 +9,10 @@ import { generateKeyPair, exportPublicKey, storePrivateKey } from "@utils/keyMan
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import { retrievePrivateKey } from "@utils/keyManagement";
+import { generatePreKeys, uploadPreKeys } from "@utils/preKey";
 import { useModalStore } from "./modal";
 import { startAuthentication } from '@simplewebauthn/browser';
+import toast from "react-hot-toast";
 
 export type User = {
   id: string;
@@ -148,6 +150,19 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
       // Continue login without encryption - user can set it up later
       // This prevents login failure if there are issues with encryption setup
     }
+
+    // --- NEW: Generate and upload pre-keys after successful registration ---
+    try {
+      const signingKey = await get().getSigningPrivateKey();
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingKey);
+      await uploadPreKeys(signedPreKey, oneTimePreKeys);
+      console.log("Pre-keys generated and uploaded successfully after registration.");
+    } catch (e) {
+      console.error("Failed to generate or upload pre-keys after registration:", e);
+      toast.error("Warning: Could not prepare secure sessions. You may need to log out and log back in.");
+    }
+    // --- END NEW ---
+
     get().ensureSocket();
   },
 
@@ -181,6 +196,18 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     set({ user: res.user });
     localStorage.setItem("user", JSON.stringify(res.user));
+
+    // --- NEW: Generate and upload pre-keys after successful registration ---
+    try {
+      const signingKey = await get().getSigningPrivateKey();
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingKey);
+      await uploadPreKeys(signedPreKey, oneTimePreKeys);
+      console.log("Pre-keys generated and uploaded successfully after registration.");
+    } catch (e) {
+      console.error("Failed to generate or upload pre-keys after registration:", e);
+      toast.error("Warning: Could not prepare secure sessions. You may need to log out and log back in.");
+    }
+    // --- END NEW ---
 
     get().ensureSocket();
     return phrase;
