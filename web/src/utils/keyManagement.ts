@@ -9,25 +9,25 @@ export async function generateKeyPair(): Promise<{ publicKey: Uint8Array, privat
 // Function to export public key in a string format
 export async function exportPublicKey(publicKey: Uint8Array): Promise<string> {
   const sodium = await getSodium();
-  return sodium.to_base64(publicKey, sodium.base64_variants.ORIGINAL);
+  return sodium.to_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
 // Function to export private key in a string format
 export async function exportPrivateKey(privateKey: Uint8Array): Promise<string> {
   const sodium = await getSodium();
-  return sodium.to_base64(privateKey, sodium.base64_variants.ORIGINAL);
+  return sodium.to_base64(privateKey, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
 // Function to import public key from string
 export async function importPublicKey(publicKeyStr: string): Promise<Uint8Array> {
   const sodium = await getSodium();
-  return sodium.from_base64(publicKeyStr, sodium.base64_variants.ORIGINAL);
+  return sodium.from_base64(publicKeyStr, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
 // Function to import private key from string
 export async function importPrivateKey(privateKeyStr: string): Promise<Uint8Array> {
   const sodium = await getSodium();
-  return sodium.from_base64(privateKeyStr, sodium.base64_variants.ORIGINAL);
+  return sodium.from_base64(privateKeyStr, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
 export async function storePrivateKey(privateKey: Uint8Array | null, password: string): Promise<string> {
@@ -64,7 +64,7 @@ export async function storePrivateKey(privateKey: Uint8Array | null, password: s
     result.set(nonce, salt.length);
     result.set(ciphertext, salt.length + nonce.length);
 
-    const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    const encoded = sodium.to_base64(result, sodium.base64_variants.URLSAFE_NO_PADDING);
     console.log("✅ storePrivateKey: encrypted and encoded successfully");
     return encoded;
   } catch (err) {
@@ -77,7 +77,7 @@ export async function storePrivateKey(privateKey: Uint8Array | null, password: s
 export async function retrievePrivateKey(encryptedDataStr: string, password: string): Promise<Uint8Array> {
   const sodium = await getSodium();
   
-  const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.ORIGINAL);
+  const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.URLSAFE_NO_PADDING);
   
   // Extract salt, nonce, and encrypted key
   const salt = encryptedData.slice(0, 32);
@@ -144,7 +144,7 @@ export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: 
     result.set(nonce, salt.length);
     result.set(ciphertext, salt.length + nonce.length);
 
-    const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    const encoded = sodium.to_base64(result, sodium.base64_variants.URLSAFE_NO_PADDING);
     console.log("✅ storePrivateKeys: encrypted and encoded successfully");
     return encoded;
   } catch (err) {
@@ -160,7 +160,7 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
 } | null> {
   const sodium = await getSodium();
 
-  const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.ORIGINAL);
+  const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.URLSAFE_NO_PADDING);
 
   // Extract salt, nonce, and encrypted data
   const salt = encryptedData.slice(0, 32);
@@ -203,7 +203,7 @@ export async function encryptSessionKeyForUser(sessionKey: Uint8Array, recipient
   // Use direct public key encryption (sealing) - recipient can decrypt with their private key
   const encryptedSessionKey = sodium.crypto_box_seal(sessionKey, recipientPublicKey);
   
-  return sodium.to_base64(encryptedSessionKey, sodium.base64_variants.ORIGINAL);
+  return sodium.to_base64(encryptedSessionKey, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
 // Function to decrypt a session key using user's private key
@@ -213,7 +213,7 @@ export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, p
     throw new TypeError("Invalid private key provided for session key decryption.");
   }
 
-  const encryptedSessionKey = sodium.from_base64(encryptedSessionKeyStr, sodium.base64_variants.ORIGINAL);
+  const encryptedSessionKey = sodium.from_base64(encryptedSessionKeyStr, sodium.base64_variants.URLSAFE_NO_PADDING);
 
   // Decrypt using only the private key (sealed box doesn't need the public key for decryption)
   const sessionKey = sodium.crypto_box_seal_open(encryptedSessionKey, privateKey);

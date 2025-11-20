@@ -1,6 +1,8 @@
 import { getSodium } from '@lib/sodiumInitializer';
 import { api } from '@lib/api';
 import { retrievePrivateKey, decryptSessionKeyForUser } from '@utils/keyManagement';
+
+const B64_VARIANT = 'URLSAFE_NO_PADDING';
 import { useModalStore } from '@store/modal';
 import {
   addSessionKey,
@@ -58,7 +60,7 @@ export async function getMyKeyPair(): Promise<{ publicKey: Uint8Array; privateKe
   }
 
   const sodium = await getSodium();
-  const publicKey = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
+  const publicKey = sodium.from_base64(publicKeyB64, sodium.base64_variants[B64_VARIANT]);
 
   userPrivateKey = privateKey;
   userPublicKey = publicKey;
@@ -126,7 +128,7 @@ export async function encryptMessage(
   combined.set(nonce);
   combined.set(encrypted, nonce.length);
 
-  const ciphertext = sodium.to_base64(combined, sodium.base64_variants.ORIGINAL);
+  const ciphertext = sodium.to_base64(combined, sodium.base64_variants[B64_VARIANT]);
   return { ciphertext, sessionId };
 }
 
@@ -157,7 +159,7 @@ export async function decryptMessage(
   }
 
   try {
-    const combined = sodium.from_base64(cipher, sodium.base64_variants.ORIGINAL);
+    const combined = sodium.from_base64(cipher, sodium.base64_variants[B64_VARIANT]);
     if (combined.length <= sodium.crypto_secretbox_NONCEBYTES) {
       return '[Invalid Encrypted Data]';
     }
@@ -200,12 +202,12 @@ export async function fulfillKeyRequest(payload: FulfillRequestPayload): Promise
 
   // 2. Re-encrypt it for the requester
   const sodium = await getSodium();
-  const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants.ORIGINAL);
+  const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants[B64_VARIANT]);
   
   // crypto_box_seal_open requires our full keypair, but we are SEALING for them.
   // We just need their public key.
   const encryptedKeyForRequester = sodium.crypto_box_seal(key, requesterPublicKey);
-  const encryptedKeyB64 = sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.ORIGINAL);
+  const encryptedKeyB64 = sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants[B64_VARIANT]);
 
   // 3. Emit the fulfillment event back
   emitSessionKeyFulfillment({
@@ -279,7 +281,7 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
   // Export the key to be sent to the recipient
   const exportedKey = await crypto.subtle.exportKey('raw', key);
   const sodium = await getSodium();
-  const keyB64 = sodium.to_base64(new Uint8Array(exportedKey), sodium.base64_variants.ORIGINAL);
+  const keyB64 = sodium.to_base64(new Uint8Array(exportedKey), sodium.base64_variants[B64_VARIANT]);
 
   return { encryptedBlob, key: keyB64 };
 }
@@ -293,7 +295,7 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
  */
 export async function decryptFile(encryptedBlob: Blob, keyB64: string, originalType: string): Promise<Blob> {
   const sodium = await getSodium();
-  const keyBytes = sodium.from_base64(keyB64, sodium.base64_variants.ORIGINAL);
+  const keyBytes = sodium.from_base64(keyB64, sodium.base64_variants[B64_VARIANT]);
 
   const key = await crypto.subtle.importKey(
     'raw',

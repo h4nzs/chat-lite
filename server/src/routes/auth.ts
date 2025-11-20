@@ -96,7 +96,7 @@ router.post(
       await sodium.ready;
       const normalizedPhrase = recoveryPhrase.trim().split(/\s+/).join(' ');
       const phraseHashBytes = sodium.crypto_generichash(64, normalizedPhrase);
-      const recoveryPhraseHash = sodium.to_base64(phraseHashBytes, sodium.base64_variants.ORIGINAL);
+      const recoveryPhraseHash = sodium.to_base64(phraseHashBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
 
       const user = await prisma.user.create({
         data: { email, username, passwordHash, name, publicKey, recoveryPhraseHash },

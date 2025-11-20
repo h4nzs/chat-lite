@@ -92,7 +92,7 @@ router.post("/verify",
       await sodium.ready;
       const normalizedPhrase = recoveryPhrase.trim().split(/\s+/).join(' ');
       const providedPhraseHash = sodium.crypto_generichash(64, normalizedPhrase);
-      const generatedHashB64 = sodium.to_base64(providedPhraseHash, sodium.base64_variants.ORIGINAL);
+      const generatedHashB64 = sodium.to_base64(providedPhraseHash, sodium.base64_variants.URLSAFE_NO_PADDING);
 
       // Workaround: Compare base64 strings directly since sodium.compare is failing unexpectedly
       if (user.recoveryPhraseHash !== generatedHashB64) {
