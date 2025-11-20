@@ -153,8 +153,12 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     // --- NEW: Generate and upload pre-keys after successful registration ---
     try {
-      const signingKey = await get().getSigningPrivateKey();
-      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingKey);
+      // After registration, we have the password. Retrieve the signing key directly.
+      const signingPrivateKey = await retrievePrivateKey(
+        localStorage.getItem('encryptedPrivateKeys')!,
+        data.password
+      );
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingPrivateKey);
       await uploadPreKeys(signedPreKey, oneTimePreKeys);
       console.log("Pre-keys generated and uploaded successfully after registration.");
     } catch (e) {
@@ -199,8 +203,12 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     // --- NEW: Generate and upload pre-keys after successful registration ---
     try {
-      const signingKey = await get().getSigningPrivateKey();
-      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingKey);
+      // After registration, we have the password. Retrieve the signing key directly.
+      const signingPrivateKey = await retrievePrivateKey(
+        localStorage.getItem('encryptedPrivateKeys')!,
+        data.password
+      );
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingPrivateKey);
       await uploadPreKeys(signedPreKey, oneTimePreKeys);
       console.log("Pre-keys generated and uploaded successfully after registration.");
     } catch (e) {
