@@ -127,35 +127,6 @@ export const validateEncryptedFileAfterUpload = (filePath: string): boolean => {
   }
 };
 
-// Export the validation function so it can be used in route handlers
-export const validateEncryptedFileAfterUpload = (filePath: string): boolean => {
-  try {
-    // Read the beginning of the file to check for encryption signatures
-    const fileSize = fs.statSync(filePath).size;
-
-    if (fileSize < 24) {
-      // Encrypted files typically need at least 24 bytes for the nonce
-      return false;
-    }
-
-    // Read first 32 bytes to check for sodium encryption format
-    const fileBuffer = fs.readFileSync(filePath, null);
-
-    // Check if this looks like a properly encrypted file (with a nonce)
-    // In libsodium's crypto_secretbox_easy, first 24 bytes are the nonce
-    if (fileBuffer.length >= 24) {
-      // For now, just check that it's a binary file of appropriate size
-      // In a more sophisticated implementation, we'd verify the encryption format
-      return true;
-    }
-
-    return false;
-  } catch (err) {
-    console.error('Error validating encrypted file:', err);
-    return false;
-  }
-};
-
 // Instance Multer dengan konfigurasi lengkap
 export const upload = multer({
   storage,

@@ -36,7 +36,26 @@ let isSyncing = false;
 getSocket();
 
 const Home = () => {
-  // ... (Home component remains the same)
+  const { conversations, loading } = useConversationStore(state => ({
+    conversations: state.conversations,
+    loading: state.loading,
+  }));
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-bg-main">
+        <p className="text-text-secondary">Loading conversations...</p>
+      </div>
+    );
+  }
+
+  if (conversations.length > 0) {
+    // Redirect to the most recent conversation
+    return <Navigate to={`/chat/${conversations[0].id}`} replace />;
+  }
+
+  // If there are no conversations, render the Chat page in its empty state
+  return <Chat />;
 };
 
 const AppContent = () => {

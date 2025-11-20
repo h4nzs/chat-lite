@@ -140,5 +140,107 @@ router.get("/public/:userId",
   }
 );
 
+// === NEW: Endpoint to upload pre-keys ===
+router.post("/prekeys",
+  requireAuth,
+  zodValidate({
+    body: z.object({
+      signedPreKey: z.object({
+        key: z.string(),
+        signature: z.string(),
+      }),
+      oneTimePreKeys: z.array(z.object({
+        key: z.string(),
+      })),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const { signedPreKey, oneTimePreKeys } = req.body;
+
+      // Use a transaction to ensure all keys are updated atomically
+      await prisma.$transaction([
+        // Delete old keys
+        prisma.signedPreKey.deleteMany({ where: { userId } }),
+        prisma.oneTimePreKey.deleteMany({ where: { userId } }),
+        // Create new signed pre-key
+        prisma.signedPreKey.create({
+          data: {
+            userId,
+            key: signedPreKey.key,
+            signature: signedPreKey.signature,
+          },
+        }),
+        // Create new one-time pre-keys
+        prisma.oneTimePreKey.createMany({
+          data: oneTimePreKeys.map(k => ({
+            userId,
+            key: k.key,
+          })),
+        }),
+      ]);
+
+      res.json({ ok: true, message: "Pre-keys uploaded successfully." });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// === NEW: Endpoint to get a pre-key bundle for a user ===
+router.get("/prekey-bundle/:userId",
+  requireAuth,
+  zodValidate({ params: z.object({ userId: z.string().cuid() }) }),
+  async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+
+      // Use a transaction to fetch and then delete the one-time key
+      const result = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          include: { // Use 'include' instead of 'select' to fetch the relation
+            signedPreKey: true,
+          },
+        });
+
+        if (!user || !user.publicKey || user.publicKey.length === 0 || !user.signedPreKey || user.signedPreKey.key.length === 0) {
+          throw new Error("User does not have a valid pre-key bundle.");
+        }
+
+        // Get one available one-time pre-key
+        const oneTimeKey = await tx.oneTimePreKey.findFirst({
+          where: { userId },
+        });
+
+        if (oneTimeKey) {
+          // IMPORTANT: Delete the key after fetching it to ensure it's only used once
+          await tx.oneTimePreKey.delete({
+            where: { id: oneTimeKey.id, userId: userId }, // More specific where clause
+          });
+        }
+
+        return {
+          identityKey: user.publicKey,
+          signedPreKey: {
+            id: user.signedPreKey.id,
+            key: user.signedPreKey.key,
+            signature: user.signedPreKey.signature,
+          },
+          oneTimeKey: oneTimeKey ? { id: oneTimeKey.id, key: oneTimeKey.key } : null,
+        };
+      });
+
+      res.json(result);
+    } catch (e) {
+      // Custom error handling for this specific case
+      if (e instanceof Error && e.message.includes("pre-key bundle")) {
+        return res.status(404).json({ error: e.message });
+      }
+      next(e);
+    }
+  }
+);
 
 export default router;

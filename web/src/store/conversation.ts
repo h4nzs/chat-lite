@@ -3,6 +3,11 @@ import { api, authFetch } from "@lib/api";
 import { decryptMessageObject } from "./message";
 import { getSocket, emitSessionKeyRequest } from "@lib/socket";
 import { useVerificationStore } from './verification';
+import { fetchPreKeyBundle } from '@utils/preKey';
+import { establishSessionFromPreKeyBundle } from '@utils/crypto';
+import { addSessionKey } from '@lib/keychainDb';
+import { getSodium } from '@lib/sodiumInitializer';
+import { useAuthStore } from './auth';
 
 // --- Type Definitions ---
 
@@ -214,17 +219,71 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
 
   startConversation: async (peerId) => {
-    const conv = await authFetch<Conversation>("/api/conversations", {
-      method: "POST",
-      body: JSON.stringify({ userIds: [peerId], isGroup: false }),
-    });
-    
-    // Join the socket room for real-time updates
-    getSocket().emit("conversation:join", conv.id);
+    const { getEncryptionKeyPair } = useAuthStore.getState();
 
-    get().addOrUpdateConversation(conv);
-    set({ activeId: conv.id, isSidebarOpen: false });
-    return conv.id;
+    try {
+      // First, try to get the peer's pre-key bundle
+      const preKeyBundle = await fetchPreKeyBundle(peerId);
+
+      // Get our own key pair
+      const myKeyPair = await getEncryptionKeyPair();
+
+      // Establish a session from the pre-key bundle using X3DH-like handshake
+      const { sessionKey, ephemeralPublicKey } = await establishSessionFromPreKeyBundle(myKeyPair, preKeyBundle);
+
+      // Encrypt the session key for both users (myself and the peer)
+      const sodium = await getSodium();
+      const myPublicKey = myKeyPair.publicKey;
+      const peerPublicKey = sodium.from_base64(preKeyBundle.identityKey, sodium.base64_variants[B64_VARIANT]);
+
+      const encryptedKeyForMe = sodium.crypto_box_seal(sessionKey, myPublicKey);
+      const encryptedKeyForPeer = sodium.crypto_box_seal(sessionKey, peerPublicKey);
+
+      // Generate a unique ID for this session
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Add the session key to local storage
+      await addSessionKey(peerId, sessionId, sessionKey);
+
+      // Create the conversation with the initial session key
+      const conv = await authFetch<Conversation>("/api/conversations", {
+        method: "POST",
+        body: JSON.stringify({
+          userIds: [peerId],
+          isGroup: false,
+          initialSession: {
+            sessionId,
+            ephemeralPublicKey, // Include the ephemeral public key for verification
+            initialKeys: [
+              { userId: useAuthStore.getState().user!.id, key: sodium.to_base64(encryptedKeyForMe, sodium.base64_variants.URLSAFE_NO_PADDING) },
+              { userId: peerId, key: sodium.to_base64(encryptedKeyForPeer, sodium.base64_variants.URLSAFE_NO_PADDING) },
+            ],
+          },
+        }),
+      });
+
+      // Join the socket room for real-time updates
+      getSocket().emit("conversation:join", conv.id);
+
+      get().addOrUpdateConversation(conv);
+      set({ activeId: conv.id, isSidebarOpen: false });
+      return conv.id;
+    } catch (error) {
+      console.error("Failed to start conversation using pre-keys, falling back to original method:", error);
+
+      // Fallback: Attempt to create conversation without pre-key (will fail if peer is offline)
+      const conv = await authFetch<Conversation>("/api/conversations", {
+        method: "POST",
+        body: JSON.stringify({ userIds: [peerId], isGroup: false }),
+      });
+
+      // Join the socket room for real-time updates
+      getSocket().emit("conversation:join", conv.id);
+
+      get().addOrUpdateConversation(conv);
+      set({ activeId: conv.id, isSidebarOpen: false });
+      return conv.id;
+    }
   },
 
   // --- Actions to be called by socket store ---

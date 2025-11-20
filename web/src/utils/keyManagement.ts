@@ -118,20 +118,17 @@ export async function encryptSessionKeyForUser(sessionKey: Uint8Array, recipient
 }
 
 // Function to decrypt a session key using user's private key
-export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, publicKey: Uint8Array, privateKey: Uint8Array, sodium: any): Promise<Uint8Array> {
-  // Final, most robust check to ensure the private key is valid before use.
+export async function decryptSessionKeyForUser(encryptedSessionKeyStr: string, publicKey: Uint8Array | null, privateKey: Uint8Array, sodium: any): Promise<Uint8Array> {
+  // Robust check to ensure the private key is valid before use.
   if (!privateKey || privateKey.length !== sodium.crypto_box_SECRETKEYBYTES) {
     throw new TypeError("Invalid private key provided for session key decryption.");
   }
-  if (!publicKey || publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) {
-    throw new TypeError("Invalid public key provided for session key decryption.");
-  }
 
   const encryptedSessionKey = sodium.from_base64(encryptedSessionKeyStr, sodium.base64_variants.ORIGINAL);
-  
-  // Decrypt using the full keypair
-  const sessionKey = sodium.crypto_box_seal_open(encryptedSessionKey, publicKey, privateKey);
-  
+
+  // Decrypt using only the private key (sealed box doesn't need the public key for decryption)
+  const sessionKey = sodium.crypto_box_seal_open(encryptedSessionKey, privateKey);
+
   if (!sessionKey) {
     throw new Error("Failed to decrypt session key.");
   }

@@ -319,3 +319,45 @@ export async function decryptFile(encryptedBlob: Blob, keyB64: string, originalT
 
   return new Blob([decryptedData], { type: originalType });
 }
+
+/**
+ * Establishes an initial session from a pre-key bundle using X3DH-like handshake.
+ */
+export async function establishSessionFromPreKeyBundle(
+  myKeyPair: { publicKey: Uint8Array, privateKey: Uint8Array },
+  preKeyBundle: any
+): Promise<{ sessionKey: Uint8Array, ephemeralPublicKey: string }> {
+  const sodium = await getSodium();
+
+  // 1. Generate an ephemeral key pair for this session establishment
+  const ephemeralKeyPair = sodium.crypto_box_keypair();
+
+  // 2. Extract the remote keys from the bundle
+  const theirIdentityPublicKey = sodium.from_base64(preKeyBundle.identityKey, sodium.base64_variants[B64_VARIANT]);
+  const theirSignedPrePublicKey = sodium.from_base64(preKeyBundle.signedPreKey.key, sodium.base64_variants[B64_VARIANT]);
+
+  // 3. Perform the X3DH key agreement
+  // DH1 = ephemeralPrivateKey * theirIdentityPublicKey
+  const dh1 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, theirIdentityPublicKey);
+  // DH2 = myPrivateKey * theirSignedPrePublicKey
+  const dh2 = sodium.crypto_scalarmult(myKeyPair.privateKey, theirSignedPrePublicKey);
+
+  // If there's a one-time key, compute DH3
+  let dh3 = new Uint8Array(0);
+  if (preKeyBundle.oneTimeKey) {
+    const theirOneTimePublicKey = sodium.from_base64(preKeyBundle.oneTimeKey.key, sodium.base64_variants[B64_VARIANT]);
+    dh3 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, theirOneTimePublicKey);
+  }
+
+  // Combine all DH outputs to create the shared secret
+  const sharedSecret = new Uint8Array([...dh1, ...dh2, ...dh3]);
+
+  // Derive the session key from the shared secret
+  const sessionKey = sodium.crypto_generichash(32, sharedSecret);
+
+  // Return the new session key and ephemeral public key for transmission
+  return {
+    sessionKey,
+    ephemeralPublicKey: sodium.to_base64(ephemeralKeyPair.publicKey, sodium.base64_variants[B64_VARIANT]),
+  };
+}

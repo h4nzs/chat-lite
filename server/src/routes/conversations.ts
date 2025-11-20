@@ -112,7 +112,7 @@ router.get("/", async (req, res, next) => {
 // CREATE a new conversation (private or group)
 router.post("/", async (req, res, next) => {
   try {
-    const { title, userIds, isGroup } = req.body;
+    const { title, userIds, isGroup, initialSession } = req.body;
     const creatorId = req.user.id;
 
     if (!isGroup) {
@@ -160,8 +160,22 @@ router.post("/", async (req, res, next) => {
       },
     });
 
-    // Create and distribute session keys for the new conversation
-    await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
+    // --- NEW: Handle initial session from pre-key bundle ---
+    if (initialSession && !isGroup) {
+      // Create session keys from the initial session data
+      await prisma.sessionKey.createMany({
+        data: initialSession.initialKeys.map((k: { userId: string; key: string }) => ({
+          conversationId: newConversation.id,
+          sessionId: initialSession.sessionId,
+          userId: k.userId,
+          encryptedKey: k.key, // k.key is already base64 encoded
+        })),
+      });
+    } else {
+      // For groups or when no initial session is provided, use the old key rotation method
+      await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
+    }
+    // --- END NEW ---
 
     // --- FIX: Transform the conversation object to match client-side expectations ---
     const transformedConversation = {
