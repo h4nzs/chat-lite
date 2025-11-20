@@ -101,6 +101,95 @@ export async function retrievePrivateKey(encryptedDataStr: string, password: str
   return privateKey;
 }
 
+// Function to store both encryption and signing private keys together, encrypted with a password
+export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: Uint8Array }, password: string): Promise<string> {
+  const sodium = await getSodium();
+
+  // Validate inputs
+  if (!keys || !keys.encryption || !keys.signing) {
+    console.error("storePrivateKeys: invalid keys object", keys);
+    throw new TypeError("Invalid keys object — must contain both encryption and signing keys");
+  }
+
+  if (!password || typeof password !== "string" || password.length === 0) {
+    throw new TypeError("Invalid password — must be a non-empty string");
+  }
+
+  try {
+    // Prepare the keys for storage by converting to base64
+    const keysToStore = {
+      encryption: sodium.to_base64(keys.encryption, sodium.base64_variants.URLSAFE_NO_PADDING),
+      signing: sodium.to_base64(keys.signing, sodium.base64_variants.URLSAFE_NO_PADDING),
+    };
+
+    const jsonString = JSON.stringify(keysToStore);
+
+    const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+    const combinedKey = `${appSecret}-${password}`;
+    const combinedBytes = sodium.from_string(combinedKey);
+
+    const salt = sodium.randombytes_buf(32); // Using a 32-byte salt for generichash
+
+    // Derive key using crypto_generichash as a workaround for pwhash issues
+    const keyInput = new Uint8Array(salt.length + combinedBytes.length);
+    keyInput.set(salt);
+    keyInput.set(combinedBytes, salt.length);
+    const key = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, keyInput);
+
+    const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+    const ciphertext = sodium.crypto_secretbox_easy(jsonString, nonce, key);
+
+    const result = new Uint8Array(salt.length + nonce.length + ciphertext.length);
+    result.set(salt, 0);
+    result.set(nonce, salt.length);
+    result.set(ciphertext, salt.length + nonce.length);
+
+    const encoded = sodium.to_base64(result, sodium.base64_variants.ORIGINAL);
+    console.log("✅ storePrivateKeys: encrypted and encoded successfully");
+    return encoded;
+  } catch (err) {
+    console.error("❌ Error in storePrivateKeys:", err);
+    throw err;
+  }
+}
+
+// Function to retrieve and decrypt both encryption and signing private keys from storage
+export async function retrievePrivateKeys(encryptedDataStr: string, password: string): Promise<{
+  encryption: Uint8Array,
+  signing: Uint8Array
+} | null> {
+  const sodium = await getSodium();
+
+  const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants.ORIGINAL);
+
+  // Extract salt, nonce, and encrypted data
+  const salt = encryptedData.slice(0, 32);
+  const nonce = encryptedData.slice(32, 32 + sodium.crypto_secretbox_NONCEBYTES);
+  const encryptedJson = encryptedData.slice(32 + sodium.crypto_secretbox_NONCEBYTES);
+
+  // Derive the same key from the password
+  const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+  const combinedKey = `${appSecret}-${password}`;
+  const combinedBytes = sodium.from_string(combinedKey);
+
+  // Derive key using crypto_generichash to match the storing logic
+  const keyInput = new Uint8Array(salt.length + combinedBytes.length);
+  keyInput.set(salt);
+  keyInput.set(combinedBytes, salt.length);
+  const key = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, keyInput);
+
+  // Decrypt the JSON
+  const decryptedJson = sodium.to_string(sodium.crypto_secretbox_open_easy(encryptedJson, nonce, key));
+
+  // Parse the JSON to get both private keys
+  const keys = JSON.parse(decryptedJson);
+
+  return {
+    encryption: sodium.from_base64(keys.encryption, sodium.base64_variants.URLSAFE_NO_PADDING),
+    signing: sodium.from_base64(keys.signing, sodium.base64_variants.URLSAFE_NO_PADDING),
+  };
+}
+
 // Function to create a session key for a conversation
 export async function createSessionKey(): Promise<Uint8Array> {
   const sodium = await getSodium();

@@ -51,7 +51,11 @@ cd server
 npm install
 
 # Create the .env file from the example
-# (No example file, create it manually)
+cd ..
+cp .env.example .env /server
+
+# And also for the frontend
+cp .env.example .env /web
 ```
 
 Create a `.env` file in the `server` directory with the following content:

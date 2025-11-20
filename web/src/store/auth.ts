@@ -5,7 +5,7 @@ import { useSocketStore, resetListenersInitialized } from './socket';
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { getSodium } from '@lib/sodiumInitializer';
-import { generateKeyPair, exportPublicKey, storePrivateKey } from "@utils/keyManagement";
+import { generateKeyPair, exportPublicKey, storePrivateKeys, retrievePrivateKeys } from "@utils/keyManagement";
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import { retrievePrivateKey } from "@utils/keyManagement";
@@ -43,35 +43,43 @@ type State = {
   setReadReceipts: (value: boolean) => void;
   regenerateKeys: (password: string) => Promise<void>;
   getPrivateKey: () => Promise<Uint8Array>;
+  getSigningPrivateKey: () => Promise<Uint8Array>;
+  getEncryptionKeyPair: () => Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }>;
   setUser: (user: User) => void;
 };
 
-// Helper function to setup user encryption keys
+// Helper function to setup user encryption and signing keys
 const setupUserEncryptionKeys = async (password: string): Promise<void> => {
   try {
     // Ensure sodium is initialized before generating keys
     await getSodium(); // Ensure libsodium is ready
     const { publicKey, privateKey } = await generateKeyPair();
-    
-    // Export public key to base64 string
+    const signingKeyPair = await generateKeyPair(); // Generate a separate key pair for signing
+
+    // Export public keys to base64 strings
     const publicKeyStr = await exportPublicKey(publicKey);
-    
-    // Encrypt the private key using the user's password
-    const encryptedPrivateKey = await storePrivateKey(privateKey, password);
-    
-    // Store the public key in localStorage
+    const signingPublicKeyStr = await exportPublicKey(signingKeyPair.publicKey);
+
+    // Encrypt both private keys using the user's password
+    const encryptedPrivateKeys = await storePrivateKeys({
+      encryption: privateKey,
+      signing: signingKeyPair.privateKey
+    }, password);
+
+    // Store the public keys in localStorage
     localStorage.setItem('publicKey', publicKeyStr);
-    
-    // Store the encrypted private key in localStorage
-    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
-    
+    localStorage.setItem('signingPublicKey', signingPublicKeyStr);
+
+    // Store the encrypted private keys in localStorage
+    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKeys);
+
     // Send the public key to the server to be associated with the user
     await api(`/api/keys/public`, {
       method: "POST",
-      body: JSON.stringify({ publicKey: publicKeyStr }),
+      body: JSON.stringify({ publicKey: publicKeyStr, signingKey: signingPublicKeyStr }),
     });
   } catch (error) {
-    console.error("Failed to setup user encryption keys:", error);
+    console.error("Failed to setup user encryption and signing keys:", error);
     throw error;
   }
 };
@@ -153,16 +161,24 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     // --- NEW: Generate and upload pre-keys after successful registration ---
     try {
-      // After registration, we have the password. Retrieve the signing key directly.
-      const signingPrivateKey = await retrievePrivateKey(
-        localStorage.getItem('encryptedPrivateKeys')!,
-        data.password
-      );
-      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingPrivateKey);
+      // After registration, we have the password. Retrieve the private keys directly.
+      const storedEncryptedKeys = localStorage.getItem('encryptedPrivateKey');
+      if (!storedEncryptedKeys) {
+        console.warn("No encrypted private keys found after registration. User may need to set up encryption later.");
+        return; // Return early instead of throwing, to avoid breaking registration flow
+      }
+      const privateKeys = await retrievePrivateKeys(storedEncryptedKeys, data.password);  // Use retrievePrivateKeys (plural) instead of retrievePrivateKey (singular)
+      if (!privateKeys || !privateKeys.signing) {
+        console.warn("Signing private key not available after registration. User may need to set up encryption later.");
+        return; // Return early instead of throwing, to avoid breaking registration flow
+      }
+      // Use the signing private key for generating pre-keys (not the encryption key)
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(privateKeys.signing);
       await uploadPreKeys(signedPreKey, oneTimePreKeys);
       console.log("Pre-keys generated and uploaded successfully after registration.");
     } catch (e) {
       console.error("Failed to generate or upload pre-keys after registration:", e);
+      // Don't throw an error that breaks the registration flow - pre-keys can be generated later
       toast.error("Warning: Could not prepare secure sessions. You may need to log out and log back in.");
     }
     // --- END NEW ---
@@ -174,28 +190,40 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     const sodium = await getSodium();
     const bip39 = await import('bip39');
     const phrase = bip39.generateMnemonic(256); // 24 words
-    const privateKeyHex = bip39.mnemonicToEntropy(phrase);
-    const privateKeyBytes = sodium.from_hex(privateKeyHex);
-    const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
-    const publicKeyB64 = sodium.to_base64(publicKeyBytes, sodium.base64_variants.ORIGINAL);
+    const masterSeed = bip39.mnemonicToEntropy(phrase);
+
+    // Derive separate seeds for encryption and signing from the master seed
+    const encryptionSeed = sodium.crypto_generichash(32, sodium.from_hex(masterSeed), "encryption");
+    const signingSeed = sodium.crypto_generichash(32, sodium.from_hex(masterSeed), "signing");
+
+    // Generate key pairs from the derived seeds
+    const encryptionKeyPair = sodium.crypto_box_seed_keypair(encryptionSeed);
+    const signingKeyPair = sodium.crypto_sign_seed_keypair(signingSeed);
+
+    const encryptionPublicKeyB64 = sodium.to_base64(encryptionKeyPair.publicKey, sodium.base64_variants.ORIGINAL);
+    const signingPublicKeyB64 = sodium.to_base64(signingKeyPair.publicKey, sodium.base64_variants.ORIGINAL);
 
     // --- Definitive Validation Step ---
-    if (!publicKeyB64 || typeof publicKeyB64 !== 'string') {
+    if (!encryptionPublicKeyB64 || typeof encryptionPublicKeyB64 !== 'string') {
       throw new Error("FATAL: Generated public key is invalid.");
     }
     if (!phrase || typeof phrase !== 'string') {
       throw new Error("FATAL: Generated recovery phrase is invalid.");
     }
 
-    // Encrypt and store the private key LOCALLY first, using the original password.
-    const encryptedPrivateKey = await storePrivateKey(privateKeyBytes, data.password);
-    localStorage.setItem('publicKey', publicKeyB64);
-    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
+    // Encrypt and store both private keys LOCALLY first, using the original password.
+    const encryptedPrivateKeys = await storePrivateKeys({
+      encryption: encryptionKeyPair.privateKey,
+      signing: signingKeyPair.privateKey
+    }, data.password);
+    localStorage.setItem('publicKey', encryptionPublicKeyB64);
+    localStorage.setItem('signingPublicKey', signingPublicKeyB64);
+    localStorage.setItem('encryptedPrivateKey', encryptedPrivateKeys);
 
     // NOW, send the registration data to the server.
     const res = await api<{ user: User }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ ...data, publicKey: publicKeyB64, recoveryPhrase: phrase }),
+      body: JSON.stringify({ ...data, publicKey: encryptionPublicKeyB64, signingKey: signingPublicKeyB64, recoveryPhrase: phrase }),
     });
 
     set({ user: res.user });
@@ -203,16 +231,24 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     // --- NEW: Generate and upload pre-keys after successful registration ---
     try {
-      // After registration, we have the password. Retrieve the signing key directly.
-      const signingPrivateKey = await retrievePrivateKey(
-        localStorage.getItem('encryptedPrivateKeys')!,
-        data.password
-      );
-      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(signingPrivateKey);
+      // After registration, we have the password. Retrieve the private keys directly.
+      const storedEncryptedKeys = localStorage.getItem('encryptedPrivateKey');
+      if (!storedEncryptedKeys) {
+        console.warn("No encrypted private keys found after registration. User may need to set up encryption later.");
+        return; // Return early instead of throwing, to avoid breaking registration flow
+      }
+      const privateKeys = await retrievePrivateKeys(storedEncryptedKeys, data.password);  // Use retrievePrivateKeys (plural) instead of retrievePrivateKey (singular)
+      if (!privateKeys || !privateKeys.signing) {
+        console.warn("Signing private key not available after registration. User may need to set up encryption later.");
+        return; // Return early instead of throwing, to avoid breaking registration flow
+      }
+      // Use the signing private key for generating pre-keys (not the encryption key)
+      const { signedPreKey, oneTimePreKeys } = await generatePreKeys(privateKeys.signing);
       await uploadPreKeys(signedPreKey, oneTimePreKeys);
       console.log("Pre-keys generated and uploaded successfully after registration.");
     } catch (e) {
       console.error("Failed to generate or upload pre-keys after registration:", e);
+      // Don't throw an error that breaks the registration flow - pre-keys can be generated later
       toast.error("Warning: Could not prepare secure sessions. You may need to log out and log back in.");
     }
     // --- END NEW ---
@@ -348,12 +384,72 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
           if (!encryptedKey) {
             throw new Error("Encrypted private key not found in storage.");
           }
-          const pk = await retrievePrivateKey(encryptedKey, password);
-          if (!pk) {
-            throw new Error("Incorrect password. Failed to decrypt private key.");
+          // For backwards compatibility, try to decrypt with the old single-key method first
+          try {
+            const pk = await retrievePrivateKey(encryptedKey, password);
+            if (!pk) {
+              throw new Error("Incorrect password. Failed to decrypt private key.");
+            }
+            privateKeyCache = pk; // Cache the key
+            resolve(pk);
+          } catch {
+            // If single-key method fails, try the new multi-key method
+            const keys = await retrievePrivateKeys(encryptedKey, password);
+            if (!keys || !keys.encryption) {
+              throw new Error("Incorrect password. Failed to decrypt private key.");
+            }
+            privateKeyCache = keys.encryption; // Cache the encryption key
+            resolve(keys.encryption);
           }
-          privateKeyCache = pk; // Cache the key
-          resolve(pk);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  },
+
+  async getSigningPrivateKey() {
+    return new Promise((resolve, reject) => {
+      useModalStore.getState().showPasswordPrompt(async (password) => {
+        if (!password) {
+          return reject(new Error("Password not provided."));
+        }
+        try {
+          const encryptedKey = localStorage.getItem('encryptedPrivateKey');
+          if (!encryptedKey) {
+            throw new Error("Encrypted private keys not found in storage.");
+          }
+          const keys = await retrievePrivateKeys(encryptedKey, password);
+          if (!keys || !keys.signing) {
+            throw new Error("Signing key not found or invalid password.");
+          }
+          resolve(keys.signing);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  },
+
+  async getEncryptionKeyPair() {
+    return new Promise((resolve, reject) => {
+      useModalStore.getState().showPasswordPrompt(async (password) => {
+        if (!password) {
+          return reject(new Error("Password not provided."));
+        }
+        try {
+          const encryptedKey = localStorage.getItem('encryptedPrivateKey');
+          if (!encryptedKey) {
+            throw new Error("Encrypted private keys not found in storage.");
+          }
+          const keys = await retrievePrivateKeys(encryptedKey, password);
+          if (!keys || !keys.encryption) {
+            throw new Error("Encryption key not found or invalid password.");
+          }
+          // Generate public key from private key
+          const sodium = await getSodium();
+          const publicKey = sodium.crypto_scalarmult_base(keys.encryption);
+          resolve({ publicKey, privateKey: keys.encryption });
         } catch (e) {
           reject(e);
         }
