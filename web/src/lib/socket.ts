@@ -5,6 +5,7 @@ import { useConversationStore } from "@store/conversation";
 import { fulfillKeyRequest, storeReceivedSessionKey } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
 import { useConnectionStore } from "@store/connection"; // Import the new store
+import { useMessageStore } from "@store/message";
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || "http://localhost:4000";
 let socket: Socket | null = null;
 
