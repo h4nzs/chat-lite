@@ -75,14 +75,17 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
     console.error(`CRITICAL: Conversation ${conversationId} was created with missing session keys for some users.`);
   }
 
+  // Find the initiator's key record BEFORE saving to the database
+  const initiatorKeyRecord = keyRecords.find(k => k.userId === initiatorId);
+  if (!initiatorKeyRecord) {
+    // This will now fail early if the initiator has no public key
+    throw new Error('Could not find the session key for the initiator.');
+  }
+
+  // Only create keys if the initiator's key was successfully generated
   await prisma.sessionKey.createMany({
     data: keyRecords,
   });
-
-  const initiatorKeyRecord = keyRecords.find(k => k.userId === initiatorId);
-  if (!initiatorKeyRecord) {
-    throw new Error('Could not find the session key for the initiator.');
-  }
 
   return { sessionId, encryptedKey: initiatorKeyRecord.encryptedKey };
 }
