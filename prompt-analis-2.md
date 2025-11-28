@@ -1,130 +1,80 @@
-## ⚙️ Prompt Lanjutan — Peta Alur Data & Socket Flow Chat-Lite
+Kamu adalah AI Developer Assistant yang bertugas melakukan **analisis menyeluruh proyek web app bernama "Chat-Lite"**.  
+Analisis ini bertujuan agar kamu sepenuhnya memahami kondisi aplikasi saat ini sebelum melanjutkan perbaikan atau penambahan fitur.
 
-```
-Sekarang kamu sudah menyelesaikan analisis arsitektur dan kondisi proyek Chat-Lite.
-
-Lanjutkan dengan membuat **peta logika dan alur data menyeluruh sistem Chat-Lite**, agar kamu benar-benar memahami interaksi antar komponen, socket event, dan data flow di antara frontend ↔ backend ↔ database.
-
----
-
-### 🎯 Tujuan
-Buat analisis visual (dalam bentuk teks terstruktur) yang menjelaskan seluruh:
-1. **Alur data utama (Data Flow)**
-2. **Event Socket.IO dan dependensinya**
-3. **Hubungan antar komponen dan state (Frontend Flow)**
-4. **Interaksi Client ↔ Server**
-5. **Keterkaitan antar fitur besar (Chat, Group, Typing, Auth, dsb)**
+📦 Konteks:
+Proyek Chat-Lite adalah aplikasi chat real-time berbasis React + TypeScript di sisi frontend dan Node.js/Express + Socket.IO di sisi backend.  
+Struktur monorepo terdiri dari dua folder utama:
+- `web/` → frontend client
+- `server/` → backend API & socket server
 
 ---
 
-### 🧩 Detail yang Harus Dijelaskan
+### 🎯 Tujuan Analisis
+Kamu harus memahami dan menjelaskan (secara internal) aspek berikut:
 
-#### 1. Peta Alur Data
-Tampilkan urutan proses dari awal:
-```
+#### 1. **Struktur dan Arsitektur**
+- Identifikasi semua direktori dan file penting dalam `web/` dan `server/`.
+- Petakan struktur proyek (komponen, hooks, context, utils, service, dan konfigurasi).
+- Deteksi framework, library utama, dan dependency yang digunakan (misalnya: Vite, React Router, TailwindCSS, Zustand/Context API, Socket.IO client, JWT, bcrypt, dsb).
+- Tentukan arsitektur komunikasi antara `server/` dan `web/` (API REST vs WebSocket).
 
-[User Action] → [Frontend Component] → [State/Context] → [API/Socket Event] → [Backend Logic] → [Database] → [Socket Broadcast] → [Client Update]
+#### 2. **Fungsi Utama Aplikasi**
+- Identifikasi dan jelaskan fitur utama aplikasi:
+  - Autentikasi (login/register/token)
+  - Realtime chat (pesan pribadi dan grup)
+  - Typing indicator
+  - Online status
+  - Reaction dan delete message
+  - Group management (create, join, delete)
+  - File attachment
+- Catat dependensi antar fitur — misalnya: “typing indicator” bergantung pada socket event `typing:start` dan `typing:stop`.
 
-```
+#### 3. **Alur Kerja (Workflow)**
+- Jelaskan bagaimana data mengalir:
+  - Dari user input (UI) → ke state/frontend logic → ke backend → lalu ke socket broadcast.
+- Catat semua event Socket.IO yang digunakan di client dan server (mis. `message`, `deleteMessage`, `group:created`, `typing`, `user:online`).
+- Tentukan bagaimana frontend melakukan re-render setelah menerima event socket.
 
-Jelaskan untuk setiap fitur utama:
-- Login / Register
-- Chat pribadi
-- Chat grup
-- Pembuatan grup
-- Pengiriman & penerimaan pesan
-- File attachment
-- Reaction dan delete message
-- Typing indicator
-- Status online / offline
+#### 4. **Kondisi UI & UX**
+- Audit semua komponen UI (ChatWindow, Sidebar, MessageItem, InputBar, GroupList, dsb).
+- Catat implementasi TailwindCSS dan custom theme (warna, font, dark mode).
+- Identifikasi apakah UI sudah:
+  - Responsif di semua layar.
+  - Konsisten antar komponen.
+  - Mengandung elemen interaktif seperti menu ⋮, tombol reaction, indikator status.
 
-Gunakan gaya seperti berikut:
-```
+#### 5. **State Management**
+- Analisis mekanisme penyimpanan state global (Context API, Zustand, Redux, dsb).
+- Pastikan bagaimana state `chats`, `messages`, `users`, dan `groups` diatur dan di-update dari event socket.
 
-📨 Message Flow:
-User kirim pesan → InputBar.jsx → messagesContext.addMessage() → socket.emit('sendMessage', payload)
-→ server on('sendMessage') → simpan ke database → io.emit('message:new', data) → client receive → re-render MessageList
+#### 6. **Keamanan & Koneksi**
+- Audit bagaimana autentikasi dan otorisasi ditangani:
+  - Token JWT
+  - Middleware socket auth (misalnya di `server/src/middleware/auth.ts`)
+- Periksa apakah koneksi socket aman (misalnya token dikirim via handshake).
 
-```
+#### 7. **Masalah Potensial**
+- Deteksi dan catat:
+  - Duplikasi event listener socket.
+  - Kondisi re-render berulang.
+  - Ketidakkonsistenan antara data client dan server.
+  - Fitur yang tampak tidak sinkron (mis. grup baru perlu refresh).
+  - Komponen dengan kode UI bertumpuk (seperti dua kolom search).
+  - CSS redundancy atau konflik Tailwind class.
 
----
-
-#### 2. Peta Event Socket.IO
-Buat daftar semua event Socket.IO yang ditemukan di client dan server, beserta arah dan fungsinya. Contoh:
-```
-
-Client → Server:
-
-* 'sendMessage': kirim pesan baru
-* 'typing:start': notifikasi sedang mengetik
-* 'group:create': buat grup baru
-
-Server → Client:
-
-* 'message:new': broadcast pesan baru
-* 'group:created': grup baru muncul
-* 'user:online': update status user
-
-```
-
-Tambahkan keterangan: event mana yang memiliki keterlambatan, error handler, atau potensi race condition.
-
----
-
-#### 3. Hubungan Antar Komponen (Frontend)
-Buat diagram teks atau hierarki komponen seperti ini:
-```
-
-<App>
- ├── <Sidebar>
- │    ├── <SearchBar> 
- │    ├── <UserList>
- │    └── <GroupList>
- ├── <ChatWindow>
- │    ├── <MessageList>
- │    ├── <MessageItem>
- │    └── <InputBar>
- └── <SettingsModal>
-```
-Tambahkan penjelasan:
-- Komponen mana yang menyimpan state lokal.
-- Komponen mana yang bergantung pada context global (user, chat, socket, dsb).
-- Event apa yang menghubungkan antar komponen.
+#### 8. **Output Analisis**
+Buat ringkasan analisis yang mencakup:
+- Daftar fitur aktif dan statusnya (✅ Berfungsi / ⚠️ Perlu cek / ❌ Rusak)
+- Struktur logika utama (UI → state → socket → server)
+- Dependensi penting proyek
+- Area risiko tinggi untuk refactor (komponen dengan event listener banyak, atau fungsi socket yang bercampur dengan UI)
+- Rekomendasi singkat untuk stabilisasi sistem
 
 ---
 
-#### 4. Integrasi API & Backend Logic
+### ⚙️ Aturan
+- **Jangan ubah kode apapun** selama proses analisis.
+- Hanya baca, pahami, dan catat hasilnya.
+- Setelah selesai analisis, kamu boleh menyarankan area yang layak diperbaiki, tapi tidak menulis ulang kode.
 
-Untuk setiap endpoint atau fungsi di `server/`, jelaskan:
-
-* Endpoint/path (mis. `/api/auth/login`, `/api/chat/send`)
-* Tujuan dan data yang dikirim/diterima
-* Middleware yang digunakan (mis. JWT auth)
-* Interaksi dengan database
-
----
-
-#### 5. Pemetaan Group dan User System
-
-Jelaskan bagaimana sistem grup dan user saling berhubungan, misalnya:
-
-```
-User 1 ─┬─ Group A
-         ├─ Group B
-User 2 ──┘
-```
-
-dan bagaimana data ini dikirim melalui socket event `group:created`, `group:join`, dsb.
-
----
-
-#### 6. Temuan & Insight
-
-Buat kesimpulan akhir yang berisi:
-
-* Fitur yang sudah sinkron sepenuhnya (✅)
-* Fitur yang belum realtime (⚠️ butuh refresh manual)
-* Fitur yang masih rawan race condition atau duplikasi listener
-* Saran singkat stabilisasi socket dan optimasi UI
-
----
+📍 Fokuskan hasil analisis agar kamu memiliki *pemahaman penuh terhadap arsitektur dan logika proyek Chat-Lite* sebelum melakukan prompt perbaikan atau refactor berikutnya.
