@@ -90,28 +90,30 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
   useEffect(() => {
-    if (!message.fileUrl) {
-      let isMounted = true;
-      const tryDecrypt = async () => {
-        if (message.content && message.sessionId) {
-          if (decryptedContent?.startsWith('[') || !decryptedContent) {
-             try {
-              const decrypted = await decryptMessage(message.content, message.conversationId, message.sessionId);
-              if (isMounted) {
-                setDecryptedContent(decrypted);
-              }
-            } catch (e) {
-              if (isMounted) {
-                setDecryptedContent(message.content);
-              }
-            }
+    if (message.fileUrl || !message.content || !message.sessionId) {
+      return;
+    }
+    
+    let isMounted = true;
+    const tryDecrypt = async () => {
+      // Only re-decrypt if the content is still in an encrypted/pending state
+      if (!decryptedContent || decryptedContent.startsWith('[')) {
+        const result = await decryptMessage(message.content!, message.conversationId, message.sessionId);
+        if (isMounted) {
+          if (result.status === 'success') {
+            setDecryptedContent(result.value);
+          } else if (result.status === 'pending') {
+            setDecryptedContent(result.reason);
+          } else {
+            setDecryptedContent(`[${result.error.message}]`);
           }
         }
-      };
-      tryDecrypt();
-      return () => { isMounted = false; };
-    }
-  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, decryptedContent, message.fileUrl]);
+      }
+    };
+
+    tryDecrypt();
+    return () => { isMounted = false; };
+  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, message.fileUrl, decryptedContent]);
 
   const hasTextContent = !!(decryptedContent && !decryptedContent.startsWith('['));
   const isImage = message.fileType?.startsWith('image/');

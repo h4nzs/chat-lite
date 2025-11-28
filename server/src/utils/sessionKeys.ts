@@ -1,78 +1,88 @@
+import { PrismaClient } from '@prisma/client';
+import { getSodium } from '../lib/sodium.js';
 
-import { prisma } from "../lib/prisma.js";
-import sodium from "libsodium-wrappers";
-import { getIo } from "../socket.js";
+const prisma = new PrismaClient();
+const B64_VARIANT = 'URLSAFE_NO_PADDING';
 
 /**
- * Creates a new session key for a conversation, encrypts it for each participant,
- * stores it in the database, and returns the new session details.
- * @param conversationId The ID of the conversation.
- * @param participantUserIds An array of user IDs for all current participants.
- * @returns An object containing the new sessionId and the array of encrypted session key data.
+ * Stores the initial session key that was already computed by the client via a pre-key handshake.
  */
-export async function createAndDistributeSessionKeys(conversationId: string, participantUserIds: string[]) {
-  await sodium.ready;
+export async function createAndDistributeInitialSessionKey(
+  conversationId: string,
+  initialSessionData: {
+    sessionId: string;
+    initialKeys: { userId: string; key: string }[];
+  }
+) {
+  const { sessionId, initialKeys } = initialSessionData;
 
-  const sessionKey = sodium.crypto_secretbox_keygen();
-  const sessionId = sodium.to_hex(sodium.randombytes_buf(16));
+  const keyRecords = initialKeys.map(ik => ({
+    sessionId,
+    encryptedKey: ik.key,
+    userId: ik.userId,
+    conversationId,
+  }));
 
-  const participants = await prisma.user.findMany({
-    where: {
-      id: { in: participantUserIds },
-      publicKey: { not: null },
-    },
-    select: { id: true, publicKey: true },
+  await prisma.sessionKey.createMany({
+    data: keyRecords,
   });
 
-  if (participants.length === 0) return null;
-
-  const sessionKeyData = participants.map(p => {
-    if (!p.publicKey) return null;
-    const encryptedKey = sodium.crypto_box_seal(sessionKey, sodium.from_base64(p.publicKey, sodium.base64_variants.ORIGINAL));
-    return {
-      conversationId,
-      sessionId,
-      userId: p.id,
-      encryptedKey: sodium.to_base64(encryptedKey, sodium.base64_variants.ORIGINAL),
-    };
-  }).filter(Boolean) as any[];
-
-  if (sessionKeyData.length > 0) {
-    await prisma.sessionKey.createMany({
-      data: sessionKeyData,
-      skipDuplicates: true,
-    });
-  }
-
-  return { sessionId, sessionKeyData };
+  return { sessionId };
 }
 
+
 /**
- * Rotates the session key for a conversation and distributes the new key to all participants.
- * This is the core function for ensuring forward and backward secrecy in groups.
- * @param conversationId The ID of the conversation to rotate keys for.
- * @param initiatorId The ID of the user initiating the rotation (to exclude from socket broadcast).
+ * Creates a new session key from scratch on the server and encrypts it for all participants.
+ * This is used for ratcheting sessions or as a fallback.
  */
 export async function rotateAndDistributeSessionKeys(conversationId: string, initiatorId: string) {
-  const currentParticipants = await prisma.participant.findMany({
+  const sodium = await getSodium();
+  const sessionKey = sodium.crypto_secretbox_keygen();
+  const sessionId = `session_${sodium.to_hex(sodium.randombytes_buf(16))}`;
+
+  const participants = await prisma.participant.findMany({
     where: { conversationId },
-    select: { userId: true },
+    include: { user: { select: { id: true, publicKey: true } } },
   });
 
-  const participantIds = currentParticipants.map(p => p.userId);
-  if (participantIds.length === 0) return;
-
-  const newSessionInfo = await createAndDistributeSessionKeys(conversationId, participantIds);
-
-  if (newSessionInfo) {
-    const io = getIo();
-    newSessionInfo.sessionKeyData.forEach(keyData => {
-      // Broadcast the new key to all participants, including the initiator this time
-      io.to(keyData.userId).emit('session:new_key', {
-        conversationId: keyData.conversationId,
-        sessionId: newSessionInfo.sessionId,
-        encryptedKey: keyData.encryptedKey,
-      });
-    });
+  if (participants.length === 0) {
+    throw new Error(`No participants found for conversation ${conversationId}`);
   }
+
+  const keyRecords = participants.map(p => {
+    if (!p.user.publicKey) {
+      console.warn(`User ${p.user.id} in conversation ${conversationId} has no public key.`);
+      return null;
+    }
+    
+    try {
+      const recipientPublicKey = sodium.from_base64(p.user.publicKey, sodium.base64_variants[B64_VARIANT]);
+      const encryptedKey = sodium.crypto_box_seal(sessionKey, recipientPublicKey);
+      
+      return {
+        sessionId,
+        encryptedKey: sodium.to_base64(encryptedKey, sodium.base64_variants[B64_VARIANT]),
+        userId: p.user.id,
+        conversationId,
+      };
+    } catch (e: any) {
+      console.error(`Failed to process public key for user ${p.user.id}. Key: "${p.user.publicKey}". Error: ${e.message}`);
+      throw new Error(`Corrupted public key found for user ${p.user.id}. Cannot establish secure session.`);
+    }
+  }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string }[];
+
+  if (keyRecords.length !== participants.length) {
+    console.error(`CRITICAL: Conversation ${conversationId} was created with missing session keys for some users.`);
+  }
+
+  await prisma.sessionKey.createMany({
+    data: keyRecords,
+  });
+
+  const initiatorKeyRecord = keyRecords.find(k => k.userId === initiatorId);
+  if (!initiatorKeyRecord) {
+    throw new Error('Could not find the session key for the initiator.');
+  }
+
+  return { sessionId, encryptedKey: initiatorKeyRecord.encryptedKey };
 }
