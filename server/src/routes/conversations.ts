@@ -429,7 +429,12 @@ router.delete("/:id/leave", async (req, res, next) => {
 
     // 3. Rotate keys using the remaining admin as the initiator
     if (remainingAdmin) {
-      await rotateAndDistributeSessionKeys(conversationId, remainingAdmin.userId);
+      try {
+        await rotateAndDistributeSessionKeys(conversationId, remainingAdmin.userId);
+      } catch (error) {
+        console.error(`Failed to rotate session keys for conversation ${conversationId} after user ${userId} left:`, error);
+        // Note: User has already been removed; key rotation failure is logged but doesn't block the leave operation
+      }
     } else {
       console.warn(`Could not rotate keys for conversation ${conversationId} after user left: no remaining admin found.`);
     }

@@ -62,6 +62,9 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
     const encryptedJson = encryptedData.slice(32 + sodium.crypto_secretbox_NONCEBYTES);
 
     const appSecret = import.meta.env.VITE_APP_SECRET;
+    if (!appSecret) {
+      throw new Error("VITE_APP_SECRET is required for key decryption.");
+    }
     const combinedPass = `${appSecret}-${password}`;
     const keyInput = new Uint8Array(salt.length + sodium.from_string(combinedPass).length);
     keyInput.set(salt);
