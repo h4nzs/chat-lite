@@ -50,8 +50,18 @@ export function getSocket() {
     // --- Application-specific Listeners ---
     socket.on("message:new", async (newMessage: Message) => {
       try {
+        const { replaceOptimisticMessage, addIncomingMessage } = useMessageStore.getState();
         const decryptedMessage = await decryptMessageObject(newMessage);
-        addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
+
+        // If the message has a tempId, it means it's an optimistic message
+        // that the current user sent. We need to replace it with the real one.
+        if (newMessage.tempId) {
+          replaceOptimisticMessage(decryptedMessage.conversationId, newMessage.tempId, decryptedMessage);
+        } else {
+          // Otherwise, it's a new message from another user.
+          addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
+        }
+
         conversationStore.updateConversationLastMessage(decryptedMessage.conversationId, decryptedMessage);
         socket?.emit('message:ack_delivered', { messageId: decryptedMessage.id, conversationId: decryptedMessage.conversationId });
       } catch (e) {
@@ -78,7 +88,9 @@ export function getSocket() {
 
     socket.on("conversation:updated", (updates) => conversationStore.updateConversation(updates.id, updates));
     socket.on("conversation:deleted", ({ id }) => conversationStore.removeConversation(id));
-    socket.on('message:status_updated', ({ conversationId, messageId, deliveredTo, readBy, status }) => {
+    socket.on('message:status_updated', (payload) => {
+      console.log('[STATUS] Received message:status_updated:', payload); // Diagnostic Log
+      const { conversationId, messageId, deliveredTo, readBy, status } = payload;
       const userId = deliveredTo || readBy;
       if (userId) {
         updateMessageStatus(conversationId, messageId, userId, status);
