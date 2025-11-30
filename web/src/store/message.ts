@@ -48,9 +48,11 @@ type State = {
   addOptimisticMessage: (conversationId: string, message: Message) => void;
   addIncomingMessage: (conversationId: string, message: Message) => void;
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
+  removeMessage: (conversationId: string, messageId: string) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
   removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
+  replaceOptimisticReaction: (conversationId: string, messageId: string, tempId: string, finalReaction: any) => void;
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
@@ -220,10 +222,44 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   replaceOptimisticMessage: (conversationId, tempId, newMessage) => set(state => ({
     messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.tempId === tempId ? { ...newMessage, tempId: undefined } : m) }
   })),
+  removeMessage: (conversationId, messageId) => set(state => ({
+    messages: {
+        ...state.messages,
+        [conversationId]: (state.messages[conversationId] || []).filter(m => m.id !== messageId),
+    }
+  })),
   updateMessage: (conversationId, messageId, updates) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, ...updates } : m) } })),
-  addReaction: (conversationId, messageId, reaction) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: [...(m.reactions || []), reaction] } : m) } })),
+  addReaction: (conversationId, messageId, reaction) => set(state => ({
+    messages: {
+      ...state.messages,
+      [conversationId]: (state.messages[conversationId] || []).map(m => {
+        if (m.id === messageId) {
+          const newReactions = [...(m.reactions || [])];
+          // Prevent duplicates
+          if (!newReactions.some(r => r.id === reaction.id)) {
+            newReactions.push(reaction);
+          }
+          return { ...m, reactions: newReactions };
+        }
+        return m;
+      })
+    }
+  })),
   removeReaction: (conversationId, messageId, reactionId) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m) } })),
-  
+  replaceOptimisticReaction: (conversationId, messageId, tempId, finalReaction) => set(state => ({
+    messages: {
+      ...state.messages,
+      [conversationId]: (state.messages[conversationId] || []).map(m => {
+        if (m.id === messageId) {
+          return {
+            ...m,
+            reactions: (m.reactions || []).map(r => r.id === tempId ? finalReaction : r),
+          };
+        }
+        return m;
+      })
+    }
+  })),
   updateSenderDetails: (user) => set(state => {
     const newMessages = { ...state.messages };
     for (const convoId in newMessages) {

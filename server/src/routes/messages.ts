@@ -126,13 +126,104 @@ router.delete("/:id", async (req, res, next) => {
     if (!message) return res.status(404).json({ error: "Message not found" });
     if (message.senderId !== userId) return res.status(403).json({ error: "You can only delete your own messages" });
 
-    // "Soft delete" by replacing content
-    const deletedMessage = await prisma.message.update({
+    // Hard delete the message
+    await prisma.message.delete({
       where: { id },
-      data: { content: '[This message was deleted]', fileUrl: null, fileName: null, fileType: null, fileSize: null, linkPreview: null, fileKey: null, duration: null },
     });
     
-    getIo().to(message.conversationId).emit("message:updated", deletedMessage);
+    getIo().to(message.conversationId).emit("message:deleted", { 
+      conversationId: message.conversationId,
+      id: message.id 
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST a reaction to a message
+router.post("/:messageId/reactions", async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji, tempId } = req.body;
+    const userId = req.user.id;
+
+    if (!emoji) {
+      return res.status(400).json({ error: "Emoji is required." });
+    }
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { conversationId: true }
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: "Message not found." });
+    }
+
+    const newReaction = await prisma.messageReaction.create({
+      data: {
+        messageId,
+        emoji,
+        userId,
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, username: true }
+        }
+      }
+    });
+
+    getIo().to(message.conversationId).emit("reaction:new", {
+      conversationId: message.conversationId,
+      messageId: messageId,
+      reaction: { ...newReaction, tempId },
+    });
+
+    res.status(201).json(newReaction);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE a reaction from a message
+router.delete("/reactions/:reactionId", async (req, res, next) => {
+  try {
+    const { reactionId } = req.params;
+    const userId = req.user.id;
+
+    const reaction = await prisma.messageReaction.findUnique({
+      where: { id: reactionId },
+      select: { 
+        userId: true, 
+        message: { 
+          select: { 
+            id: true, 
+            conversationId: true 
+          } 
+        } 
+      }
+    });
+
+    if (!reaction) {
+      return res.status(404).json({ error: "Reaction not found." });
+    }
+
+    if (reaction.userId !== userId) {
+      return res.status(403).json({ error: "You can only delete your own reactions." });
+    }
+
+    await prisma.messageReaction.delete({
+      where: { id: reactionId }
+    });
+
+    getIo().to(reaction.message.conversationId).emit("reaction:deleted", {
+      conversationId: reaction.message.conversationId,
+      messageId: reaction.message.id,
+      reactionId: reactionId,
+    });
+
     res.status(204).send();
   } catch (error) {
     next(error);

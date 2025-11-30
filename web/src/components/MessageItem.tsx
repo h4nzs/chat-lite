@@ -56,24 +56,38 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
   const lastKeychainUpdate = useKeychainStore(s => s.lastUpdated);
 
   useEffect(() => {
-    if (message.fileUrl || !message.content || !message.sessionId) return;
+    const isPlaceholder = typeof decryptedContent === 'string' && decryptedContent.startsWith('[');
+
+    if (message.fileUrl || (!message.ciphertext && !isPlaceholder) || !message.sessionId) {
+      // If it's a file, or if there's no ciphertext and the current content is not a placeholder, do nothing.
+      return;
+    }
+
     let isMounted = true;
     const tryDecrypt = async () => {
-      const result = await decryptMessage(message.content, message.conversationId, message.sessionId);
+      // Always use the original ciphertext for decryption attempts
+      const sourceCipher = message.ciphertext || message.content;
+      if (!sourceCipher) return;
+
+      const result = await decryptMessage(sourceCipher, message.conversationId, message.sessionId);
       if (isMounted) {
-        if (result.status === 'success') setDecryptedContent(result.value);
-        else if (result.status === 'pending') setDecryptedContent(result.reason);
-        else setDecryptedContent(`[${result.error.message}]`);
+        if (result.status === 'success') {
+          setDecryptedContent(result.value);
+        } else if (result.status === 'pending') {
+          setDecryptedContent(result.reason);
+        } else {
+          setDecryptedContent(`[${result.error.message}]`);
+        }
       }
     };
 
-    // Only decrypt if the content is still encrypted (or pending)
-    if (message.content && message.content.startsWith('[')) {
+    // Only try to decrypt if the current state is a placeholder (e.g., "[Requesting key...]")
+    if (isPlaceholder) {
       tryDecrypt();
     }
     
     return () => { isMounted = false; };
-  }, [message.content, message.conversationId, message.sessionId, lastKeychainUpdate, message.fileUrl, decryptedContent]);
+  }, [decryptedContent, message.ciphertext, message.content, message.conversationId, message.sessionId, lastKeychainUpdate, message.fileUrl]);
 
   const isPlaceholder = !decryptedContent || (typeof decryptedContent === 'string' && decryptedContent.startsWith('['));
   const isImage = message.fileType?.startsWith('image/');

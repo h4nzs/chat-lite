@@ -50,15 +50,15 @@ export function getSocket() {
     // --- Application-specific Listeners ---
     socket.on("message:new", async (newMessage: Message) => {
       try {
+        const { user: me } = useAuthStore.getState();
         const { replaceOptimisticMessage, addIncomingMessage } = useMessageStore.getState();
         const decryptedMessage = await decryptMessageObject(newMessage);
 
-        // If the message has a tempId, it means it's an optimistic message
-        // that the current user sent. We need to replace it with the real one.
-        if (newMessage.tempId) {
+        // If the message has a tempId AND is from the current user, it's a confirmation for an optimistic message.
+        if (newMessage.tempId && me && newMessage.senderId === me.id) {
           replaceOptimisticMessage(decryptedMessage.conversationId, newMessage.tempId, decryptedMessage);
         } else {
-          // Otherwise, it's a new message from another user.
+          // Otherwise, it's a new incoming message from another user.
           addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
         }
 
@@ -73,11 +73,27 @@ export function getSocket() {
       updateMessage(updatedMessage.conversationId, updatedMessage.id, updatedMessage);
     });
 
+    socket.on("message:deleted", ({ conversationId, id }) => {
+      const { removeMessage } = useMessageStore.getState();
+      removeMessage(conversationId, id);
+    });
+
     socket.on("presence:init", (onlineUserIds: string[]) => setOnlineUsers(onlineUserIds));
     socket.on("presence:user_joined", (userId: string) => userJoined(userId));
     socket.on("presence:user_left", (userId: string) => userLeft(userId));
     socket.on("typing:update", ({ userId, conversationId, isTyping }) => addOrUpdate({ id: userId, conversationId, isTyping }));
-    socket.on("reaction:new", ({ conversationId, messageId, reaction }) => addReaction(conversationId, messageId, reaction));
+    socket.on("reaction:new", ({ conversationId, messageId, reaction }) => {
+      const { user: me } = useAuthStore.getState();
+      const { replaceOptimisticReaction, addReaction } = useMessageStore.getState();
+
+      // If the reaction has a tempId AND is from the current user, it's a confirmation for an optimistic update.
+      if (reaction.tempId && me && reaction.userId === me.id) {
+        replaceOptimisticReaction(conversationId, messageId, reaction.tempId, reaction);
+      } else {
+        // Otherwise, it's a new reaction from another user.
+        addReaction(conversationId, messageId, reaction);
+      }
+    });
     socket.on("reaction:deleted", ({ conversationId, messageId, reactionId }) => removeReaction(conversationId, messageId, reactionId));
     
     socket.on("conversation:new", (newConversation) => {
