@@ -410,6 +410,9 @@ router.delete("/:id/leave", async (req, res, next) => {
       return res.status(400).json({ error: "Group creator cannot leave the group; please delete it instead." });
     }
 
+    // Rotate keys BEFORE removing the participant
+    await rotateAndDistributeSessionKeys(conversationId, userId);
+
     await prisma.participant.delete({
       where: { userId_conversationId: { userId, conversationId } },
     });
@@ -417,8 +420,6 @@ router.delete("/:id/leave", async (req, res, next) => {
     const io = getIo();
     io.to(conversationId).emit("conversation:participant_removed", { conversationId, userId });
     io.to(userId).emit("conversation:deleted", { id: conversationId });
-
-    await rotateAndDistributeSessionKeys(conversationId, userId);
 
     res.status(204).send();
   } catch (error) {

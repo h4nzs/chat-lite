@@ -140,17 +140,6 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
 
-  if (message.type === 'SYSTEM') {
-    return (
-      <div className="flex justify-center items-center my-2">
-        <div className="text-xs text-text-secondary bg-bg-surface rounded-full px-3 py-1 flex items-center gap-2 shadow-sm">
-          <FiShield className="text-yellow-500" />
-          <span>{message.content}</span>
-        </div>
-      </div>
-    );
-  }
-
   useEffect(() => {
     if (!ref.current || mine) return;
     const observer = new IntersectionObserver(([entry]) => {
@@ -167,6 +156,16 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
     return () => observer.disconnect();
   }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
+    if (message.type === 'SYSTEM') {
+    return (
+      <div className="flex justify-center items-center my-2">
+        <div className="text-xs text-text-secondary bg-bg-surface rounded-full px-3 py-1 flex items-center gap-2 shadow-sm">
+          <FiShield className="text-yellow-500" />
+          <span>{message.content}</span>
+        </div>
+      </div>
+    );
+  }
   const handleDelete = () => {
     showConfirm('Delete Message', 'Are you sure you want to permanently delete this message?', () => {
       api(`/api/messages/${message.id}`, { method: 'DELETE' }).catch(console.error);

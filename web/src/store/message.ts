@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, apiUpload, handleApiError } from "@lib/api";
-import { getSocket } from "@lib/socket";
+import { getSocket, emitSessionKeyRequest } from "@lib/socket";
 import { encryptMessage, decryptMessage, ensureAndRatchetSession } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
@@ -25,7 +25,7 @@ export async function decryptMessageObject(message: Message): Promise<Message> {
     }
     // Also handle repliedTo content if it exists
     if (decryptedMsg.repliedTo?.content && decryptedMsg.repliedTo.sessionId) {
-      const replyResult = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
+      const replyResult = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.repliedTo.conversationId, decryptedMsg.repliedTo.sessionId);
       if (replyResult.status === 'success') {
         decryptedMsg.repliedTo.content = replyResult.value;
       } else {
@@ -64,7 +64,7 @@ type State = {
   replaceOptimisticMessage: (conversationId: string, tempId: number, newMessage: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
   addReaction: (conversationId: string, messageId: string, reaction: any) => void;
-  removeReaction: (conversationId, string, reactionId: string) => void;
+  removeReaction: (conversationId: string, messageId: string, reactionId: string) => void;
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
@@ -286,7 +286,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     }));
   },
 
-  removeReaction: (conversationId, messageId, reactionId) => {
+  removeReaction: (conversationId: string, messageId: string, reactionId: string) => {
     set(state => ({
       messages: {
         ...state.messages,
