@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom';
 import { FiKey, FiShield, FiRefreshCw } from 'react-icons/fi';
 import { IoFingerPrint } from "react-icons/io5";
 import { useState } from 'react';
-import { useAuthStore } from '@store/auth';
-import { retrievePrivateKeys, generateKeyPairs, storePrivateKeys, exportPublicKey } from '@utils/keyManagement'; // Corrected import
+import { useAuthStore, setupAndUploadPreKeyBundle } from '@store/auth';
+import { retrievePrivateKeys, generateKeyPairs, storePrivateKeys, exportPublicKey } from '@utils/keyManagement';
 import { getSodium } from '@lib/sodiumInitializer';
 import toast from 'react-hot-toast';
 import { Spinner } from '@components/Spinner';
@@ -11,7 +11,7 @@ import { useModalStore } from '@store/modal';
 import * as bip39 from 'bip39';
 import RecoveryPhraseModal from '@components/RecoveryPhraseModal';
 import { startRegistration } from '@simplewebauthn/browser';
-import { api, authFetch } from '@lib/api';
+import { api } from '@lib/api';
 
 export default function KeyManagementPage() {
   const { logout } = useAuthStore(state => ({ 
@@ -29,24 +29,14 @@ export default function KeyManagementPage() {
       setIsProcessing(true);
       try {
         const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
-        if (!encryptedKeys) {
-          throw new Error("No encrypted key found in storage.");
-        }
-
-        const keys = await retrievePrivateKeys(encryptedKeys, password); // Use plural
-        if (!keys) {
-          throw new Error("Failed to decrypt keys. The password may be incorrect.");
+        if (!encryptedKeys) throw new Error("No encrypted key found in storage.");
+        
+        const keys = await retrievePrivateKeys(encryptedKeys, password);
+        if (!keys || !keys.masterSeed) {
+          throw new Error("Failed to decrypt keys or master seed. The password may be incorrect.");
         }
         
-        const sodium = await getSodium();
-        
-        // The recovery phrase is derived from a hash of both keys, to match registration logic
-        const combined = new Uint8Array(keys.encryption.length + keys.signing.length);
-        combined.set(keys.encryption, 0);
-        combined.set(keys.signing, keys.encryption.length);
-        const entropy = sodium.crypto_generichash(32, combined);
-
-        const mnemonic = bip39.entropyToMnemonic(entropy);
+        const mnemonic = bip39.entropyToMnemonic(keys.masterSeed);
         setRecoveryPhrase(mnemonic);
         setShowRecoveryModal(true);
 
@@ -76,7 +66,6 @@ export default function KeyManagementPage() {
 
     } catch (error: any) {
       toast.error(error.message || "Device registration failed.");
-      console.error(error);
     } finally {
       setIsProcessing(false);
     }
@@ -91,19 +80,28 @@ export default function KeyManagementPage() {
           if (!password) return;
           setIsProcessing(true);
           try {
-            // Re-implementing the key generation logic here.
-            const { encryption, signing } = await generateKeyPairs();
+            // 1. Generate new keys locally
+            const sodium = await getSodium();
+            const masterSeed = sodium.randombytes_buf(32);
+            const encryptionSeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("encryption")));
+            const signingSeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("signing")));
+            const encryptionKeyPair = sodium.crypto_box_seed_keypair(encryptionSeed);
+            const signingKeyPair = sodium.crypto_sign_seed_keypair(signingSeed);
 
-            const encryptedPrivateKeys = await storePrivateKeys({ encryption: encryption.privateKey, signing: signing.privateKey }, password);
+            // 2. Store them in localStorage
+            const encryptedPrivateKeys = await storePrivateKeys({
+              encryption: encryptionKeyPair.privateKey,
+              signing: signingKeyPair.privateKey,
+              masterSeed: masterSeed
+            }, password);
             localStorage.setItem('encryptedPrivateKeys', encryptedPrivateKeys);
-            localStorage.setItem('publicKey', await exportPublicKey(encryption.publicKey));
-            localStorage.setItem('signingPublicKey', await exportPublicKey(signing.publicKey));
+            localStorage.setItem('publicKey', await exportPublicKey(encryptionKeyPair.publicKey));
+            localStorage.setItem('signingPublicKey', await exportPublicKey(signingKeyPair.publicKey));
+            
+            // 3. Upload the new pre-key bundle to the server
+            await setupAndUploadPreKeyBundle(signingKeyPair.privateKey);
 
-            // Must re-upload public keys to server
-            // Note: The /api/keys/public route was removed in favor of pre-key bundles.
-            // A more complete implementation might have a dedicated route for this key rotation.
-            // For now, we'll assume the user will re-upload pre-keys on next login.
-            toast.success('New keys generated! For security, you will be logged out.', { duration: 5000 });
+            toast.success('New keys generated and uploaded! For security, you will be logged out.', { duration: 5000 });
             setTimeout(() => {
               logout();
             }, 2000);

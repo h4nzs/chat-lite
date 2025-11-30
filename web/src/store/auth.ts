@@ -11,7 +11,7 @@ import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import toast from "react-hot-toast";
 
-async function setupAndUploadPreKeyBundle(signingPrivateKey: Uint8Array) {
+export async function setupAndUploadPreKeyBundle(signingPrivateKey: Uint8Array) {
   try {
     const sodium = await getSodium();
     const signedPreKeyPair = sodium.crypto_box_keypair();
@@ -119,8 +119,12 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     const encryptionPublicKeyB64 = await exportPublicKey(encryptionKeyPair.publicKey);
     const signingPublicKeyB64 = await exportPublicKey(signingKeyPair.publicKey);
 
-    // 4. Encrypt and store both private keys locally.
-    const encryptedPrivateKeys = await storePrivateKeys({ encryption: encryptionKeyPair.privateKey, signing: signingKeyPair.privateKey }, data.password);
+    // 4. Encrypt and store both private keys locally, including the master seed.
+    const encryptedPrivateKeys = await storePrivateKeys({ 
+      encryption: encryptionKeyPair.privateKey, 
+      signing: signingKeyPair.privateKey,
+      masterSeed: masterSeed // Store the master seed
+    }, data.password);
     localStorage.setItem('publicKey', encryptionPublicKeyB64);
     localStorage.setItem('signingPublicKey', signingPublicKeyB64);
     localStorage.setItem('encryptedPrivateKeys', encryptedPrivateKeys);
@@ -134,8 +138,7 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
       body: JSON.stringify({ 
         ...data, 
         publicKey: encryptionPublicKeyB64, 
-        signingKey: signingPublicKeyB64,
-        recoveryPhrase: phrase 
+        signingKey: signingPublicKeyB64
       }),
     });
     

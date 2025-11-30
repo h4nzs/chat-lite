@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 import { getSodium } from '../lib/sodium.js';
 
-const prisma = new PrismaClient();
 const B64_VARIANT = 'URLSAFE_NO_PADDING';
 
 /**
@@ -72,7 +71,9 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
   }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string }[];
 
   if (keyRecords.length !== participants.length) {
-    console.error(`CRITICAL: Conversation ${conversationId} was created with missing session keys for some users.`);
+    const participantsWithKeys = new Set(keyRecords.map(r => r.userId));
+    const missingUserIds = participants.filter(p => !participantsWithKeys.has(p.user.id)).map(p => p.user.id);
+    throw new Error(`Failed to create session keys for all participants in conversation ${conversationId}. Missing keys for users: ${missingUserIds.join(', ')}`);
   }
 
   // Find the initiator's key record BEFORE saving to the database

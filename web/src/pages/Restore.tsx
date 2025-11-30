@@ -24,10 +24,20 @@ export default function RestorePage() {
     }
     setIsRestoring(true);
     try {
+      const trimmedPhrase = phrase.trim();
+      if (!bip39.validateMnemonic(trimmedPhrase)) {
+        throw new Error("Invalid recovery phrase. Please check for typos.");
+      }
+      
       const sodium = await getSodium();
 
-      // 1. Derive the 32-byte master seed from the mnemonic phrase
-      const masterSeed = await bip39.mnemonicToSeed(phrase);
+      // 1. Convert the mnemonic back to the original 32-byte entropy (master seed).
+      const masterSeedHex = bip39.mnemonicToEntropy(trimmedPhrase);
+      const masterSeed = sodium.from_hex(masterSeedHex);
+
+      if (masterSeed.length !== 32) {
+        throw new Error("Failed to derive a valid 32-byte seed from the phrase.");
+      }
 
       // 2. Deterministically re-derive the specific seeds for encryption and signing
       const encryptionSeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("encryption")));
@@ -37,9 +47,13 @@ export default function RestorePage() {
       const encryptionKeyPair = sodium.crypto_box_seed_keypair(encryptionSeed);
       const signingKeyPair = sodium.crypto_sign_seed_keypair(signingSeed);
 
-      // 4. Encrypt and store the retrieved private keys with the NEW password
+      // 4. Encrypt and store the retrieved private keys (including the master seed) with the NEW password
       const encryptedPrivateKeys = await storePrivateKeys(
-        { encryption: encryptionKeyPair.privateKey, signing: signingKeyPair.privateKey },
+        { 
+          encryption: encryptionKeyPair.privateKey, 
+          signing: signingKeyPair.privateKey,
+          masterSeed: masterSeed 
+        },
         password
       );
 
@@ -48,14 +62,8 @@ export default function RestorePage() {
       localStorage.setItem('publicKey', await exportPublicKey(encryptionKeyPair.publicKey));
       localStorage.setItem('signingPublicKey', await exportPublicKey(signingKeyPair.publicKey));
       
-      // 6. Log the user in to get a valid token for the next step (Pre-key upload etc.)
-      // We assume the username can be derived or is part of the recovery, or we prompt for it.
-      // For simplicity here, we'll assume the username is available from an API after recovery,
-      // or the user re-enters it on the login page after restore.
-      // Or we can register a temporary "restore" state in auth store and navigate to login.
-      // Since server verify returns ok, we'll assume the user can now log in.
-      toast.success('Account restored successfully! Please log in with your username and new password.');
-      navigate('/login');
+      toast.success('Account restored! Please log in to sync your new keys with the server.');
+      navigate('/login', { state: { from: 'restore' } });
 
     } catch (error: any) {
       console.error("Restore failed:", error);

@@ -18,17 +18,18 @@ export async function exportPublicKey(publicKey: Uint8Array): Promise<string> {
   return sodium.to_base64(publicKey, sodium.base64_variants[B64_VARIANT]);
 }
 
-export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: Uint8Array }, password: string): Promise<string> {
+export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: Uint8Array, masterSeed?: Uint8Array }, password: string): Promise<string> {
   const sodium = await getSodium();
   const privateKeysJson = JSON.stringify({
     encryption: sodium.to_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
     signing: sodium.to_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
+    masterSeed: keys.masterSeed ? sodium.to_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
   });
 
   const salt = sodium.randombytes_buf(32);
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
 
-  const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+  const appSecret = import.meta.env.VITE_APP_SECRET;
   const combinedPass = `${appSecret}-${password}`;
   const keyInput = new Uint8Array(salt.length + sodium.from_string(combinedPass).length);
   keyInput.set(salt);
@@ -46,7 +47,8 @@ export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: 
 
 export async function retrievePrivateKeys(encryptedDataStr: string, password: string): Promise<{
   encryption: Uint8Array,
-  signing: Uint8Array
+  signing: Uint8Array,
+  masterSeed?: Uint8Array
 } | null> {
   try {
     const sodium = await getSodium();
@@ -56,7 +58,7 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
     const nonce = encryptedData.slice(32, 32 + sodium.crypto_secretbox_NONCEBYTES);
     const encryptedJson = encryptedData.slice(32 + sodium.crypto_secretbox_NONCEBYTES);
 
-    const appSecret = import.meta.env.VITE_APP_SECRET || "default-secret";
+    const appSecret = import.meta.env.VITE_APP_SECRET;
     const combinedPass = `${appSecret}-${password}`;
     const keyInput = new Uint8Array(salt.length + sodium.from_string(combinedPass).length);
     keyInput.set(salt);
@@ -69,6 +71,7 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
     return {
       encryption: sodium.from_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
       signing: sodium.from_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
+      masterSeed: keys.masterSeed ? sodium.from_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
     };
   } catch (error) {
     console.error("Failed to retrieve private keys:", error);

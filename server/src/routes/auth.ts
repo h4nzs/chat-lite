@@ -83,26 +83,16 @@ router.post(
       name: z.string().min(1).max(80),
       publicKey: z.string(),
       signingKey: z.string(),
-      recoveryPhrase: z.string(),
     }),
   }),
   async (req, res, next) => {
     try {
-      const { email, username, password, name, publicKey, signingKey, recoveryPhrase } = req.body;
-
-      // Diagnostic log
-      console.log('[REGISTER] Received public key:', publicKey);
-      console.log('[REGISTER] Received signing key:', signingKey);
+      const { email, username, password, name, publicKey, signingKey } = req.body;
 
       const passwordHash = await bcrypt.hash(password, 10);
 
-      await sodium.ready;
-      const normalizedPhrase = recoveryPhrase.trim().split(/\s+/).join(' ');
-      const phraseHashBytes = sodium.crypto_generichash(64, normalizedPhrase);
-      const recoveryPhraseHash = sodium.to_base64(phraseHashBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
-
       await prisma.user.create({
-        data: { email, username, passwordHash, name, publicKey, signingKey, recoveryPhraseHash },
+        data: { email, username, passwordHash, name, publicKey, signingKey },
       });
 
       res.status(201).json({
@@ -132,6 +122,15 @@ router.post(
         where: {
           OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
         },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          passwordHash: true,
+          name: true,
+          avatarUrl: true,
+          hasCompletedOnboarding: true,
+        }
       });
       if (!user) throw new ApiError(401, "Invalid credentials");
 
