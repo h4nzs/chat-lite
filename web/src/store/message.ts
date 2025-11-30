@@ -12,15 +12,26 @@ import useDynamicIslandStore from './dynamicIsland';
 export async function decryptMessageObject(message: Message): Promise<Message> {
   const decryptedMsg = { ...message };
   try {
-    if (decryptedMsg.content) {
-      // Store original ciphertext before attempting decryption
-      decryptedMsg.ciphertext = decryptedMsg.content;
-      decryptedMsg.content = await decryptMessage(decryptedMsg.content, decryptedMsg.conversationId, decryptedMsg.sessionId);
+    if (decryptedMsg.content && decryptedMsg.sessionId) {
+      decryptedMsg.ciphertext = decryptedMsg.content; // Store original
+      const result = await decryptMessage(decryptedMsg.content, decryptedMsg.conversationId, decryptedMsg.sessionId);
+      if (result.status === 'success') {
+        decryptedMsg.content = result.value;
+      } else if (result.status === 'pending') {
+        decryptedMsg.content = result.reason;
+      } else {
+        decryptedMsg.content = `[${result.error.message}]`;
+      }
     }
     // Also handle repliedTo content if it exists
-    if (decryptedMsg.repliedTo?.content) {
-      // No need to store ciphertext for replies, they are just for display
-      decryptedMsg.repliedTo.content = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
+    if (decryptedMsg.repliedTo?.content && decryptedMsg.repliedTo.sessionId) {
+      const replyResult = await decryptMessage(decryptedMsg.repliedTo.content, decryptedMsg.conversationId, decryptedMsg.repliedTo.sessionId);
+      if (replyResult.status === 'success') {
+        decryptedMsg.repliedTo.content = replyResult.value;
+      } else {
+        // For replies, just show a placeholder on failure
+        decryptedMsg.repliedTo.content = '[Encrypted Reply]';
+      }
     }
     return decryptedMsg;
   } catch (e) {
