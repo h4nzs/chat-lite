@@ -67,6 +67,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   typingLinkPreview: null,
 
   setReplyingTo: (message: Message | null) => set({ replyingTo: message }),
+  
   fetchTypingLinkPreview: async (text: string) => {
     try {
       const res = await api('/api/previews/link', { method: 'POST', body: JSON.stringify({ text }) });
@@ -75,6 +76,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       set({ typingLinkPreview: null });
     }
   },
+  
   clearTypingLinkPreview: () => set({ typingLinkPreview: null }),
 
   sendMessage: async (conversationId, data) => {
@@ -101,66 +103,57 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
         optimisticMessage.content = ciphertext;
         optimisticMessage.sessionId = sessionId;
       }
-      
-      // For file messages, the fileKey is already encrypted and passed in `data`
       if (data.fileKey) {
         const { ciphertext, sessionId } = await encryptMessage(data.fileKey, conversationId);
         optimisticMessage.fileKey = ciphertext;
         optimisticMessage.sessionId = sessionId;
       }
 
-
       get().addOptimisticMessage(conversationId, optimisticMessage);
-      useConversationStore.getState().updateConversationLastMessage(conversationId, { ...optimisticMessage, content: data.content }); // Show plaintext optimistically
+      useConversationStore.getState().updateConversationLastMessage(conversationId, { ...optimisticMessage, content: data.content, fileType: data.fileType, fileName: data.fileName });
       set({ replyingTo: null, typingLinkPreview: null });
       
-      await api("/api/messages", {
-        method: "POST",
-        body: JSON.stringify({ ...optimisticMessage, tempId }),
+      getSocket()?.emit("message:send", optimisticMessage, (res: { ok: boolean, msg?: Message, error?: string }) => {
+        if (res.ok && res.msg) {
+          get().replaceOptimisticMessage(conversationId, tempId, res.msg);
+        } else {
+          console.error("Failed to send message:", res.error);
+          toast.error(`Failed to send message: ${res.error}`);
+          set(state => ({
+            messages: {
+              ...state.messages,
+              [conversationId]: state.messages[conversationId]?.map(m => m.tempId === tempId ? { ...m, error: true } : m) || [],
+            },
+          }));
+        }
       });
 
     } catch (error) {
-      console.error("Failed to send message:", error);
-      toast.error("Failed to send message.");
-      set(state => ({
-        messages: {
-          ...state.messages,
-          [conversationId]: state.messages[conversationId]?.map(m => m.tempId === tempId ? { ...m, error: true } : m) || [],
-        },
-      }));
+      console.error("Failed to encrypt and send message:", error);
+      toast.error("Could not send secure message.");
     }
   },
 
   uploadFile: async (conversationId, file) => {
     const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
     const uploadId = addActivity({ type: 'upload', fileName: file.name, progress: 0 });
-
     try {
-      // 1. Encrypt the file locally
       updateActivity(uploadId, { progress: 10 });
       const { encryptedBlob, key: fileKey } = await encryptFile(file);
-      
-      // 2. Upload the encrypted blob
       updateActivity(uploadId, { progress: 40 });
       const formData = new FormData();
       formData.append('file', encryptedBlob, file.name);
-      
       const uploadRes = await apiUpload<{ file: { url: string } }>(`/api/uploads/${conversationId}/upload`, formData);
-      const fileUrl = uploadRes.file.url;
-      
-      // 3. Send the metadata message with the encrypted file key
       updateActivity(uploadId, { progress: 90 });
       await get().sendMessage(conversationId, {
-        fileUrl,
+        fileUrl: uploadRes.file.url,
         fileName: file.name,
         fileType: `${file.type};encrypted=true`,
         fileSize: file.size,
-        fileKey, // The unencrypted file key is passed here; sendMessage will encrypt it
+        fileKey,
       });
-
       updateActivity(uploadId, { progress: 100 });
       setTimeout(() => removeActivity(uploadId), 1000);
-
     } catch (error) {
       removeActivity(uploadId);
       console.error("File upload failed:", error);
@@ -180,24 +173,15 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       const res = await api<{ items: Message[] }>(`/api/messages/${id}`);
       const fetchedMessages = res.items || [];
       const processedMessages: Message[] = [];
-      const failedSessionIds = new Set<string>();
       for (const message of fetchedMessages) {
-        try {
-          const decryptedMessage = await decryptMessageObject(message);
-          processedMessages.push(decryptedMessage);
-        } catch (e) {
-          processedMessages.push({ ...message, content: '[Requesting key to decrypt...]' });
-          if (message.sessionId) failedSessionIds.add(message.sessionId);
-        }
+        processedMessages.push(await decryptMessageObject(message));
       }
-      for (const sessionId of failedSessionIds) emitSessionKeyRequest(id, sessionId);
       set(state => {
         const existingMessages = state.messages[id] || [];
         const messageMap = new Map(existingMessages.map(m => [m.id, m]));
         processedMessages.forEach(m => messageMap.set(m.id, m));
         const allMessages = Array.from(messageMap.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         return {
-          ...state,
           messages: { ...state.messages, [id]: allMessages },
           hasMore: { ...state.hasMore, [id]: fetchedMessages.length >= 50 },
           hasLoadedHistory: { ...state.hasLoadedHistory, [id]: true }
@@ -211,8 +195,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
   loadPreviousMessages: async (conversationId) => {
     const { isFetchingMore, hasMore, messages } = get();
     if (isFetchingMore[conversationId] || !hasMore[conversationId]) return;
-    const currentMessages = messages[conversationId] || [];
-    const oldestMessage = currentMessages[0];
+    const oldestMessage = messages[conversationId]?.[0];
     if (!oldestMessage) return;
     set(state => ({ isFetchingMore: { ...state.isFetchingMore, [conversationId]: true } }));
     try {
@@ -220,7 +203,7 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
       const decryptedItems = await Promise.all((res.items || []).map(decryptMessageObject));
       decryptedItems.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       if (decryptedItems.length < 50) set(state => ({ hasMore: { ...state.hasMore, [conversationId]: false } }));
-      set(state => ({ messages: { ...state.messages, [conversationId]: [...decryptedItems, ...currentMessages] } }));
+      set(state => ({ messages: { ...state.messages, [conversationId]: [...decryptedItems, ...(state.messages[conversationId] || [])] } }));
     } catch (error) {
       console.error("Failed to load previous messages", error);
     } finally {
@@ -228,85 +211,59 @@ export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
     }
   },
 
-  addOptimisticMessage: (conversationId, message) => {
-    set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), message] } }));
-  },
+  addOptimisticMessage: (conversationId, message) => set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), message] } })),
+  addIncomingMessage: (conversationId, message) => set(state => {
+    const currentMessages = state.messages[conversationId] || [];
+    if (currentMessages.some(m => m.id === message.id)) return state;
+    return { messages: { ...state.messages, [conversationId]: [...currentMessages, message] } };
+  }),
+  replaceOptimisticMessage: (conversationId, tempId, newMessage) => set(state => ({
+    messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.tempId === tempId ? { ...newMessage, tempId: undefined } : m) }
+  })),
+  updateMessage: (conversationId, messageId, updates) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, ...updates } : m) } })),
+  addReaction: (conversationId, messageId, reaction) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: [...(m.reactions || []), reaction] } : m) } })),
+  removeReaction: (conversationId, messageId, reactionId) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m) } })),
+  
+  updateSenderDetails: (user) => set(state => {
+    const newMessages = { ...state.messages };
+    for (const convoId in newMessages) {
+      newMessages[convoId] = newMessages[convoId].map(m => m.sender?.id === user.id ? { ...m, sender: { ...m.sender, ...user } } : m);
+    }
+    return { messages: newMessages };
+  }),
 
-  addIncomingMessage: (conversationId, message) => {
-    set(state => {
-      const currentMessages = state.messages[conversationId] || [];
-      if (currentMessages.some(m => m.id === message.id)) return state;
-      return { messages: { ...state.messages, [conversationId]: [...currentMessages, { ...message, linkPreview: message.linkPreview }] } };
-    });
-  },
-
-  replaceOptimisticMessage: (conversationId, tempId, newMessage) => {
-    set(state => ({
-      messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.tempId === tempId ? { ...m, id: newMessage.id, createdAt: newMessage.createdAt, optimistic: false, error: false, linkPreview: newMessage.linkPreview } : m) }
-    }));
-  },
-
-  updateMessage: (conversationId, messageId, updates) => {
-    set(state => ({
-      messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, ...updates } : m) }
-    }));
-  },
-
-  addReaction: (conversationId, messageId, reaction) => {
-    set(state => ({
-      messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: [...(m.reactions || []), reaction] } : m) }
-    }));
-  },
-
-  removeReaction: (conversationId, messageId, reactionId) => {
-    set(state => ({
-      messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m) }
-    }));
-  },
-
-  updateSenderDetails: (user) => {
-    set(state => {
-      const newMessages = { ...state.messages };
-      for (const convoId in newMessages) {
-        newMessages[convoId] = newMessages[convoId].map(m => m.sender?.id === user.id ? { ...m, sender: { ...m.sender, ...user } } : m);
+  updateMessageStatus: (conversationId, messageId, userId, status) => set(state => {
+    const newMessages = { ...state.messages };
+    const convoMessages = newMessages[conversationId];
+    if (!convoMessages) return state;
+    newMessages[conversationId] = convoMessages.map(m => {
+      if (m.id === messageId) {
+        const existingStatus = m.statuses?.find(s => s.userId === userId);
+        if (existingStatus) return { ...m, statuses: m.statuses!.map(s => s.userId === userId ? { ...s, status } : s) };
+        else return { ...m, statuses: [...(m.statuses || []), { userId, status, messageId, id: `temp-status-${Date.now()}` }] };
       }
-      return { messages: newMessages };
+      return m;
     });
-  },
+    return { messages: newMessages };
+  }),
 
-  updateMessageStatus: (conversationId, messageId, userId, status) => {
-    set(state => {
-      const newMessages = { ...state.messages };
-      const convoMessages = newMessages[conversationId];
-      if (!convoMessages) return state;
-      newMessages[conversationId] = convoMessages.map(m => {
-        if (m.id === messageId) {
-          const existingStatus = m.statuses?.find(s => s.userId === userId);
-          if (existingStatus) return { ...m, statuses: m.statuses!.map(s => s.userId === userId ? { ...s, status } : s) };
-          else return { ...m, statuses: [...(m.statuses || []), { userId, status, messageId, id: `temp-status-${Date.now()}` }] };
-        }
-        return m;
-      });
-      return { messages: newMessages };
-    });
-  },
-
-  clearMessagesForConversation: (conversationId) => {
-    set(state => {
-      const newMessages = { ...state.messages };
-      delete newMessages[conversationId];
-      return { messages: newMessages };
-    });
-  },
+  clearMessagesForConversation: (conversationId) => set(state => {
+    const newMessages = { ...state.messages };
+    delete newMessages[conversationId];
+    return { messages: newMessages };
+  }),
 
   retrySendMessage: (message: Message) => {
     const { conversationId, tempId, content, fileUrl, fileName, fileType, fileSize, repliedToId } = message;
     set(state => ({
-      messages: {
-        ...state.messages,
-        [conversationId]: state.messages[conversationId]?.filter(m => m.tempId !== tempId) || [],
-      },
+      messages: { ...state.messages, [conversationId]: state.messages[conversationId]?.filter(m => m.tempId !== tempId) || [] },
     }));
     get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
+  },
+
+  addSystemMessage: (conversationId, content) => {
+    const systemMessage: Message = {
+      id: `system_${Date.now()}`, type: 'SYSTEM', conversationId, content, createdAt: new Date().toISOString(), senderId: 'system' };
+    set(state => ({ messages: { ...state.messages, [conversationId]: [...(state.messages[conversationId] || []), systemMessage] } }));
   },
 }));
