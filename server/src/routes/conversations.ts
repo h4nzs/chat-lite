@@ -400,19 +400,16 @@ router.delete("/:id/leave", async (req, res, next) => {
     const participant = await prisma.participant.findFirst({
       where: { conversationId, userId },
     });
-
     if (!participant) {
       return res.status(404).json({ error: "You are not a member of this group." });
     }
 
     const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
     if (conversation?.creatorId === userId) {
-      return res.status(400).json({ error: "Group creator cannot leave the group; please delete it instead." });
+      return res.status(400).json({ error: "Group creator cannot leave; please delete it instead." });
     }
 
-    // Rotate keys BEFORE removing the participant
-    await rotateAndDistributeSessionKeys(conversationId, userId);
-
+    // 1. Delete the leaving user from participants
     await prisma.participant.delete({
       where: { userId_conversationId: { userId, conversationId } },
     });
@@ -420,6 +417,22 @@ router.delete("/:id/leave", async (req, res, next) => {
     const io = getIo();
     io.to(conversationId).emit("conversation:participant_removed", { conversationId, userId });
     io.to(userId).emit("conversation:deleted", { id: conversationId });
+
+    // 2. Find another admin to initiate key rotation
+    const remainingAdmin = await prisma.participant.findFirst({
+      where: {
+        conversationId,
+        role: "ADMIN",
+        userId: { not: userId }, // Ensure it's not the user who just left
+      },
+    });
+
+    // 3. Rotate keys using the remaining admin as the initiator
+    if (remainingAdmin) {
+      await rotateAndDistributeSessionKeys(conversationId, remainingAdmin.userId);
+    } else {
+      console.warn(`Could not rotate keys for conversation ${conversationId} after user left: no remaining admin found.`);
+    }
 
     res.status(204).send();
   } catch (error) {

@@ -30,6 +30,9 @@ export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: 
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
 
   const appSecret = import.meta.env.VITE_APP_SECRET;
+  if (!appSecret) {
+    throw new Error("VITE_APP_SECRET is required for key encryption.");
+  }
   const combinedPass = `${appSecret}-${password}`;
   const keyInput = new Uint8Array(salt.length + sodium.from_string(combinedPass).length);
   keyInput.set(salt);
