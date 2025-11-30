@@ -63,9 +63,6 @@ router.get(
         },
       });
 
-      // Diagnostic log
-      console.log(`[GET PREKEY BUNDLE] Fetched bundle for user ${userId}:`, JSON.stringify(userWithBundle, null, 2));
-
       if (!userWithBundle?.preKeyBundle || !userWithBundle.signingKey) {
         throw new Error("User does not have a valid pre-key bundle available.");
       }

@@ -18,7 +18,6 @@ model User {
   description        String?
   publicKey          String?   // Encryption/Identity Key
   signingKey         String?   // Verification Key
-  recoveryPhraseHash String?
   showEmailToOthers  Boolean   @default(false)
   hasCompletedOnboarding Boolean @default(false)
   createdAt          DateTime  @default(now())

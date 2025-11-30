@@ -116,9 +116,18 @@ export async function decryptMessage(
 
 // --- Pre-Key Handshake (Simplified X3DH) ---
 
+export type PreKeyBundle = {
+  identityKey: string;
+  signingKey: string;
+  signedPreKey: {
+    key: string;
+    signature: string;
+  };
+};
+
 export async function establishSessionFromPreKeyBundle(
   myIdentityKeyPair: { publicKey: Uint8Array, privateKey: Uint8Array },
-  preKeyBundle: any
+  preKeyBundle: PreKeyBundle
 ): Promise<{ sessionKey: Uint8Array, ephemeralPublicKey: string }> {
   const sodium = await getSodium();
   const ephemeralKeyPair = sodium.crypto_box_keypair();
@@ -181,10 +190,6 @@ export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promi
   const { conversationId, sessionId, encryptedKey } = payload;
   const { publicKey, privateKey } = await getMyEncryptionKeyPair();
   const newSessionKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey);
-
-  if (!newSessionKey) {
-    throw new Error("Failed to decrypt received session key.");
-  }
 
   await addSessionKey(conversationId, sessionId, newSessionKey);
 }

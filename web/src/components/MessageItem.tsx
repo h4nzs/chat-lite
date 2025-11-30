@@ -68,7 +68,7 @@ const MessageBubble = ({ message, mine, isLastInSequence, onImageClick, conversa
     };
 
     // Only decrypt if the content is still encrypted (or pending)
-    if (decryptedContent && decryptedContent.startsWith('[')) {
+    if (message.content && message.content.startsWith('[')) {
       tryDecrypt();
     }
     

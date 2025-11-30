@@ -192,8 +192,12 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
 
   startConversation: async (peerId: string): Promise<string> => {
+    const { user, getEncryptionKeyPair } = useAuthStore.getState();
+    if (!user) {
+      throw new Error("Cannot start a conversation: user is not authenticated.");
+    }
+
     try {
-      const { getEncryptionKeyPair } = useAuthStore.getState();
       const theirBundle = await authFetch<any>(`/api/keys/prekey-bundle/${peerId}`);
       if (!theirBundle) throw new Error("User does not have a pre-key bundle available.");
 
@@ -217,7 +221,7 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
             sessionId,
             ephemeralPublicKey,
             initialKeys: [
-              { userId: useAuthStore.getState().user!.id, key: sodium.to_base64(encryptedKeyForSelf, sodium.base64_variants.URLSAFE_NO_PADDING) },
+              { userId: user.id, key: sodium.to_base64(encryptedKeyForSelf, sodium.base64_variants.URLSAFE_NO_PADDING) },
               { userId: peerId, key: sodium.to_base64(encryptedKeyForPeer, sodium.base64_variants.URLSAFE_NO_PADDING) },
             ],
           },
