@@ -30,20 +30,6 @@ export default function Login() {
     }
     try {
       await login(data.a, data.b);
-
-      // Check if we came from the restore page
-      if (location.state?.from === 'restore') {
-        const toastId = toast.loading("Syncing new keys with server...");
-        try {
-          const signingKey = await getSigningPrivateKey();
-          await setupAndUploadPreKeyBundle(signingKey);
-          toast.success("Keys synced successfully!", { id: toastId });
-        } catch (e) {
-          toast.error("Failed to sync keys. Please try logging in again.", { id: toastId });
-          return; // Stop before navigating
-        }
-      }
-      
       navigate("/chat");
 
     } catch (err: any) {
@@ -68,6 +54,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-bg-main p-4">
       <div className="w-full max-w-md bg-bg-surface rounded-xl p-8 shadow-neumorphic-concave">
         <h1 className="text-3xl font-bold text-center text-foreground mb-6">Login</h1>
+        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <AuthForm 
           onSubmit={handleLogin}
           button="Login"

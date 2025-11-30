@@ -14,7 +14,7 @@ export default function RestorePage() {
   const [password, setPassword] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
   const navigate = useNavigate();
-  const login = useAuthStore((s) => s.login);
+
 
   const handleRestore = async (e: React.FormEvent) => {
     e.preventDefault();
