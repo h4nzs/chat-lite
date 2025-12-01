@@ -98,69 +98,24 @@ export async function decryptMessage(
   sessionId: string | null | undefined
 ): Promise<DecryptResult> {
   if (!cipher) return { status: 'success', value: '' };
-  if (!sessionId) return { status: 'error', error: new Error('Cannot decrypt message: Missing session ID.') };
+  if (!sessionId) return { status: 'error', error: new Error('Cannot decrypt message: Missing session ID.')};
 
-  // 1. Try to get the key from our local keychain DB
-  let sessionKey = await getKeyFromDb(conversationId, sessionId);
-
-  // 2. If the key is not found, try to derive it from an initial session
-  if (!sessionKey) {
-    try {
-      console.log(`Key for session ${sessionId} not found locally. Attempting to derive from initial session...`);
-      const initialSession = await authFetch<any>(`/api/keys/initial-session/${conversationId}/${sessionId}`);
-      
-      const { getSignedPreKeyPair, getEncryptionKeyPair } = useAuthStore.getState();
-      const mySignedPreKeyPair = await getSignedPreKeyPair();
-      const myIdentityKeyPair = await getEncryptionKeyPair();
-
-      const derivedSessionKey = await deriveSessionKeyAsRecipient(
-        myIdentityKeyPair,
-        mySignedPreKeyPair,
-        initialSession.initiatorIdentityKey,
-        initialSession.initiatorEphemeralKey
-      );
-
-      // We have the shared secret. Now we need to decrypt the session key itself,
-      // which was encrypted with this shared secret (or rather, sealed to our public key).
-      // Let's re-evaluate. No, the `establishSessionFromPreKeyBundle` creates the final key.
-      // The `deriveSessionKeyAsRecipient` should create the *exact same* final key.
-      
-      // Let's re-verify the key was encrypted for us.
-      const decryptedSessionKey = await decryptSessionKeyForUser(
-        initialSession.encryptedKey,
-        myIdentityKeyPair.publicKey,
-        myIdentityKeyPair.privateKey
-      );
-
-      // The derived key and decrypted key should match. This is a sanity check.
-      // For now, let's trust the decrypted key as it's more direct.
-      // The derivation is what allows the recipient to get the same key.
-      
-      // The issue is, `decryptSessionKeyForUser` uses box_seal_open, which is for asymmetric
-      // encryption, not a derived shared secret. We need to use the derived key.
-      // Let's just use the derived key. The server stores the key encrypted with box_seal,
-      // but the recipient *calculates* the key, it doesn't decrypt it.
-
-      await addSessionKey(conversationId, sessionId, derivedSessionKey);
-      sessionKey = derivedSessionKey;
-      console.log(`Successfully derived and stored key for initial session ${sessionId}.`);
-
-    } catch (e) {
-      // This will fail if it's not an initial session (404) or if derivation fails.
-      // In that case, we fall back to the original method.
-      console.warn("Failed to derive key from initial session, falling back to peer request.", e);
-      emitSessionKeyRequest(conversationId, sessionId);
-      return { status: 'pending', reason: '[Requesting key to decrypt...]' };
-    }
-  }
+  const key = await getKeyFromDb(conversationId, sessionId);
   
-  // 3. If we have the key (either from DB or derivation), decrypt the message
+  // If the key is not found locally, the only fallback is to request it from a peer.
+  if (!key) {
+    console.warn(`Key for session ${sessionId} not found locally. Emitting peer request...`);
+    emitSessionKeyRequest(conversationId, sessionId);
+    return { status: 'pending', reason: '[Requesting key to decrypt...]' };
+  }
+
+  // If we have the key, decrypt the message
   try {
     const sodium = await getSodium();
     const combined = sodium.from_base64(cipher, sodium.base64_variants[B64_VARIANT]);
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
-    const decrypted = sodium.to_string(sodium.crypto_secretbox_open_easy(encrypted, nonce, sessionKey));
+    const decrypted = sodium.to_string(sodium.crypto_secretbox_open_easy(encrypted, nonce, key));
     return { status: 'success', value: decrypted };
   } catch (e: any) {
     console.error(`Decryption failed for convo ${conversationId}, session ${sessionId}:`, e);
