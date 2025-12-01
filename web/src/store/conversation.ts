@@ -84,6 +84,9 @@ type State = {
   error: string | null;
   loading: boolean;
   initialLoadCompleted: boolean;
+};
+
+type Actions = {
   loadConversations: () => Promise<void>;
   openConversation: (id: string | null) => void;
   deleteConversation: (id: string) => Promise<void>;
@@ -100,19 +103,28 @@ type State = {
   updateConversationLastMessage: (conversationId: string, message: Message) => void;
   resyncState: () => Promise<void>;
   clearError: () => void;
-};
+  reset: () => void;
+}
 
 // --- Zustand Store ---
 
-export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
+const initialState: State = {
   conversations: [],
   activeId: null,
   isSidebarOpen: false,
   error: null,
   loading: false,
   initialLoadCompleted: false,
+};
+
+export const useConversationStore = createWithEqualityFn<State & Actions>((set, get) => ({
+  ...initialState,
 
   clearError: () => set({ error: null }),
+
+  reset: () => {
+    set(initialState);
+  },
 
   resyncState: async () => {
     if (!get().initialLoadCompleted) {

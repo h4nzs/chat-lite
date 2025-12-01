@@ -4,35 +4,6 @@ import { getSodium } from '../lib/sodium.js';
 const B64_VARIANT = 'URLSAFE_NO_PADDING';
 
 /**
- * Stores the initial session key that was already computed by the client via a pre-key handshake.
- */
-export async function createAndDistributeInitialSessionKey(
-  conversationId: string,
-  initialSessionData: {
-    sessionId: string;
-    ephemeralPublicKey: string;
-    initialKeys: { userId: string; key: string }[];
-  }
-) {
-  const { sessionId, initialKeys, ephemeralPublicKey } = initialSessionData;
-
-  const keyRecords = initialKeys.map(ik => ({
-    sessionId,
-    encryptedKey: ik.key,
-    userId: ik.userId,
-    conversationId,
-    initiatorEphemeralKey: ephemeralPublicKey, // Save the ephemeral key
-  }));
-
-  await prisma.sessionKey.createMany({
-    data: keyRecords,
-  });
-
-  return { sessionId };
-}
-
-
-/**
  * Creates a new session key from scratch on the server and encrypts it for all participants.
  * This is used for ratcheting sessions or as a fallback.
  */

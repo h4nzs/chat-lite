@@ -19,4 +19,4 @@ web/dist
 
 /generated/prisma
 server/uploads/
-vspostgres.session.sql
+vspostgre.session.sql

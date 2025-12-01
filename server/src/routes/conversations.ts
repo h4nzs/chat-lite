@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getIo } from "../socket.js";
 import { upload } from "../utils/upload.js";
-import { createAndDistributeInitialSessionKey, rotateAndDistributeSessionKeys } from "../utils/sessionKeys.js";
+import { rotateAndDistributeSessionKeys } from "../utils/sessionKeys.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -125,8 +125,18 @@ router.post("/", async (req, res, next) => {
     });
 
     if (initialSession) {
-      console.log("DEBUG initialSession:", initialSession);
-      await createAndDistributeInitialSessionKey(newConversation.id, initialSession);
+      // INLINED LOGIC FROM createAndDistributeInitialSessionKey
+      const { sessionId, initialKeys, ephemeralPublicKey } = initialSession;
+      const keyRecords = initialKeys.map((ik: { userId: string; key: string; }) => ({
+        sessionId,
+        encryptedKey: ik.key,
+        userId: ik.userId,
+        conversationId: newConversation.id,
+        initiatorEphemeralKey: ephemeralPublicKey,
+      }));
+      await prisma.sessionKey.createMany({
+        data: keyRecords,
+      });
     } else {
       await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
     }

@@ -38,6 +38,9 @@ type State = {
   hasMore: Record<string, boolean>;
   typingLinkPreview: any | null;
   hasLoadedHistory: Record<string, boolean>;
+};
+
+type Actions = {
   setReplyingTo: (message: Message | null) => void;
   fetchTypingLinkPreview: (text: string) => void;
   clearTypingLinkPreview: () => void;
@@ -58,15 +61,24 @@ type State = {
   clearMessagesForConversation: (conversationId: string) => void;
   retrySendMessage: (message: Message) => void;
   addSystemMessage: (conversationId: string, content: string) => void;
+  reset: () => void;
 };
 
-export const useMessageStore = createWithEqualityFn<State>((set, get) => ({
+const initialState: State = {
   messages: {},
   isFetchingMore: {},
   hasMore: {},
   hasLoadedHistory: {},
   replyingTo: null,
   typingLinkPreview: null,
+};
+
+export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) => ({
+  ...initialState,
+
+  reset: () => {
+    set(initialState);
+  },
 
   setReplyingTo: (message: Message | null) => set({ replyingTo: message }),
   

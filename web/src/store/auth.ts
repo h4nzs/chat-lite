@@ -166,11 +166,13 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     eraseCookie("rt");
     privateKeysCache = null;
     clearKeyCache();
-    localStorage.clear();
+    // Selectively remove session data instead of clearing everything
+    localStorage.removeItem('user');
     set({ user: null });
     disconnectSocket();
-    useConversationStore.setState({ conversations: [] }, true);
-    useMessageStore.setState({ messages: {} }, true);
+    // Reset all other stores to their initial state
+    useConversationStore.getState().reset();
+    useMessageStore.getState().reset();
   },
 
   async getSigningPrivateKey(): Promise<Uint8Array> {
