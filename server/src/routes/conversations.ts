@@ -127,6 +127,12 @@ router.post("/", async (req, res, next) => {
     if (initialSession) {
       // INLINED LOGIC FROM createAndDistributeInitialSessionKey
       const { sessionId, initialKeys, ephemeralPublicKey } = initialSession;
+      
+      // Ensure the required data is present
+      if (!sessionId || !initialKeys || !ephemeralPublicKey) {
+        throw new Error("Incomplete initial session data provided.");
+      }
+
       const keyRecords = initialKeys.map((ik: { userId: string; key: string; }) => ({
         sessionId,
         encryptedKey: ik.key,
@@ -134,6 +140,7 @@ router.post("/", async (req, res, next) => {
         conversationId: newConversation.id,
         initiatorEphemeralKey: ephemeralPublicKey,
       }));
+
       await prisma.sessionKey.createMany({
         data: keyRecords,
       });
