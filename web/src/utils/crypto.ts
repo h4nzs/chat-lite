@@ -98,24 +98,59 @@ export async function decryptMessage(
   sessionId: string | null | undefined
 ): Promise<DecryptResult> {
   if (!cipher) return { status: 'success', value: '' };
-  if (!sessionId) return { status: 'error', error: new Error('Cannot decrypt message: Missing session ID.')};
+  if (!sessionId) return { status: 'error', error: new Error('Cannot decrypt message: Missing session ID.') };
 
-  const key = await getKeyFromDb(conversationId, sessionId);
-  
-  // If the key is not found locally, the only fallback is to request it from a peer.
-  if (!key) {
-    console.warn(`Key for session ${sessionId} not found locally. Emitting peer request...`);
-    emitSessionKeyRequest(conversationId, sessionId);
-    return { status: 'pending', reason: '[Requesting key to decrypt...]' };
+  // 1. Try to get the key from our local keychain DB
+  let sessionKey = await getKeyFromDb(conversationId, sessionId);
+
+  // 2. If the key is not found, try to derive it from an initial session OR decrypt a ratchet key
+  if (!sessionKey) {
+    try {
+      console.log(`Key for session ${sessionId} not found locally. Attempting to fetch initial/ratchet session...`);
+      const sessionData = await authFetch<any>(`/api/keys/initial-session/${conversationId}/${sessionId}`);
+      const { getSignedPreKeyPair, getEncryptionKeyPair } = useAuthStore.getState();
+      const myIdentityKeyPair = await getEncryptionKeyPair();
+
+      // Check if this is a client-initiated session (X3DH) or a server-ratcheted session
+      if (sessionData.initiatorEphemeralKey === "server-ratchet") {
+        // This is a server-ratcheted key, we just need to decrypt it.
+        console.log("Detected server-ratchet session. Decrypting key...");
+        sessionKey = await decryptSessionKeyForUser(
+          sessionData.encryptedKey,
+          myIdentityKeyPair.publicKey,
+          myIdentityKeyPair.privateKey
+        );
+      } else {
+        // This is a client-initiated session, we need to derive the key.
+        console.log("Detected client-initiated session. Deriving key...");
+        const mySignedPreKeyPair = await getSignedPreKeyPair();
+        sessionKey = await deriveSessionKeyAsRecipient(
+          myIdentityKeyPair,
+          mySignedPreKeyPair,
+          sessionData.initiatorIdentityKey,
+          sessionData.initiatorEphemeralKey
+        );
+      }
+
+      await addSessionKey(conversationId, sessionId, sessionKey);
+      console.log(`Successfully processed and stored key for session ${sessionId}.`);
+
+    } catch (e) {
+      // This will fail if the API call fails or if derivation/decryption fails.
+      // In that case, we fall back to the original peer request method.
+      console.warn("Failed to process session from server, falling back to peer request.", e);
+      emitSessionKeyRequest(conversationId, sessionId);
+      return { status: 'pending', reason: '[Requesting key to decrypt...]' };
+    }
   }
-
-  // If we have the key, decrypt the message
+  
+  // 3. If we have the key (either from DB or after processing), decrypt the message
   try {
     const sodium = await getSodium();
     const combined = sodium.from_base64(cipher, sodium.base64_variants[B64_VARIANT]);
     const nonce = combined.slice(0, sodium.crypto_secretbox_NONCEBYTES);
     const encrypted = combined.slice(sodium.crypto_secretbox_NONCEBYTES);
-    const decrypted = sodium.to_string(sodium.crypto_secretbox_open_easy(encrypted, nonce, key));
+    const decrypted = sodium.to_string(sodium.crypto_secretbox_open_easy(encrypted, nonce, sessionKey));
     return { status: 'success', value: decrypted };
   } catch (e: any) {
     console.error(`Decryption failed for convo ${conversationId}, session ${sessionId}:`, e);

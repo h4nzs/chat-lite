@@ -24,20 +24,27 @@ router.post(
       const userId = req.user.id;
       const { identityKey, signedPreKey } = req.body;
 
-      await prisma.preKeyBundle.upsert({
-        where: { userId },
-        update: {
-          identityKey,
-          key: signedPreKey.key,
-          signature: signedPreKey.signature,
-        },
-        create: {
-          userId,
-          identityKey,
-          key: signedPreKey.key,
-          signature: signedPreKey.signature,
-        },
-      });
+      // Use a transaction to ensure both operations succeed or fail together
+      await prisma.$transaction([
+        prisma.preKeyBundle.upsert({
+          where: { userId },
+          update: {
+            identityKey,
+            key: signedPreKey.key,
+            signature: signedPreKey.signature,
+          },
+          create: {
+            userId,
+            identityKey,
+            key: signedPreKey.key,
+            signature: signedPreKey.signature,
+          },
+        }),
+        prisma.user.update({
+          where: { id: userId },
+          data: { publicKey: identityKey },
+        }),
+      ]);
 
       res.status(201).json({ message: "Pre-key bundle updated successfully." });
     } catch (e) {

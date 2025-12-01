@@ -36,12 +36,13 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
         encryptedKey: sodium.to_base64(encryptedKey, sodium.base64_variants[B64_VARIANT]),
         userId: p.user.id,
         conversationId,
+        initiatorEphemeralKey: "server-ratchet", // Add placeholder ephemeral key
       };
     } catch (e: any) {
       console.error(`Failed to process public key for user ${p.user.id}. Key: "${p.user.publicKey}". Error: ${e.message}`);
       throw new Error(`Corrupted public key found for user ${p.user.id}. Cannot establish secure session.`);
     }
-  }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string }[];
+  }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string; initiatorEphemeralKey: string }[];
 
   if (keyRecords.length !== participants.length) {
     const participantsWithKeys = new Set(keyRecords.map(r => r.userId));

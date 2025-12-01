@@ -36,6 +36,7 @@ model User {
   
   // Relation to the simplified pre-key bundle
   preKeyBundle         PreKeyBundle?
+  sessionKeys          SessionKey[]
 
   @@index([email])
   @@index([username])
@@ -190,6 +191,7 @@ model SessionKey {
   conversationId        String
   sessionId             String
   userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   encryptedKey          String
   initiatorEphemeralKey String?  // For the recipient to derive the initial shared secret
   createdAt             DateTime @default(now())
