@@ -18,11 +18,17 @@ export async function exportPublicKey(publicKey: Uint8Array): Promise<string> {
   return sodium.to_base64(publicKey, sodium.base64_variants[B64_VARIANT]);
 }
 
-export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: Uint8Array, masterSeed?: Uint8Array }, password: string): Promise<string> {
+export async function storePrivateKeys(keys: {
+  encryption: Uint8Array,
+  signing: Uint8Array,
+  signedPreKey: Uint8Array,
+  masterSeed?: Uint8Array
+}, password: string): Promise<string> {
   const sodium = await getSodium();
   const privateKeysJson = JSON.stringify({
     encryption: sodium.to_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
     signing: sodium.to_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
+    signedPreKey: sodium.to_base64(keys.signedPreKey, sodium.base64_variants[B64_VARIANT]),
     masterSeed: keys.masterSeed ? sodium.to_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
   });
 
@@ -51,6 +57,7 @@ export async function storePrivateKeys(keys: { encryption: Uint8Array, signing: 
 export async function retrievePrivateKeys(encryptedDataStr: string, password: string): Promise<{
   encryption: Uint8Array,
   signing: Uint8Array,
+  signedPreKey: Uint8Array,
   masterSeed?: Uint8Array
 } | null> {
   try {
@@ -73,10 +80,15 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
 
     const decryptedJson = sodium.to_string(sodium.crypto_secretbox_open_easy(encryptedJson, nonce, key));
     const keys = JSON.parse(decryptedJson);
+    
+    if (!keys.signedPreKey) {
+      throw new Error("Legacy key bundle found. Account reset might be needed.");
+    }
 
     return {
       encryption: sodium.from_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
       signing: sodium.from_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
+      signedPreKey: sodium.from_base64(keys.signedPreKey, sodium.base64_variants[B64_VARIANT]),
       masterSeed: keys.masterSeed ? sodium.from_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
     };
   } catch (error) {

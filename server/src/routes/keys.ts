@@ -89,4 +89,57 @@ router.get(
   }
 );
 
+// === GET: Get an initial session key record for a recipient ===
+router.get(
+  "/initial-session/:conversationId/:sessionId",
+  requireAuth,
+  zodValidate({
+    params: z.object({
+      conversationId: z.string(),
+      sessionId: z.string(),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      const { conversationId, sessionId } = req.params;
+      const userId = req.user.id;
+
+      const keyRecord = await prisma.sessionKey.findFirst({
+        where: {
+          conversationId,
+          sessionId,
+          userId,
+        },
+      });
+
+      if (!keyRecord || !keyRecord.initiatorEphemeralKey) {
+        return res.status(404).json({ error: "Initial session data not found for this user." });
+      }
+
+      // Find the initiator to get their public identity key
+      const initiatorRecord = await prisma.sessionKey.findFirst({
+        where: {
+          conversationId,
+          sessionId,
+          userId: { not: userId }
+        },
+        include: { user: { select: { id: true, publicKey: true } } },
+      });
+
+      if (!initiatorRecord?.user?.publicKey) {
+        return res.status(404).json({ error: "Initiator's public key could not be found for this session." });
+      }
+
+      res.json({
+        encryptedKey: keyRecord.encryptedKey,
+        initiatorEphemeralKey: keyRecord.initiatorEphemeralKey,
+        initiatorIdentityKey: initiatorRecord.user.publicKey,
+      });
+
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
 export default router;

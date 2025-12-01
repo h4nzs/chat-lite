@@ -1,128 +1,62 @@
-# Laporan Analisis Komprehensif: Chat-Lite
+# Laporan Analisis Awal "Chat Lite" oleh Gemini
 
-Dokumen ini merangkum hasil analisis menyeluruh terhadap proyek Chat-Lite, sesuai dengan instruksi pada `@prompt-analis.md` dan `@prompt-analis-2.md`. Tujuannya adalah untuk memetakan arsitektur, alur data, dan kondisi aplikasi saat ini.
+Dokumen ini merangkum hasil analisis awal dari basis kode "Chat Lite". Analisis ini dilakukan menggunakan `codebase_investigator` dan ditindaklanjuti dengan inspeksi manual.
 
----
+## Temuan Kunci & Isu Kritis
 
-## 1. Ringkasan & Arsitektur Umum
+Analisis awal berhasil mengungkap dua isu fundamental yang memerlukan perhatian segera sebelum pengembangan lebih lanjut.
 
-Chat-Lite adalah aplikasi pesan instan modern yang mengutamakan keamanan melalui enkripsi ujung-ke-ujung (E2EE). Aplikasi ini dibangun dengan arsitektur monorepo yang terdiri dari:
+### 1. **Bug Kritis: Regenerasi Kunci Otomatis saat Login di Perangkat Baru**
 
--   **Backend (`server/`):** Node.js, Express, Prisma (PostgreSQL), dan Socket.IO. Bertanggung jawab atas otentikasi, persistensi data terenkripsi, dan komunikasi real-time.
--   **Frontend (`web/`):** React, Vite, TypeScript, Zustand, dan Tailwind CSS. Menyediakan antarmuka pengguna yang reaktif dan modern.
+-   **Lokasi:** `web/src/store/auth.ts` (fungsi `login`)
+-   **Masalah:** Alur login saat ini memeriksa keberadaan kunci privat terenkripsi di `localStorage`. Jika tidak ditemukan (kasus umum pada perangkat baru), aplikasi secara keliru melanjutkan untuk membuat **pasangan kunci identitas yang sama sekali baru** dan menyimpannya.
+-   **Dampak:** Ini adalah pelanggaran serius terhadap model identitas E2EE. Kunci publik baru akan menimpa kunci publik lama di server, menyebabkan semua kontak kehilangan kemampuan untuk mengenkripsi pesan untuk pengguna tersebut dengan benar. Ini juga membuat pengguna tidak dapat mendekripsi riwayat pesan mereka di perangkat baru, karena mereka tidak memiliki kunci privat yang sesuai.
+-   **Seharusnya:** Jika kunci tidak ada, alur aplikasi harus secara eksplisit mengarahkan pengguna ke halaman pemulihan akun (`/restore`) untuk menggunakan *recovery phrase* mereka, yang akan meregenerasi kunci asli secara deterministik.
 
-Komunikasi antara klien dan server menggunakan pendekatan hybrid:
--   **API REST:** Untuk operasi CRUD stateful seperti otentikasi, pengambilan riwayat chat, dan manajemen sesi.
--   **WebSockets (Socket.IO):** Untuk semua komunikasi real-time seperti pengiriman pesan, status online, notifikasi pengetikan, dan sinkronisasi kunci enkripsi.
+### 2. **Disparitas Sistem Kunci: Implementasi Tidak Sesuai Dokumentasi**
 
----
-
-## 2. Peta Alur Data & Fitur Utama
-
-Berikut adalah pemetaan alur data untuk fitur-fitur inti aplikasi:
-
-| Fitur | Alur Proses |
-| :--- | :--- |
-| **👤 Otentikasi (Login)** | `AuthForm` → `useAuthStore.login()` → `POST /api/auth/login` → `jwt.sign()` → `HTTP-only cookie` → `useAuthStore.setUser()` → Navigasi ke `/chat` |
-| **📨 Pengiriman Pesan** | `MessageInput` → `useConversation.sendMessage()` → `encryptMessage()` → `socket.emit('message:send', payload)` → **Server:** `on('message:send')` → Simpan ke DB → `io.to(roomId).emit('message:new', data)` → **Klien:** `on('message:new')` → `decryptMessage()` → Update `useConversation` store → UI re-render |
-| **👥 Pembuatan Grup** | `CreateGroupChat` → `POST /api/conversations` → **Server:** Buat grup & partisipan → `io.to(userIds).emit('conversation:new', data)` → **Klien:** `on('conversation:new')` → `useConversationStore.addOrUpdateConversation()` |
-| **✍️ Indikator Pengetikan** | `MessageInput.onChange` → `socket.emit('typing:start', { convId })` → **Server:** `io.to(roomId).emit('typing:started', { userId })` → **Klien:** `usePresenceStore.addTypingUser()` → `TypingIndicator` re-render |
-| **🟢 Status Online** | `socket.on('connect')` → `socket.emit('presence:update', { online: true })` → **Server:** `redis.sadd('online_users')` → `io.emit('presence:updated', { userId, online: true })` → **Klien:** `usePresenceStore.setPresence()` |
-| **📎 Lampiran File** | `MessageInput.onFileChange` → `useConversation.uploadFile()` → `POST /api/uploads` (multipart/form-data) → Simpan file di `server/uploads` → `sendMessage` dengan `fileUrl` |
-| **🔄 Sinkronisasi Kunci E2EE** | `App.tsx` → `syncSessionKeys()` → `emitSessionKeyRequest()` → **Server:** `on('session:request_key')` → `io.to(otherDeviceId).emit('session:fulfill_request')` → **Perangkat Lain:** `on('session:fulfill_request')` → `fulfillKeyRequest()` → `emitSessionKeyFulfillment()` → **Server:** `on('session:fulfill_response')` → `io.to(requesterId).emit('session:new_key')` → **Perangkat Peminta:** `on('session:new_key')` → `storeReceivedSessionKey()` → `useKeychainStore.keysUpdated()` |
+-   **Lokasi:** `web/src/utils/keyManagement.ts`
+-   **Masalah:** Dokumentasi (`prompt-analis.md`) menjelaskan sistem **dual-key** yang menggunakan satu pasang kunci untuk enkripsi (X25519) dan satu lagi untuk tanda tangan digital (Ed25519). Namun, kode sumber hanya mengimplementasikan dan menggunakan **satu pasang kunci** (X25519 untuk `crypto_box`). Fungsi untuk menghasilkan kunci tanda tangan tidak pernah dibuat atau digunakan.
+-   **Dampak:** Aplikasi ini tidak memiliki lapisan keamanan tambahan dari tanda tangan digital, yang seharusnya dapat memverifikasi integritas dan otentisitas pengirim pesan. Fitur keamanan seperti *Safety Numbers* (nomor keamanan) tidak dapat diimplementasikan dengan andal tanpa kunci penandatangan.
 
 ---
 
-## 3. Peta Event Socket.IO
+## Analisis Alur Kerja (Selesai Sebagian)
 
-Event Socket.IO adalah tulang punggung komunikasi real-time di Chat-Lite.
+### Alur Otentikasi dan Manajemen Kunci Identitas
 
-#### Client → Server
--   `presence:update`: Mengirim status online/offline pengguna saat terhubung/terputus.
--   `conversation:join`: Bergabung ke "room" sebuah percakapan untuk menerima pesan.
--   `message:send`: Mengirim pesan baru yang sudah terenkripsi ke sebuah percakapan.
--   `typing:start` / `typing:stop`: Memberi tahu server bahwa pengguna sedang mengetik atau berhenti.
--   `session:request_key`: Meminta kunci sesi dari perangkat lain milik pengguna yang sama.
--   `session:fulfill_response`: Mengirimkan kunci sesi yang diminta (terenkripsi) sebagai respons.
--   `linking:send_payload`: Mengirim payload untuk menautkan perangkat baru.
+Alur ini sebagian besar terpusat di `web/src/store/auth.ts` dan `web/src/utils/keyManagement.ts`.
 
-#### Server → Client
--   `presence:updated`: Memberi tahu semua klien tentang perubahan status online/offline seorang pengguna.
--   `conversation:new`: Memberi tahu pengguna bahwa mereka telah ditambahkan ke percakapan baru.
--   `message:new`: Meneruskan pesan baru yang terenkripsi ke semua anggota percakapan.
--   `message:updated`: Mengirim pembaruan untuk sebuah pesan (misalnya, reaksi atau penghapusan).
--   `typing:started` / `typing:stopped`: Meneruskan status pengetikan ke anggota percakapan.
--   `session:fulfill_request`: Meneruskan permintaan kunci sesi ke perangkat lain milik pengguna.
--   `session:new_key`: Mengirim kunci sesi yang baru diterima ke perangkat yang memintanya.
--   `force_logout`: Memaksa klien untuk logout (misalnya, jika sesi dicabut dari perangkat lain).
+-   **Registrasi (`registerAndGeneratePhrase`):**
+    1.  Sebuah *seed* acak 32-byte dibuat.
+    2.  Dari *seed* ini, satu pasang kunci enkripsi X25519 (`publicKey`, `privateKey`) dibuat secara deterministik.
+    3.  Sebuah *recovery phrase* (BIP39 mnemonic) 24 kata dibuat dari *seed* tersebut.
+    4.  `privateKey` dienkripsi dengan *password* pengguna (menggunakan `crypto_secretbox`) dan disimpan di `localStorage`.
+    5.  `publicKey` dan *hash* dari *recovery phrase* dikirim ke server (`POST /api/auth/register`). Server menyimpan `publicKey` dan `recoveryPhraseHash` pada model `User`.
 
----
+-   **Login (`login`):**
+    1.  Pengguna mengirimkan kredensial.
+    2.  Server memvalidasi kredensial.
+    3.  Aplikasi memeriksa `localStorage` untuk `encryptedPrivateKey`.
+    4.  **DI SINILAH BUG TERJADI:** Jika tidak ada, kunci baru dibuat. Jika ada, kunci tersebut akan didekripsi dan dimuat ke dalam state.
 
-## 4. Arsitektur Frontend (React & Zustand)
+-   **Pemulihan Akun (`Restore.tsx`):**
+    1.  Pengguna memasukkan *recovery phrase* dan *password* baru.
+    2.  Aplikasi mengubah *phrase* kembali menjadi *seed* aslinya.
+    3.  Pasangan kunci X25519 yang identik dibuat ulang dari *seed* tersebut.
+    4.  Aplikasi mengirim *hash* dari *phrase* ke server (`POST /api/keys/verify`) untuk verifikasi.
+    5.  Jika berhasil, `privateKey` yang baru dibuat dienkripsi dengan *password* baru dan disimpan, menyelesaikan proses pemulihan. Alur ini berfungsi dengan benar dan aman.
 
-#### Hierarki Komponen Utama (`pages/Chat.tsx`)
-```
-<Chat>
- ├── <ConnectionStatusBanner />
- ├── <ChatList> (Sidebar Kiri)
- │    ├── <ChatItem />
- │    └── <StartNewChat />
- ├── <ChatWindow> (Konten Utama)
- │    ├── <ChatHeader />
- │    ├── <Virtuoso> (Message List)
- │    │    └── <MessageItem />
- │    └── <MessageInput />
- └── <GroupInfoPanel> / <UserInfoPanel> (Sidebar Kanan)
-```
+### Alur Enkripsi End-to-End (E2EE)
 
-#### State Management (Zustand)
-State global dibagi menjadi beberapa *store* yang logis, yang merupakan praktik yang baik untuk dikelola.
--   `useAuthStore`: Mengelola state otentikasi pengguna, token, dan data pengguna.
--   `useConversationStore`: Mengelola daftar percakapan, percakapan aktif, dan operasi terkait (memuat, membuka, membuat).
--   `useMessageStore` (di dalam hook `useConversation`): Mengelola pesan untuk percakapan yang sedang aktif.
--   `usePresenceStore`: Melacak status online pengguna dan siapa yang sedang mengetik di setiap percakapan.
--   `useKeychainStore`: Mengelola status kunci enkripsi yang tersedia di perangkat.
--   `useModalStore`, `useCommandPaletteStore`, dll: Mengelola state UI spesifik.
+**Status: Analisis Belum Selesai.**
 
-Interaksi antar komponen sebagian besar terjadi melalui *store* Zustand ini. Komponen mengirim *action*, dan *store* berkomunikasi dengan backend. Ketika data baru diterima (terutama melalui socket), *store* diperbarui, dan semua komponen yang berlangganan akan me-render ulang secara otomatis.
+Analisis investigator terhenti sebelum dapat sepenuhnya memetakan alur ini. Investigasi manual akan dilanjutkan pada file-file berikut:
+-   `web/src/store/conversation.ts`
+-   `web/src/utils/crypto.ts`
+-   `web/src/lib/socket.ts`
+-   `server/src/socket.ts`
+-   `server/src/routes/conversations.ts`
+-   `server/src/routes/keys.ts`
 
----
-
-## 5. Integrasi API Backend
-
-Backend menyediakan API REST untuk operasi yang tidak memerlukan real-time.
-
--   `/api/auth/*`: Mengelola registrasi, login, logout, dan manajemen sesi (misalnya, `POST /api/auth/login`).
--   `/api/conversations`:
-    -   `GET /`: Mengambil semua percakapan pengguna.
-    -   `POST /`: Membuat percakapan baru.
-    -   `POST /:id/read`: Menandai percakapan sebagai telah dibaca.
--   `/api/messages/:conversationId`: Mengambil riwayat pesan untuk sebuah percakapan (dengan paginasi).
--   `/api/users/*`: Mencari pengguna.
--   `/api/uploads`: Mengunggah lampiran file.
--   `/api/keys/*`: Mengelola kunci publik dan kunci sesi terenkripsi.
-
-Semua rute yang memerlukan otentikasi dilindungi oleh middleware yang memverifikasi token JWT dari *cookie*.
-
----
-
-## 6. Temuan & Status Fitur
-
-| Fitur | Status | Catatan |
-| :--- | :--- | :--- |
-| **Otentikasi & Sesi** | ✅ **Berfungsi** | Alur login, registrasi, dan manajemen sesi sudah solid. |
-| **Pesan Pribadi & Grup** | ✅ **Berfungsi** | Pengiriman dan penerimaan pesan berfungsi secara real-time. |
-| **Enkripsi E2E** | ✅ **Berfungsi** | Alur enkripsi, dekripsi, dan sinkronisasi kunci antar perangkat sudah terimplementasi. |
-| **Indikator Pengetikan** | ✅ **Berfungsi** | Tampil secara real-time. |
-| **Status Online** | ✅ **Berfungsi** | Status online/offline pengguna ditampilkan dengan benar. |
-| **Manajemen Grup** | ✅ **Berfungsi** | Membuat grup dan menambahkan anggota sudah berfungsi. |
-| **Lampiran File** | ✅ **Berfungsi** | Pengguna dapat mengunggah dan melihat lampiran. |
-| **Pencarian Pesan** | ✅ **Berfungsi** | Fungsionalitas pencarian di dalam percakapan sudah ada. |
-| **UI Responsif** |  **berfungsi** | Tata letak utama sudah responsif, tetapi beberapa modal dan panel mungkin memerlukan penyesuaian lebih lanjut untuk layar yang sangat kecil atau sangat besar. |
-| **Stabilitas Socket** |  **berfungsi** | Logika *reconnect* sudah ada, tetapi perlu diuji dalam kondisi jaringan yang tidak stabil untuk memastikan tidak ada *race condition* atau kehilangan state. |
-
-### Rekomendasi & Area Risiko
-1.  **Kompleksitas E2EE:** Logika sinkronisasi kunci (`session:request_key`, `session:fulfill_request`, dll.) sangat penting dan rumit. Kesalahan implementasi di sisi klien dapat membahayakan keamanan atau menyebabkan pengguna tidak dapat mendekripsi pesan. Area ini harus diuji secara menyeluruh.
-2.  **Manajemen State:** Meskipun Zustand membantu, ada banyak *store* yang saling bergantung. Perubahan pada satu *store* dapat memicu pembaruan berantai. Ini perlu diperhatikan saat menambahkan fitur baru agar tidak menimbulkan *re-render loop*.
-3.  **Optimasi Performa:** Penggunaan `react-virtuoso` untuk daftar pesan adalah pilihan yang sangat baik untuk performa. Namun, pemuatan awal `loadConversations` yang mendekripsi setiap pesan terakhir bisa menjadi lambat jika jumlah percakapan sangat banyak. Ini bisa dioptimalkan di masa depan.
-4.  **Penanganan Error:** Penanganan error di beberapa alur socket bisa ditingkatkan. Saat ini, banyak error hanya dicatat di konsol (`console.error`). Menampilkan umpan balik yang lebih jelas kepada pengguna (misalnya, melalui *toast*) akan meningkatkan UX.
+Langkah selanjutnya adalah memahami bagaimana kunci sesi (session keys) dibuat, didistribusikan (diratchet), dan digunakan untuk mengenkripsi/mendekripsi pesan individual.

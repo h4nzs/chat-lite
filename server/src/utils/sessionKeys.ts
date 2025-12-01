@@ -10,16 +10,18 @@ export async function createAndDistributeInitialSessionKey(
   conversationId: string,
   initialSessionData: {
     sessionId: string;
+    ephemeralPublicKey: string;
     initialKeys: { userId: string; key: string }[];
   }
 ) {
-  const { sessionId, initialKeys } = initialSessionData;
+  const { sessionId, initialKeys, ephemeralPublicKey } = initialSessionData;
 
   const keyRecords = initialKeys.map(ik => ({
     sessionId,
     encryptedKey: ik.key,
     userId: ik.userId,
     conversationId,
+    initiatorEphemeralKey: ephemeralPublicKey, // Save the ephemeral key
   }));
 
   await prisma.sessionKey.createMany({

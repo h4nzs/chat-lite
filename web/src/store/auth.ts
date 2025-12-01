@@ -4,17 +4,25 @@ import { getSocket, disconnectSocket, connectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { getSodium } from '@lib/sodiumInitializer';
-import { generateKeyPairs, exportPublicKey, storePrivateKeys, retrievePrivateKeys } from "@utils/keyManagement";
+import { exportPublicKey, storePrivateKeys, retrievePrivateKeys } from "@utils/keyManagement";
 import { useModalStore } from "./modal";
 import * as bip39 from 'bip39';
 import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import toast from "react-hot-toast";
 
-export async function setupAndUploadPreKeyBundle(signingPrivateKey: Uint8Array) {
+/**
+ * Retrieves the persisted signed pre-key, signs it with the identity signing key,
+ * and uploads the bundle to the server.
+ */
+export async function setupAndUploadPreKeyBundle() {
   try {
+    const { getSigningPrivateKey, getSignedPreKeyPair } = useAuthStore.getState();
+
     const sodium = await getSodium();
-    const signedPreKeyPair = sodium.crypto_box_keypair();
+    const signingPrivateKey = await getSigningPrivateKey();
+    const signedPreKeyPair = await getSignedPreKeyPair();
+
     const signature = sodium.crypto_sign_detached(signedPreKeyPair.publicKey, signingPrivateKey);
     const identityKey = localStorage.getItem('publicKey');
     if (!identityKey) throw new Error("Identity key not found.");
@@ -56,11 +64,18 @@ type State = {
   logout: () => Promise<void>;
   getEncryptionKeyPair: () => Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }>;
   getSigningPrivateKey: () => Promise<Uint8Array>;
+  getSignedPreKeyPair: () => Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }>;
   setUser: (user: User) => void;
 };
 
 const savedUser = localStorage.getItem("user");
-let privateKeysCache: { encryption: Uint8Array, signing: Uint8Array } | null = null;
+// This cache now holds all three private keys once decrypted
+let privateKeysCache: {
+  encryption: Uint8Array,
+  signing: Uint8Array,
+  signedPreKey: Uint8Array,
+  masterSeed?: Uint8Array,
+} | null = null;
 
 export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
@@ -90,8 +105,8 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     
     if (localStorage.getItem('encryptedPrivateKeys')) {
       try {
-        const signingKey = await get().getSigningPrivateKey();
-        await setupAndUploadPreKeyBundle(signingKey);
+        // This function now gets all keys internally
+        await setupAndUploadPreKeyBundle();
       } catch (e) {
         toast.error("Could not prepare secure sessions.");
       }
@@ -105,34 +120,32 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
   async registerAndGeneratePhrase(data) {
     const sodium = await getSodium();
     
-    // 1. Generate a single 32-byte master seed. This is the source for the mnemonic.
     const masterSeed = sodium.randombytes_buf(32);
 
-    // 2. Derive specific seeds for encryption and signing from the master seed.
     const encryptionSeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("encryption")));
     const signingSeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("signing")));
+    const signedPreKeySeed = sodium.crypto_generichash(32, masterSeed, new Uint8Array(new TextEncoder().encode("signed-pre-key")));
 
-    // 3. Generate key pairs from the derived seeds.
     const encryptionKeyPair = sodium.crypto_box_seed_keypair(encryptionSeed);
     const signingKeyPair = sodium.crypto_sign_seed_keypair(signingSeed);
+    const signedPreKeyPair = sodium.crypto_box_seed_keypair(signedPreKeySeed); // It's a box key for DH
 
     const encryptionPublicKeyB64 = await exportPublicKey(encryptionKeyPair.publicKey);
     const signingPublicKeyB64 = await exportPublicKey(signingKeyPair.publicKey);
 
-    // 4. Encrypt and store both private keys locally, including the master seed.
     const encryptedPrivateKeys = await storePrivateKeys({ 
       encryption: encryptionKeyPair.privateKey, 
       signing: signingKeyPair.privateKey,
-      masterSeed: masterSeed // Store the master seed
+      signedPreKey: signedPreKeyPair.privateKey, // Store the third private key
+      masterSeed: masterSeed
     }, data.password);
+
     localStorage.setItem('publicKey', encryptionPublicKeyB64);
     localStorage.setItem('signingPublicKey', signingPublicKeyB64);
     localStorage.setItem('encryptedPrivateKeys', encryptedPrivateKeys);
 
-    // 5. Create the 24-word mnemonic from the 32-byte master seed.
     const phrase = bip39.entropyToMnemonic(masterSeed);
 
-    // 6. Register the user on the server.
     await api("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ 
@@ -141,9 +154,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
         signingKey: signingPublicKeyB64
       }),
     });
-    
-    // 7. DO NOT log in. The user must now log in manually.
-    // This simplifies the flow and ensures the login flow (with pre-key upload) is always triggered.
     
     return phrase;
   },
@@ -200,6 +210,31 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
                 const sodium = await getSodium();
                 const publicKey = sodium.crypto_scalarmult_base(keys.encryption);
                 resolve({ publicKey, privateKey: keys.encryption });
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+  },
+
+  async getSignedPreKeyPair(): Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }> {
+    if (privateKeysCache?.signedPreKey) {
+      const sodium = await getSodium();
+      const publicKey = sodium.crypto_scalarmult_base(privateKeysCache.signedPreKey);
+      return { publicKey, privateKey: privateKeysCache.signedPreKey };
+    }
+    return new Promise((resolve, reject) => {
+        useModalStore.getState().showPasswordPrompt(async (password) => {
+            if (!password) return reject(new Error("Password not provided."));
+            try {
+                const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
+                if (!encryptedKeys) throw new Error("Encrypted private keys not found.");
+                const keys = await retrievePrivateKeys(encryptedKeys, password);
+                if (!keys?.signedPreKey) throw new Error("Incorrect password or corrupted/legacy keys.");
+                privateKeysCache = keys;
+                const sodium = await getSodium();
+                const publicKey = sodium.crypto_scalarmult_base(keys.signedPreKey);
+                resolve({ publicKey, privateKey: keys.signedPreKey });
             } catch (e) {
                 reject(e);
             }

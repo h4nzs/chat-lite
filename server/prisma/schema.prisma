@@ -186,13 +186,14 @@ model RefreshToken {
 
 
 model SessionKey {
-  id              String   @id @default(cuid())
-  conversationId  String
-  sessionId       String
-  userId          String
-  encryptedKey    String
-  createdAt       DateTime @default(now())
-  expiresAt       DateTime?
+  id                    String   @id @default(cuid())
+  conversationId        String
+  sessionId             String
+  userId                String
+  encryptedKey          String
+  initiatorEphemeralKey String?  // For the recipient to derive the initial shared secret
+  createdAt             DateTime @default(now())
+  expiresAt             DateTime?
 
   @@index([conversationId])
   @@index([userId])

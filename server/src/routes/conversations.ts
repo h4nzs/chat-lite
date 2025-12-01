@@ -125,6 +125,7 @@ router.post("/", async (req, res, next) => {
     });
 
     if (initialSession) {
+      console.log("DEBUG initialSession:", initialSession);
       await createAndDistributeInitialSessionKey(newConversation.id, initialSession);
     } else {
       await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
