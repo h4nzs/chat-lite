@@ -104,6 +104,18 @@ export function getSocket() {
 
     socket.on("conversation:updated", (updates) => conversationStore.updateConversation(updates.id, updates));
     socket.on("conversation:deleted", ({ id }) => conversationStore.removeConversation(id));
+
+    socket.on('user:updated', (updatedUser) => {
+      // Update the user's own info if it's them
+      const { user, setUser } = useAuthStore.getState();
+      if (user?.id === updatedUser.id) {
+        setUser({ ...user, ...updatedUser });
+      }
+      // Update user details in conversation participants and message senders
+      useConversationStore.getState().updateParticipantDetails(updatedUser);
+      useMessageStore.getState().updateSenderDetails(updatedUser);
+    });
+
     socket.on('message:status_updated', (payload) => {
       console.log('[STATUS] Received message:status_updated:', payload); // Diagnostic Log
       const { conversationId, messageId, deliveredTo, readBy, status } = payload;

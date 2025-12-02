@@ -4,7 +4,7 @@ import { getSocket, disconnectSocket, connectSocket } from "@lib/socket";
 import { eraseCookie } from "@lib/tokenStorage";
 import { clearKeyCache } from "@utils/crypto";
 import { getSodium } from '@lib/sodiumInitializer';
-import { exportPublicKey, storePrivateKeys, retrievePrivateKeys } from "@utils/keyManagement";
+import { exportPublicKey, storePrivateKeys, retrievePrivateKeys, type RetrieveKeysResult } from "@utils/keyManagement";
 import { useModalStore } from "./modal";
 import * as bip39 from 'bip39';
 import { useConversationStore } from "./conversation";
@@ -53,11 +53,16 @@ export type User = {
   description?: string | null;
   avatarUrl?: string | null;
   hasCompletedOnboarding?: boolean;
+  showEmailToOthers?: boolean;
 };
 
 type State = {
   user: User | null;
   isBootstrapping: boolean;
+  sendReadReceipts: boolean;
+};
+
+type Actions = {
   bootstrap: () => Promise<void>;
   login: (emailOrUsername: string, password: string) => Promise<void>;
   registerAndGeneratePhrase: (data: any) => Promise<string>;
@@ -66,9 +71,14 @@ type State = {
   getSigningPrivateKey: () => Promise<Uint8Array>;
   getSignedPreKeyPair: () => Promise<{ publicKey: Uint8Array, privateKey: Uint8Array }>;
   setUser: (user: User) => void;
+  updateProfile: (data: Partial<Pick<User, 'name' | 'description' | 'showEmailToOthers'>>) => Promise<void>;
+  updateAvatar: (avatar: File) => Promise<void>;
+  setReadReceipts: (value: boolean) => void;
 };
 
 const savedUser = localStorage.getItem("user");
+const savedReadReceipts = localStorage.getItem('sendReadReceipts');
+
 // This cache now holds all three private keys once decrypted
 let privateKeysCache: {
   encryption: Uint8Array,
@@ -77,9 +87,15 @@ let privateKeysCache: {
   masterSeed?: Uint8Array,
 } | null = null;
 
-export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
+export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
   isBootstrapping: true,
+  sendReadReceipts: savedReadReceipts ? JSON.parse(savedReadReceipts) : true,
+
+  setReadReceipts: (value: boolean) => {
+    set({ sendReadReceipts: value });
+    localStorage.setItem('sendReadReceipts', JSON.stringify(value));
+  },
 
   async bootstrap() {
     try {
@@ -105,7 +121,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     
     if (localStorage.getItem('encryptedPrivateKeys')) {
       try {
-        // This function now gets all keys internally
         await setupAndUploadPreKeyBundle();
       } catch (e) {
         toast.error("Could not prepare secure sessions.");
@@ -128,7 +143,7 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
 
     const encryptionKeyPair = sodium.crypto_box_seed_keypair(encryptionSeed);
     const signingKeyPair = sodium.crypto_sign_seed_keypair(signingSeed);
-    const signedPreKeyPair = sodium.crypto_box_seed_keypair(signedPreKeySeed); // It's a box key for DH
+    const signedPreKeyPair = sodium.crypto_box_seed_keypair(signedPreKeySeed);
 
     const encryptionPublicKeyB64 = await exportPublicKey(encryptionKeyPair.publicKey);
     const signingPublicKeyB64 = await exportPublicKey(signingKeyPair.publicKey);
@@ -136,7 +151,7 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     const encryptedPrivateKeys = await storePrivateKeys({ 
       encryption: encryptionKeyPair.privateKey, 
       signing: signingKeyPair.privateKey,
-      signedPreKey: signedPreKeyPair.privateKey, // Store the third private key
+      signedPreKey: signedPreKeyPair.privateKey,
       masterSeed: masterSeed
     }, data.password);
 
@@ -166,13 +181,41 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     eraseCookie("rt");
     privateKeysCache = null;
     clearKeyCache();
-    // Selectively remove session data instead of clearing everything
     localStorage.removeItem('user');
     set({ user: null });
     disconnectSocket();
-    // Reset all other stores to their initial state
     useConversationStore.getState().reset();
     useMessageStore.getState().reset();
+  },
+
+  updateProfile: async (data) => {
+    try {
+      const updatedUser = await authFetch<User>('/api/users/me', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      set({ user: updatedUser });
+      toast.success('Profile updated!');
+    } catch (e: any) {
+      toast.error(`Update failed: ${e.message}`);
+      throw e;
+    }
+  },
+
+  updateAvatar: async (avatar: File) => {
+    const formData = new FormData();
+    formData.append('avatar', avatar);
+    try {
+      const updatedUser = await authFetch<User>('/api/users/me/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+      set({ user: updatedUser });
+      toast.success('Avatar updated!');
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e.message}`);
+      throw e;
+    }
   },
 
   async getSigningPrivateKey(): Promise<Uint8Array> {
@@ -190,7 +233,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
             return reject(new Error("Incorrect password."));
           }
           if (result.reason === 'legacy_bundle') {
-            // Special handling for legacy bundles - prompt user to restore
             return reject(new Error("Legacy key bundle found. Account reset might be needed."));
           }
           return reject(new Error(`Failed to retrieve signing key: ${result.reason}`));
@@ -255,7 +297,6 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
                 return reject(new Error("Incorrect password."));
               }
               if (result.reason === 'legacy_bundle') {
-                // This is the specific case Coderabbit wanted us to propagate
                 return reject(new Error("Legacy key bundle found without signed pre-key. Please restore your account from your recovery phrase."));
               }
               return reject(new Error(`Failed to retrieve signed pre-key pair: ${result.reason}`));
