@@ -5,6 +5,7 @@ import { useConversationStore } from "@store/conversation";
 import { useMessageStore, decryptMessageObject } from "@store/message";
 import { useConnectionStore } from "@store/connection";
 import { usePresenceStore } from "@store/presence";
+import useNotificationStore from '@store/notification';
 import { fulfillKeyRequest, storeReceivedSessionKey } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
 import type { Message } from "@store/conversation";
@@ -60,6 +61,17 @@ export function getSocket() {
         } else {
           // Otherwise, it's a new incoming message from another user.
           addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
+          
+          // Trigger Notification store if the message is for an inactive conversation
+          const activeId = useConversationStore.getState().activeId;
+          if (decryptedMessage.conversationId !== activeId && decryptedMessage.sender) {
+            const { addNotification } = useNotificationStore.getState();
+            addNotification({
+              sender: decryptedMessage.sender,
+              message: decryptedMessage.content || 'Sent a file',
+              link: decryptedMessage.conversationId,
+            });
+          }
         }
 
         conversationStore.updateConversationLastMessage(decryptedMessage.conversationId, decryptedMessage);
@@ -104,6 +116,18 @@ export function getSocket() {
 
     socket.on("conversation:updated", (updates) => conversationStore.updateConversation(updates.id, updates));
     socket.on("conversation:deleted", ({ id }) => conversationStore.removeConversation(id));
+
+    socket.on('user:updated', (updatedUser) => {
+      // Update the user's own info if it's them
+      const { user, setUser } = useAuthStore.getState();
+      if (user?.id === updatedUser.id) {
+        setUser({ ...user, ...updatedUser });
+      }
+      // Update user details in conversation participants and message senders
+      useConversationStore.getState().updateParticipantDetails(updatedUser);
+      useMessageStore.getState().updateSenderDetails(updatedUser);
+    });
+
     socket.on('message:status_updated', (payload) => {
       console.log('[STATUS] Received message:status_updated:', payload); // Diagnostic Log
       const { conversationId, messageId, deliveredTo, readBy, status } = payload;

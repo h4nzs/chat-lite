@@ -7,12 +7,13 @@ const B64_VARIANT = 'URLSAFE_NO_PADDING';
  * Creates a new session key from scratch on the server and encrypts it for all participants.
  * This is used for ratcheting sessions or as a fallback.
  */
-export async function rotateAndDistributeSessionKeys(conversationId: string, initiatorId: string) {
+export async function rotateAndDistributeSessionKeys(conversationId: string, initiatorId: string, tx?: any) {
+  const db = tx || prisma;
   const sodium = await getSodium();
   const sessionKey = sodium.crypto_secretbox_keygen();
   const sessionId = `session_${sodium.to_hex(sodium.randombytes_buf(16))}`;
 
-  const participants = await prisma.participant.findMany({
+  const participants = await db.participant.findMany({
     where: { conversationId },
     include: { user: { select: { id: true, publicKey: true } } },
   });
@@ -28,7 +29,7 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
     }
     
     try {
-      const recipientPublicKey = sodium.from_base64(p.user.publicKey, sodium.base64_variants[B64_VARIANT]);
+      const recipientPublicKey = sodium.from_base64(p.user.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
       const encryptedKey = sodium.crypto_box_seal(sessionKey, recipientPublicKey);
       
       return {
@@ -51,15 +52,12 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
     throw new Error(`Failed to create session keys for all participants in conversation ${conversationId}. Missing keys for users: ${missingUserIds.join(', ')}`);
   }
 
-  // Find the initiator's key record BEFORE saving to the database
   const initiatorKeyRecord = keyRecords.find(k => k.userId === initiatorId);
   if (!initiatorKeyRecord) {
-    // This will now fail early if the initiator has no public key
     throw new Error('Could not find the session key for the initiator.');
   }
 
-  // Only create keys if the initiator's key was successfully generated
-  await prisma.sessionKey.createMany({
+  await db.sessionKey.createMany({
     data: keyRecords,
   });
 
