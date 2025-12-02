@@ -159,8 +159,7 @@ const MessageItem = ({ message, conversation, isHighlighted, onImageClick, isFir
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         const alreadyRead = message.statuses?.some(s => s.userId === meId && s.status === 'READ');
-        const shouldSendReceipt = useAuthStore.getState().sendReadReceipts;
-        if (!alreadyRead && shouldSendReceipt) {
+      if (!alreadyRead) {
           getSocket().emit('message:mark_as_read', { messageId: message.id, conversationId: message.conversationId });
         }
         observer.disconnect();
