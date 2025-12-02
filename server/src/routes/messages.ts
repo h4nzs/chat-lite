@@ -12,7 +12,20 @@ router.use(requireAuth);
 router.get("/:conversationId", async (req, res, next) => {
   try {
     const { conversationId } = req.params;
+    const userId = req.user.id;
     const cursor = req.query.cursor as string | undefined;
+
+    // Authorization check: Ensure the user is a participant
+    const participant = await prisma.participant.findFirst({
+      where: {
+        userId,
+        conversationId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(403).json({ error: "You are not a member of this conversation." });
+    }
 
     const messages = await prisma.message.findMany({
       where: { conversationId },
@@ -160,6 +173,18 @@ router.post("/:messageId/reactions", async (req, res, next) => {
 
     if (!message) {
       return res.status(404).json({ error: "Message not found." });
+    }
+
+    // Authorization check: Ensure the user is a participant of the message's conversation
+    const participant = await prisma.participant.findFirst({
+      where: {
+        userId,
+        conversationId: message.conversationId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(403).json({ error: "You are not a participant of this conversation." });
     }
 
     const newReaction = await prisma.messageReaction.create({

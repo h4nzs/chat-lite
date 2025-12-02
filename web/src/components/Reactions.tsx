@@ -48,15 +48,15 @@ export default function ReactionPopover({ message, children }: ReactionPopoverPr
     addReaction(message.conversationId, message.id, optimisticReaction);
 
     try {
-      // If user had a previous reaction, delete it on the server
-      if (userReaction) {
-        await api(`/api/messages/reactions/${userReaction.id}`, { method: 'DELETE' });
-      }
-      // Add the new reaction on the server
+      // Add the new reaction on the server first
       await api(`/api/messages/${message.id}/reactions`, {
         method: 'POST',
         body: JSON.stringify({ emoji, tempId }),
       });
+      // If user had a previous reaction, now delete it on the server
+      if (userReaction) {
+        await api(`/api/messages/reactions/${userReaction.id}`, { method: 'DELETE' });
+      }
     } catch (error) {
       // Revert all optimistic changes on failure
       console.error("Failed to update reaction:", error);
