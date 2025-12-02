@@ -246,16 +246,9 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       get().addOrUpdateConversation(conv);
       set({ activeId: conv.id, isSidebarOpen: false });
       return conv.id;
-    } catch (error) {
-      console.error("Failed to start conversation using pre-keys, falling back to original method:", error);
-      const conv = await authFetch<Conversation>("/api/conversations", {
-        method: "POST",
-        body: JSON.stringify({ userIds: [peerId], isGroup: false }),
-      });
-      getSocket().emit("conversation:join", conv.id);
-      get().addOrUpdateConversation(conv);
-      set({ activeId: conv.id, isSidebarOpen: false });
-      return conv.id;
+    } catch (error: any) {
+      console.error("Failed to start conversation using pre-keys:", error);
+      throw new Error(`Failed to establish secure conversation. ${error.message || ''} The recipient may not have encryption keys set up.`);
     }
   },
 

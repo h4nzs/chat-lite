@@ -128,7 +128,7 @@ router.get(
         where: {
           conversationId,
           sessionId,
-          userId: { not: userId }
+          isInitiator: true
         },
         include: { user: { select: { id: true, publicKey: true } } },
       });

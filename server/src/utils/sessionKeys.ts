@@ -37,12 +37,13 @@ export async function rotateAndDistributeSessionKeys(conversationId: string, ini
         userId: p.user.id,
         conversationId,
         initiatorEphemeralKey: "server-ratchet", // Add placeholder ephemeral key
+        isInitiator: p.user.id === initiatorId,
       };
     } catch (e: any) {
       console.error(`Failed to process public key for user ${p.user.id}. Key: "${p.user.publicKey}". Error: ${e.message}`);
       throw new Error(`Corrupted public key found for user ${p.user.id}. Cannot establish secure session.`);
     }
-  }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string; initiatorEphemeralKey: string }[];
+  }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string; initiatorEphemeralKey: string; isInitiator: boolean }[];
 
   if (keyRecords.length !== participants.length) {
     const participantsWithKeys = new Set(keyRecords.map(r => r.userId));

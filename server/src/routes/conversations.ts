@@ -137,6 +137,7 @@ router.post("/", async (req, res, next) => {
           userId: ik.userId,
           conversationId: conversation.id,
           initiatorEphemeralKey: ephemeralPublicKey,
+          isInitiator: ik.userId === creatorId,
         }));
         await tx.sessionKey.createMany({
           data: keyRecords,
@@ -144,7 +145,7 @@ router.post("/", async (req, res, next) => {
       } else {
         // Note: rotateAndDistributeSessionKeys performs its own prisma calls and cannot be part of this transaction.
         // If this call fails, the transaction will still commit. This is a known limitation to be addressed if needed.
-        await rotateAndDistributeSessionKeys(conversation.id, creatorId);
+        await rotateAndDistributeSessionKeys(conversation.id, creatorId, tx);
       }
 
       return conversation;

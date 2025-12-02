@@ -124,6 +124,7 @@ export function registerSocket(httpServer: HttpServer) {
         });
 
         if (message && message.senderId !== userId) {
+          console.log(`[Read Receipt] Emitting status update for message ${messageId} to sender ${message.senderId}`);
           io.to(message.senderId).emit('message:status_updated', {
             messageId,
             conversationId: message.conversationId,
