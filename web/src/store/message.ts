@@ -112,7 +112,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         statuses: [{ userId: user.id, status: 'READ', messageId: `temp_${tempId}`, id: `temp_status_${tempId}` }],
       };
 
+      // Store original content for potential retry before encrypting
       if (data.content) {
+        optimisticMessage.preview = data.content;
         const { ciphertext, sessionId } = await encryptMessage(data.content, conversationId);
         optimisticMessage.content = ciphertext;
         optimisticMessage.sessionId = sessionId;
@@ -124,6 +126,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       }
 
       get().addOptimisticMessage(conversationId, optimisticMessage);
+      // Use original content for the last message preview
       useConversationStore.getState().updateConversationLastMessage(conversationId, { ...optimisticMessage, content: data.content, fileType: data.fileType, fileName: data.fileName });
       set({ replyingTo: null, typingLinkPreview: null });
       
@@ -302,11 +305,12 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
   }),
 
   retrySendMessage: (message: Message) => {
-    const { conversationId, tempId, content, fileUrl, fileName, fileType, fileSize, repliedToId } = message;
+    const { conversationId, tempId, preview, fileUrl, fileName, fileType, fileSize, repliedToId } = message;
     set(state => ({
       messages: { ...state.messages, [conversationId]: state.messages[conversationId]?.filter(m => m.tempId !== tempId) || [] },
     }));
-    get().sendMessage(conversationId, { content, fileUrl, fileName, fileType, fileSize, repliedToId });
+    // Use the original content from the 'preview' field for the retry
+    get().sendMessage(conversationId, { content: preview, fileUrl, fileName, fileType, fileSize, repliedToId });
   },
 
   addSystemMessage: (conversationId, content) => {

@@ -54,13 +54,23 @@ export async function storePrivateKeys(keys: {
   return sodium.to_base64(result, sodium.base64_variants[B64_VARIANT]);
 }
 
-export async function retrievePrivateKeys(encryptedDataStr: string, password: string): Promise<{
+type RetrievedKeys = {
   encryption: Uint8Array,
   signing: Uint8Array,
   signedPreKey: Uint8Array,
   masterSeed?: Uint8Array
-} | null> {
+};
+
+export type RetrieveKeysResult =
+  | { success: true; keys: RetrievedKeys }
+  | { success: false; reason: 'incorrect_password' | 'legacy_bundle' | 'keys_not_found' | 'decryption_failed' | 'app_secret_missing' };
+
+export async function retrievePrivateKeys(encryptedDataStr: string, password: string): Promise<RetrieveKeysResult> {
   try {
+    if (!encryptedDataStr) {
+      return { success: false, reason: 'keys_not_found' };
+    }
+
     const sodium = await getSodium();
     const encryptedData = sodium.from_base64(encryptedDataStr, sodium.base64_variants[B64_VARIANT]);
 
@@ -70,7 +80,8 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
 
     const appSecret = import.meta.env.VITE_APP_SECRET;
     if (!appSecret) {
-      throw new Error("VITE_APP_SECRET is required for key decryption.");
+      console.error("VITE_APP_SECRET is required for key decryption but is missing.");
+      return { success: false, reason: 'app_secret_missing' };
     }
     const combinedPass = `${appSecret}-${password}`;
     const keyInput = new Uint8Array(salt.length + sodium.from_string(combinedPass).length);
@@ -78,22 +89,29 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password: st
     keyInput.set(sodium.from_string(combinedPass), salt.length);
     const key = sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, keyInput);
 
-    const decryptedJson = sodium.to_string(sodium.crypto_secretbox_open_easy(encryptedJson, nonce, key));
-    const keys = JSON.parse(decryptedJson);
+    const decryptedJson = sodium.crypto_secretbox_open_easy(encryptedJson, nonce, key);
+    if (!decryptedJson) {
+      return { success: false, reason: 'incorrect_password' };
+    }
+    const keys = JSON.parse(sodium.to_string(decryptedJson));
     
     if (!keys.signedPreKey) {
-      throw new Error("Legacy key bundle found. Account reset might be needed.");
+      // Legacy key bundle found without signedPreKey
+      return { success: false, reason: 'legacy_bundle' };
     }
 
     return {
-      encryption: sodium.from_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
-      signing: sodium.from_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
-      signedPreKey: sodium.from_base64(keys.signedPreKey, sodium.base64_variants[B64_VARIANT]),
-      masterSeed: keys.masterSeed ? sodium.from_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
+      success: true,
+      keys: {
+        encryption: sodium.from_base64(keys.encryption, sodium.base64_variants[B64_VARIANT]),
+        signing: sodium.from_base64(keys.signing, sodium.base64_variants[B64_VARIANT]),
+        signedPreKey: sodium.from_base64(keys.signedPreKey, sodium.base64_variants[B64_VARIANT]),
+        masterSeed: keys.masterSeed ? sodium.from_base64(keys.masterSeed, sodium.base64_variants[B64_VARIANT]) : undefined,
+      }
     };
   } catch (error) {
-    console.error("Failed to retrieve private keys:", error);
-    return null;
+    console.error("Failed to retrieve private keys due to unexpected error:", error);
+    return { success: false, reason: 'decryption_failed' };
   }
 }
 

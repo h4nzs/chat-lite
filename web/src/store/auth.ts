@@ -180,16 +180,25 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     return new Promise((resolve, reject) => {
       useModalStore.getState().showPasswordPrompt(async (password) => {
         if (!password) return reject(new Error("Password not provided."));
-        try {
-          const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
-          if (!encryptedKeys) throw new Error("Encrypted private keys not found.");
-          const keys = await retrievePrivateKeys(encryptedKeys, password);
-          if (!keys?.signing) throw new Error("Incorrect password or corrupted keys.");
-          privateKeysCache = keys;
-          resolve(keys.signing);
-        } catch (e) {
-          reject(e);
+        const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
+        if (!encryptedKeys) return reject(new Error("Encrypted private keys not found."));
+        
+        const result = await retrievePrivateKeys(encryptedKeys, password);
+
+        if (!result.success) {
+          if (result.reason === 'incorrect_password') {
+            return reject(new Error("Incorrect password."));
+          }
+          if (result.reason === 'legacy_bundle') {
+            // Special handling for legacy bundles - prompt user to restore
+            return reject(new Error("Legacy key bundle found. Account reset might be needed."));
+          }
+          return reject(new Error(`Failed to retrieve signing key: ${result.reason}`));
         }
+        
+        if (!result.keys.signing) return reject(new Error("Signing key not found in bundle."));
+        privateKeysCache = result.keys;
+        resolve(result.keys.signing);
       });
     });
   },
@@ -203,18 +212,26 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     return new Promise((resolve, reject) => {
         useModalStore.getState().showPasswordPrompt(async (password) => {
             if (!password) return reject(new Error("Password not provided."));
-            try {
-                const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
-                if (!encryptedKeys) throw new Error("Encrypted private keys not found.");
-                const keys = await retrievePrivateKeys(encryptedKeys, password);
-                if (!keys?.encryption) throw new Error("Incorrect password or corrupted keys.");
-                privateKeysCache = keys;
-                const sodium = await getSodium();
-                const publicKey = sodium.crypto_scalarmult_base(keys.encryption);
-                resolve({ publicKey, privateKey: keys.encryption });
-            } catch (e) {
-                reject(e);
+            const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
+            if (!encryptedKeys) return reject(new Error("Encrypted private keys not found."));
+
+            const result = await retrievePrivateKeys(encryptedKeys, password);
+
+            if (!result.success) {
+              if (result.reason === 'incorrect_password') {
+                return reject(new Error("Incorrect password."));
+              }
+              if (result.reason === 'legacy_bundle') {
+                return reject(new Error("Legacy key bundle found. Account reset might be needed."));
+              }
+              return reject(new Error(`Failed to retrieve encryption key pair: ${result.reason}`));
             }
+            
+            if (!result.keys.encryption) return reject(new Error("Encryption key not found in bundle."));
+            privateKeysCache = result.keys;
+            const sodium = await getSodium();
+            const publicKey = sodium.crypto_scalarmult_base(result.keys.encryption);
+            resolve({ publicKey, privateKey: result.keys.encryption });
         });
     });
   },
@@ -228,18 +245,27 @@ export const useAuthStore = createWithEqualityFn<State>((set, get) => ({
     return new Promise((resolve, reject) => {
         useModalStore.getState().showPasswordPrompt(async (password) => {
             if (!password) return reject(new Error("Password not provided."));
-            try {
-                const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
-                if (!encryptedKeys) throw new Error("Encrypted private keys not found.");
-                const keys = await retrievePrivateKeys(encryptedKeys, password);
-                if (!keys?.signedPreKey) throw new Error("Incorrect password or corrupted/legacy keys.");
-                privateKeysCache = keys;
-                const sodium = await getSodium();
-                const publicKey = sodium.crypto_scalarmult_base(keys.signedPreKey);
-                resolve({ publicKey, privateKey: keys.signedPreKey });
-            } catch (e) {
-                reject(e);
+            const encryptedKeys = localStorage.getItem('encryptedPrivateKeys');
+            if (!encryptedKeys) return reject(new Error("Encrypted private keys not found."));
+
+            const result = await retrievePrivateKeys(encryptedKeys, password);
+
+            if (!result.success) {
+              if (result.reason === 'incorrect_password') {
+                return reject(new Error("Incorrect password."));
+              }
+              if (result.reason === 'legacy_bundle') {
+                // This is the specific case Coderabbit wanted us to propagate
+                return reject(new Error("Legacy key bundle found without signed pre-key. Please restore your account from your recovery phrase."));
+              }
+              return reject(new Error(`Failed to retrieve signed pre-key pair: ${result.reason}`));
             }
+            
+            if (!result.keys.signedPreKey) return reject(new Error("Signed pre-key not found in bundle."));
+            privateKeysCache = result.keys;
+            const sodium = await getSodium();
+            const publicKey = sodium.crypto_scalarmult_base(result.keys.signedPreKey);
+            resolve({ publicKey, privateKey: result.keys.signedPreKey });
         });
     });
   },
