@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getIo } from "../socket.js";
 import { upload } from "../utils/upload.js";
-import { createAndDistributeInitialSessionKey, rotateAndDistributeSessionKeys } from "../utils/sessionKeys.js";
+import { rotateAndDistributeSessionKeys } from "../utils/sessionKeys.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -75,10 +75,10 @@ router.get("/", async (req, res, next) => {
 
 // CREATE a new conversation (private or group)
 router.post("/", async (req, res, next) => {
-  try {
-    const { title, userIds, isGroup, initialSession } = req.body;
-    const creatorId = req.user.id;
+  const { title, userIds, isGroup, initialSession } = req.body;
+  const creatorId = req.user.id;
 
+  try {
     if (!isGroup) {
       const otherUserId = userIds.find((id: string) => id !== creatorId);
       if (!otherUserId) {
@@ -106,29 +106,51 @@ router.post("/", async (req, res, next) => {
 
     const allUserIds = Array.from(new Set([...userIds, creatorId]));
 
-    const newConversation = await prisma.conversation.create({
-      data: {
-        title: isGroup ? title : null,
-        isGroup,
-        creatorId: isGroup ? creatorId : null,
-        participants: {
-          create: allUserIds.map((userId: string) => ({
-            user: { connect: { id: userId } },
-            role: userId === creatorId ? "ADMIN" : "MEMBER",
-          })),
+    // --- Start Transaction ---
+    const newConversation = await prisma.$transaction(async (tx) => {
+      const conversation = await tx.conversation.create({
+        data: {
+          title: isGroup ? title : null,
+          isGroup,
+          creatorId: isGroup ? creatorId : null,
+          participants: {
+            create: allUserIds.map((userId: string) => ({
+              user: { connect: { id: userId } },
+              role: userId === creatorId ? "ADMIN" : "MEMBER",
+            })),
+          },
         },
-      },
-      include: {
-        participants: { include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, description: true } } } },
-        creator: true,
-      },
-    });
+        include: {
+          participants: { include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, description: true } } } },
+          creator: true,
+        },
+      });
 
-    if (initialSession) {
-      await createAndDistributeInitialSessionKey(newConversation.id, initialSession);
-    } else {
-      await rotateAndDistributeSessionKeys(newConversation.id, creatorId);
-    }
+      if (initialSession) {
+        const { sessionId, initialKeys, ephemeralPublicKey } = initialSession;
+        if (!sessionId || !initialKeys || !ephemeralPublicKey) {
+          throw new Error("Incomplete initial session data provided.");
+        }
+        const keyRecords = initialKeys.map((ik: { userId: string; key: string; }) => ({
+          sessionId,
+          encryptedKey: ik.key,
+          userId: ik.userId,
+          conversationId: conversation.id,
+          initiatorEphemeralKey: ephemeralPublicKey,
+          isInitiator: ik.userId === creatorId,
+        }));
+        await tx.sessionKey.createMany({
+          data: keyRecords,
+        });
+      } else {
+        // Note: rotateAndDistributeSessionKeys performs its own prisma calls and cannot be part of this transaction.
+        // If this call fails, the transaction will still commit. This is a known limitation to be addressed if needed.
+        await rotateAndDistributeSessionKeys(conversation.id, creatorId, tx);
+      }
+
+      return conversation;
+    });
+    // --- End Transaction ---
 
     const transformedConversation = {
       ...newConversation,
@@ -145,6 +167,7 @@ router.post("/", async (req, res, next) => {
 
     const initiatorConversation = { ...transformedConversation, unreadCount: 0 };
     res.status(201).json(initiatorConversation);
+
   } catch (error) {
     next(error);
   }

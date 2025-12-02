@@ -84,6 +84,9 @@ type State = {
   error: string | null;
   loading: boolean;
   initialLoadCompleted: boolean;
+};
+
+type Actions = {
   loadConversations: () => Promise<void>;
   openConversation: (id: string | null) => void;
   deleteConversation: (id: string) => Promise<void>;
@@ -100,19 +103,28 @@ type State = {
   updateConversationLastMessage: (conversationId: string, message: Message) => void;
   resyncState: () => Promise<void>;
   clearError: () => void;
-};
+  reset: () => void;
+}
 
 // --- Zustand Store ---
 
-export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
+const initialState: State = {
   conversations: [],
   activeId: null,
   isSidebarOpen: false,
   error: null,
   loading: false,
   initialLoadCompleted: false,
+};
+
+export const useConversationStore = createWithEqualityFn<State & Actions>((set, get) => ({
+  ...initialState,
 
   clearError: () => set({ error: null }),
+
+  reset: () => {
+    set(initialState);
+  },
 
   resyncState: async () => {
     if (!get().initialLoadCompleted) {
@@ -234,16 +246,9 @@ export const useConversationStore = createWithEqualityFn<State>((set, get) => ({
       get().addOrUpdateConversation(conv);
       set({ activeId: conv.id, isSidebarOpen: false });
       return conv.id;
-    } catch (error) {
-      console.error("Failed to start conversation using pre-keys, falling back to original method:", error);
-      const conv = await authFetch<Conversation>("/api/conversations", {
-        method: "POST",
-        body: JSON.stringify({ userIds: [peerId], isGroup: false }),
-      });
-      getSocket().emit("conversation:join", conv.id);
-      get().addOrUpdateConversation(conv);
-      set({ activeId: conv.id, isSidebarOpen: false });
-      return conv.id;
+    } catch (error: any) {
+      console.error("Failed to start conversation using pre-keys:", error);
+      throw new Error(`Failed to establish secure conversation. ${error.message || ''} The recipient may not have encryption keys set up.`);
     }
   },
 

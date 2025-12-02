@@ -24,20 +24,27 @@ router.post(
       const userId = req.user.id;
       const { identityKey, signedPreKey } = req.body;
 
-      await prisma.preKeyBundle.upsert({
-        where: { userId },
-        update: {
-          identityKey,
-          key: signedPreKey.key,
-          signature: signedPreKey.signature,
-        },
-        create: {
-          userId,
-          identityKey,
-          key: signedPreKey.key,
-          signature: signedPreKey.signature,
-        },
-      });
+      // Use a transaction to ensure both operations succeed or fail together
+      await prisma.$transaction([
+        prisma.preKeyBundle.upsert({
+          where: { userId },
+          update: {
+            identityKey,
+            key: signedPreKey.key,
+            signature: signedPreKey.signature,
+          },
+          create: {
+            userId,
+            identityKey,
+            key: signedPreKey.key,
+            signature: signedPreKey.signature,
+          },
+        }),
+        prisma.user.update({
+          where: { id: userId },
+          data: { publicKey: identityKey },
+        }),
+      ]);
 
       res.status(201).json({ message: "Pre-key bundle updated successfully." });
     } catch (e) {
@@ -84,6 +91,59 @@ router.get(
       if (e.message.includes("pre-key bundle")) {
         return res.status(404).json({ error: e.message });
       }
+      next(e);
+    }
+  }
+);
+
+// === GET: Get an initial session key record for a recipient ===
+router.get(
+  "/initial-session/:conversationId/:sessionId",
+  requireAuth,
+  zodValidate({
+    params: z.object({
+      conversationId: z.string(),
+      sessionId: z.string(),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      const { conversationId, sessionId } = req.params;
+      const userId = req.user.id;
+
+      const keyRecord = await prisma.sessionKey.findFirst({
+        where: {
+          conversationId,
+          sessionId,
+          userId,
+        },
+      });
+
+      if (!keyRecord || !keyRecord.initiatorEphemeralKey) {
+        return res.status(404).json({ error: "Initial session data not found for this user." });
+      }
+
+      // Find the initiator to get their public identity key
+      const initiatorRecord = await prisma.sessionKey.findFirst({
+        where: {
+          conversationId,
+          sessionId,
+          isInitiator: true
+        },
+        include: { user: { select: { id: true, publicKey: true } } },
+      });
+
+      if (!initiatorRecord?.user?.publicKey) {
+        return res.status(404).json({ error: "Initiator's public key could not be found for this session." });
+      }
+
+      res.json({
+        encryptedKey: keyRecord.encryptedKey,
+        initiatorEphemeralKey: keyRecord.initiatorEphemeralKey,
+        initiatorIdentityKey: initiatorRecord.user.publicKey,
+      });
+
+    } catch (e) {
       next(e);
     }
   }
