@@ -17,18 +17,27 @@ import toast from "react-hot-toast";
  */
 export async function setupAndUploadPreKeyBundle() {
   try {
-    const { getSigningPrivateKey, getSignedPreKeyPair } = useAuthStore.getState();
+    const { getSigningPrivateKey, getSignedPreKeyPair, getEncryptionKeyPair } = useAuthStore.getState();
 
     const sodium = await getSodium();
     const signingPrivateKey = await getSigningPrivateKey();
     const signedPreKeyPair = await getSignedPreKeyPair();
+    const encryptionKeyPair = await getEncryptionKeyPair(); // Get the main identity key pair
+
+    // Validation: Ensure the public key in localStorage matches the one derived from the private key
+    const identityKeyFromStorage = localStorage.getItem('publicKey');
+    if (!identityKeyFromStorage) throw new Error("Identity key not found in localStorage.");
+
+    const derivedIdentityKey = await exportPublicKey(encryptionKeyPair.publicKey);
+
+    if (identityKeyFromStorage !== derivedIdentityKey) {
+      throw new Error("CRITICAL: Stored public key does not match derived private key. Aborting pre-key bundle upload.");
+    }
 
     const signature = sodium.crypto_sign_detached(signedPreKeyPair.publicKey, signingPrivateKey);
-    const identityKey = localStorage.getItem('publicKey');
-    if (!identityKey) throw new Error("Identity key not found.");
 
     const bundle = {
-      identityKey: identityKey,
+      identityKey: identityKeyFromStorage,
       signedPreKey: {
         key: await exportPublicKey(signedPreKeyPair.publicKey),
         signature: sodium.to_base64(signature, sodium.base64_variants.URLSAFE_NO_PADDING),
