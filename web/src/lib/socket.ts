@@ -5,6 +5,7 @@ import { useConversationStore } from "@store/conversation";
 import { useMessageStore, decryptMessageObject } from "@store/message";
 import { useConnectionStore } from "@store/connection";
 import { usePresenceStore } from "@store/presence";
+import useDynamicIslandStore from '@store/dynamicIsland';
 import { fulfillKeyRequest, storeReceivedSessionKey } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
 import type { Message } from "@store/conversation";
@@ -60,6 +61,18 @@ export function getSocket() {
         } else {
           // Otherwise, it's a new incoming message from another user.
           addIncomingMessage(decryptedMessage.conversationId, decryptedMessage);
+          
+          // Trigger Dynamic Island if the message is for an inactive conversation
+          const activeId = useConversationStore.getState().activeId;
+          if (decryptedMessage.conversationId !== activeId && decryptedMessage.sender) {
+            const { addActivity } = useDynamicIslandStore.getState();
+            addActivity({
+              type: 'notification',
+              sender: decryptedMessage.sender,
+              message: decryptedMessage.content || 'Sent a file',
+              link: decryptedMessage.conversationId,
+            }, 5000);
+          }
         }
 
         conversationStore.updateConversationLastMessage(decryptedMessage.conversationId, decryptedMessage);
