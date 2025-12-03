@@ -39,7 +39,7 @@ export async function getSecureLinkPreview(url: string): Promise<LinkPreview> {
     const preview = await getLinkPreview(url, {
       timeout: 5000,
       followRedirects: 'follow', // Let the library handle redirects
-      resolveDNS: (url) => resolveDns(url), // Our security check is here
+      resolveDNSHost: (url) => resolveDns(url), // Our security check is here
     });
     return preview as LinkPreview;
   } catch (error) {
