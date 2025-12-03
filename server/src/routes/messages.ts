@@ -156,7 +156,7 @@ router.delete("/:id", async (req, res, next) => {
         const candidatePath = path.join(uploadsDir, relativePath);
 
         // Final check: ensure the resolved path is within the uploads directory
-        if (candidatePath.startsWith(uploadsDir)) {
+        if (relativePath && relativePath !== '.' && candidatePath.startsWith(uploadsDir + path.sep)) {
           await fs.unlink(candidatePath);
           console.log(`[File Delete] Successfully deleted physical file: ${candidatePath}`);
         } else {

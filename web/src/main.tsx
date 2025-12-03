@@ -12,9 +12,7 @@ import { useAuthStore } from '@store/auth';
 // --- Dependency Injection for Auth Failure ---
 // This injects the logout function into the api layer, breaking the circular dependency.
 // Now, if authFetch encounters a final token refresh failure, it can trigger a full logout.
-setAuthFailureHandler(() => {
-  useAuthStore.getState().logout();
-});
+setAuthFailureHandler(() => useAuthStore.getState().logout());
 // -----------------------------------------
 
 // Validate essential environment variables on startup
