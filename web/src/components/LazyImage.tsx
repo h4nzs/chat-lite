@@ -135,7 +135,7 @@ export default function LazyImage({
         ref={imgRef}
         src={imageUrl || undefined}
         alt={alt}
-        className={`w-full h-full object-cover ${decryptionStatus !== 'succeeded' ? 'opacity-0' : 'opacity-100'}`}
+        className={`w-full h-full object-cover ${decryptionStatus !== 'succeeded' ? 'opacity-0' : 'opacity-100'} ${className || ''}`}
         {...props}
       />
     </div>
