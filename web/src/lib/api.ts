@@ -4,14 +4,15 @@ const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:40
 
 // Cache untuk token CSRF
 let csrfTokenCache: string | null = null;
-let onAuthFailure: (() => void) | null = null;
+// Handler for auth failure, to be injected from the UI layer
+let onAuthFailure: (() => Promise<void>) | null = null;
 
 /**
  * Injects a callback to be executed on a final, unrecoverable authentication failure.
  * This breaks the circular dependency between the api layer and the auth store.
- * @param handler The function to call on auth failure.
+ * @param handler The async function to call on auth failure (e.g., logout).
  */
-export function setAuthFailureHandler(handler: () => void) {
+export function setAuthFailureHandler(handler: () => Promise<void>) {
   onAuthFailure = handler;
 }
 
@@ -116,11 +117,12 @@ export async function authFetch<T>(
           return await api<T>(url, options);
         }
         // If refresh fails, trigger the auth failure handler
-        if (onAuthFailure) onAuthFailure();
+        if (onAuthFailure) await onAuthFailure();
         throw err;
-      } catch {
+      } catch (refreshErr) {
         // This catch block handles failure of the refresh token endpoint itself
-        if (onAuthFailure) onAuthFailure();
+        if (onAuthFailure) await onAuthFailure();
+        // Re-throw the original error that triggered the refresh attempt
         throw err;
       }
     }

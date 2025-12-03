@@ -238,13 +238,19 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
   },
 
   retrySendMessage: (message: Message) => {
-    // This can only retry text messages now
-    if (message.fileUrl) {
-      toast.error("Cannot retry file messages automatically.");
-      return;
-    };
-    const { conversationId, content } = message;
+    const { conversationId, content, fileUrl } = message;
+    
+    // First, always remove the failed message to clean up state and revoke blob URLs
     useMessageStore.getState().removeMessage(conversationId, message.id);
+
+    // If it's a file message, we cannot automatically retry the upload.
+    // We have already removed it, so we just inform the user.
+    if (fileUrl) {
+      toast.error("Cannot retry file messages automatically. Please try uploading again.");
+      return;
+    }
+    
+    // If it's a text message, proceed with sending again.
     get().sendMessage(conversationId, { content: content || '' });
   },
 }));
