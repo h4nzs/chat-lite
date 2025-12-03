@@ -1,10 +1,19 @@
 import axios from 'axios';
-import { useAuthStore } from '@store/auth';
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
 
 // Cache untuk token CSRF
 let csrfTokenCache: string | null = null;
+let onAuthFailure: (() => void) | null = null;
+
+/**
+ * Injects a callback to be executed on a final, unrecoverable authentication failure.
+ * This breaks the circular dependency between the api layer and the auth store.
+ * @param handler The function to call on auth failure.
+ */
+export function setAuthFailureHandler(handler: () => void) {
+  onAuthFailure = handler;
+}
 
 /**
  * Mengambil token CSRF dari server dan menyimpannya di cache.
@@ -106,14 +115,12 @@ export async function authFetch<T>(
         if (refreshRes.ok) {
           return await api<T>(url, options);
         }
-        // If refresh fails, clear caches and throw original error
-        useAuthStore.getState().clearPrivateKeysCache();
+        // If refresh fails, trigger the auth failure handler
+        if (onAuthFailure) onAuthFailure();
         throw err;
       } catch {
         // This catch block handles failure of the refresh token endpoint itself
-        useAuthStore.getState().clearPrivateKeysCache();
-        // Force a logout to clear all state
-        useAuthStore.getState().logout();
+        if (onAuthFailure) onAuthFailure();
         throw err;
       }
     }

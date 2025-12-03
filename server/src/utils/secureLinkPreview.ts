@@ -27,18 +27,16 @@ async function resolveDns(url: string): Promise<string> {
 }
 
 // Custom redirect handler to prevent SSRF on redirects
-function handleRedirects(url: string, newUrl: string, maxRedirects: number): Promise<boolean> {
-  return new Promise(async (resolve, reject) => {
-    if (maxRedirects < 0) {
-      return reject(new Error("Exceeded max redirects."));
-    }
-    try {
-      await resolveDns(newUrl); // Validate the new URL's IP
-      resolve(true); // Allow the redirect
-    } catch (error) {
-      reject(error); // Reject if the redirect target is disallowed
-    }
-  });
+async function handleRedirects(url: string, newUrl: string, maxRedirects: number): Promise<boolean> {
+  if (maxRedirects < 0) {
+    throw new Error("Exceeded max redirects.");
+  }
+  try {
+    await resolveDns(newUrl); // Validate the new URL's IP
+    return true; // Allow the redirect
+  } catch (error) {
+    throw error; // Reject if the redirect target is disallowed
+  }
 }
 
 /**
