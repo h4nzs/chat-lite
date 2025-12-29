@@ -7,9 +7,10 @@ import {
   getLatestSessionKey,
   storeGroupKey,
   getGroupKey,
+  deleteGroupKey,
   receiveGroupKey,
 } from '@lib/keychainDb';
-import { emitSessionKeyFulfillment, emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/socket';
+import { emitSessionKeyFulfillment, emitSessionKeyRequest, emitGroupKeyDistribution, emitGroupKeyRequest, emitGroupKeyFulfillment } from '@lib/socket';
 import { 
   worker_crypto_secretbox_easy, 
   worker_crypto_secretbox_open_easy, 
@@ -99,11 +100,14 @@ export async function ensureGroupSession(conversationId: string, participants: P
   
     const myId = useAuthStore.getState().user?.id;
     const otherParticipants = participants.filter(p => p.id !== myId);
+    
+    const missingKeys: string[] = [];
   
     const distributionKeys = await Promise.all(
       otherParticipants.map(async (p) => {
         if (!p.publicKey) {
           console.warn(`Participant ${p.username} has no public key. Cannot send group key.`);
+          missingKeys.push(p.username);
           return null;
         }
         const theirPublicKey = sodium.from_base64(p.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -115,6 +119,10 @@ export async function ensureGroupSession(conversationId: string, participants: P
         };
       })
     );
+
+    if (missingKeys.length > 0) {
+      throw new Error(`Failed to encrypt for users: ${missingKeys.join(', ')}. They may need to set up their keys.`);
+    }
   
     return distributionKeys.filter(Boolean);
 }
@@ -125,6 +133,11 @@ export async function handleGroupKeyDistribution(conversationId: string, encrypt
     const groupKey = await decryptSessionKeyForUser(encryptedKey, publicKey, privateKey);
     await receiveGroupKey(conversationId, groupKey);
     console.log(`[crypto] Received and stored a new group key for ${conversationId}`);
+}
+
+export async function rotateGroupKey(conversationId: string): Promise<void> {
+  console.log(`[crypto] Rotating group key for conversation ${conversationId} due to membership change.`);
+  await deleteGroupKey(conversationId);
 }
 
 // --- Message Encryption/Decryption ---
@@ -150,22 +163,10 @@ export async function encryptMessage(
     key = groupKey;
     sessionId = undefined; // No session ID for group messages
   } else {
-    // This is the 1-on-1 chat logic path.
-    // DIAGNOSTIC PATCH: Check if a group key exists anyway.
-    const potentialGroupKey = await getGroupKey(conversationId);
-    if (potentialGroupKey) {
-      console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-      console.error(`[crypto] CONTRADICTION: encryptMessage called with isGroup=false, but a group key exists for this conversation (${conversationId}).`);
-      console.error("[crypto] Forcing use of group key to prevent crash.");
-      console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-      key = potentialGroupKey;
-      sessionId = undefined;
-    } else {
-      const latestKey = await getLatestSessionKey(conversationId);
-      if (!latestKey) throw new Error('No session key available for encryption.');
-      key = latestKey.key;
-      sessionId = latestKey.sessionId;
-    }
+    const latestKey = await getLatestSessionKey(conversationId);
+    if (!latestKey) throw new Error('No session key available for encryption.');
+    key = latestKey.key;
+    sessionId = latestKey.sessionId;
   }
   
   const messageBytes = sodium.from_string(text);
@@ -198,10 +199,9 @@ export async function decryptMessage(
       console.log(`[crypto] Decrypting for GROUP ${conversationId}`);
       key = await getGroupKey(conversationId);
       if (!key) {
-        console.warn(`[crypto] No group key found for decryption in ${conversationId}. Requesting...`);
-        // TODO: In a real scenario, we might want to request the group key
-        // from another member or the server. For now, we show a pending state.
-        return { status: 'pending', reason: '[Requesting group key...]' };
+        console.warn(`[crypto] No group key for ${conversationId}. Emitting request.`);
+        emitGroupKeyRequest(conversationId);
+        return { status: 'pending', reason: 'waiting_for_key' };
       }
       console.log(`[crypto] Found group key for decryption.`);
     } else {
@@ -308,6 +308,33 @@ export async function deriveSessionKeyAsRecipient(
 
 
 // --- Key Recovery ---
+
+interface GroupFulfillRequestPayload {
+  conversationId: string;
+  requesterId: string;
+  requesterPublicKey: string;
+}
+
+export async function fulfillGroupKeyRequest(payload: GroupFulfillRequestPayload): Promise<void> {
+  const { conversationId, requesterId, requesterPublicKey: requesterPublicKeyB64 } = payload;
+  console.log(`[crypto] Fulfilling group key request for ${requesterId} in conversation ${conversationId}.`);
+
+  const key = await getGroupKey(conversationId);
+  if (!key) {
+    console.warn(`[crypto] Cannot fulfill group key request, key not found for ${conversationId}.`);
+    return;
+  }
+
+  const sodium = await getSodium();
+  const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const encryptedKeyForRequester = await worker_crypto_box_seal(key, requesterPublicKey);
+
+  emitGroupKeyFulfillment({
+    requesterId,
+    conversationId,
+    encryptedKey: sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.URLSAFE_NO_PADDING),
+  });
+}
 
 interface FulfillRequestPayload {
   conversationId: string;
