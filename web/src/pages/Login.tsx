@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuthStore } from "../store/auth";
+import { useAuthStore, type User } from "../store/auth";
 import AuthForm from "../components/AuthForm";
 import { IoFingerPrint } from "react-icons/io5";
+import { startAuthentication, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
+import { api } from "@lib/api";
 
 export default function Login() {
   const [error, setError] = useState("");
@@ -15,8 +17,10 @@ export default function Login() {
   }));
 
   useEffect(() => {
-    // This is a placeholder for a potential future biometrics implementation
-    // For now, we'll keep it simple.
+    // Cek ketersediaan hardware biometric
+    platformAuthenticatorIsAvailable().then((available: boolean) => {
+      setIsBiometricsAvailable(available);
+    });
   }, []);
 
   const handleLogin = async (data: { a: string; b?: string }) => {
@@ -34,35 +38,79 @@ export default function Login() {
     }
   };
 
-  async function handleBiometricLogin(username: string) {
-    // This is a placeholder for a potential future biometrics implementation
-    setError("Biometric login is not fully implemented in this version.");
+  async function handleBiometricLogin() {
+    try {
+      setError("");
+
+      // A. Minta Challenge Login
+      const options = await api<any>("/api/auth/webauthn/login/options");
+
+      // B. Browser minta fingerprint user
+      const authResp = await startAuthentication(options);
+
+      // C. Verifikasi ke Server
+      const result = await api<{ verified: boolean; user: User; accessToken: string }>("/api/auth/webauthn/login/verify", {
+        method: "POST",
+        body: JSON.stringify(authResp)
+      });
+
+      if (result.verified && result.accessToken) {
+        // D. Login Sukses -> Set Store -> Redirect
+        useAuthStore.getState().setAccessToken(result.accessToken);
+        useAuthStore.getState().setUser(result.user);
+
+        // Auto-unlock keys jika ada di localStorage (dari sesi sebelumnya/link device)
+        useAuthStore.getState().tryAutoUnlock();
+
+        navigate("/chat");
+      }
+    } catch (err: any) {
+      console.error("Biometric login error:", err);
+
+      // Tangani berbagai jenis error WebAuthn
+      if (err.name === 'NotAllowedError') {
+        setError("Biometric authentication was cancelled or timed out.");
+        return;
+      } else if (err.name === 'SecurityError') {
+        setError("Biometric authentication is not available due to security settings.");
+        return;
+      } else if (err.name === 'AbortError') {
+        setError("Biometric authentication was aborted.");
+        return;
+      } else if (err.name === 'InvalidStateError') {
+        setError("Device is locked or already authenticated. Please try again later.");
+        return;
+      }
+
+      // Error umum
+      setError("Biometric login failed. Please use password or try again.");
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg-main p-4">
-      <div className="w-full max-w-md bg-bg-surface rounded-xl p-8 shadow-neumorphic-concave">
+      <div className="w-full max-w-md card-neumorphic p-8">
         <h1 className="text-3xl font-bold text-center text-foreground mb-6">Login</h1>
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-        <AuthForm 
+        <AuthForm
           onSubmit={handleLogin}
           button="Login"
         />
         {isBiometricsAvailable && (
-          <button 
+          <button
             type="button"
-            onClick={() => handleBiometricLogin((document.querySelector('input[placeholder="Email or Username"]') as HTMLInputElement)?.value)}
+            onClick={handleBiometricLogin}
             className="w-full flex items-center justify-center gap-3 mt-4 btn btn-secondary"
           >
-            <IoFingerPrint />
-            <span>Login with Biometrics</span>
+            <IoFingerPrint size={20} />
+            <span>Login with Passkey</span>
           </button>
         )}
         <div className="text-center mt-6">
           <p className="text-text-secondary">
             Don't have an account? <Link to="/register" className="font-semibold text-accent hover:underline">Sign up</Link>
           </p>
-          <div className="flex justify-center gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
             <Link to="/restore" className="text-sm text-accent hover:underline">Restore from phrase</Link>
             <Link to="/link-device" className="text-sm text-accent hover:underline">Link a new device</Link>
           </div>

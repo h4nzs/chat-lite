@@ -1,4 +1,5 @@
-import type { Conversation, Message, User } from '@store/conversation';
+import type { Conversation, Message } from '@store/conversation';
+import type { User } from '@store/auth';
 
 export interface ServerToClientEvents {
     connect: () => void;
@@ -44,6 +45,13 @@ export interface ServerToClientEvents {
     }) => void;
     force_logout: () => void;
     'user:identity_changed': (data: { userId: string; name: string }) => void;
+
+    // --- TAMBAHAN UNTUK LINKING DEVICE (SERVER -> CLIENT) ---
+    "auth:linking_success": (payload: {
+        accessToken: string;
+        user: User;
+        encryptedMasterKey: string;
+    }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -76,7 +84,15 @@ export interface ClientToServerEvents {
         keys: { p256dh: string; auth: string };
     }) => void;
     "push:unsubscribe": () => void;
+    
+    // --- TAMBAHAN UNTUK LINKING DEVICE (CLIENT -> SERVER) ---
+    "auth:request_linking_qr": (
+        payload: { publicKey: string }, 
+        callback: (response: { token?: string; error?: string }) => void
+    ) => void;
+
     "linking:join_room": (roomId: string) => void;
+    
     "linking:send_payload": (payload: {
         roomId: string;
         encryptedMasterKey: string;

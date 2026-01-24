@@ -99,52 +99,90 @@ export async function ensureAndRatchetSession(conversationId: string): Promise<v
 
 // --- Group Key Management & Recovery ---
 
+// Menyimpan lock untuk mencegah race condition dalam ensureGroupSession
+const groupSessionLocks = new Set<string>();
+
 export async function ensureGroupSession(conversationId: string, participants: Participant[]): Promise<any[] | null> {
+  // Periksa apakah sudah ada promise pending
   const pending = pendingGroupSessionPromises.get(conversationId);
   if (pending) {
     return pending;
   }
 
-  const promise = (async () => {
-    console.log(`[crypto] ensureGroupSession called for ${conversationId}`);
-    const existingKey = await getGroupKey(conversationId);
-    if (existingKey) {
-      return null;
-    }
-    
-    console.log(`[crypto] No existing key. Generating a new group key for ${conversationId}.`);
-    const sodium = await getSodium();
-    const groupKey = await worker_generate_random_key();
-    await storeGroupKey(conversationId, groupKey);
-    console.log(`[crypto] New group key stored for ${conversationId}.`);
-
-    const myId = useAuthStore.getState().user?.id;
-    const otherParticipants = participants.filter(p => p.id !== myId);
-    
-    const missingKeys: string[] = [];
-
-    const distributionKeys = await Promise.all(
-      otherParticipants.map(async (p) => {
-        if (!p.publicKey) {
-          console.warn(`Participant ${p.username} has no public key. Cannot send group key.`);
-          missingKeys.push(p.username);
-          return null;
+  // Periksa apakah sedang ada proses pembuatan kunci grup berlangsung
+  if (groupSessionLocks.has(conversationId)) {
+    // Jika sudah ada proses berlangsung, tunggu sampai selesai
+    // Ini mencegah race condition di mana dua proses berjalan bersamaan
+    return new Promise((resolve) => {
+      const interval = setInterval(() => {
+        if (!groupSessionLocks.has(conversationId)) {
+          clearInterval(interval);
+          // Setelah lock dilepas, coba lagi
+          ensureGroupSession(conversationId, participants).then(resolve);
         }
-        const theirPublicKey = sodium.from_base64(p.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-        const encryptedKey = await worker_crypto_box_seal(groupKey, theirPublicKey);
-        return {
-          userId: p.id,
-          key: sodium.to_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING),
-          type: 'GROUP_KEY'
-        };
-      })
-    );
+      }, 10); // Cek setiap 10ms
+    });
+  }
 
-    if (missingKeys.length > 0) {
-      throw new Error(`Failed to encrypt for users: ${missingKeys.join(', ')}. They may need to set up their keys.`);
+  // Tambahkan lock untuk mencegah proses lain berjalan
+  groupSessionLocks.add(conversationId);
+
+  const promise = (async () => {
+    try {
+      console.log(`[crypto] ensureGroupSession called for ${conversationId}`);
+      const existingKey = await getGroupKey(conversationId);
+      if (existingKey) {
+        return null;
+      }
+
+      console.log(`[crypto] No existing key. Generating a new group key for ${conversationId}.`);
+      const sodium = await getSodium();
+      const groupKey = await worker_generate_random_key();
+      await storeGroupKey(conversationId, groupKey);
+      console.log(`[crypto] New group key stored for ${conversationId}.`);
+
+      const myId = useAuthStore.getState().user?.id;
+      const otherParticipants = participants.filter(p => p.id !== myId);
+
+      const missingKeys: string[] = [];
+      const participantsWithoutKeys: { id: string; username: string }[] = [];
+
+      const distributionKeys = await Promise.all(
+        otherParticipants.map(async (p) => {
+          if (!p.publicKey) {
+            console.warn(`Participant ${p.username} has no public key. Cannot send group key.`);
+            missingKeys.push(p.username);
+            participantsWithoutKeys.push({ id: p.id, username: p.username });
+            return null;
+          }
+          const theirPublicKey = sodium.from_base64(p.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+          const encryptedKey = await worker_crypto_box_seal(groupKey, theirPublicKey);
+          return {
+            userId: p.id,
+            key: sodium.to_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING),
+            type: 'GROUP_KEY'
+          };
+        })
+      );
+
+      if (missingKeys.length > 0) {
+        // Jika ada anggota tanpa kunci publik, beri tahu admin grup
+        const myParticipant = participants.find(p => p.id === myId);
+
+        if (myParticipant?.role === 'ADMIN' || myParticipant?.role === 'MEMBER') {
+          // Tampilkan notifikasi bahwa beberapa anggota tidak bisa menerima kunci grup
+          console.warn(`[crypto] Some participants do not have public keys: ${missingKeys.join(', ')}. They may need to set up their keys.`);
+
+          // Alternatif: Kirim pesan sistem ke grup memberi tahu tentang masalah ini
+          // await sendSystemMessage(conversationId, 'Some participants do not have public keys and won\'t be able to read messages.');
+        }
+      }
+
+      return distributionKeys.filter(Boolean);
+    } finally {
+      // Pastikan lock selalu dilepas setelah proses selesai
+      groupSessionLocks.delete(conversationId);
     }
-
-    return distributionKeys.filter(Boolean);
   })();
 
   pendingGroupSessionPromises.set(conversationId, promise);
@@ -163,9 +201,41 @@ export async function handleGroupKeyDistribution(conversationId: string, encrypt
   console.log(`[crypto] Received and stored a new group key for ${conversationId}`);
 }
 
-export async function rotateGroupKey(conversationId: string): Promise<void> {
-  console.log(`[crypto] Rotating group key for conversation ${conversationId} due to membership change.`);
+export async function rotateGroupKey(conversationId: string, reason: 'membership_change' | 'periodic_rotation' = 'membership_change'): Promise<void> {
+  console.log(`[crypto] Rotating group key for conversation ${conversationId} due to ${reason}.`);
   await deleteGroupKey(conversationId);
+
+  // Memberi tahu server bahwa kunci lama tidak valid
+  try {
+    await authFetch(`/api/conversations/${conversationId}/key-rotation`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  } catch (error) {
+    console.error(`[crypto] Failed to notify server about key rotation for ${conversationId}:`, error);
+    // Tetap lanjutkan proses meskipun server tidak merespons
+  }
+
+  // Jika rotasi karena perubahan keanggotaan, buat kunci baru dan distribusikan
+  if (reason === 'membership_change') {
+    const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      const distributionKeys = await ensureGroupSession(conversationId, conversation.participants);
+      if (distributionKeys) {
+        emitGroupKeyDistribution(conversationId, distributionKeys);
+      }
+    }
+  }
+}
+
+export async function schedulePeriodicGroupKeyRotation(conversationId: string): Promise<void> {
+  // Jadwalkan rotasi kunci grup secara berkala (misalnya setiap 24 jam)
+  const rotationInterval = 24 * 60 * 60 * 1000; // 24 jam dalam milidetik
+
+  setInterval(async () => {
+    await rotateGroupKey(conversationId, 'periodic_rotation');
+    console.log(`[crypto] Periodic group key rotation completed for ${conversationId}`);
+  }, rotationInterval);
 }
 
 async function requestGroupKeyWithTimeout(conversationId: string, attempt = 0) {
@@ -398,7 +468,42 @@ interface ReceiveKeyPayload {
 }
 
 export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promise<void> {
+  // Validasi struktur dan isi payload
+  if (!payload || typeof payload !== 'object') {
+    console.error('[crypto] storeReceivedSessionKey: Invalid payload - not an object');
+    return;
+  }
+
   const { conversationId, sessionId, encryptedKey, type } = payload;
+
+  // Validasi conversationId
+  if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
+    console.error('[crypto] storeReceivedSessionKey: Invalid conversationId', { conversationId });
+    return;
+  }
+
+  // Validasi encryptedKey
+  if (!encryptedKey || typeof encryptedKey !== 'string' || encryptedKey.trim() === '') {
+    console.error('[crypto] storeReceivedSessionKey: Invalid encryptedKey', { encryptedKey });
+    return;
+  }
+
+  // Validasi type
+  if (type && type !== 'GROUP_KEY' && type !== 'SESSION_KEY') {
+    console.error('[crypto] storeReceivedSessionKey: Invalid key type', { type });
+    return;
+  }
+
+  // Jika type adalah SESSION_KEY, sessionId harus disediakan
+  if (type === 'SESSION_KEY' && (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '')) {
+    console.error('[crypto] storeReceivedSessionKey: Missing or invalid sessionId for SESSION_KEY type', { sessionId });
+    return;
+  }
+
+  // Jika type adalah GROUP_KEY, sessionId tidak boleh disediakan
+  if (type === 'GROUP_KEY' && sessionId) {
+    console.warn('[crypto] storeReceivedSessionKey: sessionId provided for GROUP_KEY type, ignoring', { sessionId });
+  }
 
   if (type === 'GROUP_KEY') {
     // Clear any pending timeout for this group key request
@@ -446,11 +551,30 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
 export async function decryptFile(encryptedBlob: Blob, keyB64: string, originalType: string): Promise<Blob> {
   const sodium = await getSodium();
   const keyBytes = sodium.from_base64(keyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-  
+
   const combinedData = await encryptedBlob.arrayBuffer();
   if (combinedData.byteLength < IV_LENGTH) throw new Error("Encrypted file is too short.");
 
   const decryptedData = await worker_file_decrypt(combinedData, keyBytes);
 
   return new Blob([decryptedData], { type: originalType });
+}
+
+export async function generateSafetyNumber(myPublicKey: Uint8Array, theirPublicKey: Uint8Array): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const id = Math.random().toString(36).substring(2, 15);
+    const handler = (event: MessageEvent) => {
+      if (event.data.id === id && event.data.type === 'generateSafetyNumber_result') {
+        resolve(event.data.result);
+        self.removeEventListener('message', handler);
+      }
+    };
+    self.addEventListener('message', handler);
+
+    postMessage({
+      type: 'generateSafetyNumber',
+      payload: { myPublicKey, theirPublicKey },
+      id
+    });
+  });
 }

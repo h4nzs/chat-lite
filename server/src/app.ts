@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Express, Request, Response, NextFunction } from "express";
 
 declare global {
   namespace Express {
@@ -27,8 +27,9 @@ import previewsRouter from "./routes/previews.js";
 import sessionKeysRouter from "./routes/sessionKeys.js";
 import sessionsRouter from "./routes/sessions.js";
 import webpush from "web-push";
+import { generalLimiter } from "./middleware/rateLimiter.js"; // Import ini
 
-// Set VAPID keys for web-push notifications (only if all required environment variables are set)
+// Set VAPID keys for web-push notifications
 if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT,
@@ -37,10 +38,14 @@ if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAP
   );
 } else {
   console.warn("⚠️ VAPID keys not configured. Push notifications will be disabled.");
-  console.warn("To enable push notifications, set VAPID_SUBJECT, VAPID_PUBLIC_KEY, and VAPID_PRIVATE_KEY environment variables.");
 }
 
-const app = express();
+const app: Express = express();
+
+// PERBAIKAN: Set trust proxy ke true/angka tinggi.
+// Karena via Vercel Rewrites, request melewati banyak hop (Vercel -> Render LB -> Nginx -> App).
+// Jika diset 1, Express mungkin mengira request dari Vercel adalah client asli (HTTP), padahal aslinya HTTPS.
+app.set('trust proxy', true);
 
 // === SECURITY / CORS ===
 const isProd = env.nodeEnv === 'production';
@@ -50,7 +55,6 @@ let wsOrigin = 'ws://localhost:4000';
 if (env.appUrl) {
   try {
     const url = new URL(env.appUrl);
-    // Gunakan wss:// untuk koneksi https://
     wsOrigin = `${url.protocol === 'https:' ? 'wss' : 'ws'}://${url.host}`;
   } catch (e) {
     console.error("Invalid APP_URL provided for CSP:", env.appUrl);
@@ -62,35 +66,105 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // 'unsafe-eval' diperlukan untuk hot-reloading di mode development
-      scriptSrc: ["'self'", isProd ? '' : "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // Diperlukan untuk styling dinamis
-      imgSrc: ["'self'", "data:", "blob:"], // blob: diperlukan untuk avatar preview
-      connectSrc: ["'self'", wsOrigin],
+      scriptSrc: [
+        "'self'",
+        isProd ? "'strict-dynamic'" : "'unsafe-eval'",
+        isProd ? "" : "https://*.ngrok-free.app"
+      ].filter(Boolean),
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Diperlukan untuk Tailwind CSS
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://*.vercel.app",
+        "https://*.koyeb.app",
+        "https://*.upstash.io",
+        "https://*.supabase.co"
+      ],
+      connectSrc: [
+        "'self'",
+        wsOrigin,
+        "https://*.vercel.app",
+        "wss://*.vercel.app",
+        "https://*.koyeb.app",
+        "wss://*.koyeb.app",
+        "https://*.upstash.io", // Untuk Redis
+        "https://*.supabase.co" // Untuk Supabase
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com" // Jika menggunakan Google Fonts
+      ],
       objectSrc: ["'none'"],
-      frameAncestors: ["'none'"], // Mencegah clickjacking
+      frameAncestors: ["'none'"],
       ...(isProd && { upgradeInsecureRequests: [] }),
     },
   },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
-// Hapus header X-Powered-By untuk menyembunyikan detail teknologi server
+
 app.disable('x-powered-by');
 
+// Fungsi untuk memvalidasi origins yang diizinkan
+const isAllowedOrigin = (origin: string): boolean => {
+  if (!origin) return true; // Untuk request tanpa origin (misalnya dari curl)
+
+  // Daftar origins yang diizinkan
+  const allowedOrigins = [
+    env.corsOrigin,
+    "http://localhost:5173",
+    "http://localhost:4173",
+    // Domain Vercel
+    "https://chat-lite-git-main-h4nzs.vercel.app",
+    "https://chat-lite-h4nzs.vercel.app",
+    "https://*.vercel.app",
+    // Domain Koyeb
+    "https://vast-aigneis-h4nzs-9319f44e.koyeb.app",
+    "https://*.koyeb.app",
+    // Domain Upstash
+    "https://*.upstash.io",
+    // Domain Supabase
+    "https://*.supabase.co",
+  ];
+
+  // Cek apakah origin cocok dengan salah satu dari daftar yang diizinkan
+  return allowedOrigins.some(allowedOrigin => {
+    if (allowedOrigin.includes('*')) {
+      // Jika ada wildcard, cocokkan dengan regex
+      const regex = new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$');
+      return regex.test(origin);
+    }
+    return allowedOrigin === origin;
+  });
+};
+
 const corsMiddleware = cors({
-  origin: env.corsOrigin || "http://localhost:5173",
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "CSRF-Token"],
 });
+
 app.use(corsMiddleware);
 
 if (isProd) {
   app.use(
     rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 menit
-      max: 100, // max 100 request / 15 menit
+      windowMs: 15 * 60 * 1000, 
+      max: 100, 
       standardHeaders: true,
       legacyHeaders: false,
+      validate: { trustProxy: false }
     })
   );
 }
@@ -98,48 +172,73 @@ if (isProd) {
 // === MIDDLEWARE ===
 app.use(logger("dev"));
 app.use(cookieParser());
-app.use(express.json({ limit: "10mb" })); // Naikkan limit untuk payload JSON jika perlu
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Public routes that don't need CSRF protection
+// === SECURITY & STABILITY ===
+
+// 1. Rate Limiter Global (Pasang SEBELUM routes)
+// Ini melindungi server dari DDoS sederhana / spam bot
+app.use("/api", generalLimiter);
+
+// 2. Request Timeout (Manual Implementation)
+// Koyeb punya timeout sendiri, tapi Node.js sebaiknya memutus lebih cepat
+// untuk membebaskan Event Loop.
+app.use((req, res, next) => {
+  res.setTimeout(30000, () => { // 30 Detik timeout untuk konsistensi
+    res.status(408).send({ error: "Request Timeout" });
+  });
+  next();
+});
+
+// 3. Body Parser Limits (Sudah ada, tapi kita review)
+// Batasi JSON body max 10MB (cukup buat base64 keys, tapi cegah payload bom)
+app.use(express.json({ limit: "10mb" })); 
+app.use(express.urlencoded({ extended: true, limit: "10mb" })); // Tambahkan limit juga disini
 app.use("/api/keys", keysRouter);
 app.use("/api/sessions", sessionsRouter);
+app.post("/api/admin/cleanup", async (req, res) => {
+  // Tambahkan proteksi password sederhana pakai env variable
+  if (req.headers["x-admin-key"] !== process.env.CHAT_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }  
+});
 
 // === CSRF Protection ===
+// 'lax' cocok untuk arsitektur Proxy/Rewrite (First-Party simulation)
 const csrfProtection = csrf({
-  cookie: { httpOnly: true, sameSite: "lax", secure: true}
+  cookie: { 
+    httpOnly: true, 
+    sameSite: "lax", 
+    secure: isProd 
+  }
 });
 app.use(csrfProtection);
 
-// === ROUTE FOR CSRF TOKEN ===
 app.get("/api/csrf-token", (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// === STATIC FILES (UPLOAD) - SECURE IMPLEMENTATION ===
+// === STATIC FILES (UPLOAD) ===
 const uploadsPath = path.resolve(process.cwd(), env.uploadDir);
 app.use("/uploads", 
-  corsMiddleware, // Apply the CORS middleware here as well
-  // Middleware untuk menambahkan header CORP & keamanan lainnya
+  corsMiddleware, 
   (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
   express.static(uploadsPath, {
-    // Nonaktifkan directory listing
     index: false, 
-    // Jangan jalankan file secara otomatis, paksa download untuk tipe tertentu jika perlu
     setHeaders: (res, filePath) => {
       const mimeType = express.static.mime.lookup(filePath);
       if (mimeType && !mimeType.startsWith('image/') && !mimeType.startsWith('video/') && !mimeType.startsWith('audio/')) {
-        // Paksa download untuk dokumen dan file lainnya
         res.setHeader('Content-Disposition', 'attachment');
       }
     }
   })
 );
-
 
 // === ROUTES ===
 app.use("/api/auth", authRouter);

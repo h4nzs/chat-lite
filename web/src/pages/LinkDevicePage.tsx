@@ -1,163 +1,182 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
-import { FiRefreshCw, FiCheckCircle, FiXCircle, FiChevronLeft } from 'react-icons/fi';
+import { FiCheckCircle, FiXCircle, FiChevronLeft, FiSmartphone } from 'react-icons/fi';
 import { Spinner } from '@components/Spinner';
-import io from "socket.io-client";
-import type { Socket } from "socket.io-client";
+import { getSocket, connectSocket } from '@lib/socket';
 import { getSodium } from '@lib/sodiumInitializer';
-import { v4 as uuidv4 } from 'uuid';
-import { useAuthStore } from '@store/auth';
+import { reEncryptBundleFromMasterKey } from '@lib/crypto-worker-proxy'; // Import fungsi ini!
 import toast from 'react-hot-toast';
-import { worker_crypto_box_seal_open, reEncryptBundleFromMasterKey } from '@lib/crypto-worker-proxy';
-import { Html5Qrcode } from 'html5-qrcode';
-
-const SERVER_URL = import.meta.env.VITE_WS_URL || "http://localhost:4000";
-const qrcodeRegionId = "qr-code-scanner-region";
+import { useAuthStore } from '@store/auth';
 
 export default function LinkDevicePage() {
   const [qrData, setQrData] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'processing' | 'success' | 'failed' | 'scanning' | 'linked'>('generating');
+  const [status, setStatus] = useState<'initializing' | 'waiting' | 'processing' | 'success' | 'failed'>('initializing');
   const [error, setError] = useState<string | null>(null);
+  
   const navigate = useNavigate();
-  const getMasterSeed = useAuthStore(s => s.getMasterSeed);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  // Kita tidak butuh login otomatis dari store, user akan login manual
+  
+  const ephemeralKeyPair = useRef<{ publicKey: Uint8Array; privateKey: Uint8Array } | null>(null);
 
-  const processQrCode = useCallback(async (decodedText: string) => {
+  // Inisialisasi Sesi (Socket & QR)
+  useEffect(() => {
+    let isMounted = true;
+    const socket = getSocket();
+
+    const initializeSession = async () => {
+      try {
+        setStatus('initializing');
+        const sodium = await getSodium();
+        
+        // 1. Generate Ephemeral Keys (Untuk handshake aman)
+        const keyPair = sodium.crypto_box_keypair();
+        ephemeralKeyPair.current = keyPair;
+        
+        const pubKeyB64 = sodium.to_base64(keyPair.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+
+        // 2. Connect Socket (Guest Mode)
+        if (!socket.connected) connectSocket();
+
+        // 3. Minta Room ID ke Server
+        socket.emit('auth:request_linking_qr', { publicKey: pubKeyB64 }, (response: any) => {
+          if (!isMounted) return;
+          if (response?.error) {
+            setError(response.error);
+            setStatus('failed');
+            return;
+          }
+          if (response?.token) {
+            setQrData(JSON.stringify({
+              roomId: response.token,
+              linkingPubKey: pubKeyB64
+            }));
+            setStatus('waiting');
+          }
+        });
+
+      } catch (err: any) {
+        console.error("Init error:", err);
+        if (isMounted) {
+          setError("Failed to initialize.");
+          setStatus('failed');
+        }
+      }
+    };
+
+    initializeSession();
+  }, []);
+
+  // Handler saat Scan Berhasil
+  const handleLinkingSuccess = useCallback(async (data: any) => {
+    console.log("📦 Payload received!");
     setStatus('processing');
-    toast.loading('QR Code scanned, processing...', { id: 'linking-toast' });
+    toast.loading("Processing keys...", { id: 'link-process' });
 
     try {
-      const { roomId, linkingPubKey } = JSON.parse(decodedText);
-      if (!roomId || !linkingPubKey) throw new Error('Invalid QR code format.');
-
-      const masterSeed = await getMasterSeed();
-      if (!masterSeed) throw new Error("Could not retrieve master key. Password prompt might have been cancelled or key is missing.");
-
       const sodium = await getSodium();
-      const linkingPubKeyBytes = sodium.from_base64(linkingPubKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-      const encryptedPayload = sodium.crypto_box_seal(masterSeed, linkingPubKeyBytes);
-      const encryptedPayloadB64 = sodium.to_base64(encryptedPayload, sodium.base64_variants.URLSAFE_NO_PADDING);
+      
+      // 1. Dekripsi Master Key (Layer Transport)
+      if (!ephemeralKeyPair.current) throw new Error("Keypair lost.");
+      if (!data.encryptedMasterKey) throw new Error("Invalid payload.");
 
-      const socket = io(SERVER_URL);
-      console.log(`[Scanner] Emitting payload to roomId: ${roomId}`);
-      socket.emit('linking:send_payload', { 
-        roomId, 
-        encryptedMasterKey: encryptedPayloadB64 
-      });
+      const cipherText = sodium.from_base64(data.encryptedMasterKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+      
+      const masterSeed = sodium.crypto_box_seal_open(
+        cipherText, 
+        ephemeralKeyPair.current.publicKey, 
+        ephemeralKeyPair.current.privateKey
+      );
 
+      // 2. RE-ENKRIPSI MENGGUNAKAN WORKER (PENTING!)
+      // Generate password acak mesin (32 bytes)
+      const devicePasswordBytes = sodium.randombytes_buf(32);
+      const devicePassword = sodium.to_base64(devicePasswordBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
+
+      // Panggil Worker untuk mengenkripsi ulang dengan format yang benar
+      // Ini akan menghasilkan format Base64 yang valid, bukan JSON
+      const result = await reEncryptBundleFromMasterKey(masterSeed, devicePassword);
+
+      // 3. Simpan ke LocalStorage
+      // Bersihkan data lama
+      localStorage.removeItem('encryptedPrivateKeys');
+      
+      // Simpan data baru (String Base64 dari worker)
+      localStorage.setItem('encryptedPrivateKeys', result.encryptedPrivateKeys);
+      
+      // Simpan Public Keys untuk identitas
+      if (result.encryptionPublicKeyB64) localStorage.setItem('publicKey', result.encryptionPublicKeyB64);
+      if (result.signingPublicKeyB64) localStorage.setItem('signingPublicKey', result.signingPublicKeyB64);
+
+      // Simpan indikator bahwa kunci pembuka otomatis siap (tanpa menyimpan password mentah)
+      localStorage.setItem('device_auto_unlock_ready', 'true');
+
+      console.log("✅ Keys re-encrypted by worker and saved.");
+      
+      // 4. Sukses & Redirect
       setStatus('success');
-      toast.success('Device link initiated! Check your new device.', { id: 'linking-toast' });
-      setTimeout(() => navigate('/settings/sessions'), 2000);
+      toast.success("Paired! Redirecting to Login...", { id: 'link-process' });
+
+      // Redirect ke Login Manual (User tinggal klik login, kunci otomatis terbuka)
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 2000);
 
     } catch (err: any) {
-      console.error("Linking error:", err);
-      setError(err.message || 'Failed to process QR code.');
+      console.error("Linking failed:", err);
+      toast.error("Error: " + err.message, { id: 'link-process' });
       setStatus('failed');
-      toast.error(err.message || 'Failed to link device.', { id: 'linking-toast' });
+      setError(err.message);
     }
-  }, [getMasterSeed, navigate]);
+  }, [navigate]);
 
-  // Expose a self-contained function to the window for manual testing
+  // Pasang Listener Socket
   useEffect(() => {
-    (window as any).testScan = async (data: string) => {
-      if (scannerRef.current?.isScanning) {
-        await scannerRef.current.stop();
-      }
-      processQrCode(data);
-    };
-  }, [processQrCode]);
-
-  useEffect(() => {  
-    if (status !== 'scanning') return;
-
-    // Prevent multiple initializations
-    if (scannerRef.current) return;
-
-    const html5QrCode = new Html5Qrcode(qrcodeRegionId);
-    scannerRef.current = html5QrCode;
-
-    const qrCodeSuccessCallback = (decodedText: string) => {
-      // Stop scanning first
-      if (scannerRef.current?.isScanning) {
-        scannerRef.current.stop().then(() => {
-          processQrCode(decodedText);
-        }).catch((err: any) => {
-          console.error("Failed to stop scanner after success, but proceeding anyway.", err);
-          processQrCode(decodedText);
-        });
-      }
-    };
-
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      qrCodeSuccessCallback,
-      (errorMessage: string) => { /* ignore parse errors */ }
-    ).catch((err: any) => {
-      setError('Could not start QR scanner. Please grant camera permission.');
-      setStatus('failed');
-      toast.error('Camera permission denied.');
-    });
-
+    const socket = getSocket();
+    socket.on('auth:linking_success', handleLinkingSuccess);
     return () => {
-      if (scannerRef.current?.isScanning) {
-        scannerRef.current.stop().catch((err: any) => {
-          console.error("Failed to stop QR scanner on cleanup.", err);
-        });
-      }
+      socket.off('auth:linking_success', handleLinkingSuccess);
     };
-  }, [status, processQrCode]);
-
-  const renderStatusMessage = () => {
-    const messageClasses = "flex items-center gap-2";
-    switch (status) {
-      case 'generating':
-        return <div className={`${messageClasses} text-text-secondary`}><Spinner size="sm" /> Generating QR Code...</div>;
-      case 'waiting':
-        return <div className={`${messageClasses} text-text-secondary`}><FiRefreshCw className="animate-spin" /> Waiting for scan...</div>;
-      case 'linked':
-      case 'success':
-        return <div className={`${messageClasses} text-green-500`}><FiCheckCircle /> Device Linked! Redirecting...</div>;
-      case 'failed':
-        return <div className={`${messageClasses} text-red-500`}><FiXCircle /> Linking Failed: {error}</div>;
-      case 'processing':
-          return <div className={`${messageClasses} text-text-secondary`}><Spinner size="sm" /> Processing...</div>;
-      default:
-        return null;
-    }
-  };
+  }, [handleLinkingSuccess]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-screen bg-bg-main text-text-primary p-4">
-      <Link to="/login" aria-label="Go back to login" className="btn btn-secondary p-2 h-10 w-10 rounded-full justify-center absolute top-4 left-4">
+    <div className="relative flex flex-col items-center justify-center h-screen bg-bg-main text-text-primary p-4 overflow-hidden">
+      <Link to="/auth/login" className="absolute top-6 left-6 touch-target p-3 rounded-full bg-bg-surface shadow-neumorphic-convex text-text-secondary hover:text-text-primary">
         <FiChevronLeft size={24} />
       </Link>
-      <div className="bg-bg-surface p-8 rounded-xl shadow-neumorphic-convex text-center max-w-md w-full">
-        <h1 className="text-2xl font-bold mb-4">Link a New Device</h1>
-        <p className="text-text-secondary mb-6">
-          Scan this QR code with an already logged-in device to securely link this new device.
+
+      <div className="card-neumorphic p-10 text-center max-w-md w-full">
+        <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-text-primary to-text-secondary bg-clip-text text-transparent">Link Device</h1>
+        <p className="text-text-secondary text-sm mb-8">
+          Go to Settings &gt; Link Device on your phone
         </p>
 
-        {qrData && status !== 'generating' ? (
-          <div className="bg-white p-2 rounded-lg inline-block mb-6">
-            <QRCode value={qrData} size={256} level="H" />
-          </div>
-        ) : (
-          <div className="w-64 h-64 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg mb-6">
-            <Spinner size="lg" />
-          </div>
-        )}
+        {/* CONTAINER UI */}
+        <div className="bg-white p-4 rounded-xl inline-block mb-8 shadow-inner min-w-[250px] min-h-[250px] flex items-center justify-center">
 
-        <div className="mb-6 h-6">
-          {renderStatusMessage()}
+          {status === 'success' ? (
+            <div className="flex flex-col items-center animate-bounce-in">
+              <FiCheckCircle size={100} className="text-green-500 mb-4" />
+              <p className="text-green-600 font-bold text-lg">Paired!</p>
+            </div>
+          ) : qrData ? (
+            <QRCode value={qrData} size={220} level="M" />
+          ) : (
+            <div className="flex items-center justify-center">
+              {status === 'failed' ? <FiXCircle size={60} className="text-red-400" /> : <Spinner size="lg" />}
+            </div>
+          )}
+
         </div>
 
-        {status !== 'generating' && status !== 'linked' && status !== 'success' && (
-          <Link to="/login" className="text-text-secondary hover:text-text-primary mt-4 block">
-            Cancel and Login Manually
-          </Link>
-        )}
+        {/* STATUS TEXT */}
+        <div className="h-8 flex justify-center">
+          {status === 'initializing' && <div className="flex items-center gap-2 text-text-secondary"><Spinner size="sm" /> Preparing...</div>}
+          {status === 'waiting' && <div className="flex items-center gap-2 text-accent animate-pulse"><FiSmartphone /> Scan with mobile app</div>}
+          {status === 'processing' && <div className="flex items-center gap-2 text-text-secondary"><Spinner size="sm" /> Securing keys...</div>}
+          {status === 'success' && <div className="text-green-500 font-medium">Redirecting to login...</div>}
+          {status === 'failed' && <div className="text-red-500 text-sm">{error}</div>}
+        </div>
       </div>
     </div>
   );
