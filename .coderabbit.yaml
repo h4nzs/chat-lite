@@ -1,0 +1,15 @@
+# .coderabbit.yaml
+reviews:
+  profile: "assertive" # Biar reviewnya galak & teliti
+  path_filters:
+    # ❌ Abaikan file statis, gambar, dan audio
+    - "!web/public/**"
+    - "!**/*.png"
+    - "!**/*.mp3"
+    - "!**/*.ico"
+    # ❌ Abaikan Lockfiles (Ini makan memori review paling gede)
+    - "!**/*lock.yaml"
+    # ❌ Abaikan file Markdown & Config dasar
+    - "!*.md"
+    - "!**/*.md"
+    - "!docker-compose.yml"
