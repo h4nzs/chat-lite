@@ -21,7 +21,7 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-popover": "^1.1.15",
     "@simplewebauthn/browser": "^13.2.2",
-    "axios": "^1.13.6",
+    "axios": "^1.13.5",
     "bip39": "^3.1.0",
     "browser-image-compression": "^2.0.2",
     "classnames": "^2.5.1",
