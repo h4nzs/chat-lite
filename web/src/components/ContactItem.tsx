@@ -1,7 +1,14 @@
 import { useEffect } from 'react';
 import { useProfileStore } from '@store/profile';
+import type { StoryContact } from './StoryPrivacyMenu';
 
-export const ContactItem = ({ contact, isSelected, onToggle }: { contact: any, isSelected: boolean, onToggle: () => void }) => {
+interface ContactItemProps {
+  contact: StoryContact;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+export const ContactItem = ({ contact, isSelected, onToggle }: ContactItemProps) => {
   const profile = useProfileStore(state => {
     const cacheKey = contact.encryptedProfile ? `${contact.id}_${contact.encryptedProfile.substring(0, 32)}` : contact.id;
     return state.profiles[cacheKey];

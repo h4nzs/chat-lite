@@ -5,7 +5,7 @@ import { FiImage, FiX, FiEdit3, FiCrop, FiLock } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useConversationStore } from '@store/conversation';
 import { useAuthStore } from '@store/auth';
-import StoryPrivacyMenu from './StoryPrivacyMenu';
+import StoryPrivacyMenu, { StoryContact } from './StoryPrivacyMenu';
 import { Spinner } from './Spinner';
 
 const ImageEditorModal = lazy(() => import('./ImageEditorModal'));
@@ -25,12 +25,23 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
   const conversations = useConversationStore(state => state.conversations);
   const me = useAuthStore(state => state.user);
   
-  const contacts = useMemo(() => {
-    const map = new Map();
+  const contacts = useMemo<StoryContact[]>(() => {
+    const map = new Map<string, StoryContact>();
     conversations.forEach(c => {
       if (!c.isGroup) {
         const other = c.participants.find(p => p.id !== me?.id);
-        if (other) map.set(other.id, other);
+        if (other) {
+          const actualUserId = (other as any).userId || other.id;
+          if (actualUserId && !map.has(actualUserId)) {
+            map.set(actualUserId, {
+              id: actualUserId,
+              name: other.name || other.username || 'Unknown User',
+              avatarUrl: other.avatarUrl || (other as any).profilePicture || null,
+              encryptedProfile: (other as any).encryptedProfile,
+              username: other.username
+            });
+          }
+        }
       }
     });
     return Array.from(map.values());

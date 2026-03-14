@@ -1,6 +1,14 @@
 import { FiUsers, FiX } from 'react-icons/fi';
 import { ContactItem } from './ContactItem';
 
+export interface StoryContact {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  encryptedProfile?: string;
+  username?: string;
+}
+
 interface StoryPrivacyMenuProps {
   isOpen: boolean;
   onClose: () => void;
@@ -8,7 +16,7 @@ interface StoryPrivacyMenuProps {
   setPrivacyMode: (mode: 'ALL' | 'EXCLUDE' | 'ONLY') => void;
   selectedUsers: string[];
   toggleUser: (id: string) => void;
-  contacts: any[]; // The derived contacts array
+  contacts: StoryContact[];
 }
 
 export default function StoryPrivacyMenu({ 
@@ -55,7 +63,7 @@ export default function StoryPrivacyMenu({
             <div className="mt-2 border-t border-white/5 pt-4 px-3">
               <p className="text-[11px] font-bold text-text-secondary mb-3 uppercase tracking-wider px-2">Select Contacts</p>
               <div className="space-y-1">
-                {contacts.map((contact: any) => (
+                {contacts.map((contact) => (
                   <ContactItem 
                     key={contact.id} 
                     contact={contact} 

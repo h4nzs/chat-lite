@@ -48,7 +48,7 @@ export default function OnboardingTour({ isOpen, onClose }: OnboardingTourProps)
     {
       icon: <FiSmile size={32} className="text-accent" />,
       title: "Welcome to Nyx!",
-      content: <p>You have entered a <strong>Zero-Knowledge</strong> zone. We don't know who you are, and we can't read your messages. Total anonymity.</p>
+      content: <p>You have entered a <strong>Zero-Knowledge</strong> zone. We don&apos;t know who you are, and we can&apos;t read your messages. Total anonymity.</p>
     },
     {
       icon: <FiKey size={32} className="text-accent" />,
@@ -68,7 +68,7 @@ export default function OnboardingTour({ isOpen, onClose }: OnboardingTourProps)
     {
       icon: <FiShield size={32} className="text-accent" />,
       title: "Safety Numbers",
-      content: <p>Each conversation has a unique "Safety Number". You can compare this with your contact to verify no one is intercepting your chat.</p>
+      content: <p>Each conversation has a unique &quot;Safety Number&quot;. You can compare this with your contact to verify no one is intercepting your chat.</p>
     },
     {
       // --- SLIDE BARU: Server Status & Support ---
