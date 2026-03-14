@@ -14,9 +14,11 @@ import SmartReply from './SmartReply';
 import { useMessageStore } from '@store/message';
 import { triggerSendFeedback } from '@utils/feedback';
 import { useUserProfile } from '@hooks/useUserProfile';
-import AttachmentCropperModal from './AttachmentCropperModal';
-import ImageEditorModal from './ImageEditorModal';
 import { FiEdit3 } from 'react-icons/fi';
+import { Spinner } from './Spinner';
+
+const AttachmentCropperModal = lazy(() => import('./AttachmentCropperModal'));
+const ImageEditorModal = lazy(() => import('./ImageEditorModal'));
 
 // --- Types ---
 interface MessageInputProps {
@@ -838,26 +840,30 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
       )}
 
       {cropTarget && (
-        <AttachmentCropperModal 
-          file={cropTarget.file} 
-          url={cropTarget.url} 
-          onClose={() => setCropTarget(null)} 
-          onSave={(newFile) => {
-            updateStagedFile(cropTarget.id, newFile);
-            setCropTarget(null);
-          }} 
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center backdrop-blur-sm"><Spinner /></div>}>
+          <AttachmentCropperModal 
+            file={cropTarget.file} 
+            url={cropTarget.url} 
+            onClose={() => setCropTarget(null)} 
+            onSave={(newFile) => {
+              updateStagedFile(cropTarget.id, newFile);
+              setCropTarget(null);
+            }} 
+          />
+        </Suspense>
       )}
 
       {paintTarget && (
-        <ImageEditorModal 
-          file={paintTarget.file}
-          onSave={(newFile) => {
-            updateStagedFile(paintTarget.id, newFile);
-            setPaintTarget(null);
-          }}
-          onCancel={() => setPaintTarget(null)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center backdrop-blur-sm"><Spinner /></div>}>
+          <ImageEditorModal 
+            file={paintTarget.file}
+            onSave={(newFile) => {
+              updateStagedFile(paintTarget.id, newFile);
+              setPaintTarget(null);
+            }}
+            onCancel={() => setPaintTarget(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

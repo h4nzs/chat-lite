@@ -1,203 +1,30 @@
-import { useCallback, useRef, ChangeEvent, useState, useEffect, useMemo } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { useAuthStore } from "@store/auth";
 import { getSocket } from "@lib/socket";
-import { Virtuoso } from "react-virtuoso";
-import MessageItem from "@components/MessageItem";
 import { useConversation } from "@hooks/useConversation";
-import { Spinner } from "./Spinner";
-import { useConversationStore, type Conversation, type Message } from "@store/conversation";
 import { useMessageStore } from '@store/message';
 import { useMessageInputStore } from '@store/messageInput';
 import { useMessageSearchStore } from '@store/messageSearch';
-import { usePresenceStore } from "@store/presence";
-import useDynamicIslandStore from "@store/dynamicIsland";
-import { toAbsoluteUrl } from "@utils/url";
 import { useModalStore } from "@store/modal";
 import { useShallow } from 'zustand/react/shallow';
-import SearchMessages from './SearchMessages';
 import Lightbox from "./Lightbox";
 import GroupInfoPanel from './GroupInfoPanel';
-import clsx from "clsx";
-import { useVerificationStore } from '@store/verification';
-import { FiShield, FiMoreHorizontal, FiArrowLeft, FiInfo, FiUsers, FiPhone, FiVideo, FiX, FiTrash2 } from 'react-icons/fi';
+import { FiShield, FiX, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import MessageInput from './MessageInput';
 import MessageSkeleton from './MessageSkeleton';
-import { useUserProfile } from '@hooks/useUserProfile';
 import { useEdgeSwipe } from '@hooks/useEdgeSwipe';
-import { startCall } from '@lib/webrtc';
-import { useSettingsStore } from '@store/settings';
+import { useConversationStore, type Message } from "@store/conversation";
 
-const KeyRotationBanner = () => (
-  <div className="bg-yellow-500/10 border-y border-yellow-500/20 px-4 py-3 text-yellow-600 dark:text-yellow-400">
-    <div className="flex items-center gap-3">
-      <FiShield className="flex-shrink-0 animate-pulse" size={18} />
-      <div className="font-mono text-xs">
-        <p className="font-bold uppercase tracking-wider">Security Alert: Key Rotation Required</p>
-        <p className="opacity-80">Encryption keys desynchronized. Transmit message to re-establish secure handshake.</p>
-      </div>
-    </div>
-  </div>
-);
-
-const NewConversationBanner = () => (
-  <div className="bg-blue-500/10 border-y border-blue-500/20 px-4 py-3 text-blue-600 dark:text-blue-400">
-    <div className="flex items-start gap-3">
-      <FiInfo className="flex-shrink-0 mt-0.5" size={18} />
-      <div className="font-mono text-xs">
-        <p className="font-bold uppercase tracking-wider mb-1">Encryption Protocol Recommendation</p>
-        <p className="opacity-90 leading-relaxed">
-          For the initial handshake, ensure both parties are <strong>ONLINE</strong>. 
-          Sending messages to offline users in a new conversation may require a key refresh if they come online later.
-        </p>
-      </div>
-    </div>
-  </div>
-);
-
-const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conversation: Conversation; onBack: () => void; onInfoToggle: () => void; onMenuClick: () => void; }) => {
-  const user = useAuthStore((s) => s.user);
-  const meId = user?.id;
-  const onlineUsers = usePresenceStore((s) => s.onlineUsers);
-  const { openProfileModal, openChatInfoModal } = useModalStore(useShallow(s => ({ openProfileModal: s.openProfileModal, openChatInfoModal: s.openChatInfoModal })));
-  const { verifiedStatus } = useVerificationStore();
-  const privacyCloak = useSettingsStore(s => s.privacyCloak);
-  
-  const cloakClass = privacyCloak ? "blur-[6px] opacity-70 group-hover:blur-none group-hover:opacity-100 group-active:blur-none group-active:opacity-100 transition-all duration-300 select-none" : "";
-
-  const peerUser = !conversation.isGroup ? conversation.participants?.find((p) => p.id !== meId) : null;
-  const peerProfile = useUserProfile(peerUser as any);
-  const title = conversation.isGroup ? conversation.title : peerProfile.name;
-  const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerProfile.avatarUrl;
-  const isOnline = peerUser ? onlineUsers.has(peerUser.id) : false;
-  const isConvVerified = verifiedStatus[conversation.id] || false;
-
-  const handleHeaderClick = () => {
-    if (peerUser) {
-      openProfileModal(peerUser.id);
-    } else {
-      onInfoToggle();
-    }
-  };
-
-  const getStatus = () => {
-    if (conversation.isGroup) {
-      return `${conversation.participants.length} members`;
-    }
-    return isOnline ? "Online" : "Offline";
-  };
-
-  const handleVoiceCall = () => {
-    if (peerUser) {
-      startCall(peerUser.id, false, user);
-    }
-  };
-
-  const handleVideoCall = () => {
-    if (peerUser) {
-      startCall(peerUser.id, true, user);
-    }
-  };
-
-  return (
-    <div className="
-      flex items-center justify-between px-4 py-3 z-30
-      bg-bg-main
-      border-b border-white/10
-      shadow-[0_1px_0_rgba(255,255,255,0.05)] dark:shadow-[0_1px_0_rgba(0,0,0,0.2)]
-      relative
-    ">
-      <div className="flex items-center gap-4">
-        {/* Mobile Back Button */}
-        <button 
-          onClick={onMenuClick} 
-          aria-label="Menu" 
-          className="md:hidden p-3 text-text-secondary active:scale-95 transition-transform"
-        >
-          <FiMoreHorizontal size={24} />
-        </button>
-        <button 
-          onClick={onBack} 
-          aria-label="Back" 
-          className="hidden md:block p-3 text-text-secondary hover:text-accent active:scale-95 transition-transform"
-        >
-          <FiArrowLeft size={20} />
-        </button>
-
-        {/* Identity Plate */}
-        <button 
-          onClick={handleHeaderClick} 
-          className="group flex items-center gap-3 p-1 pr-4 rounded-xl transition-all"
-        >
-          <div className="relative">
-             <div className="w-10 h-10 rounded-full shadow-neu-pressed dark:shadow-neu-pressed-dark border-2 border-bg-main p-0.5">
-                <img
-                  src={toAbsoluteUrl(avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${title}`}
-                  alt="ID"
-                  className={clsx("w-full h-full rounded-full object-cover", cloakClass)}
-                />
-             </div>
-             {isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-bg-surface shadow-sm"></div>}
-          </div>
-          
-          <div className="text-left">
-            <div className="flex items-center gap-2">
-              <p className={clsx("font-bold text-text-primary text-sm group-hover:text-accent transition-colors", cloakClass)}>{title}</p>
-              {isConvVerified && <FiShield className="text-accent w-3 h-3" />}
-            </div>
-            <p className="text-xs text-text-secondary opacity-70">
-              {getStatus()}
-            </p>
-          </div>
-        </button>
-      </div>
-
-      {/* Action Module */}
-      <div className="flex items-center gap-2 md:gap-3">
-        {!conversation.isGroup && (
-          <>
-            <button 
-              onClick={handleVoiceCall} 
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-bg-main text-text-secondary shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent active:shadow-neu-pressed dark:active:shadow-neu-pressed-dark transition-all duration-200"
-            >
-              <FiPhone size={16} />
-            </button>
-            <button 
-              onClick={handleVideoCall} 
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-bg-main text-text-secondary shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent active:shadow-neu-pressed dark:active:shadow-neu-pressed-dark transition-all duration-200"
-            >
-              <FiVideo size={16} />
-            </button>
-          </>
-        )}
-        <SearchMessages conversationId={conversation.id} />
-        <button 
-          onClick={openChatInfoModal} 
-          className="
-            flex items-center justify-center w-9 h-9 rounded-full 
-            bg-bg-main text-text-secondary
-            shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent
-            active:shadow-neu-pressed dark:active:shadow-neu-pressed-dark transition-all duration-200
-          "
-        >
-          {conversation.isGroup ? <FiUsers size={18} /> : <FiInfo size={18} />}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const ChatSpinner = () => (
-  <div className="py-6 flex justify-center items-center">
-    <Spinner size="sm" />
-  </div>
-);
+import ChatWindowHeader from './ChatWindowHeader';
+import MessageList from './MessageList';
 
 export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClick: () => void }) {
   const meId = useAuthStore((s) => s.user?.id);
   const { conversation, messages, isLoading, error, actions, isFetchingMore } = useConversation(id);
+
   const { loadMessagesForConversation, selectedMessageIds, clearMessageSelection, removeMessages } = useMessageStore(useShallow(s => ({
       loadMessagesForConversation: s.loadMessagesForConversation,
       selectedMessageIds: s.selectedMessageIds,
@@ -205,9 +32,10 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
       removeMessages: s.removeMessages
   })));
   const isSelectionMode = selectedMessageIds.length > 0;
-  const loadMessageContext = useMessageStore(s => s.loadMessageContext);
+  
   const openConversation = useConversationStore(state => state.openConversation);
   const showConfirm = useModalStore(s => s.showConfirm);
+  const clearSearch = useMessageSearchStore(s => s.clearSearch);
   
   useEdgeSwipe(() => {
     if (window.innerWidth < 768) {
@@ -215,24 +43,19 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
     }
   });
 
-  const { highlightedMessageId, setHighlightedMessageId } = useMessageSearchStore(useShallow(state => ({
-    highlightedMessageId: state.highlightedMessageId,
-    setHighlightedMessageId: state.setHighlightedMessageId,
-  })));
-  const clearSearch = useMessageSearchStore(s => s.clearSearch);
-
   const handleStopRecording = useMessageInputStore(state => state.handleStopRecording);
   
-  const typingIndicators = usePresenceStore(state => state.typingIndicators);
-  const virtuosoRef = useRef<any>(null);
   const [lightboxMessage, setLightboxMessage] = useState<Message | null>(null);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (id) loadMessagesForConversation(id);
+    if (id) {
+        loadMessagesForConversation(id);
+        clearSearch();
+    }
     clearMessageSelection();
-  }, [id, loadMessagesForConversation, clearMessageSelection]);
+  }, [id, loadMessagesForConversation, clearMessageSelection, clearSearch]);
 
   const handleImageClick = useCallback((message: Message) => setLightboxMessage(message), []);
 
@@ -251,47 +74,11 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
       confirmMessage,
       async () => {
           await removeMessages(conversation.id, selectedMessageIds);
-          // clearMessageSelection is already handled inside removeMessages now
           toast.success(`${selectedMessageIds.length} messages processed`);
       }
     );
   };
 
-  useEffect(() => {
-    if (!highlightedMessageId) return;
-
-    const handleJump = async () => {
-      // 1. Check if the message is already rendered in the DOM
-      let el = document.getElementById(`msg-${highlightedMessageId}`);
-      
-      // 2. If not in DOM, we need to fetch its context from the server
-      if (!el) {
-        await loadMessageContext(highlightedMessageId);
-        // Wait for React to re-render the new messages
-        await new Promise(resolve => setTimeout(resolve, 300));
-        el = document.getElementById(`msg-${highlightedMessageId}`);
-      }
-
-      // 3. Scroll and Highlight
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Add a temporary highlight class
-        el.classList.add('ring-2', 'ring-accent', 'ring-offset-2', 'ring-offset-bg-main', 'scale-[1.02]', 'transition-all', 'duration-500', 'z-10');
-        
-        setTimeout(() => {
-          el?.classList.remove('ring-2', 'ring-accent', 'ring-offset-2', 'ring-offset-bg-main', 'scale-[1.02]', 'z-10');
-        }, 2000);
-      }
-      
-      // Clear the highlight state so it can be triggered again later
-      useMessageSearchStore.getState().setHighlightedMessageId(null);
-    };
-
-    handleJump();
-  }, [highlightedMessageId, messages, loadMessageContext, setHighlightedMessageId]);
-
-  const typingUsersInThisConvo = typingIndicators.filter(i => i.conversationId === id && i.id !== meId && i.isTyping);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTyping = useCallback(() => {
@@ -312,31 +99,6 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const handleVoiceSend = (blob: Blob, duration: number) => {
     handleStopRecording(id, blob, duration);
   };
-
-  // Memoize stable conversation parts to prevent list re-renders
-  const participants = useMemo(() => conversation?.participants || [], [conversation?.participants]);
-  const isGroup = conversation?.isGroup || false;
-
-  const itemContent = useCallback((index: number, message: Message) => {
-    const prevMessage = messages[index - 1];
-    const nextMessage = messages[index + 1];
-    const isFirstInSequence = !prevMessage || prevMessage.senderId !== message.senderId;
-    const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
-
-    return (
-      <div className="px-1 md:px-4 py-0.5" key={message.id}>
-        <MessageItem 
-          message={message} 
-          isGroup={isGroup}
-          participants={participants}
-          isHighlighted={message.id === highlightedMessageId}
-          onImageClick={handleImageClick}
-          isFirstInSequence={isFirstInSequence}
-          isLastInSequence={isLastInSequence}
-        />
-      </div>
-    );
-  }, [messages, isGroup, participants, highlightedMessageId, handleImageClick]);
 
   return (
     <AnimatePresence mode="wait">
@@ -385,58 +147,27 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                       </button>
                   </div>
               ) : (
-                  <ChatHeader 
+                  <ChatWindowHeader 
                     conversation={conversation} 
-                    onBack={() => navigate('/chat')} 
+                    onBack={() => {
+                        openConversation(null);
+                        navigate('/chat');
+                    }} 
                     onInfoToggle={() => setIsGroupInfoOpen(true)} 
                     onMenuClick={onMenuClick} 
                   />
               )}
               
-              {messages.length === 0 && <NewConversationBanner />}
-
-              {/* Main Display Screen */}
-              <div className="flex-1 min-h-0 relative z-0 shadow-neu-pressed dark:shadow-neu-pressed-dark mx-2 md:mx-4 my-2 rounded-2xl bg-bg-main overflow-hidden">
-                <div className="h-full px-4 md:px-6 pt-6 pb-2">
-                  <Virtuoso
-                    ref={virtuosoRef}
-                    initialTopMostItemIndex={messages.length - 1}
-                    data={messages}
-                    startReached={actions.loadPrevious}
-                    components={{ Header: () => isFetchingMore ? <ChatSpinner /> : <div className="h-4" /> }}
-                    itemContent={itemContent}
-                    followOutput="auto"
-                  />
-                </div>
-
-                {/* Typing Indicator Overlay */}
-                <AnimatePresence>
-                  {typingUsersInThisConvo.length > 0 && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute bottom-4 left-6 z-20"
-                    >
-                      <div className="
-                        px-4 py-2 rounded-full
-                        bg-bg-surface/80 backdrop-blur-md border border-white/10
-                        shadow-neumorphic-convex
-                        flex items-center gap-3
-                      ">
-                        <div className="flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce"></span>
-                        </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Typing...</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {conversation.keyRotationPending && <KeyRotationBanner />}
+              <MessageList 
+                 conversationId={id}
+                 conversation={conversation}
+                 messages={messages}
+                 isLoading={isLoading}
+                 isFetchingMore={isFetchingMore}
+                 meId={meId}
+                 onLoadPrevious={actions.loadPrevious}
+                 onImageClick={handleImageClick}
+              />
               
               <MessageInput
                 onSend={handleSendMessage}

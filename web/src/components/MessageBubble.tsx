@@ -1,55 +1,28 @@
-import { useEffect, useState } from "react";
-import { Message, MessageStatus } from "@store/conversation";
-import { useAuthStore } from "@store/auth";
+import { Message } from "@store/conversation";
 import classNames from "classnames";
-import { FaCheck, FaCheckDouble } from "react-icons/fa";
-import { FiClock, FiEyeOff, FiCamera, FiVideo, FiMic, FiEye, FiVolumeX } from "react-icons/fi";
+import { FiCamera, FiVideo, FiMic, FiEyeOff } from "react-icons/fi";
 import FileAttachment from "./FileAttachment";
 import LinkPreviewCard from "./LinkPreviewCard";
 import LazyImage from "./LazyImage";
-import { useMessageStore } from "@store/message";
 import { useShallow } from 'zustand/react/shallow';
-import { formatTime } from "@utils/date";
 import MarkdownMessage from "./MarkdownMessage";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
 import clsx from 'clsx'; 
-import { useUserProfile } from '@hooks/useUserProfile';
 import { useSettingsStore } from '@store/settings';
-
-const ReplyQuote = ({ message }: { message: Message }) => {
-  const profile = useUserProfile(message.sender as any);
-  const currentUser = useAuthStore.getState().user;
-  const isMe = message.senderId === currentUser?.id;
-  const authorName = isMe ? 'You' : (profile.name || 'Unknown');
-  let contentPreview: string;
-  if (message.duration) contentPreview = 'Voice Message';
-  else if (message.fileName) contentPreview = message.fileName;
-  else if (message.fileUrl) contentPreview = 'File';
-  else contentPreview = message.content || '...';
-  return (
-    <div className="mb-1.5 p-2 rounded-lg bg-black/20 border-l-4 border-accent/50">
-      <p className="text-xs font-bold text-accent/80">{authorName}</p>
-      <div className="text-text-primary/70 truncate text-sm">
-        <MarkdownMessage content={contentPreview} />
-      </div>
-    </div>
-  );
-};
+import { useState } from "react";
+import ReplyQuote from "./ReplyQuote";
+import MessageMetadata from "./MessageMetadata";
 
 interface Props {
   message: Message;
   isOwn: boolean;
-  // Props lain seperti showAvatar, showName, isGroup tidak lagi dipakai di sini
-  // karena Bubble ini hanya merender kontennya saja.
   onImageClick?: (message: Message) => void;
   isLastInSequence?: boolean;
   participants?: any[];
 }
 
 export default function MessageBubble({ message, isOwn, onImageClick, isLastInSequence = true, participants = [] }: Props) {
-  const { user } = useAuthStore(useShallow(s => ({ user: s.user })));
   const privacyCloak = useSettingsStore(s => s.privacyCloak);
-  const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
 
   const content = message.content || '';
@@ -58,54 +31,6 @@ export default function MessageBubble({ message, isOwn, onImageClick, isLastInSe
   const isPlaceholder = content === 'waiting_for_key' || content.startsWith('[') || content === 'Decryption failed';
 
   const cloakClass = privacyCloak ? "blur-[6px] opacity-75 hover:blur-none hover:opacity-100 active:blur-none active:opacity-100 transition-all duration-300 select-none" : "";
-
-  useEffect(() => {
-    if (!message.expiresAt || message.deletedAt) {
-      setTimeLeft(null);
-      return;
-    }
-
-    const checkExpiration = () => {
-      const expireTime = new Date(message.expiresAt!).getTime();
-      const now = Date.now();
-      const diff = expireTime - now;
-
-      if (diff <= 0) {
-        useMessageStore.getState().removeMessage(message.conversationId, message.id);
-        setTimeLeft(null);
-      } else {
-        const hours = Math.floor(diff / 3600000);
-        const minutes = Math.floor((diff % 3600000) / 60000);
-        const seconds = Math.floor((diff % 60000) / 1000);
-        
-        if (hours > 0) {
-           setTimeLeft(`${hours}h ${minutes}m`);
-        } else if (minutes > 0) {
-           setTimeLeft(`${minutes}m ${seconds}s`);
-        } else {
-           setTimeLeft(`${seconds}s`);
-        }
-      }
-    };
-
-    checkExpiration();
-    const interval = setInterval(checkExpiration, 1000);
-    return () => clearInterval(interval);
-  }, [message.expiresAt, message.deletedAt, message.id, message.conversationId]);
-
-  const getStatusIcon = () => {
-    if (!isOwn) return null;
-    const statuses = message.statuses || [];
-    
-    // Logic from original code: check if read by ANYONE other than self
-    const readCount = statuses.filter((s: MessageStatus) => s.status === 'READ' && s.userId !== user?.id).length;
-    const deliveredCount = statuses.filter((s: MessageStatus) => s.status === 'DELIVERED').length;
-
-    // Restore green color for Read status
-    if (readCount > 0) return <FaCheckDouble size={14} className="text-green-400" />;
-    if (deliveredCount > 0) return <FaCheckDouble size={14} className="text-white/70" />;
-    return <FaCheck size={14} className="text-white/70" />;
-  };
 
   const isImage = message.fileType?.startsWith('image/');
   const isVoiceMessage = message.fileType?.startsWith('audio/webm');
@@ -216,24 +141,7 @@ export default function MessageBubble({ message, isOwn, onImageClick, isLastInSe
         )}
       </div>
 
-      {/* Metadata Footer */}
-      <div className={clsx("text-xs mt-1.5 flex items-center gap-1.5 select-none", {
-        "absolute bottom-2 right-2 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded text-white shadow-sm": isImage && !message.content,
-        "justify-end": !isImage || message.content,
-        "text-white/80": isOwn && (!isImage || message.content), // Fix contrast for own messages
-        "text-text-secondary/80": !isOwn && (!isImage || message.content)
-      })}>
-        {message.isViewOnce && <FiEye size={12} className="opacity-70" />}
-        {message.isSilent && <FiVolumeX size={12} className="opacity-60 text-text-secondary" title="Sent Silently" />}
-        {timeLeft && (
-          <span className="flex items-center gap-1 text-[9px] font-bold text-red-500 bg-red-500/10 px-1 rounded animate-pulse mr-1">
-            <FiClock size={10} /> {timeLeft}
-          </span>
-        )}
-        <span className="text-[10px] font-medium tracking-wide opacity-90">{formatTime(message.createdAt)}</span>
-        {message.isEdited && <span className="opacity-70 italic text-[10px]">(edited)</span>}
-        {isOwn && !isDeleted && getStatusIcon()}
-      </div>
+      <MessageMetadata message={message} isOwn={isOwn} isImage={!!isImage} isDeleted={isDeleted} />
     </div>
   );
 }

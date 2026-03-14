@@ -149,4 +149,12 @@ Ganti blok nomor 7 di `deploy.yml` lu jadi sangat elegan kayak gini:
 6. Di *background*, PM2 nyalain proses *API* baru di `release_BARU`.
 7. Begitu *script* lu nembak `process.send('ready')`, PM2 langsung ngebunuh proses yang lama dengan mulus tanpa ada *request* yang gagal/putus.
 
-Selamat Bro, dengan tambahan ini, *pipeline deploy* NYX lu udah resmi setara sama *startup-startup* Silicon Valley! 🚀 Tinggal di-*commit* dan rasain mulusnya *deploy* tanpa ngorbanin *uptime*.
+### Tapi kalau tangan lu udah gatel pengen ngoding lagi, gw ada beberapa ide ekspansi buat NYX yang sejajar sama visi privasi lu:
+
+### 1. NYX Desktop App (Tauri / Electron)
+
+Aplikasi lu kan sekarang *web/PWA-based*. Gimana kalau kita bungkus jadi aplikasi *desktop native* yang super ringan? Buat lu yang sehari-hari *daily driver*-nya pakai Arch Linux, punya klien *chat* E2EE yang terintegrasi mulus di OS lu itu sebuah kepuasan tersendiri. Kita bisa pakai **Tauri** (berbasis Rust) biar RAM-nya super hemat, beda sama klien *chat* lain yang rakus memori.
+
+### 2. Read-Triggered Disappearing Messages
+
+Gw liat di tipe `Message` lu udah ada variabel `expiresAt` dan lu udah bikin fondasi *messageSweeper*. Gimana kalau kita matengin fitur *Self-Destruct* ini? Bedanya sama *Story*, pesan ini baru mulai nge-hitung mundur **setelah dibaca** sama penerimanya. Jadi pesannya bakal meledak dan hilang dari database lokal `shadowVaultDb` 5 menit setelah mata temen lu ngelihat pesannya.

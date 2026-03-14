@@ -8,9 +8,8 @@ import { toAbsoluteUrl } from "@utils/url";
 import { useModalStore } from '@store/modal';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import { FiRefreshCw, FiShield, FiCopy, FiTrash2, FiCornerUpLeft, FiClock, FiInfo, FiEdit2, FiCheckSquare, FiCheck, FiPaperclip, FiLock, FiAlertTriangle } from 'react-icons/fi';
+import { FiCopy, FiTrash2, FiCornerUpLeft, FiInfo, FiEdit2, FiCheckSquare, FiCheck, FiPaperclip, FiShield } from 'react-icons/fi';
 import { getUserColor } from '@utils/color';
-import { FaCheck, FaCheckDouble } from 'react-icons/fa';
 import { useMessageStore } from '@store/message';
 import { useShallow } from 'zustand/react/shallow';
 import toast from 'react-hot-toast';
@@ -18,37 +17,7 @@ import MessageBubble from "./MessageBubble";
 import { useUserProfile } from '@hooks/useUserProfile';
 import SwipeableItem from "./SwipeableItem";
 import { useContextMenuStore } from "../store/contextMenu";
-
-const MessageStatusIcon = ({ message, participants }: { message: Message; participants: Participant[] }) => {
-  const meId = useAuthStore((s) => s.user?.id);
-  const retrySendMessage = useMessageInputStore(s => s.retrySendMessage);
-  
-  if (message.senderId !== meId) return null;
-  
-  if (message.status === 'FAILED' || message.error) {
-    return (
-      <button onClick={() => retrySendMessage(message)} title="Failed to send. Click to retry.">
-        <FiRefreshCw className="text-destructive cursor-pointer" size={14} />
-      </button>
-    );
-  }
-
-  if (message.status === 'SENDING' || message.optimistic) {
-     return <FiClock size={14} className="text-text-secondary opacity-70" />;
-  }
-
-  const otherParticipants = participants.filter((p: Participant) => p.id !== meId) || [];
-  if (otherParticipants.length === 0) return <FaCheck size={14} className="text-text-secondary" />;
-  
-  const statuses = message.statuses || [];
-  const isReadAll = otherParticipants.every((p: Participant) => statuses.some((s: MessageStatus) => s.userId === p.id && s.status === 'READ'));
-  if (isReadAll) return <FaCheckDouble size={14} className="text-blue-500" />;
-  
-  const isDeliveredAll = otherParticipants.every((p: Participant) => statuses.some((s: MessageStatus) => s.userId === p.id && s.status === 'DELIVERED'));
-  if (isDeliveredAll) return <FaCheckDouble size={14} className="text-text-secondary" />;
-  
-  return <FaCheck size={14} className="text-text-secondary" />;
-};
+import SystemMessage from "./SystemMessage";
 
 const ReactionsDisplay = ({ reactions }: { reactions: Message['reactions'] }) => {
   if (!reactions || reactions.length === 0) return null;
@@ -116,42 +85,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
   }, [message.id, message.conversationId, mine, meId, message.statuses]);
 
   if (message.type === 'SYSTEM' || message.content?.startsWith('You sent') || message.content?.startsWith('Secure session') || message.content?.startsWith('System')) {
-    const getSystemIcon = (text: string) => {
-      const lowerText = text.toLowerCase();
-      if (lowerText.includes('encrypt') || lowerText.includes('decrypt') || lowerText.includes('key')) return <FiLock size={12} className="text-emerald-500" />;
-      if (lowerText.includes('file') || lowerText.includes('attachment')) return <FiPaperclip size={12} className="text-blue-400" />;
-      if (lowerText.includes('restart') || lowerText.includes('sync')) return <FiRefreshCw size={12} className="text-blue-500" />;
-      if (lowerText.includes('error') || lowerText.includes('failed')) return <FiAlertTriangle size={12} className="text-red-500" />;
-      return <FiInfo size={12} className="text-text-secondary" />;
-    };
-
-    const isError = message.content?.includes('Error') || message.content?.includes('Unreadable') || message.content?.includes('Key out of sync');
-    const isDesyncError = message.content?.includes('Key out of sync');
-
-    return (
-      <div className="flex justify-center my-4 w-full">
-        <div className="flex flex-col items-center gap-2">
-          <div className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium shadow-neu-pressed-dark border border-white/5",
-            isError 
-              ? "bg-red-500/10 text-red-500" 
-              : "bg-black/20 text-text-secondary"
-          )}>
-            {getSystemIcon(message.content || '')}
-            <span>{message.content}</span>
-          </div>
-          
-          {isDesyncError && (
-              <button 
-                  onClick={() => useMessageStore.getState().repairSecureSession(message.conversationId, isGroup)}
-                  className="text-[10px] text-blue-500 hover:text-blue-400 font-bold bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
-              >
-                  Repair Session
-              </button>
-          )}
-        </div>
-      </div>
-    );
+    return <SystemMessage message={message} isGroup={isGroup} />;
   }
 
   const handleDelete = () => {
