@@ -156,7 +156,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         });
 
         useModalStore.getState().showPasswordPrompt(async (password) => {
-          cleanup();
+          if (unsubscribe) unsubscribe();
           if (!password) { reject(new Error("Password not provided.")); return; }
 
           try {
