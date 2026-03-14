@@ -2,23 +2,9 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
-import { api, apiUpload, authFetch } from "@lib/api"; // Added authFetch
+import { api } from "@lib/api";
 import { getSocket, emitSessionKeyRequest, emitGroupKeyDistribution } from "@lib/socket";
-import { 
-  encryptMessage, 
-  decryptMessage, 
-  ensureAndRatchetSession, 
-  encryptFile, 
-  ensureGroupSession,
-  retrieveLatestSessionKeySecurely, 
-  establishSessionFromPreKeyBundle, 
-  getMyEncryptionKeyPair, 
-  storeSessionKeySecurely, 
-  deriveSessionKeyAsRecipient,
-  storeRatchetStateSecurely,
-  retrieveRatchetStateSecurely,
-  PreKeyBundle 
-} from "@utils/crypto";
+import { decryptMessage, ensureGroupSession, deriveSessionKeyAsRecipient, getMyEncryptionKeyPair, storeRatchetStateSecurely } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
 import type { Message } from "./conversation";
@@ -103,106 +89,12 @@ export async function decryptMessageObject(message: Message, seenIds = new Set<s
     // [FIX #1] SELF-MESSAGE DECRYPTION (Pesan Sendiri)
     // Jika ini pesan saya sendiri
     if (currentUser && decryptedMsg.senderId === currentUser.id) {
-        // Coba ambil Message Key dari brankas lokal (MK Vault) - Works for BOTH Group & 1-on-1 now!
-        const { retrieveMessageKeySecurely } = await import('@utils/crypto');
-        let mk = await retrieveMessageKeySecurely(decryptedMsg.id);
-        // Fallback: If not found by real ID, check if we have it under its tempId
-        if (!mk && decryptedMsg.tempId) {
-            mk = await retrieveMessageKeySecurely(`temp_${decryptedMsg.tempId}`);
+        const { decryptSelfMessage } = await import('@services/messageCrypto');
+        const selfDecrypted = await decryptSelfMessage(decryptedMsg, seenIds, depth, options);
+        if (selfDecrypted.repliedTo) {
+            selfDecrypted.repliedTo = await decryptMessageObject(selfDecrypted.repliedTo, seenIds, depth + 1, options);
         }
-        
-        if (mk) {
-            // Kita punya kuncinya! Dekripsi langsung secara statis.
-            const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
-            const sodium = await getSodium();
-            
-            // [FIX] Matryoshka Parsing Loop: Peel all JSON layers (X3DH, DR) until raw ciphertext
-            let cipherTextToUse = decryptedMsg.ciphertext || decryptedMsg.content;
-            
-            // Helper to unwrap
-            const unwrap = (str: string): string => {
-                 if (str && typeof str === 'string' && str.trim().startsWith('{')) {
-                     try {
-                         const p = JSON.parse(str);
-                         if (p.ciphertext) return unwrap(p.ciphertext);
-                     } catch {}
-                 }
-                 return str;
-            }
-            
-            cipherTextToUse = unwrap(cipherTextToUse!);
-
-            if (cipherTextToUse) {
-                try {
-                    const combined = sodium.from_base64(cipherTextToUse, sodium.base64_variants.URLSAFE_NO_PADDING);
-                    const nonce = combined.slice(0, 24);
-                    const encrypted = combined.slice(24);
-                    const decryptedBytes = await worker_crypto_secretbox_xchacha20poly1305_open_easy(encrypted, nonce, mk);
-                    let plainText = sodium.to_string(decryptedBytes);
-                    
-                    // --- STRIP PROFILE KEY DARI PESAN SENDIRI ---
-                    if (plainText && plainText.trim().startsWith('{')) {
-                        try {
-                            const parsed = JSON.parse(plainText);
-                            if (parsed.profileKey) {
-                                delete parsed.profileKey;
-                                if (parsed.text !== undefined && Object.keys(parsed).length === 1) {
-                                    plainText = parsed.text;
-                                } else {
-                                    plainText = JSON.stringify(parsed);
-                                }
-                            }
-                        } catch (e) {}
-                    }
-                    
-                    decryptedMsg.content = plainText;
-                    
-                    if (decryptedMsg.content && decryptedMsg.content.startsWith('{') && decryptedMsg.content.includes('"type":"file"')) {
-                        try {
-                            const metadata = JSON.parse(decryptedMsg.content);
-                            if (metadata.type === 'file') {
-                                decryptedMsg.fileUrl = metadata.url;
-                                decryptedMsg.fileKey = metadata.key;
-                                decryptedMsg.fileName = metadata.name;
-                                decryptedMsg.fileSize = metadata.size;
-                                decryptedMsg.fileType = metadata.mimeType;
-                                decryptedMsg.content = null;
-                                decryptedMsg.isBlindAttachment = true;
-                            }
-                        } catch {}
-                    } else if (decryptedMsg.content && decryptedMsg.content.startsWith('{') && decryptedMsg.content.includes('"type":"story_reply"')) {
-                        try {
-                            const metadata = JSON.parse(decryptedMsg.content);
-                            if (metadata.type === 'story_reply') {
-                                decryptedMsg.content = metadata.text;
-                                decryptedMsg.repliedTo = {
-                                    id: 'story_mock',
-                                    senderId: metadata.storyAuthorId,
-                                    sender: { id: metadata.storyAuthorId },
-                                    content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story')
-                                } as any;
-                            }
-                        } catch {}
-                    }
-                    if (decryptedMsg.repliedTo) {
-                        decryptedMsg.repliedTo = await decryptMessageObject(decryptedMsg.repliedTo, seenIds, depth + 1, options);
-                    }
-                    return decryptedMsg;
-                } catch (e) {
-                    console.error("Self-decrypt failed with stored key:", e);
-                }
-            }
-        }
-        
-        // Fallback jika MK tidak ada (misal clear cache tapi DB pesan masih ada)
-        // Kita tidak bisa mendekripsi pesan sendiri tanpa MK lokal.
-        if (decryptedMsg.content && decryptedMsg.content.trim().startsWith('{')) {
-             decryptedMsg.content = "🔒 You sent this message (Encrypted)";
-        }
-        if (decryptedMsg.repliedTo) {
-            decryptedMsg.repliedTo = await decryptMessageObject(decryptedMsg.repliedTo, seenIds, depth + 1, options);
-        }
-        return decryptedMsg;
+        return selfDecrypted;
     }
 
     // 2. Tentukan Payload yang Akan Didekripsi
@@ -862,175 +754,39 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     }
 
     try {
-      let ciphertext = '';
-      let x3dhHeader: any = null;
-
-      if (!isGroup && data.content) {
-          const state = await retrieveRatchetStateSecurely(conversationId);
-          if (!state) {
-             const peerId = conversation.participants.find(p => p.id !== user.id)?.id;
-             if (peerId) {
-                 const theirBundle = await authFetch<any>(`/api/keys/prekey-bundle/${peerId}`);
-                 const myKeyPair = await getMyEncryptionKeyPair();
-                 const { sessionKey, ephemeralPublicKey, otpkId } = await establishSessionFromPreKeyBundle(myKeyPair, theirBundle);
-                 const sodium = await getSodium();
-                 
-                 const { worker_dr_init_alice } = await import('@lib/crypto-worker-proxy');
-                 const newState = await worker_dr_init_alice({
-                     sk: sessionKey,
-                     theirSignedPreKeyPublic: sodium.from_base64(theirBundle.signedPreKey.key, sodium.base64_variants.URLSAFE_NO_PADDING)
-                 });
-                 
-                 await storeRatchetStateSecurely(conversationId, newState);
-
-                 x3dhHeader = {
-                     ik: sodium.to_base64(myKeyPair.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING),
-                     ek: ephemeralPublicKey,
-                     otpkId: otpkId
-                 };
-             } else {
-                 console.error(`[X3DH] Peer not found in participants for ${conversationId}.`);
-                 toast.error("Encryption failed: Cannot identify recipient.");
-                 return;
-             }
-          }
-      }
-
-      let mkToStore: Uint8Array | undefined;
-      let contentToEncrypt = data.content;
-
-      if (contentToEncrypt) {
-        try {
-            const profileKey = await import('@lib/keychainDb').then(m => m.getProfileKey(user.id));
-            if (profileKey) {
-                let parsedObj: any = null;
-                if (contentToEncrypt.trim().startsWith('{')) {
-                    try { parsedObj = JSON.parse(contentToEncrypt); } catch (e) {}
-                }
-                
-                if (parsedObj && typeof parsedObj === 'object') {
-                    parsedObj.profileKey = profileKey;
-                    contentToEncrypt = JSON.stringify(parsedObj);
-                } else {
-                    contentToEncrypt = JSON.stringify({ text: contentToEncrypt, profileKey });
-                }
-            }
-        } catch (e) {
-            console.error("Failed to inject profile key", e);
-        }
-
-        const result = await encryptMessage(contentToEncrypt, conversationId, isGroup, undefined, `temp_${actualTempId}`);
-        ciphertext = result.ciphertext;
-        
-        // [FIX PERSISTENCE] Store MK for ALL chats (Group + 1on1)
-        if (result.mk) {
-             mkToStore = result.mk;
-             await import('@utils/crypto').then(({ storeMessageKeySecurely }) => 
-                 storeMessageKeySecurely(`temp_${actualTempId}`, mkToStore!)
-             );
-        }
-        
-        if (!isGroup && result.drHeader) {
-            ciphertext = JSON.stringify({
-                dr: result.drHeader,
-                ciphertext: ciphertext
-            });
-        }
-      }
+      const { prepareEncryptedPayload, generatePushPayloads } = await import('@services/messageCrypto');
       
+      const contentToEncrypt = data.content || '';
+      
+      const { ciphertext, x3dhHeader, mkToStore } = await prepareEncryptedPayload({
+          content: contentToEncrypt,
+          conversationId,
+          isGroup,
+          actualTempId,
+          participants: conversation.participants as any[],
+          isReactionPayload
+      });
+
+      if (mkToStore) {
+           await import('@utils/crypto').then(({ storeMessageKeySecurely }) => 
+               storeMessageKeySecurely(`temp_${actualTempId}`, mkToStore)
+           );
+      }
+
+      let finalCiphertext = ciphertext;
       if (x3dhHeader) {
-          const payloadJson = JSON.stringify({
+          finalCiphertext = JSON.stringify({
               x3dh: x3dhHeader,
               ciphertext: ciphertext 
           });
-          ciphertext = payloadJson;
       }
-      
-      const pushPayloads: Record<string, string> = {};
-      try {
-        const { getSodium } = await import('@lib/sodiumInitializer');
-        const sodium = await getSodium();
-        const { worker_crypto_box_seal } = await import('@lib/crypto-worker-proxy');
 
-        const myAuthUser = useAuthStore.getState().user;
-        let myName = 'Someone';
-
-        if (myAuthUser?.encryptedProfile) {
-           try {
-              const profileStore = (await import('@store/profile')).useProfileStore.getState();
-              // We pass null for profileKey fallback internally inside decryptAndCache
-              const myDecrypted = await profileStore.decryptAndCache(myAuthUser.id, myAuthUser.encryptedProfile);
-              if (myDecrypted && myDecrypted.name !== "Encrypted User") {
-                  myName = myDecrypted.name;
-              }
-           } catch (e) {
-              console.error("Failed to decrypt own profile for push", e);
-           }
-        }
-
-        // DO NOT generate push payload for silent messages (STORY_KEY, CALL_INIT, GHOST_SYNC, etc.)
-        const silentPayload = parseSilent(data.content);
-        const isSilentMessage = data.isSilent || silentPayload !== null;
-        
-        if (!isSilentMessage) {
-            // Prepare the push content securely
-            // For file messages, show a generic description
-            // For text messages, include the actual plaintext content
-            let pushBody: string;
-            
-            // Check for story_reply type and extract the text
-            if (typeof data.content === 'string' && data.content.startsWith('{') && data.content.includes('"type":"story_reply"')) {
-                try {
-                    const metadata = JSON.parse(data.content);
-                    if (metadata.type === 'story_reply' && metadata.text) {
-                        pushBody = `📖 Story reply: ${metadata.text}`;
-                    } else {
-                        pushBody = '📖 Replied to your story';
-                    }
-                } catch (e) {
-                    pushBody = '📖 Replied to your story';
-                }
-            } else if (data.fileUrl || data.fileName) {
-                pushBody = `Sent a file: ${data.fileName || 'Attachment'}`;
-            } else if (data.isViewOnce) {
-                pushBody = 'Sent a view-once message';
-            } else if (typeof data.content === 'string' && data.content.trim()) {
-                // Truncate long messages for push notification preview
-                const maxLength = 100;
-                pushBody = data.content.length > maxLength
-                    ? data.content.substring(0, maxLength) + '...'
-                    : data.content;
-            } else {
-                pushBody = 'Sent a secure message';
-            }
-
-            const pushData = JSON.stringify({ title: myName, body: pushBody, conversationId });
-            const pushDataBytes = new TextEncoder().encode(pushData);
-
-            // Encrypt for each recipient using Web Worker
-            for (const p of conversation.participants as any[]) {
-               const targetUserId = p.userId || p.id;
-               const targetPublicKey = p.user?.publicKey || p.publicKey;
-
-               if (targetUserId !== user.id && targetPublicKey) {
-                   try {
-                       const recipientPubBytes = sodium.from_base64(targetPublicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-                       const sealed = await worker_crypto_box_seal(pushDataBytes, recipientPubBytes);
-                       pushPayloads[targetUserId] = sodium.to_base64(sealed, sodium.base64_variants.URLSAFE_NO_PADDING);
-                   } catch (e) {
-                       console.error(`Failed to seal push for ${targetUserId}`, e);
-                   }
-               }
-            }
-        }
-      } catch (e) {
-        console.error("Failed to generate push payloads", e);
-      }
+      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as any[], data);
 
       const payload = {
           ...data,
-          content: ciphertext,
-          sessionId: undefined, // [PHASE 3 FIX] No session ID needed for group anymore, or managed by logic
+          content: finalCiphertext,
+          sessionId: undefined,
           fileKey: undefined, fileName: undefined, fileType: undefined, fileSize: undefined,
           pushPayloads: Object.keys(pushPayloads).length > 0 ? pushPayloads : undefined
       };
@@ -1212,60 +968,24 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     useConversationStore.getState().updateConversationLastMessage(conversationId, optimisticMessage);
     
     try {
-      updateActivity(uploadId, { progress: 5 });
-
-      const { encryptedBlob, key: fileKey } = await encryptFile(file);
-      
-      updateActivity(uploadId, { progress: 20 });
-
-      const presignedRes = await api<{ uploadUrl: string, publicUrl: string, key: string }>('/api/uploads/presigned', {
-          method: 'POST',
-          body: JSON.stringify({
-              fileName: file.name, 
-              fileType: 'application/octet-stream', 
-              folder: 'attachments',
-              fileSize: encryptedBlob.size 
-          })
+      const { processAndUploadAttachment } = await import('@services/attachmentService');
+      const uploadResult = await processAndUploadAttachment(file, (progress) => {
+          updateActivity(uploadId, { progress });
       });
-
-      updateActivity(uploadId, { progress: 30 });
-
-      await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', presignedRes.uploadUrl, true);
-          xhr.setRequestHeader('Content-Type', 'application/octet-stream'); 
-          
-          xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                  const percentComplete = (e.loaded / e.total) * 60; 
-                  updateActivity(uploadId, { progress: 30 + percentComplete });
-              }
-          };
-          
-          xhr.onload = () => {
-              if (xhr.status === 200) resolve();
-              else reject(new Error('Upload failed'));
-          };
-          
-          xhr.onerror = () => reject(new Error('Network error'));
-          xhr.send(encryptedBlob);
-      });
-
-      updateActivity(uploadId, { progress: 95 });
 
       const metadata = {
           type: 'file',
-          url: presignedRes.publicUrl,
-          key: fileKey, 
-          name: file.name,
-          size: file.size,
-          mimeType: file.type
+          url: uploadResult.url,
+          key: uploadResult.key, 
+          name: uploadResult.name,
+          size: uploadResult.size,
+          mimeType: uploadResult.mimeType
       };
 
       await get().sendMessage(conversationId, {
           content: JSON.stringify(metadata),
-          fileName: file.name,
-          fileType: file.type
+          fileName: uploadResult.name,
+          fileType: uploadResult.mimeType
       }, tempId);
       
       updateActivity(uploadId, { progress: 100 });
