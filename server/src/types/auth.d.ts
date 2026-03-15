@@ -3,4 +3,6 @@
 export interface AuthPayload {
   id: string;
   role?: string;
+  usernameHash?: string;
+  publicKey?: string | null;
 }

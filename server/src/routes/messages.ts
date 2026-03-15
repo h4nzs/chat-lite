@@ -1,325 +1,160 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import { Router } from 'express'
-import { prisma } from '../lib/prisma.js'
-import { requireAuth } from '../middleware/auth.js'
-import { getIo } from '../socket.js'
-import { ApiError } from '../utils/errors.js'
-import { sendPushNotification } from '../utils/sendPushNotification.js'
-import { deleteR2File } from '../utils/r2.js'
-import { env } from '../config.js'
-import { z } from 'zod'
-import { zodValidate } from '../utils/validate.js'
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { ApiError } from '../utils/errors.js';
+import { z } from 'zod';
+import { zodValidate } from '../utils/validate.js';
+import {
+  getMessages,
+  getMessageContext,
+  sendMessage,
+  deleteMessage,
+  deleteMessages,
+  updateMessage,
+  markMessageAsRead
+} from '../services/message.service.js';
 
-const router: Router = Router()
-router.use(requireAuth)
+const router: Router = Router();
+router.use(requireAuth);
 
-// GET Messages
+// ==================== GET Messages ====================
 router.get('/:conversationId', async (req, res, next) => {
   try {
-    if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const { conversationId } = req.params
-    const userId = req.user.id
-    const cursor = req.query.cursor as string | undefined
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
 
-    // Cek participant
-    const participant = await prisma.participant.findUnique({
-      where: {
-        userId_conversationId: {
-          userId,
-          conversationId
-        }
-      }
-    })
-
-    if (!participant) return res.status(403).json({ error: 'You are not a member of this conversation.' })
-
-    const messages = await prisma.message.findMany({
-      where: {
-        conversationId,
-        // Hanya ambil pesan setelah user join (opsional, tergantung kebutuhan bisnis)
-        createdAt: { gte: participant.joinedAt }
-      },
-      take: 50, // Ubah jadi positive jika pakai cursor ID yang benar, atau negative untuk "latest"
-      skip: cursor ? 1 : 0,
-      cursor: cursor ? { id: cursor } : undefined,
-      orderBy: { createdAt: 'desc' }, // Ambil dari yang terbaru dulu
-      include: {
-        sender: {
-          select: { id: true, encryptedProfile: true }
-        },
-        statuses: true,
-        repliedTo: {
-          include: {
-            sender: { select: { id: true, encryptedProfile: true } }
-          }
-        }
-      }
-    })
-
-    // Reverse biar di frontend urutannya bener (Oldest -> Newest)
-    res.json({ items: messages.reverse() })
-  } catch (error) {
-    next(error)
-  }
-})
-
-// GET Context (Surrounding Messages)
-router.get('/context/:id', requireAuth, async (req, res, next) => {
-  try {
-    const targetId = req.params.id;
-
-    // Get the target message first to find its timestamp and conversationId
-    const targetMsg = await prisma.message.findUnique({
-      where: { id: targetId as string },
-      include: { sender: { select: { id: true, encryptedProfile: true } }, repliedTo: true, statuses: true }
+    const result = await getMessages({
+      conversationId: req.params.conversationId,
+      userId: req.user.id,
+      cursor: req.query.cursor as string | undefined
     });
 
-    if (!targetMsg) {
-      throw new ApiError(404, 'Message not found');
-    }
-
-    // Verify participation
-    const participation = await prisma.participant.findUnique({
-      where: { userId_conversationId: { userId: req.user!.id, conversationId: targetMsg.conversationId } }
-    });
-    if (!participation) throw new ApiError(403, 'Not a participant');
-
-    // Fetch older messages (before target)
-    const older = await prisma.message.findMany({
-      where: { conversationId: targetMsg.conversationId, createdAt: { lt: targetMsg.createdAt, gte: participation.joinedAt } },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      include: { sender: { select: { id: true, encryptedProfile: true } }, repliedTo: true, statuses: true }
-    });
-
-    // Fetch newer messages (after target)
-    const newer = await prisma.message.findMany({
-      where: { conversationId: targetMsg.conversationId, createdAt: { gt: targetMsg.createdAt, gte: participation.joinedAt } },
-      orderBy: { createdAt: 'asc' },
-      take: 20,
-      include: { sender: { select: { id: true, encryptedProfile: true } }, repliedTo: true, statuses: true }
-    });
-
-    // Combine and sort chronologically
-    const allMessages = [...older.reverse(), targetMsg, ...newer];
-
-    res.json({ items: allMessages, conversationId: targetMsg.conversationId });
+    res.json(result);
   } catch (error) {
     next(error);
   }
 });
 
-// SEND Message
+// ==================== GET Message Context ====================
+router.get('/context/:id', requireAuth, async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    const result = await getMessageContext({
+      messageId: req.params.id as string,
+      userId: req.user.id
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== SEND Message ====================
 router.post('/', zodValidate({
   body: z.object({
     conversationId: z.string().min(1),
     content: z.string().max(20000).optional().nullable(),
-    // File fields removed (Blind Attachments)
     sessionId: z.string().optional().nullable(),
     repliedToId: z.string().optional().nullable(),
     tempId: z.union([z.string(), z.number()]).optional(),
     expiresIn: z.number().optional().nullable(),
-    isViewOnce: z.boolean().optional()
+    isViewOnce: z.boolean().optional(),
+    pushPayloads: z.record(z.string(), z.string()).optional()
   }).refine(data => data.content, {
     message: "Message must contain content"
   })
 }), async (req, res, next) => {
   try {
-    if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const senderId = req.user.id
-    const { conversationId, content, sessionId, repliedToId, tempId, expiresIn, isViewOnce } = req.body
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
 
-    // 1. Ambil Participants
-    const participants = await prisma.participant.findMany({
-      where: { conversationId },
-      select: { userId: true } // Select seperlunya aja biar ringan
-    })
-
-    // Calculate expiration time if provided
-    let expiresAt: Date | undefined
-    if (expiresIn && typeof expiresIn === 'number' && expiresIn > 0) {
-      expiresAt = new Date(Date.now() + expiresIn * 1000)
-    }
-
-    if (!participants.some(p => p.userId === senderId)) {
-      return res.status(403).json({ error: 'You are not a participant.' })
-    }
-
-    // 2. BLOCKING CHECK & REPLY DEPTH (Parallel)
-    // Jalankan pengecekan berat secara paralel
-    const checks = []
-
-    // Cek Blocking (Khusus 1-on-1)
-    if (participants.length === 2) {
-      const otherUserId = participants.find(p => p.userId !== senderId)?.userId
-      if (otherUserId) {
-        checks.push(
-          prisma.blockedUser.findFirst({
-            where: {
-              OR: [
-                { blockerId: senderId, blockedId: otherUserId }, // Sender ngeblok Receiver
-                { blockerId: otherUserId, blockedId: senderId } // Receiver ngeblok Sender
-              ]
-            }
-          }).then(block => {
-            if (block) throw new ApiError(403, 'Messaging unavailable due to blocking.')
-          })
-        )
-      }
-    }
-
-    // Cek Reply Depth
-    if (repliedToId) {
-      checks.push((async () => {
-        let currentId: string | null = repliedToId
-        let depth = 0
-        const MAX_DEPTH = 10
-        while (currentId && depth < MAX_DEPTH) {
-          const parentMessage = await prisma.message.findUnique({
-            where: { id: currentId },
-            select: { repliedToId: true }
-          })
-          if (!parentMessage) break
-          currentId = parentMessage.repliedToId
-          depth++
-        }
-        if (depth >= MAX_DEPTH) throw new ApiError(400, 'Reply chain is too deep.')
-      })())
-    }
-
-    // Tunggu validasi selesai
-    await Promise.all(checks)
-
-    // 4. DATABASE TRANSACTION (Critical Path)
-    // Buat array status insert
-    const statusData = participants.map(p => ({
-      userId: p.userId,
-      status: p.userId === senderId ? 'READ' : 'SENT' // Pakai string literal enum
-    }))
-
-    const [newMessage] = await prisma.$transaction([
-      prisma.message.create({
-        data: {
-          conversationId,
-          senderId,
-          content,
-          sessionId,
-          repliedToId,
-          expiresAt, // Store expiration time
-          isViewOnce: isViewOnce === true,
-          statuses: {
-            createMany: { data: statusData as Array<{ userId: string; status: 'SENT' | 'DELIVERED' | 'READ' }> } // createMany lebih cepat dari nested create
-          }
-        },
-        include: {
-          sender: { select: { id: true, encryptedProfile: true } },
-          statuses: true,
-          repliedTo: { include: { sender: { select: { id: true, encryptedProfile: true } } } }
-        }
-      }),
-      prisma.conversation.update({
-        where: { id: conversationId },
-        data: { lastMessageAt: new Date() } // Pakai new Date() langsung
-      })
-    ])
-
-    // 5. REALTIME RESPONSE (Prioritas Tinggi)
-    const messageToBroadcast = { ...newMessage, tempId }
-
-    // Kirim response HTTP dulu biar UI user sender update
-    res.status(201).json(messageToBroadcast)
-
-    // 6. SOCKET & PUSH (Background / Fire & Forget)
-    // Socket emit
-    getIo().to(conversationId).emit('message:new', messageToBroadcast)
-
-    // Push Notification (JANGAN DI-AWAIT)
-    const pushRecipients = participants.filter(p => p.userId !== senderId)
-    if (pushRecipients.length > 0) {
-      const payload = {
-        data: { conversationId, messageId: newMessage.id }
-      }
-
-      // Jalankan loop push secara paralel tanpa nunggu
-      Promise.all(
-        pushRecipients.map(p => sendPushNotification(p.userId, payload))
-      ).catch(err => console.error('[Push] Failed:', err))
-    }
-  } catch (error) {
-    next(error)
-  }
-})
-
-// DELETE Message
-router.delete('/:id', async (req, res, next) => {
-  try {
-    if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const { id } = req.params
-    const userId = req.user.id
-    const r2Key = req.query.r2Key as string | undefined
-
-    const message = await prisma.message.findUnique({ where: { id } })
-    if (!message) return res.status(404).json({ error: 'Message not found' })
-    if (message.senderId !== userId) return res.status(403).json({ error: 'You can only delete your own messages' })
-
-    // Hapus file dari R2 (Blind Attachment via Query Param)
-    if (r2Key) {
-       // [SECURITY] Validate ownership via filename convention
-       // Format: folder/userId-uuid.ext
-       const parts = r2Key.split('/');
-       const filename = parts.length > 1 ? parts[parts.length - 1] : parts[0];
-
-       if (!filename.startsWith(`${userId}-`)) {
-          console.warn('[Security] User', userId, 'attempted to delete unauthorized file:', r2Key);
-       } else {
-          console.log('[R2] Deleting blind attachment:', r2Key);
-          deleteR2File(r2Key).catch(err => console.error('[R2] Failed to delete blind file:', r2Key, ':', err))
-       }
-    }
-
-    await prisma.message.delete({ where: { id } })
-
-    // Emit event
-    getIo().to(message.conversationId).emit('message:deleted', {
-      conversationId: message.conversationId,
-      id: message.id
-    })
-
-    res.status(204).send()
-  } catch (error) {
-    next(error)
-  }
-})
-
-// VIEW ONCE Message
-router.put('/:id/viewed', async (req, res, next) => {
-  try {
-    if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const messageId = req.params.id;
-    const userId = req.user.id;
-
-    const message = await prisma.message.findUnique({ where: { id: messageId }, include: { conversation: { include: { participants: true } } } });
-    if (!message || !message.isViewOnce || message.senderId === userId) return res.status(400).json({ error: 'Invalid operation' });
-
-    // NEW: Check participation
-    const isParticipant = message.conversation.participants.some(p => p.userId === userId);
-    if (!isParticipant) return res.status(403).json({ error: 'Not a participant' });
-
-    const updated = await prisma.message.update({
-      where: { id: messageId },
-      data: { isViewed: true }
+    const message = await sendMessage({
+      ...req.body,
+      senderId: req.user.id
     });
 
-    // Notify sender and receiver
-    const io = getIo();
-    io.to(message.conversationId).emit('message:viewed', { messageId, conversationId: message.conversationId });
-
-    res.json(updated);
+    res.status(201).json({ msg: message });
   } catch (error) {
     next(error);
   }
 });
 
-export default router
+// ==================== DELETE Message ====================
+router.delete('/:id', async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    await deleteMessage({
+      messageId: req.params.id as string,
+      userId: req.user.id
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== DELETE Multiple Messages ====================
+router.post('/delete-bulk', zodValidate({
+  body: z.object({
+    messageIds: z.array(z.string())
+  })
+}), async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    const result = await deleteMessages({
+      messageIds: req.body.messageIds,
+      userId: req.user.id
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== UPDATE Message (Edit) ====================
+router.put('/:id', zodValidate({
+  body: z.object({
+    content: z.string().min(1).max(20000)
+  })
+}), async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    const message = await updateMessage({
+      messageId: req.params.id as string,
+      userId: req.user.id,
+      content: req.body.content
+    });
+
+    res.json(message);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== MARK AS READ ====================
+router.post('/:messageId/read', async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      throw new ApiError(400, 'Conversation ID required');
+    }
+
+    await markMessageAsRead(req.params.messageId, req.user.id, conversationId);
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
