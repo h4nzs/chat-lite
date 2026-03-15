@@ -666,7 +666,7 @@ async function doEncryptMessage(
 
     return { 
         ciphertext: sodium.to_base64(result.ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING),
-        drHeader: result.header,
+        drHeader: result.header as DrHeader,
         mk: mkUint8 
     };
   }

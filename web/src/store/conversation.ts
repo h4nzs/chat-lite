@@ -299,7 +299,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
               const existing = existingConversations.find(e => e.id === fetched.id);
               if (existing) {
                   // Compare participant lists (simple ID comparison)
-                  const existingIds = existing.participants.map((p: any) => p.id).sort().join(',');
+                  const existingIds = existing.participants.map((p: Participant) => p.id).sort().join(',');
                   const fetchedIds = fetched.participants.map((p: any) => p.id).sort().join(',');
                   
                   if (existingIds !== fetchedIds) {
@@ -345,9 +345,9 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     try {
       await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
       get().removeConversation(id);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete conversation:", error);
-      const errorMessage = error.message || "Failed to delete conversation.";
+      const errorMessage = (error as Error).message || "Failed to delete conversation.";
       toast.error(errorMessage);
     }
   },
@@ -355,13 +355,13 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     try {
       await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
       get().removeConversation(id);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete group:", error);
       // Check if error is an ApiError with status property
-      if (error.status === 403) {
+      if ((error as any).status === 403) {
         toast.error("Only the group creator can delete the group.");
       } else {
-        const errorMessage = error.message || "Failed to delete group.";
+        const errorMessage = (error as Error).message || "Failed to delete group.";
         toast.error(errorMessage);
       }
     }
@@ -411,9 +411,9 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       get().addOrUpdateConversation(conv);
       set({ activeId: conv.id, isSidebarOpen: false });
       return conv.id;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to start conversation:", error);
-      throw new Error(`Failed to establish conversation. ${error.message || ''}`);
+      throw new Error(`Failed to establish conversation. ${(error as Error).message || ''}`);
     }
   },
 
@@ -498,7 +498,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         if (c.id === conversationId) {
           const newParticipants = participants.map((p: any) => ({
             ...p.user,
-            description: p.user.description,
+            description: p.user?.description,
             role: p.role,
             isPinned: p.isPinned  // Include the pinned status
           }));
@@ -595,10 +595,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         });
         return { conversations: sortConversations(updatedConversations, useAuthStore.getState().user?.id) };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to toggle pinned conversation", error);
       // Show error toast
-      const errorMessage = error.message || "Failed to toggle pinned conversation.";
+      const errorMessage = (error as Error).message || "Failed to toggle pinned conversation.";
       toast.error(errorMessage);
       // If the API call fails, revert the optimistic update
       set(state => {

@@ -10,7 +10,8 @@ import clsx from "clsx";
 import { FiShield, FiMoreHorizontal, FiArrowLeft, FiInfo, FiUsers, FiPhone, FiVideo } from 'react-icons/fi';
 import { startCall } from '@lib/webrtc';
 import SearchMessages from './SearchMessages';
-import type { Conversation } from "@store/conversation";
+import type { Conversation, Participant } from "@store/conversation";
+import type { User } from "@store/auth";
 
 export default function ChatWindowHeader({ 
   conversation, 
@@ -33,7 +34,8 @@ export default function ChatWindowHeader({
   const cloakClass = privacyCloak ? "blur-[6px] opacity-70 group-hover:blur-none group-hover:opacity-100 group-active:blur-none group-active:opacity-100 transition-all duration-300 select-none" : "";
 
   const peerUser = !conversation.isGroup ? conversation.participants?.find((p) => p.id !== meId) : null;
-  const peerProfile = useUserProfile(peerUser as any);
+  // Participant is compatible with User (has id, name, username, avatarUrl)
+  const peerProfile = useUserProfile(peerUser as unknown as User);
   const title = conversation.isGroup ? conversation.title : peerProfile.name;
   const avatarUrl = conversation.isGroup ? conversation.avatarUrl : peerProfile.avatarUrl;
   const isOnline = peerUser ? onlineUsers.has(peerUser.id) : false;
@@ -56,13 +58,13 @@ export default function ChatWindowHeader({
 
   const handleVoiceCall = () => {
     if (peerUser) {
-      startCall(peerUser.id, false, user);
+      startCall(peerUser.id, false, user || {});
     }
   };
 
   const handleVideoCall = () => {
     if (peerUser) {
-      startCall(peerUser.id, true, user);
+      startCall(peerUser.id, true, user || {});
     }
   };
 

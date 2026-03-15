@@ -1,4 +1,4 @@
-import { Message } from "@store/conversation";
+import { Message, Participant } from "@store/conversation";
 import classNames from "classnames";
 import { FiCamera, FiVideo, FiMic, FiEyeOff } from "react-icons/fi";
 import FileAttachment from "./FileAttachment";
@@ -18,7 +18,7 @@ interface Props {
   isOwn: boolean;
   onImageClick?: (message: Message) => void;
   isLastInSequence?: boolean;
-  participants?: any[];
+  participants?: Participant[];
 }
 
 export default function MessageBubble({ message, isOwn, onImageClick, isLastInSequence = true, participants = [] }: Props) {

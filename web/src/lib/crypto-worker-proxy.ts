@@ -8,9 +8,16 @@ import { v4 as uuidv4 } from 'uuid';
 const worker = new CryptoWorker();
 
 // Map untuk nyimpen Promise yang nunggu balasan worker
-const pendingRequests = new Map<string, { resolve: (val: any) => void; reject: (err: any) => void }>();
+const pendingRequests = new Map<string, { resolve: (val: unknown) => void; reject: (err: unknown) => void }>();
 
-worker.onmessage = (e) => {
+interface WorkerResponse<T> {
+  id: string;
+  success: boolean;
+  result: T;
+  error?: string;
+}
+
+worker.onmessage = (e: MessageEvent<WorkerResponse<unknown>>) => {
   const { id, success, result, error } = e.data;
   if (pendingRequests.has(id)) {
     const { resolve, reject } = pendingRequests.get(id)!;
@@ -20,10 +27,10 @@ worker.onmessage = (e) => {
   }
 };
 
-function sendToWorker<T>(type: string, payload: any): Promise<T> {
+function sendToWorker<T>(type: string, payload: Record<string, unknown>): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = uuidv4();
-    pendingRequests.set(id, { resolve, reject });
+    pendingRequests.set(id, { resolve: resolve as (val: unknown) => void, reject });
     worker.postMessage({ id, type, payload });
   });
 }
@@ -43,7 +50,7 @@ export const deriveKeyFromPassword = async (password: string, salt: Uint8Array):
  * Mengenkripsi Private Keys (atau data sensitif lain)
  * Output: String (JSON representation of IV + Ciphertext)
  */
-export const encryptWithKey = async (keyBytes: Uint8Array, data: any): Promise<string> => {
+export const encryptWithKey = async (keyBytes: Uint8Array, data: unknown): Promise<string> => {
   return sendToWorker<string>('ENCRYPT_DATA', { keyBytes: Array.from(keyBytes), data });
 };
 
@@ -51,8 +58,8 @@ export const encryptWithKey = async (keyBytes: Uint8Array, data: any): Promise<s
  * Mendekripsi Data
  * Output: Original Data (Object / String)
  */
-export const decryptWithKey = async (keyBytes: Uint8Array, encryptedString: string): Promise<any> => {
-  return sendToWorker<any>('DECRYPT_DATA', { keyBytes: Array.from(keyBytes), encryptedString });
+export const decryptWithKey = async (keyBytes: Uint8Array, encryptedString: string): Promise<unknown> => {
+  return sendToWorker<unknown>('DECRYPT_DATA', { keyBytes: Array.from(keyBytes), encryptedString });
 };
 
 
@@ -307,30 +314,30 @@ export function worker_dr_init_bob(payload: {
 export function worker_dr_ratchet_encrypt(payload: {
     serializedState: SerializedRatchetState,
     plaintext: Uint8Array | string
-}): Promise<{ state: SerializedRatchetState, header: any, ciphertext: Uint8Array, mk: Uint8Array }> {
-    return sendToWorker<{ state: SerializedRatchetState, header: any, ciphertext: any, mk: any }>('dr_ratchet_encrypt', {
+}): Promise<{ state: SerializedRatchetState, header: unknown, ciphertext: Uint8Array, mk: Uint8Array }> {
+    return sendToWorker<{ state: SerializedRatchetState, header: unknown, ciphertext: Record<string, number>, mk: Record<string, number> }>('dr_ratchet_encrypt', {
         serializedState: payload.serializedState,
         plaintext: typeof payload.plaintext === 'string' ? payload.plaintext : Array.from(payload.plaintext)
     }).then(res => ({
         ...res,
-        ciphertext: new Uint8Array(res.ciphertext),
-        mk: new Uint8Array(res.mk)
+        ciphertext: new Uint8Array(Object.values(res.ciphertext)),
+        mk: new Uint8Array(Object.values(res.mk))
     }));
 }
 
 export function worker_dr_ratchet_decrypt(payload: {
     serializedState: SerializedRatchetState,
-    header: any,
+    header: unknown,
     ciphertext: Uint8Array
 }): Promise<{ state: SerializedRatchetState, plaintext: Uint8Array, skippedKeys: { dh: string, epk?: string, n: number, mk: string }[], mk: Uint8Array }> {
-    return sendToWorker<{ state: SerializedRatchetState, plaintext: any, skippedKeys: any[], mk: any }>('dr_ratchet_decrypt', {
+    return sendToWorker<{ state: SerializedRatchetState, plaintext: Record<string, number>, skippedKeys: any[], mk: Record<string, number> }>('dr_ratchet_decrypt', {
         serializedState: payload.serializedState,
         header: payload.header,
         ciphertext: Array.from(payload.ciphertext)
     }).then(res => ({
         ...res,
-        plaintext: new Uint8Array(res.plaintext),
-        mk: new Uint8Array(res.mk)
+        plaintext: new Uint8Array(Object.values(res.plaintext)),
+        mk: new Uint8Array(Object.values(res.mk))
     }));
 }
 
@@ -345,14 +352,14 @@ export async function groupRatchetEncrypt(
   plaintext: string | Uint8Array,
   signingPrivateKey: Uint8Array
 ): Promise<{ state: { CK: string; N: number }, header: { n: number }, ciphertext: Uint8Array, signature: string, mk: Uint8Array }> {
-  return sendToWorker<{ state: { CK: string; N: number }, header: { n: number }, ciphertext: any, signature: string, mk: any }>('group_ratchet_encrypt', { 
+  return sendToWorker<{ state: { CK: string; N: number }, header: { n: number }, ciphertext: Record<string, number>, signature: string, mk: Record<string, number> }>('group_ratchet_encrypt', { 
     serializedState, 
     plaintext: typeof plaintext === 'string' ? plaintext : Array.from(plaintext),
     signingPrivateKey: Array.from(signingPrivateKey) 
   }).then(res => ({
       ...res,
-      ciphertext: new Uint8Array(res.ciphertext),
-      mk: new Uint8Array(res.mk)
+      ciphertext: new Uint8Array(Object.values(res.ciphertext)),
+      mk: new Uint8Array(Object.values(res.mk))
   }));
 }
 
@@ -363,7 +370,7 @@ export async function groupRatchetDecrypt(
   signature: string,
   senderSigningPublicKey: Uint8Array
 ): Promise<{ state: { CK: string; N: number }, plaintext: Uint8Array, skippedKeys: any[], mk: Uint8Array }> {
-  return sendToWorker<{ state: { CK: string; N: number }, plaintext: any, skippedKeys: any[], mk: any }>('group_ratchet_decrypt', { 
+  return sendToWorker<{ state: { CK: string; N: number }, plaintext: Record<string, number>, skippedKeys: any[], mk: Record<string, number> }>('group_ratchet_decrypt', { 
     serializedState, 
     header, 
     ciphertext: Array.from(ciphertext), 
@@ -371,8 +378,8 @@ export async function groupRatchetDecrypt(
     senderSigningPublicKey: Array.from(senderSigningPublicKey) 
   }).then(res => ({
       ...res,
-      plaintext: new Uint8Array(res.plaintext),
-      mk: new Uint8Array(res.mk)
+      plaintext: new Uint8Array(Object.values(res.plaintext)),
+      mk: new Uint8Array(Object.values(res.mk))
   }));
 }
 
@@ -383,13 +390,13 @@ export async function groupDecryptSkipped(
   signature: string,
   senderSigningPublicKey: Uint8Array
 ): Promise<{ plaintext: Uint8Array }> {
-  return sendToWorker<{ plaintext: any }>('group_decrypt_skipped', {
+  return sendToWorker<{ plaintext: Record<string, number> }>('group_decrypt_skipped', {
     mk,
     headerN,
     ciphertext: Array.from(ciphertext),
     signature,
     senderSigningPublicKey: Array.from(senderSigningPublicKey)
   }).then(res => ({
-    plaintext: new Uint8Array(res.plaintext)
+    plaintext: new Uint8Array(Object.values(res.plaintext))
   }));
 }

@@ -7,6 +7,12 @@ import { FiPlus, FiChevronLeft } from 'react-icons/fi';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useThemeStore } from '@store/theme';
 
+import { Theme } from 'emoji-picker-react';
+
+interface WindowWithReactionHandler extends Window {
+  currentReactionHandler?: (emoji: string) => void;
+}
+
 export default function ContextMenu() {
   const { isOpen, x, y, options, reactions, closeMenu } = useContextMenuStore(useShallow(s => ({
     isOpen: s.isOpen, x: s.x, y: s.y, options: s.options, reactions: s.reactions, closeMenu: s.closeMenu
@@ -102,12 +108,13 @@ export default function ContextMenu() {
                  <Suspense fallback={<div className="w-[300px] h-[400px] flex items-center justify-center text-text-secondary">Loading...</div>}>
                    <EmojiPicker 
                       onEmojiClick={(emojiData: EmojiClickData) => {
-                         if (typeof (window as any).currentReactionHandler === 'function') {
-                            (window as any).currentReactionHandler(emojiData.emoji);
+                         const win = window as unknown as WindowWithReactionHandler;
+                         if (typeof win.currentReactionHandler === 'function') {
+                            win.currentReactionHandler(emojiData.emoji);
                          }
                          closeMenu();
                       }}
-                      theme={theme as any}
+                      theme={theme as Theme}
                       lazyLoadEmojis={true}
                       searchDisabled={false}
                       skinTonesDisabled={true}

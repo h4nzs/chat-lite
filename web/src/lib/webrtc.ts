@@ -133,15 +133,15 @@ const getMediaStream = async (video: boolean) => {
     localMediaStream = stream;
     useCallStore.getState().setLocalStream(stream);
     return stream;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error accessing media devices.', error);
     // Show toast so it doesn't fail silently
-    import('react-hot-toast').then(m => m.default.error(`Media Error: ${error.message || 'Permission denied'}`));
+    import('react-hot-toast').then(m => m.default.error(`Media Error: ${(error as Error).message || 'Permission denied'}`));
     throw error;
   }
 };
 
-export const startCall = async (to: string, isVideo: boolean, callerProfile: any) => {
+export const startCall = async (to: string, isVideo: boolean, callerProfile: Record<string, unknown>) => {
   try {
     const { generateCallKey, encryptCallSignal } = await import('../utils/crypto');
     const callKey = await generateCallKey();
@@ -162,8 +162,8 @@ export const startCall = async (to: string, isVideo: boolean, callerProfile: any
         // Fallback: Try to find 1:1 by participant
         conversation = conversations.find(c =>
           !c.isGroup &&
-          c.participants.some((p: any) => p.userId === to || p.id === to) &&
-          c.participants.some((p: any) => p.userId === currentUser?.id || p.id === currentUser?.id)
+          c.participants.some((p) => (p as any).userId === to || p.id === to) &&
+          c.participants.some((p) => (p as any).userId === currentUser?.id || p.id === currentUser?.id)
         );
     }
 
@@ -264,7 +264,9 @@ export const hangup = () => {
   cleanupCall();
 };
 
-export const initWebRTCListeners = (socket: any) => {
+import type { Socket } from 'socket.io-client';
+
+export const initWebRTCListeners = (socket: Socket) => {
   if (!socket) return;
 
   if (socket.listeners('webrtc:secure_signal').length > 0) return;

@@ -1,8 +1,12 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { Message, Conversation, Participant, MessageStatus } from "@store/conversation";
-import { useAuthStore } from "@store/auth";
+import { useAuthStore, User } from "@store/auth";
 import { useMessageInputStore } from "@store/messageInput";
 import { getSocket } from "@lib/socket";
+
+interface WindowWithReactionHandler extends Window {
+  currentReactionHandler?: (emoji: string) => void;
+}
 import { api } from "@lib/api";
 import { toAbsoluteUrl } from "@utils/url";
 import { useModalStore } from '@store/modal';
@@ -64,7 +68,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
   const isSelectionMode = selectedMessageIds.length > 0;
   const isSelected = selectedMessageIds.includes(message.id);
 
-  const profile = useUserProfile(message.sender as any);
+  const profile = useUserProfile(message.sender as unknown as User);
   const mine = message.senderId === meId;
   const ref = useRef<HTMLDivElement>(null);
   const openMenu = useContextMenuStore(s => s.openMenu);
@@ -144,7 +148,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
     if (userReaction?.emoji === emoji) {
       removeLocalReaction(message.conversationId, message.id, userReaction.id);
       try {
-        if ((userReaction as any).isMessage) {
+        if (userReaction.isMessage) {
             await api(`/api/messages/${userReaction.id}`, { method: 'DELETE' });
         } else {
             await api(`/api/messages/reactions/${userReaction.id}`, { method: 'DELETE' });
@@ -157,7 +161,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
 
     if (userReaction) {
         removeLocalReaction(message.conversationId, message.id, userReaction.id);
-        const deletePromise = (userReaction as any).isMessage
+        const deletePromise = userReaction.isMessage
             ? api(`/api/messages/${userReaction.id}`, { method: 'DELETE' })
             : api(`/api/messages/reactions/${userReaction.id}`, { method: 'DELETE' });
         deletePromise.catch(console.error);
@@ -176,7 +180,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
     
     // BLACK OPS: Temporarily store this specific message's reaction handler globally
     // so the expanded EmojiPicker in ContextMenu can access it.
-    (window as any).currentReactionHandler = reactToMessage;
+    (window as unknown as WindowWithReactionHandler).currentReactionHandler = reactToMessage;
 
     // Limit edit window to 5 minutes (300,000 ms)
     const isWithinEditWindow = (Date.now() - new Date(message.createdAt).getTime()) < 5 * 60 * 1000;

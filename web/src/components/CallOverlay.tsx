@@ -6,7 +6,13 @@ import { acceptCall, rejectCall, hangup, replaceVideoTrack, getNetworkQuality } 
 import { toAbsoluteUrl } from '../utils/url';
 import toast from 'react-hot-toast';
 
-const RemoteStream = ({ userId, stream, isVideo, profile }: { userId: string, stream?: MediaStream, isVideo: boolean, profile: any }) => {
+interface RemoteUser {
+  id: string;
+  name?: string;
+  avatarUrl?: string | null;
+}
+
+const RemoteStream = ({ userId, stream, isVideo, profile }: { userId: string, stream?: MediaStream, isVideo: boolean, profile: RemoteUser }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -93,7 +99,7 @@ export default function CallOverlay() {
     const isRinging = callState === 'calling' || callState === 'ringing';
 
     if (isRinging) {
-      audio.play().catch(e => console.error("Audio play blocked by browser:", e));
+      audio.play().catch((e: unknown) => console.error("Audio play blocked by browser:", e));
     } else {
       audio.pause();
       audio.currentTime = 0;
@@ -144,7 +150,7 @@ export default function CallOverlay() {
         localVideoRef.current.srcObject = new MediaStream([newVideoTrack]);
       }
       setFacingMode(newMode);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Camera switch failed:", err);
       toast.error("Failed to switch camera");
     }
@@ -216,7 +222,7 @@ export default function CallOverlay() {
             }
         };
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Screen share error:", err);
       toast.error("Failed to share screen");
     }

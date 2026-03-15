@@ -5,12 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useDynamicIslandStore, { Activity, NotificationActivity, UploadActivity } from '@store/dynamicIsland';
 import { FiFile, FiX, FiMessageSquare, FiUploadCloud } from 'react-icons/fi';
 import { useUserProfile } from '@hooks/useUserProfile';
+import type { User } from '@store/auth';
 
 const NotificationView = ({ activity }: { activity: NotificationActivity }) => {
   const openConversation = useConversationStore(state => state.openConversation);
   const removeActivity = useDynamicIslandStore(state => state.removeActivity);
   const navigate = useNavigate();
-  const profile = useUserProfile(activity.sender as any);
+  // Using 'unknown' then 'User' or Partial<User> is safer if the type doesn't perfectly match
+  const profile = useUserProfile(activity.sender as unknown as User);
 
   const handleClick = () => {
     if (activity.link) {

@@ -7,6 +7,7 @@ import { useContextMenuStore } from '@store/contextMenu';
 import { useUserProfile } from '@hooks/useUserProfile';
 import { toAbsoluteUrl } from '@utils/url';
 import type { Conversation } from '@store/conversation';
+import type { User } from '@store/auth';
 
 export default memo(function ConversationItem({ 
   conversation, 
@@ -36,7 +37,7 @@ export default memo(function ConversationItem({
   privacyCloak: boolean;
 }) {
   const peerUser = !conversation.isGroup ? conversation.participants?.find(p => p.id !== meId) : null;
-  const peerProfile = useUserProfile(peerUser as any);
+  const peerProfile = useUserProfile(peerUser as unknown as User);
   const title = conversation.isGroup ? conversation.title : peerProfile.name || 'Conversation';
   const isUnread = conversation.unreadCount > 0;
   const isPinnedByMe = Boolean(conversation.participants?.some(p => p.id === meId && p.isPinned));

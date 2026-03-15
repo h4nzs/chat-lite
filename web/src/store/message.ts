@@ -23,7 +23,7 @@ function enrichMessagesWithSenderProfile(conversationId: string, messages: Messa
     const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
     if (!conv) return messages;
     
-    const participantsMap = new Map(conv.participants.map(p => [(p as any).userId || p.id, p]));
+    const participantsMap = new Map(conv.participants.map(p => [(p as unknown as { userId?: string, id: string }).userId || p.id, p]));
     const cachedProfiles = useProfileStore.getState().profiles;
     
     return messages.map(m => {
@@ -36,7 +36,7 @@ function enrichMessagesWithSenderProfile(conversationId: string, messages: Messa
         const resolvedName = globalProfile?.name || pInfo?.name;
         const resolvedUsername = globalProfile?.username || pInfo?.username;
         const resolvedAvatar = globalProfile?.avatarUrl || pInfo?.avatarUrl;
-        const encryptedProfile = pInfo?.encryptedProfile || (m.sender as any)?.encryptedProfile;
+        const encryptedProfile = pInfo?.encryptedProfile || (m.sender as unknown as { encryptedProfile?: string })?.encryptedProfile;
 
         // If we found any real name, apply it and preserve metadata
         if (resolvedName && resolvedName !== 'Unknown' && resolvedName !== 'Encrypted User') {
@@ -53,7 +53,7 @@ function enrichMessagesWithSenderProfile(conversationId: string, messages: Messa
         }
         
         // Ensure encryptedProfile is at least present for the UI hook to attempt decryption
-        if (encryptedProfile && !(m.sender as any)?.encryptedProfile) {
+        if (encryptedProfile && !(m.sender as unknown as { encryptedProfile?: string })?.encryptedProfile) {
             return {
                 ...m,
                 sender: {
@@ -274,7 +274,7 @@ export async function decryptMessageObject(message: Message, seenIds = new Set<s
               senderId: metadata.storyAuthorId,
               sender: { id: metadata.storyAuthorId },
               content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story')
-            } as any;
+            } as Message;
           }
         } catch (e) { }
       }      
@@ -299,7 +299,7 @@ export async function decryptMessageObject(message: Message, seenIds = new Set<s
 
     return decryptedMsg;
 
-  } catch (e) {
+  } catch (e: unknown) {
     console.error("Critical error in decryptMessageObject:", e);
     return { ...message, content: "🔒 Decryption Error", type: 'SYSTEM' };
   }
@@ -365,8 +365,8 @@ function parseSilent(content: string | null | undefined): { text?: string, type?
 // Helper to separate messages and reactions
 function processMessagesAndReactions(decryptedItems: Message[], existingMessages: Message[] = []) {
   const chatMessages: Message[] = [];
-  const reactions: any[] = [];
-  const edits: any[] = [];
+  const reactions: { id: string; messageId: string; emoji: string; userId: string; createdAt: string; user?: Message['sender']; isMessage: boolean }[] = [];
+  const edits: { targetMessageId: string; text: string; timestamp: number }[] = [];
 
   for (const msg of decryptedItems) {
     const reactionPayload = parseReaction(msg.content);
@@ -763,7 +763,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           conversationId,
           isGroup,
           actualTempId,
-          participants: conversation.participants as any[],
+          participants: conversation.participants as unknown[],
           isReactionPayload
       });
 
@@ -781,7 +781,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           });
       }
 
-      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as any[], data);
+      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as unknown[], data);
 
       const payload = {
           ...data,
@@ -855,7 +855,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         }
       });
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to encrypt/send:", error);
       if (!isReactionPayload) {
          get().updateMessage(conversationId, `temp_${actualTempId}`, { error: true, status: 'FAILED' });
@@ -991,7 +991,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       updateActivity(uploadId, { progress: 100 });
       setTimeout(() => removeActivity(uploadId), 1000);
 
-    } catch (error) {
+    } catch (error: unknown) {
       removeActivity(uploadId);
       console.error("File upload failed:", error);
       toast.error(`Failed to upload ${file.name}.`);
@@ -1068,7 +1068,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           hasLoadedHistory: { ...state.hasLoadedHistory, [id]: true }
         };
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Failed to load messages for ${id}`, error);
     }
   },
@@ -1125,7 +1125,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         
         return newState;
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to load previous messages", error);
     } finally {
       set(state => ({ isFetchingMore: { ...state.isFetchingMore, [conversationId]: false } }));
@@ -1187,7 +1187,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           hasMore: { ...state.hasMore, [convoId]: true } 
         };
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Failed to load context for message ${messageId}`, error);
     }
   },
@@ -1400,8 +1400,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               const isViewingChat = window.location.pathname.includes(`/chat/${finalDecrypted.conversationId}`);
               if (!isViewingChat && !finalDecrypted.isSilent && finalDecrypted.senderId !== currentUser?.id) {
                   import('@store/dynamicIsland').then(({ default: useDynamicIslandStore }) => {
-                      const sender = finalDecrypted.sender as any;
-                      const senderName = sender?.name || sender?.decryptedProfile?.name || 'Someone'; 
+                      const sender = finalDecrypted.sender as Record<string, unknown>;
+                      const senderName = (sender?.name as string) || (sender?.decryptedProfile as { name?: string })?.name || 'Someone'; 
                       let snippet = finalDecrypted.content || 'New secure message';
                       if (finalDecrypted.fileUrl || finalDecrypted.isBlindAttachment) snippet = 'Sent an attachment 📎';
                       if (finalDecrypted.content && finalDecrypted.content.startsWith('🔒')) snippet = 'System message';
@@ -1411,7 +1411,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                           sender: sender || { name: senderName },
                           message: snippet,
                           link: `/chat/${finalDecrypted.conversationId}`
-                      } as any, 4000);
+                      } as unknown as import('@store/dynamicIsland').NotificationActivity, 4000);
                   }).catch(console.error);
               }
 
@@ -1546,14 +1546,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     })
   },
   
-  addLocalReaction: (conversationId, messageId, reaction: any) => set(state => ({
+  addLocalReaction: (conversationId, messageId, reaction: { id: string; emoji: string; userId: string; [key: string]: unknown }) => set(state => ({
     messages: {
       ...state.messages,
       [conversationId]: (state.messages[conversationId] || []).map(m => {
         if (m.id === messageId) {
           const newReactions = [...(m.reactions || [])];
           if (!newReactions.some(r => r.id === reaction.id)) {
-            newReactions.push(reaction);
+            newReactions.push(reaction as any); // Cast to any to avoid strict type mismatch with Message['reactions'] which might be simpler
           }
           return { ...m, reactions: newReactions };
         }
