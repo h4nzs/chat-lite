@@ -46,7 +46,7 @@ export async function prepareEncryptedPayload({
               const { authFetch } = await import('@lib/api');
 
               // Fetch Bob's PreKeyBundle
-              const res = await authFetch(`/api/keys/bundle/${targetUserId}`) as Response;
+              const res = await authFetch(`/api/keys/prekey-bundle/${targetUserId}`) as Response;
               if (!res.ok) throw new Error("Failed to fetch pre-keys");
               
               const theirBundle: PreKeyBundle = await res.json();
@@ -112,15 +112,25 @@ export async function generatePushPayloads(
   content: string,
   conversationId: string,
   participants: Array<{ id?: string; userId?: string; publicKey?: string }>,
-  data: { content?: string; reaction?: string; fileUrl?: string; fileName?: string; isViewOnce?: boolean; metadata?: { text?: string; isReply?: boolean } } // The raw unencrypted data passed to sendMessage to derive the preview
+  data: { content?: string; reaction?: string; fileUrl?: string; fileName?: string; isViewOnce?: boolean; metadata?: { text?: string; isReply?: boolean }; isSilent?: boolean } // The raw unencrypted data passed to sendMessage to derive the preview
 ): Promise<Record<string, string>> {
   const pushPayloads: Record<string, string> = {};
-  
+
   try {
     const sodium = await getSodium();
     const { worker_crypto_box_seal } = await import('@lib/crypto-worker-proxy');
     const myAuthUser = useAuthStore.getState().user;
     if (!myAuthUser) return pushPayloads;
+
+    // Skip push notification for STORY_KEY messages (silent key distribution)
+    if (typeof data.content === 'string' && data.content.startsWith('STORY_KEY:')) {
+      return pushPayloads; // Return empty object - no push notifications
+    }
+
+    // Skip push notification for silent messages
+    if (data.isSilent === true) {
+      return pushPayloads; // Return empty object - no push notifications
+    }
 
     let myName = 'Someone';
     if (myAuthUser.encryptedProfile) {
