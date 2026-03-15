@@ -1,83 +1,110 @@
-# NYX Chat Lite - Developer Context
+# NYX - Zero-Knowledge Messenger
 
-## Project Overview
+> **Context for AI Agents:** This document outlines the architecture, security protocols, and development standards for the NYX project.
 
-NYX Chat Lite is a secure, zero-knowledge messaging application designed with a "Privacy First" architecture. It operates on a **Pure Anonymity** model, decoupling digital identity from physical identity by removing dependencies on email and phone numbers.
+## 1. Project Overview
 
-**Core Philosophy:**
-*   **Zero-Knowledge:** The server cannot read messages or view user profiles.
-*   **Pure Anonymity:** No PII storage. Usernames are hashed (Blind Indexing).
-*   **Local-First:** Chat history and private keys are stored exclusively on the user's device (IndexedDB).
-*   **Trust-Tier System:** Anti-spam mechanism using "Sandbox" (unverified) and "VIP" (Verified via WebAuthn/PoW) tiers.
+NYX is a privacy-first, zero-knowledge messaging application that operates without collecting Personally Identifiable Information (PII). It decouples digital identity from physical identity using a "Trust No One" (TNO) architecture.
 
-## Tech Stack
+*   **Core Principle:** The server cannot read messages or identify users.
+*   **Identity:** Blind Indexing (Argon2id hashing of usernames). No emails or phone numbers.
+*   **Storage:** Local-first (IndexedDB) for messages; Server stores only encrypted blobs and delivery metadata.
 
-**Monorepo Structure (pnpm workspaces):**
-*   `server/`: Backend API and WebSocket server.
-*   `web/`: Frontend React application.
+## 2. Architecture
 
-**Frontend (`web`):**
-*   **Framework:** React 19 + Vite
-*   **Language:** TypeScript
-*   **State Management:** Zustand
-*   **Styling:** Tailwind CSS (Custom "Industrial Neumorphism" design system)
-*   **Cryptography:** `libsodium-wrappers` + Web Crypto API (running in a dedicated Web Worker)
-*   **Storage:** IndexedDB (`idb`, `idb-keyval`) for "The Vault" (Keys & Messages)
-*   **PWA:** Vite PWA plugin
+The project is structured as a monorepo managed by `pnpm`.
 
-**Backend (`server`):**
-*   **Runtime:** Node.js (Express)
-*   **Language:** TypeScript
-*   **Database:** PostgreSQL (via Prisma ORM)
-*   **Real-time:** Socket.IO (with Redis Adapter)
-*   **Caching/Queue:** Redis (Rate limiting, Presence, PoW Challenges)
-*   **Storage:** Cloudflare R2 (Encrypted binary blobs only) using AWS SDK v3
-*   **Auth:** WebAuthn (`@simplewebauthn/server`), Argon2id hashing
+### Tech Stack
 
-## Key Architecture Concepts
+*   **Frontend (`web/`):**
+    *   **Framework:** React 19 + Vite 7 (TypeScript)
+    *   **State:** Zustand v5
+    *   **Styling:** Tailwind CSS v4
+    *   **Crypto:** `libsodium-wrappers` (WASM), Web Workers for off-main-thread encryption.
+    *   **Storage:** IndexedDB (`idb-keyval`, `dexie`) for the "Shadow Vault".
+*   **Backend (`server/`):**
+    *   **Runtime:** Node.js (Express)
+    *   **Database:** PostgreSQL 15 + Prisma ORM v7
+    *   **Real-time:** Socket.IO v4 + Redis Adapter
+    *   **Storage:** Cloudflare R2 (Encrypted binary blobs)
+*   **Infrastructure:** Docker Compose (Postgres, Redis, API, Web).
 
-1.  **Blind Indexing:** Usernames are hashed client-side (Argon2id) before being sent to the server. The server stores `usernameHash` and performs exact-match lookups.
-2.  **Profile Encryption:** User profiles (Name, Bio, Avatar) are encrypted client-side with a symmetric `ProfileKey`. This key is shared via the Double Ratchet header in messages. The server stores only `encryptedProfile`.
-3.  **Double Ratchet E2EE:** Implementation of the Signal Protocol (X3DH + Double Ratchet) for message encryption.
-4.  **Device Migration Tunnel:** Direct WebSocket tunnel for transferring data between devices via QR code (Zero-Knowledge migration).
-5.  **WebAuthn PRF:** Uses the PRF extension to allow biometric unlocking of the local key vault.
+### Key Directories
 
-## Build and Run
+*   `server/`: Backend API and Socket.IO server.
+    *   `src/routes/`: API endpoints (Auth, Messages, Keys).
+    *   `src/middleware/`: Auth and Rate Limiting.
+    *   `prisma/`: Database schema and migrations.
+*   `web/`: Frontend PWA.
+    *   `src/utils/crypto.ts`: Core cryptographic operations (Signal Protocol).
+    *   `src/lib/`: Low-level helpers (Sodium, Workers, Database).
+    *   `src/store/`: State management (Auth, Messages).
 
-**Prerequisites:**
-*   Node.js v18+
-*   pnpm
-*   PostgreSQL
-*   Redis
+## 3. Security & Cryptography
 
-**Root Commands:**
-*   `pnpm install`: Install dependencies for all workspaces.
-*   `pnpm run build`: Build both server and web projects.
-*   `pnpm run test`: Run tests for both projects.
-*   `./start-dev.sh`: Helper script to start both frontend and backend in development mode.
+### Zero-Knowledge Authentication (`server/src/routes/auth.ts`)
 
-**Server Commands (`cd server`):**
-*   `pnpm run dev`: Start development server (`tsx watch`).
-*   `pnpm run build`: Build TypeScript to `dist/`.
-*   `pnpm run start`: Run production server.
-*   `npx prisma migrate dev`: Run database migrations.
-*   `npx prisma studio`: Open Prisma Studio.
+1.  **Registration:**
+    *   Client hashes username: `Argon2id(username) -> usernameHash`.
+    *   Client generates Key Pairs: Identity Key, Signed PreKey, One-Time PreKeys.
+    *   Server receives: `usernameHash`, `passwordHash`, `encryptedProfile`, and Public Keys.
+    *   Server **never** sees the plaintext username.
+2.  **Login:**
+    *   User authenticates with `usernameHash` and `password`.
+    *   Server issues JWTs (`at` access token, `rt` refresh token) in HTTP-Only cookies.
+3.  **Trust Tiers:**
+    *   **Sandbox:** Default state. Restricted.
+    *   **Verified:** Unlocked via WebAuthn (FIDO2) or Proof-of-Work (SHA-256 puzzle).
 
-**Web Commands (`cd web`):**
-*   `pnpm run dev`: Start Vite development server.
-*   `pnpm run build`: Build for production.
-*   `pnpm run test`: Run Vitest tests.
+### Signal Protocol Implementation
 
-## Development Conventions
+*   **Key Exchange:** X3DH (Extended Triple Diffie-Hellman).
+*   **Encryption:** Double Ratchet Algorithm for Perfect Forward Secrecy (PFS).
+*   **Primitives:** XChaCha20-Poly1305, Ed25519, SHA-256.
+*   **Location:**
+    *   `web/src/utils/crypto.ts`: High-level protocol logic.
+    *   `web/src/lib/crypto-worker-proxy.ts`: Offloads heavy crypto to Web Worker.
+    *   `server/prisma/schema.prisma`: Stores public key bundles (`PreKeyBundle`, `OneTimePreKey`).
 
-*   **Security:**
-    *   **NEVER** log sensitive data (keys, plaintext messages) to the console.
-    *   Use `sodium.memzero()` to wipe sensitive data from memory in `crypto.worker.ts`.
-    *   Respect the strict Content Security Policy (CSP).
-*   **Code Style:**
-    *   Follow TypeScript best practices (strict types).
-    *   Use `eslint` and `prettier` (configured in `package.json`).
-*   **State Management:**
-    *   Use specific Zustand stores (e.g., `useAuthStore`, `useMessageStore`) rather than a monolithic store.
-*   **Cryptography:**
-    *   All heavy crypto operations **MUST** be performed in the Web Worker (`crypto.worker.ts`) via the proxy (`crypto-worker-proxy.ts`) to avoid blocking the main thread.
+## 4. Database Schema (`server/prisma/schema.prisma`)
+
+*   **`User`:** Stores `usernameHash`, `encryptedProfile`, and `isVerified`. No PII fields.
+*   **`Message`:** Stores encrypted content blobs (`content`), `senderId`, `sessionId`.
+    *   **Blind Indexing:** Messages are indexed by `senderId` and `conversationId`, but content is opaque.
+*   **`SessionKey` / `PreKeyBundle`:** Infrastructure for the Signal Protocol key exchange.
+*   **`OneTimePreKey`:** Replenishable keys for asynchronous communication.
+
+## 5. Development Workflow
+
+### Setup & Run
+
+1.  **Install Dependencies:**
+    ```bash
+    pnpm install
+    ```
+2.  **Environment Setup:**
+    *   Copy `.env.example` to `server/.env` and `web/.env`.
+    *   Ensure `DATABASE_URL` and `JWT_SECRET` are set.
+3.  **Database:**
+    ```bash
+    cd server
+    npx prisma db push
+    ```
+4.  **Start Development:**
+    *   **Root:** `pnpm run build` (Builds both)
+    *   **Server:** `cd server && pnpm dev`
+    *   **Web:** `cd web && pnpm dev`
+    *   **Docker:** `docker-compose up --build`
+
+### Conventions
+
+*   **Linting:** ESLint v10 (Flat Config). Run `pnpm lint` before committing.
+*   **Formatting:** Prettier.
+*   **Commits:** Use descriptive messages.
+*   **Crypto:** **NEVER** modify `libsodium-wrappers` version or usage without explicit instruction. Backward compatibility is critical.
+
+## 6. Critical Constraints
+
+*   **No PII:** Do not add fields for email, phone, or real names to the database.
+*   **Local-First:** Chat history is authoritative on the client (IndexedDB). The server is a relay.
+*   **Security:** Always use `safeUser` objects in API responses. Never return `passwordHash` or raw secrets.
