@@ -1,7 +1,7 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import { Router, Response, CookieOptions } from 'express'
+import { Router, Request, Response, CookieOptions } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { hashPassword, verifyPassword } from '../utils/password.js'
 import { ApiError } from '../utils/errors.js'
@@ -17,7 +17,8 @@ import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
-  verifyAuthenticationResponse
+  verifyAuthenticationResponse,
+  type AuthenticatorTransport
 } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import { Buffer } from 'buffer'
@@ -57,21 +58,21 @@ function setAuthCookies (res: Response, { access, refresh }: { access: string; r
   })
 }
 
-async function issueTokens (user: any, req: any) {
+async function issueTokens (user: Record<string, unknown>, req: Request) {
   // PURE ANONYMITY: Only store ID and Role in JWT. No Email/Username.
-  const access = signAccessToken({ 
-    id: user.id, 
-    role: user.role 
+  const access = signAccessToken({
+    id: user.id as string,
+    role: user.role as string
   })
   const jti = newJti()
-  const refresh = signAccessToken({ sub: user.id, jti }, { expiresIn: '30d' })
+  const refresh = signAccessToken({ sub: user.id as string, jti }, { expiresIn: '30d' })
 
   const rawIp = req.ip || '';
   const ipAddress = crypto.createHash('sha256').update(rawIp).digest('hex').substring(0, 16);
   const userAgent = req.headers['user-agent']
 
   await prisma.refreshToken.create({
-    data: { jti, userId: user.id, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
+    data: { jti, userId: user.id as string, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
   })
   return { access, refresh }
 }
@@ -153,11 +154,11 @@ async (req, res, next) => {
       accessToken: tokens.access,
       needVerification: false
     })
-  } catch (e: any) {
-    if (e?.code === 'P2002') {
+  } catch (e: unknown) {
+    if ((e as { code?: string }).code === 'P2002') {
       return next(new ApiError(409, 'Username already taken.'))
     }
-    next(e)
+    next(e as Error)
   }
 })
 
@@ -487,15 +488,15 @@ router.get('/webauthn/register/options', requireAuth, async (req, res, next) => 
     // This allows creating a NEW credential on the same device.
     const forceNew = req.query.force === 'true';
     
-    const excludeCredentials = forceNew ? [] : userAuthenticators.reduce((acc: any[], auth) => {
+    const excludeCredentials = forceNew ? [] : userAuthenticators.reduce((acc: Array<{ id: string; type: 'public-key'; transports?: AuthenticatorTransport[] }>, auth) => {
         try {
           if (!auth.credentialID) return acc;
           const base64 = String(auth.credentialID).replace(/-/g, '+').replace(/_/g, '/');
           const idBuffer = Buffer.from(base64, 'base64');
           acc.push({
-            id: idBuffer,
-            type: 'public-key',
-            transports: auth.transports ? (auth.transports.split(',') as any) : undefined
+            id: idBuffer.toString('hex'),
+            type: 'public-key' as const,
+            transports: auth.transports ? auth.transports.split(',').filter((t: string): t is AuthenticatorTransport => ['ble', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'].includes(t)) : undefined
           });
         } catch (e) {
           console.warn(`Skipping invalid credential ID: ${auth.credentialID}`, e);
@@ -602,10 +603,10 @@ router.post('/webauthn/login/verify', async (req, res, next) => {
         id: userAuthenticator.credentialID,
         publicKey: isoBase64URL.toBuffer(userAuthenticator.credentialPublicKey),
         counter: Number(userAuthenticator.counter),
-        transports: userAuthenticator.transports ? (userAuthenticator.transports.split(',') as any) : undefined
+        transports: userAuthenticator.transports ? userAuthenticator.transports.split(',').filter((t: string): t is AuthenticatorTransport => ['ble', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'].includes(t)) : undefined
       },
       requireUserVerification: false
-    } as any)
+    })
 
     if (verification.verified) {
       const { authenticationInfo } = verification

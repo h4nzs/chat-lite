@@ -12,7 +12,7 @@ import { usePresenceStore } from "@store/presence";
 import useNotificationStore from '@store/notification';
 import { fulfillKeyRequest, storeReceivedSessionKey, rotateGroupKey, fulfillGroupKeyRequest, schedulePeriodicGroupKeyRotation } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
-import type { Message } from "@store/conversation";
+import type { Message, Participant } from "@store/conversation";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
 import { triggerReceiveFeedback } from "@utils/feedback";
 
@@ -204,9 +204,9 @@ export function getSocket() {
       const { replaceOptimisticReaction, addLocalReaction } = useMessageStore.getState();
 
       if (reaction.tempId && me && reaction.userId === me.id) {
-        replaceOptimisticReaction(conversationId, messageId, reaction.tempId, reaction);
+        replaceOptimisticReaction(conversationId, messageId, reaction.tempId as string, reaction as { id: string; emoji: string; tempId?: string });
       } else {
-        addLocalReaction(conversationId, messageId, reaction);
+        addLocalReaction(conversationId, messageId, reaction as { id: string; emoji: string; tempId?: string });
       }
     });
     socket.on("reaction:deleted", ({ conversationId, messageId, reactionId }) => removeLocalReaction(conversationId, messageId, reactionId));
@@ -247,7 +247,7 @@ export function getSocket() {
     });
 
     socket.on("conversation:participants_added", ({ conversationId, newParticipants }) => {
-      useConversationStore.getState().addParticipants(conversationId, newParticipants);
+      useConversationStore.getState().addParticipants(conversationId, newParticipants as Participant[]);
       useConversationStore.getState().markKeyRotationNeeded(conversationId, true);
       fireGhostSync(conversationId, 2000);
     });
@@ -315,7 +315,7 @@ export function connectSocket() {
   if (socket) {
     // 3. UPDATE TOKEN DI SOCKET AUTH (FIX UTAMA)
     // Ini memastikan socket menggunakan token baru hasil refresh, bukan token null saat init
-    (socket.auth as any) = { token };
+    (socket.auth as Record<string, unknown>) = { token };
 
     // 4. Connect hanya jika belum connect
     if (!socket.connected) {
@@ -342,7 +342,7 @@ export function emitSessionKeyFulfillment(payload: { requesterId: string; conver
   getSocket()?.emit('session:fulfill_response', payload);
 }
 
-export function emitGroupKeyDistribution(conversationId: string, keys: any[]) {
+export function emitGroupKeyDistribution(conversationId: string, keys: Array<{ userId: string; key: string }>) {
   getSocket()?.emit('messages:distribute_keys', { conversationId, keys });
 }
 

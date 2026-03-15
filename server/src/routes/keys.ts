@@ -31,7 +31,7 @@ router.post(
       const { identityKey, signedPreKey, signingKey } = req.body
 
       // Prepare user update data
-      const userUpdateData: any = { publicKey: identityKey }
+      const userUpdateData: Record<string, string> = { publicKey: identityKey }
       if (signingKey) {
         userUpdateData.signingKey = signingKey
       } else {
@@ -185,7 +185,7 @@ router.get(
       const { preKeyBundle, signingKey } = userWithBundle
 
       // Assemble the response bundle
-      const responseBundle: any = {
+      const responseBundle: Record<string, unknown> = {
         identityKey: preKeyBundle.identityKey,
         signedPreKey: {
           key: preKeyBundle.key,
@@ -203,8 +203,8 @@ router.get(
       }
 
       res.json(responseBundle)
-    } catch (e: any) {
-      next(e)
+    } catch (e: unknown) {
+      next(e as Error)
     }
   }
 )
@@ -247,22 +247,22 @@ router.get(
         include: { user: { select: { id: true, publicKey: true } } }
       })
 
-      if (!(initiatorRecord as any)?.user?.publicKey) {
+      if (!(initiatorRecord as { user?: { publicKey?: string } })?.user?.publicKey) {
         return res.status(404).json({ error: "Initiator's public key could not be found for this session." })
       }
 
       res.json({
         encryptedKey: keyRecord.encryptedKey,
         initiatorEphemeralKey: keyRecord.initiatorEphemeralKey,
-        initiatorIdentityKey: (initiatorRecord as any).user.publicKey
+        initiatorIdentityKey: (initiatorRecord as { user: { publicKey: string } }).user.publicKey
       })
     } catch (e) {
-      next(e)
+      next(e as Error)
     }
   }
 )
 
-router.get('/turn', requireAuth, async (req, res): Promise<any> => {
+router.get('/turn', requireAuth, async (req, res) => {
   try {
     const { env } = await import('../config.js');
     if (!env.cfAccountId || !env.cfTurnKeyId || !env.cfTurnApiToken) {
@@ -279,7 +279,7 @@ router.get('/turn', requireAuth, async (req, res): Promise<any> => {
       body: JSON.stringify({ ttl: 86400 }) // 24 hours validity
     });
 
-    const data: any = await response.json();
+    const data: Record<string, unknown> = await response.json();
 
     if (data.iceServers) {
       const payload = { 

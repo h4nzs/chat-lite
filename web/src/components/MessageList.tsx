@@ -64,7 +64,7 @@ export default function MessageList({
   onLoadPrevious,
   onImageClick
 }: MessageListProps) {
-  const virtuosoRef = useRef<any>(null);
+  const virtuosoRef = useRef<unknown>(null);
   
   const { highlightedMessageId, setHighlightedMessageId } = useMessageSearchStore(useShallow(state => ({
     highlightedMessageId: state.highlightedMessageId,
@@ -133,7 +133,8 @@ export default function MessageList({
       <div className="flex-1 min-h-0 relative z-0 shadow-neu-pressed dark:shadow-neu-pressed-dark mx-2 md:mx-4 my-2 rounded-2xl bg-bg-main overflow-hidden">
         <div className="h-full px-4 md:px-6 pt-6 pb-2">
           <Virtuoso
-            ref={virtuosoRef}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            ref={virtuosoRef as any}
             initialTopMostItemIndex={messages.length - 1}
             data={messages}
             startReached={onLoadPrevious}

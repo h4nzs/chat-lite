@@ -4,7 +4,7 @@ import type { Message } from "./conversation";
 import { shadowVault, decryptVaultText } from '@lib/shadowVaultDb';
 
 type State = {
-  searchResults: any[];
+  searchResults: Array<{ id: string; content: string; conversationId: string; createdAt: string | Date }>;
   highlightedMessageId: string | null;
   searchQuery: string;
   isSearching: boolean;

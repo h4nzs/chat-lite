@@ -112,9 +112,9 @@ export function usePushNotifications() {
         localStorage.setItem('nyx_push_enabled', 'true');
         toast.success('Notifications enabled!');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to subscribe:', error);
-      toast.error('Failed to enable notifications: ' + error.message);
+      toast.error('Failed to enable notifications: ' + (error as Error).message);
       if (mountedRef.current) {
         setIsSubscribed(false);
         localStorage.removeItem('nyx_push_enabled');

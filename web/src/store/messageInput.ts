@@ -21,7 +21,7 @@ export type StagedFile = {
 
 type State = {
   replyingTo: Message | null;
-  typingLinkPreview: any | null;
+  typingLinkPreview: Record<string, unknown> | null;
   expiresIn: number | null;
   isViewOnce: boolean;
   stagedFiles: StagedFile[];
@@ -62,9 +62,9 @@ const ensureGroupSessionIfNeeded = async (conversationId: string): Promise<boole
       if (distributionKeys && distributionKeys.length > 0) {
         emitGroupKeyDistribution(conversationId, distributionKeys);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Failed to ensure group session.", e);
-      toast.error(`Failed to establish group session: ${e.message}`);
+      toast.error(`Failed to establish group session: ${(e as Error).message}`);
       return false;
     }
   }
@@ -264,7 +264,7 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
       updateActivity(activityId, { progress: 100, fileName: 'Done!' });
       setTimeout(() => removeActivity(activityId), 1000); 
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
       const errorMsg = handleApiError(error);
       toast.error(`File upload failed: ${errorMsg}`);
@@ -378,7 +378,7 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
       updateActivity(activityId, { progress: 100, fileName: 'Sent!' });
       setTimeout(() => removeActivity(activityId), 1000); 
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMsg = handleApiError(error);
       toast.error(`Voice message failed: ${errorMsg}`);
       removeActivity(activityId);

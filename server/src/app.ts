@@ -310,15 +310,15 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // === ERROR HANDLING ===
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  if (err.code === 'EBADCSRFTOKEN') {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if ((err as { code?: string }).code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ error: 'Invalid CSRF token' });
   }
-  if (err?.type === "entity.parse.failed") {
+  if ((err as { type?: string })?.type === "entity.parse.failed") {
     return res.status(400).json({ error: "Invalid JSON" });
   }
-  if (err?.status && err?.message) {
-    return res.status(err.status).json({ error: err.message });
+  if ((err as { status?: number })?.status && (err as { message?: string })?.message) {
+    return res.status((err as { status?: number }).status).json({ error: (err as { message?: string }).message });
   }
 
   console.error("❌ Server Error:", err);

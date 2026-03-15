@@ -387,7 +387,15 @@ export function registerSocket(httpServer: HttpServer) {
          return callback?.({ ok: false, error: "Rate limit exceeded. Slow down." });
       }
 
-      const { conversationId, content, sessionId, tempId, expiresAt, isViewOnce, pushPayloads, repliedToId } = message as any;
+      const messageData = message as unknown as Record<string, unknown>;
+      const conversationId = messageData.conversationId as string;
+      const content = messageData.content as string;
+      const sessionId = messageData.sessionId as string | undefined;
+      const tempId = messageData.tempId as number | undefined;
+      const expiresAt = messageData.expiresAt as Date | undefined;
+      const isViewOnce = messageData.isViewOnce as boolean | undefined;
+      const pushPayloads = messageData.pushPayloads as Record<string, string> | undefined;
+      const repliedToId = messageData.repliedToId as string | undefined;
 
       if (!content || typeof content !== 'string' || content.length > 10000) {
         return callback?.({ ok: false, error: "Invalid message content." });
@@ -576,8 +584,8 @@ export function registerSocket(httpServer: HttpServer) {
       }
     });
 
-    socket.on('session:request_key', async (data: any) => {
-      const { conversationId, sessionId, targetId } = data;
+    socket.on('session:request_key', async (data: Record<string, unknown>) => {
+      const { conversationId, sessionId, targetId } = data as { conversationId?: string; sessionId?: string; targetId?: string };
       if (!conversationId) return;
 
       // [NEW] Targeted Key Request (Auto-Heal Relay)
@@ -685,7 +693,7 @@ export function registerSocket(httpServer: HttpServer) {
       socket.to(data.roomId).emit('migration:start', data);
     });
 
-    socket.on('migration:chunk', async (data: { roomId: string, chunkIndex: number, chunk: any }) => {
+    socket.on('migration:chunk', async (data: { roomId: string; chunkIndex: number; chunk: Record<string, unknown> }) => {
       if (!data || !data.roomId || typeof data.roomId !== 'string') return;
       
       // Verify ownership

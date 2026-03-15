@@ -15,14 +15,14 @@ const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, isOwn = fals
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
         components={{
-          code({ className, children, ...props }: any) {
+          code({ className, children, ...props }) {
             return (
               <code className="bg-secondary/50 px-1 py-0.5 rounded text-sm font-mono" {...props}>
                 {children}
               </code>
             );
           },
-          pre({ children }: any) {
+          pre({ children }) {
             return (
               <pre className="block bg-secondary p-2 rounded-md my-1 text-sm font-mono overflow-x-auto [&>code]:bg-transparent [&>code]:p-0">
                 {children}

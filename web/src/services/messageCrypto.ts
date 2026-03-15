@@ -16,7 +16,7 @@ export interface EncryptPayloadParams {
   conversationId: string;
   isGroup: boolean;
   actualTempId: number;
-  participants: any[];
+  participants: Array<{ id?: string; userId?: string; publicKey?: string; encryptedProfile?: string | null }>;
   isReactionPayload?: boolean;
 }
 
@@ -27,8 +27,8 @@ export async function prepareEncryptedPayload({
   actualTempId,
   participants,
   isReactionPayload
-}: EncryptPayloadParams): Promise<{ ciphertext: string, x3dhHeader: any, mkToStore?: Uint8Array }> {
-  let x3dhHeader: any = null;
+}: EncryptPayloadParams): Promise<{ ciphertext: string, x3dhHeader: Record<string, unknown> | null, mkToStore?: Uint8Array }> {
+  let x3dhHeader: Record<string, unknown> | null = null;
   const user = useAuthStore.getState().user;
   if (!user) throw new Error("Not authenticated");
 
@@ -36,17 +36,17 @@ export async function prepareEncryptedPayload({
   if (!isGroup && !isReactionPayload) {
       const { retrieveRatchetStateSecurely } = await import('@utils/crypto');
       const existingState = await retrieveRatchetStateSecurely(conversationId);
-      
+
       if (!existingState) {
           // Initialize X3DH Alice (Sender)
-          const targetParticipant = participants.find((p: any) => (p.userId || p.id) !== user.id);
-          
+          const targetParticipant = participants.find((p: { id?: string; userId?: string }) => (p.userId || p.id) !== user.id);
+
           if (targetParticipant) {
               const targetUserId = targetParticipant.userId || targetParticipant.id;
               const { authFetch } = await import('@lib/api');
-              
+
               // Fetch Bob's PreKeyBundle
-              const res = await authFetch(`/api/keys/bundle/${targetUserId}`) as any;
+              const res = await authFetch(`/api/keys/bundle/${targetUserId}`) as Response;
               if (!res.ok) throw new Error("Failed to fetch pre-keys");
               
               const theirBundle: PreKeyBundle = await res.json();
@@ -78,7 +78,7 @@ export async function prepareEncryptedPayload({
   try {
       const profileKey = await import('@lib/keychainDb').then(m => m.getProfileKey(user.id));
       if (profileKey) {
-          let parsedObj: any = null;
+          let parsedObj: Record<string, unknown> | null = null;
           if (contentToEncrypt.trim().startsWith('{')) {
               try { parsedObj = JSON.parse(contentToEncrypt); } catch (e) {}
           }
@@ -109,10 +109,10 @@ export async function prepareEncryptedPayload({
 }
 
 export async function generatePushPayloads(
-  content: string, 
-  conversationId: string, 
-  participants: any[], 
-  data: any // The raw unencrypted data passed to sendMessage to derive the preview
+  content: string,
+  conversationId: string,
+  participants: Array<{ id?: string; userId?: string; publicKey?: string }>,
+  data: { content?: string; reaction?: string; fileUrl?: string; fileName?: string; isViewOnce?: boolean; metadata?: { text?: string; isReply?: boolean } } // The raw unencrypted data passed to sendMessage to derive the preview
 ): Promise<Record<string, string>> {
   const pushPayloads: Record<string, string> = {};
   
@@ -169,13 +169,13 @@ export async function generatePushPayloads(
     // Encrypt for each recipient
     for (const p of participants) {
        const targetUserId = p.userId || p.id;
-       const targetPublicKey = p.user?.publicKey || p.publicKey;
+       const targetPublicKey = (p as { user?: { publicKey?: string }; publicKey?: string }).user?.publicKey || p.publicKey;
 
        if (targetUserId !== myAuthUser.id && targetPublicKey) {
            try {
                const recipientPubBytes = sodium.from_base64(targetPublicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
                const sealed = await worker_crypto_box_seal(pushDataBytes, recipientPubBytes);
-               pushPayloads[targetUserId] = sodium.to_base64(sealed, sodium.base64_variants.URLSAFE_NO_PADDING);
+               pushPayloads[targetUserId as string] = sodium.to_base64(sealed, sodium.base64_variants.URLSAFE_NO_PADDING);
            } catch (e) {
                console.error(`Failed to seal push for ${targetUserId}`, e);
            }
@@ -188,11 +188,11 @@ export async function generatePushPayloads(
   return pushPayloads;
 }
 
-export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>, depth: number, options: any): Promise<any> {
+export async function decryptSelfMessage(decryptedMsg: { id?: unknown; ciphertext?: unknown; content?: unknown; tempId?: unknown }, seenIds: Set<string>, depth: number, options: Record<string, unknown>): Promise<Record<string, unknown> | null> {
     const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
     const sodium = await getSodium();
-    
-    let mk = await retrieveMessageKeySecurely(decryptedMsg.id);
+
+    let mk = await retrieveMessageKeySecurely(decryptedMsg.id as string);
     if (!mk && decryptedMsg.tempId) {
         mk = await retrieveMessageKeySecurely(`temp_${decryptedMsg.tempId}`);
     }
@@ -204,14 +204,14 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
         const unwrap = (str: string): string => {
              if (str && typeof str === 'string' && str.trim().startsWith('{')) {
                  try {
-                     const p = JSON.parse(str);
-                     if (p.ciphertext) return unwrap(p.ciphertext);
-                 } catch {}
+                     const p = JSON.parse(str) as Record<string, unknown>;
+                     if (p.ciphertext) return unwrap(p.ciphertext as string);
+                 } catch { return str; }
              }
              return str;
         }
-        
-        cipherTextToUse = unwrap(cipherTextToUse!);
+
+        cipherTextToUse = unwrap(cipherTextToUse as string || '');
 
         if (cipherTextToUse) {
             try {
@@ -245,7 +245,7 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
     }
     
     // Fallback if MK is missing
-    if (decryptedMsg.content && decryptedMsg.content.trim().startsWith('{')) {
+    if (decryptedMsg.content && typeof decryptedMsg.content === 'string' && decryptedMsg.content.trim().startsWith('{')) {
          decryptedMsg.content = "You sent this message (Encrypted)";
     }
     return decryptedMsg;

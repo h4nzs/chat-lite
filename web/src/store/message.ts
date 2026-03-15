@@ -7,7 +7,7 @@ import { getSocket, emitSessionKeyRequest, emitGroupKeyDistribution } from "@lib
 import { decryptMessage, ensureGroupSession, deriveSessionKeyAsRecipient, getMyEncryptionKeyPair, storeRatchetStateSecurely } from "@utils/crypto";
 import toast from "react-hot-toast";
 import { useAuthStore, type User } from "./auth";
-import type { Message } from "./conversation";
+import type { Message, Participant } from "./conversation";
 import useDynamicIslandStore, { UploadActivity } from './dynamicIsland';
 import { useConversationStore } from "./conversation";
 import { addToQueue, getQueueItems, removeFromQueue, updateQueueAttempt } from "@lib/offlineQueueDb";
@@ -91,10 +91,10 @@ export async function decryptMessageObject(message: Message, seenIds = new Set<s
     if (currentUser && decryptedMsg.senderId === currentUser.id) {
         const { decryptSelfMessage } = await import('@services/messageCrypto');
         const selfDecrypted = await decryptSelfMessage(decryptedMsg, seenIds, depth, options);
-        if (selfDecrypted.repliedTo) {
-            selfDecrypted.repliedTo = await decryptMessageObject(selfDecrypted.repliedTo, seenIds, depth + 1, options);
+        if (selfDecrypted && (selfDecrypted as Message).repliedTo) {
+            (selfDecrypted as Message).repliedTo = await decryptMessageObject((selfDecrypted as Message).repliedTo as Message, seenIds, depth + 1, options);
         }
-        return selfDecrypted;
+        return selfDecrypted as Message;
     }
 
     // 2. Tentukan Payload yang Akan Didekripsi
@@ -434,7 +434,7 @@ type State = {
   replyingTo: Message | null;
   isFetchingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
-  typingLinkPreview: any | null;
+  typingLinkPreview: Record<string, unknown> | null;
   hasLoadedHistory: Record<string, boolean>;
   selectedMessageIds: string[];
 };
@@ -455,9 +455,9 @@ type Actions = {
   removeMessage: (conversationId: string, messageId: string) => void;
   removeMessages: (conversationId: string, messageIds: string[]) => Promise<void>;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
-  addLocalReaction: (conversationId: string, messageId: string, reaction: any) => void;
+  addLocalReaction: (conversationId: string, messageId: string, reaction: { id: string; emoji: string; tempId?: string }) => void;
   removeLocalReaction: (conversationId: string, messageId: string, reactionId: string) => void;
-  replaceOptimisticReaction: (conversationId: string, messageId: string, tempId: string, finalReaction: any) => void;
+  replaceOptimisticReaction: (conversationId: string, messageId: string, tempId: string, finalReaction: { id: string; emoji: string }) => void;
   updateSenderDetails: (user: Partial<User>) => void;
   updateMessageStatus: (conversationId: string, messageId: string, userId: string, status: string) => void;
   clearMessagesForConversation: (conversationId: string) => void;
@@ -724,7 +724,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                         senderId: metadata.storyAuthorId,
                         sender: { id: metadata.storyAuthorId },
                         content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story')
-                    } as any;
+                    } as unknown as Message;
                 }
             } catch (e) {
                 console.error('Failed to parse story_reply metadata:', e);
@@ -763,7 +763,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           conversationId,
           isGroup,
           actualTempId,
-          participants: conversation.participants as unknown[],
+          participants: conversation.participants as Participant[],
           isReactionPayload
       });
 
@@ -781,7 +781,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           });
       }
 
-      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as unknown[], data);
+      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as Participant[], data as { content?: string; reaction?: string; fileUrl?: string; fileName?: string; isViewOnce?: boolean; metadata?: { text?: string; isReply?: boolean } });
 
       const payload = {
           ...data,
@@ -822,12 +822,12 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                     const tempReactionId = `temp_react_${actualTempId}`;
                     get().replaceOptimisticReaction(conversationId, reactionData.targetMessageId, tempReactionId, {
                         ...reactionData,
-                        id: res.msg.id, 
+                        id: res.msg.id,
                         userId: user.id,
                         createdAt: res.msg.createdAt,
                         user: user,
                         isMessage: true
-                    });
+                    } as unknown as { id: string; emoji: string });
                 }
             }
               
@@ -1117,7 +1117,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         // [UI UPDATE] Keep tombstones visible
         // const visibleMessages = allMessages.filter(m => !m.isDeletedLocal);
 
-        const newState: any = { messages: { ...state.messages, [conversationId]: enrichedMessages } };
+        const newState: { messages: Record<string, Message[]>; hasMore?: Record<string, boolean> } = { messages: { ...state.messages, [conversationId]: enrichedMessages } };
 
         if (fetchedItems.length < 50) {
             newState.hasMore = { ...state.hasMore, [conversationId]: false };
@@ -1261,7 +1261,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       }
 
       // INTERCEPT STORY KEYS
-      if ((decrypted as any).type === 'STORY_KEY' || (decrypted.content && decrypted.content.startsWith('STORY_KEY:'))) {
+      if ((decrypted as Record<string, unknown>).type === 'STORY_KEY' || (decrypted.content && decrypted.content.startsWith('STORY_KEY:'))) {
           try {
               // Expecting content format: "STORY_KEY:{storyId}:{base64Key}" or parsing from JSON
               const payloadStr = decrypted.content ? decrypted.content.replace('STORY_KEY:', '') : '';
@@ -1301,7 +1301,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               
               // 15-second cooldown to prevent spamming renegotiation requests
               if (now - lastRepair > 15000) {
-                  (window as any)[repairKey] = now;
+                  (window as unknown as Record<string, number>)[repairKey] = now;
                   console.warn(`[Auto-Heal] Ratchet out of sync for ${conversationId}. Initiating silent repair...`);
                   get().repairSecureSession(conversationId, false, true); // isAuto = true
               }
@@ -1546,38 +1546,45 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     })
   },
   
-  addLocalReaction: (conversationId, messageId, reaction: { id: string; emoji: string; userId: string; [key: string]: unknown }) => set(state => ({
+  addLocalReaction: (conversationId, messageId, reaction) => set((state) => {
+    const user = useAuthStore.getState().user;
+    return {
     messages: {
       ...state.messages,
-      [conversationId]: (state.messages[conversationId] || []).map(m => {
+      [conversationId]: (state.messages[conversationId] || []).map((m: Message) => {
         if (m.id === messageId) {
           const newReactions = [...(m.reactions || [])];
           if (!newReactions.some(r => r.id === reaction.id)) {
-            newReactions.push(reaction as any); // Cast to any to avoid strict type mismatch with Message['reactions'] which might be simpler
+            newReactions.push({ ...reaction, userId: user?.id || '' } as { id: string; emoji: string; userId: string; isMessage?: boolean });
           }
           return { ...m, reactions: newReactions };
         }
         return m;
       })
     }
-  })),
+  }}),
   
   removeLocalReaction: (conversationId, messageId, reactionId) => set(state => ({ messages: { ...state.messages, [conversationId]: (state.messages[conversationId] || []).map(m => m.id === messageId ? { ...m, reactions: (m.reactions || []).filter(r => r.id !== reactionId) } : m) } })),
   
-  replaceOptimisticReaction: (conversationId, messageId, tempId, finalReaction) => set(state => ({
+  replaceOptimisticReaction: (conversationId, messageId, tempId, finalReaction) => {
+    set((state) => {
+    const user = useAuthStore.getState().user;
+    const fr = finalReaction as { id: string; emoji: string; userId?: string };
+    return {
     messages: {
       ...state.messages,
-      [conversationId]: (state.messages[conversationId] || []).map(m => {
+      [conversationId]: (state.messages[conversationId] || []).map((m: Message) => {
         if (m.id === messageId) {
           return {
             ...m,
-            reactions: (m.reactions || []).map(r => r.id === tempId ? finalReaction : r),
+            reactions: (m.reactions || []).map((r) => r.id === tempId ? { id: fr.id, emoji: fr.emoji, userId: fr.userId || user?.id || '', isMessage: true } : r),
           };
         }
         return m;
       })
     }
-  })),
+  }})
+  },
   updateSenderDetails: (user) => set(state => {
     const newMessages = { ...state.messages };
     for (const convoId in newMessages) {
@@ -1676,7 +1683,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                      createdAt: m.createdAt,
                      user: m.sender,
                      isMessage: true
-                 });
+                 } as unknown as { id: string; emoji: string; userId: string });
                  messageMap.delete(m.id);
                  return;
              }

@@ -19,7 +19,7 @@ interface BannedUser {
 export default function AdminDashboard() {
   const { user } = useAuthStore(useShallow(s => ({ user: s.user })));
   const navigate = useNavigate();
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
   const [bannedUsers, setBannedUsers] = useState<BannedUser[]>([]);
   const [isBanModalOpen, setIsBanModalOpen] = useState(false);
   const { showConfirm } = useModalStore(useShallow(s => ({ showConfirm: s.showConfirm })));
@@ -28,8 +28,8 @@ export default function AdminDashboard() {
   // Defined before useEffect to be available inside it
   const loadMetrics = () => {
     authFetch('/api/admin/system-status')
-      .then((res: any) => setMetrics(res))
-      .catch((err: any) => toast.error("Failed to load metrics"));
+      .then((res: unknown) => setMetrics(res as Record<string, unknown>))
+      .catch((err: unknown) => toast.error("Failed to load metrics"));
   };
 
   const loadBannedUsers = () => {
@@ -64,8 +64,8 @@ export default function AdminDashboard() {
           });
           toast.success(`User @${user.username} unbanned!`);
           loadAllData();
-        } catch (e: any) {
-          toast.error(e.message || "Failed to unban user.");
+        } catch (e: unknown) {
+          toast.error((e as Error).message || "Failed to unban user.");
         }
       }
     );
@@ -98,26 +98,26 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
           <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">VPS RAM USAGE</h3>
-          <p className="text-xl font-bold">{metrics.vps.ramUsage}</p>
-          <p className="text-xs text-text-secondary mt-2">Uptime: {metrics.vps.uptime}</p>
+          <p className="text-xl font-bold">{(metrics.vps as { ramUsage: string }).ramUsage}</p>
+          <p className="text-xs text-text-secondary mt-2">Uptime: {(metrics.vps as { uptime: string }).uptime}</p>
         </div>
         <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
           <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">ACTIVE DATABASE</h3>
           <div className="flex justify-between items-end">
              <div>
-                <p className="text-2xl font-bold">{metrics.db.totalUsers}</p>
+                <p className="text-2xl font-bold">{(metrics.db as { totalUsers: number }).totalUsers}</p>
                 <p className="text-xs text-text-secondary">Users</p>
              </div>
              <div className="text-right">
-                <p className="text-xl font-bold text-accent">{metrics.db.totalMessages}</p>
+                <p className="text-xl font-bold text-accent">{(metrics.db as { totalMessages: number }).totalMessages}</p>
                 <p className="text-xs text-text-secondary">Messages</p>
              </div>
           </div>
         </div>
         <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
           <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">R2 STORAGE</h3>
-          <p className="text-2xl font-bold text-blue-400">{metrics.storage.totalSizeMB}</p>
-          <p className="text-xs text-text-secondary mt-2">{metrics.storage.totalFiles} Files</p>
+          <p className="text-2xl font-bold text-blue-400">{(metrics.storage as { totalSizeMB: number }).totalSizeMB}</p>
+          <p className="text-xs text-text-secondary mt-2">{(metrics.storage as { totalFiles: number }).totalFiles} Files</p>
         </div>
       </div>
 

@@ -253,6 +253,7 @@ const pendingGroupKeyRequests = new Map<string, { timerId: number }>();
 const MAX_KEY_REQUEST_RETRIES = 2; // Total 3 attempts
 const KEY_REQUEST_TIMEOUT_MS = 15000; // 15 seconds
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pendingGroupSessionPromises = new Map<string, Promise<any[] | null>>();
 const groupSessionLocks = new Set<string>();
 
@@ -300,7 +301,7 @@ export async function encryptCallSignal(payload: object, base64Key: string): Pro
   return sodium.to_base64(combined, sodium.base64_variants.URLSAFE_NO_PADDING);
 }
 
-export async function decryptCallSignal(encryptedStr: string, base64Key: string): Promise<any> {
+export async function decryptCallSignal(encryptedStr: string, base64Key: string): Promise<Record<string, unknown>> {
   const { getSodium } = await import('@lib/sodiumInitializer');
   const sodium = await getSodium();
   const keyBytes = sodium.from_base64(base64Key, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -387,6 +388,7 @@ export async function ensureAndRatchetSession(conversationId: string): Promise<v
 
 // --- Group Key Management & Recovery ---
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function ensureGroupSession(conversationId: string, participants: Participant[], forceRotate: boolean = false): Promise<any[] | null> {
   const pending = pendingGroupSessionPromises.get(conversationId);
   if (pending) return pending;

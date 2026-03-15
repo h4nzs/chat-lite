@@ -39,8 +39,8 @@ export default function KeyManagementPage() {
         setRecoveryPhrase(phrase);
         setShowRecoveryModal(true);
 
-      } catch (error: any) {
-        toast.error(error.message || "Operation failed.");
+      } catch (error: unknown) {
+        toast.error((error as Error).message || "Operation failed.");
       } finally {
         setIsProcessing(false);
       }
@@ -61,9 +61,9 @@ export default function KeyManagementPage() {
               encryptionPublicKeyB64,
               signingPublicKeyB64,
             } = await generateNewKeys(password);
-            
+
             await saveEncryptedKeys(encryptedPrivateKeys);
-            
+
             await setupAndUploadPreKeyBundle();
 
             toast.success('Keys Rotated. Rebooting Session...');
@@ -72,8 +72,8 @@ export default function KeyManagementPage() {
               window.location.reload();
             }, 1000);
 
-          } catch (error: any) {
-            toast.error(error.message || "Rotation failed.");
+          } catch (error: unknown) {
+            toast.error((error as Error).message || "Rotation failed.");
           } finally {
             setIsProcessing(false);
           }

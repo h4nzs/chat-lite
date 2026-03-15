@@ -4,7 +4,7 @@ import MarkdownMessage from './MarkdownMessage';
 import type { Message } from '@store/conversation';
 
 export default function ReplyQuote({ message }: { message: Message }) {
-  const profile = useUserProfile(message.sender as any);
+  const profile = useUserProfile(message.sender as unknown as { id: string; encryptedProfile?: string | null; isVerified?: boolean; publicKey?: string });
   const currentUser = useAuthStore.getState().user;
   const isMe = message.senderId === currentUser?.id;
   const authorName = isMe ? 'You' : (profile.name || 'Unknown');

@@ -15,7 +15,7 @@ const parseUserAgent = (ua: string) => {
   return { browser: 'Unknown', os: 'Device' };
 };
 
-const SessionBlade = ({ session, onLogout, isCurrent }: { session: any, onLogout: (jti: string) => void, isCurrent: boolean }) => {
+const SessionBlade = ({ session, onLogout, isCurrent }: { session: { userAgent: string; jti: string; expiresAt: string; ipAddress?: string; lastUsedAt?: string }, onLogout: (jti: string) => void, isCurrent: boolean }) => {
   const { browser, os } = parseUserAgent(session.userAgent);
   const Icon = os === 'Mobile' ? FiSmartphone : FiMonitor;
 
@@ -51,7 +51,7 @@ const SessionBlade = ({ session, onLogout, isCurrent }: { session: any, onLogout
           
           <div className="font-mono text-xs text-text-secondary mt-1 space-y-0.5 opacity-80">
             <p>IP: <span className="text-text-primary">{session.ipAddress}</span></p>
-            <p>LAST_PING: {new Date(session.lastUsedAt).toLocaleString()}</p>
+            <p>LAST_PING: {new Date(session.lastUsedAt as string | number).toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -76,18 +76,19 @@ const SessionBlade = ({ session, onLogout, isCurrent }: { session: any, onLogout
 };
 
 export default function SessionManagerPage() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const data = await api<{ sessions: any[] }>('/api/sessions');
-        
-        const uniqueSessions = new Map<string, any>();
+        const data = await api<{ sessions: Array<{ userAgent: string; jti: string; expiresAt: string; lastUsedAt: string; ipAddress?: string }> }>('/api/sessions');
+
+        const uniqueSessions = new Map<string, { userAgent: string; jti: string; expiresAt: string; lastUsedAt: string; ipAddress?: string }>();
         for (const session of data.sessions) {
           const existing = uniqueSessions.get(session.userAgent);
-          if (!existing || new Date(session.lastUsedAt) > new Date(existing.lastUsedAt)) {
+          if (!existing || (session.lastUsedAt && existing.lastUsedAt && new Date(session.lastUsedAt) > new Date(existing.lastUsedAt))) {
             uniqueSessions.set(session.userAgent, session);
           }
         }

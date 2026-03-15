@@ -144,13 +144,15 @@ export const useStoryStore = createWithEqualityFn<StoryState>((set, get) => ({
       
       conversations.forEach(c => {
         if (!c.isGroup && c.participants) {
-          const otherParticipant = c.participants.find((p: any) => {
-            const uId = p.userId || p.user?.id || p.id;
+          const otherParticipant = c.participants.find((p: unknown) => {
+            const pObj = p as { userId?: string, user?: { id: string }, id: string };
+            const uId = pObj.userId || pObj.user?.id || pObj.id;
             return uId !== me?.id;
           });
           
           if (otherParticipant) {
-            const actualUserId = (otherParticipant as any).userId || (otherParticipant as any).user?.id || otherParticipant.id;
+            const pObj = otherParticipant as { userId?: string, user?: { id: string }, id: string };
+            const actualUserId = pObj.userId || pObj.user?.id || pObj.id;
             if (actualUserId) {
               userToConvMap.set(actualUserId, c.id);
             }
@@ -203,9 +205,9 @@ export const useStoryStore = createWithEqualityFn<StoryState>((set, get) => ({
       }));
 
       toast.success('Story posted!', { id: toastId });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(`Failed to post story: ${e.message || 'Unknown error'}`, { id: toastId });
+      toast.error(`Failed to post story: ${(e as Error).message || 'Unknown error'}`, { id: toastId });
     }
   }
 }));

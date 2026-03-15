@@ -25,21 +25,23 @@ async function decryptData(ciphertextB64: string, ivB64: string, keyBuffer: Arra
 // 1. SETUP (Dipanggil saat user mengaktifkan Biometric di Settings)
 // Meminta otentikator untuk membuat kredensial baru dengan dukungan PRF, 
 // lalu mengenkripsi Recovery Phrase dengan kunci dari PRF tersebut.
-export async function setupBiometricUnlock(options: any, recoveryPhrase: string): Promise<any> {
+export async function setupBiometricUnlock(options: Record<string, unknown>, recoveryPhrase: string): Promise<unknown> {
   try {
     // Inject PRF extension ke options dari server
     // Note: TypeScript might complain about 'extensions', using 'any' bypasses it safely for now
-    const authOptions: any = {
+    const authOptions: Record<string, unknown> = {
       ...options,
       extensions: { 
-          ...options.extensions,
+          ...(options.extensions as Record<string, unknown>),
           prf: { eval: { first: PRF_SALT } } 
       }
     };
 
-    const attResp = await startRegistration(authOptions);
-    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const attResp = await startRegistration(authOptions as any);
+
     // Ambil kunci rahasia yang dihasilkan oleh hardware sidik jari (PRF)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const prfResults = (attResp as any).clientExtensionResults?.prf;
     
     // Note: Not all authenticators return PRF on registration, some do it only on auth.
@@ -71,32 +73,33 @@ export async function setupBiometricUnlock(options: any, recoveryPhrase: string)
 }
 
 // 2. UNLOCK (Dipanggil di halaman Login)
-export async function unlockWithBiometric(options: any): Promise<{ authResp: any, recoveryPhrase: string | null }> {
+export async function unlockWithBiometric(options: Record<string, unknown>): Promise<{ authResp: unknown, recoveryPhrase: string | null }> {
   const vaultStr = localStorage.getItem('nyx_bio_vault');
   
-  const authOptions: any = {
+  const authOptions: Record<string, unknown> = {
     ...options,
     extensions: { 
-        ...options.extensions,
+        ...(options.extensions as Record<string, unknown>),
         prf: { eval: { first: PRF_SALT } } 
     }
   };
 
-  const asseResp = await startAuthentication(authOptions);
-  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const asseResp = await startAuthentication({ optionsJSON: authOptions } as any);
+
   let recoveryPhrase: string | null = null;
 
   if (vaultStr) {
       try {
           const vault = JSON.parse(vaultStr);
-          const prfResults = (asseResp as any).clientExtensionResults?.prf;
+          const prfResults = (asseResp as unknown as { clientExtensionResults?: { prf?: { results?: { first?: ArrayBuffer } } } }).clientExtensionResults?.prf;
           
           if (prfResults?.results?.first) {
               const symmetricKey = new Uint8Array(prfResults.results.first).buffer;
               // Dekripsi phrase menggunakan kunci yang baru saja dibuat ulang oleh sidik jari
               recoveryPhrase = await decryptData(vault.ciphertext, vault.iv, symmetricKey);
           }
-      } catch (e) {
+      } catch (e: unknown) {
           console.error("Failed to unlock local vault:", e);
       }
   }

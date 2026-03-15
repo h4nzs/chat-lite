@@ -30,8 +30,8 @@ const ParticipantActions = ({ conversationId, participant, profile, amIAdmin }: 
         body: JSON.stringify({ role: newRole }),
       });
       toast.success(`${profile.name} is now ${newRole.toLowerCase()}.`);
-    } catch (error: any) {
-      toast.error(`Failed to change role: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to change role: ${(error as Error).message || 'Unknown error'}`);
     }
   };
 
@@ -46,8 +46,8 @@ const ParticipantActions = ({ conversationId, participant, profile, amIAdmin }: 
             method: 'DELETE',
           });
           toast.success(`${profile.name} removed from group.`);
-        } catch (error: any) {
-          toast.error(`Failed to remove participant: ${error.message || 'Unknown error'}`);
+        } catch (error: unknown) {
+          toast.error(`Failed to remove participant: ${(error as Error).message || 'Unknown error'}`);
         }
       }
     );
@@ -63,8 +63,8 @@ const ParticipantActions = ({ conversationId, participant, profile, amIAdmin }: 
         await blockUser(participant.id);
         toast.success(`${profile.name} blocked.`);
       }
-    } catch (error: any) {
-      toast.error(`Failed to ${isBlocked ? 'unblock' : 'block'} user: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to ${isBlocked ? 'unblock' : 'block'} user: ${(error as Error).message || 'Unknown error'}`);
     }
   };
 
@@ -96,7 +96,7 @@ const ParticipantActions = ({ conversationId, participant, profile, amIAdmin }: 
 };
 
 const ParticipantItem = ({ p, conversationId, amIAdmin, handleProfileClick }: { p: Participant, conversationId: string, amIAdmin: boolean, handleProfileClick: (p: Participant) => void }) => {
-  const profile = useUserProfile(p as any);
+  const profile = useUserProfile(p as unknown as { id: string; encryptedProfile?: string | null; isVerified?: boolean; publicKey?: string });
   return (
     <li className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary">
       <button onClick={() => handleProfileClick(p)} className="flex items-center gap-3 text-left min-w-0">

@@ -70,9 +70,9 @@ const VoiceMessagePlayer = ({ message }: VoiceMessagePlayerProps) => {
           objectUrl = URL.createObjectURL(decryptedBlob);
           setAudioSrc(objectUrl);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Voice message decryption failed:", e);
-        if (isMounted) setError(e.message || "Failed to decrypt voice message.");
+        if (isMounted) setError((e as Error).message || "Failed to decrypt voice message.");
       } finally {
         if (isMounted) setIsLoading(false);
       }

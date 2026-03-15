@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js'
 import { getSodium } from '../lib/sodium.js'
+import type { Prisma } from '@prisma/client'
 
 const B64_VARIANT = 'URLSAFE_NO_PADDING'
 
@@ -7,7 +8,7 @@ const B64_VARIANT = 'URLSAFE_NO_PADDING'
  * Creates a new session key from scratch on the server and encrypts it for all participants.
  * This is used for ratcheting sessions or as a fallback.
  */
-export async function rotateAndDistributeSessionKeys (conversationId: string, initiatorId: string, tx?: any) {
+export async function rotateAndDistributeSessionKeys (conversationId: string, initiatorId: string, tx?: Prisma.TransactionClient) {
   const db = tx || prisma
   const sodium = await getSodium()
   const sessionKey = sodium.crypto_secretbox_keygen()
@@ -40,8 +41,8 @@ export async function rotateAndDistributeSessionKeys (conversationId: string, in
         initiatorEphemeralKey: 'server-ratchet', // Add placeholder ephemeral key
         isInitiator: p.user.id === initiatorId
       }
-    } catch (e: any) {
-      console.error(`Failed to process public key for user ${p.user.id}. Key: "${p.user.publicKey}". Error: ${e.message}`)
+    } catch (e: unknown) {
+      console.error(`Failed to process public key for user ${p.user.id}. Key: "${p.user.publicKey}". Error: ${(e as Error).message}`)
       throw new Error(`Corrupted public key found for user ${p.user.id}. Cannot establish secure session.`)
     }
   }).filter(Boolean) as { sessionId: string; encryptedKey: string; userId: string; conversationId: string; initiatorEphemeralKey: string; isInitiator: boolean }[]

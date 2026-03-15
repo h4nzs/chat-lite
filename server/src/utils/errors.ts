@@ -1,3 +1,5 @@
+import type { Request, Response, NextFunction } from 'express'
+
 export class ApiError extends Error {
   status: number
 
@@ -7,9 +9,9 @@ export class ApiError extends Error {
   }
 }
 
-export function errorHandler (err: any, _req: any, res: any, _next: any) {
-  const status = err.status || 500
-  const message = err.message || 'Internal Server Error'
+export function errorHandler (err: unknown, _req: Request, res: Response, _next: NextFunction) {
+  const status = (err as ApiError).status || 500
+  const message = (err as Error).message || 'Internal Server Error'
   if (status >= 500) console.error(err)
   res.status(status).json({ error: message })
 }

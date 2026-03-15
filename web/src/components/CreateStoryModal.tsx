@@ -31,13 +31,13 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
       if (!c.isGroup) {
         const other = c.participants.find(p => p.id !== me?.id);
         if (other) {
-          const actualUserId = (other as any).userId || other.id;
+          const actualUserId = (other as { userId?: string; id: string }).userId || other.id;
           if (actualUserId && !map.has(actualUserId)) {
             map.set(actualUserId, {
               id: actualUserId,
               name: other.name || other.username || 'Unknown User',
-              avatarUrl: other.avatarUrl || (other as any).profilePicture || null,
-              encryptedProfile: (other as any).encryptedProfile,
+              avatarUrl: other.avatarUrl || (other as { profilePicture?: string }).profilePicture || null,
+              encryptedProfile: (other as { encryptedProfile?: string }).encryptedProfile,
               username: other.username
             });
           }

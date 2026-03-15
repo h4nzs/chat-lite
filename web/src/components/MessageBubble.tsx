@@ -134,7 +134,7 @@ export default function MessageBubble({ message, isOwn, onImageClick, isLastInSe
             )}
             {message.linkPreview && !message.fileUrl && (
               <div className="mt-2">
-                <LinkPreviewCard preview={message.linkPreview} />
+                <LinkPreviewCard preview={message.linkPreview as unknown as React.ComponentProps<typeof LinkPreviewCard>['preview']} />
               </div>
             )}
           </>

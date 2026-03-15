@@ -48,7 +48,7 @@ export type Message = {
   optimistic?: boolean;
   repliedTo?: Message;
   repliedToId?: string;
-  linkPreview?: any;
+  linkPreview?: Record<string, unknown>;
   duration?: number;
   statuses?: MessageStatus[]; // Server delivery statuses (for other users)
   status?: 'SENDING' | 'SENT' | 'FAILED'; // Local status for UI
@@ -237,7 +237,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
          lastMessage: { id: 'msg-1', content: 'Welcome to NYX. No active chats found.', senderId: 'bot-1', createdAt: new Date().toISOString(), conversationId: 'decoy-1', type: 'SYSTEM' }
       };
-      set({ conversations: [dummyConvo as any], loading: false, initialLoadCompleted: true });
+      set({ conversations: [dummyConvo as unknown as Conversation], loading: false, initialLoadCompleted: true });
       return;
     }
 
@@ -250,62 +250,65 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     if (!shouldProceed) return;
 
     try {
-      const rawConversations = await api<any[]>("/api/conversations");
+      const rawConversations = await api<Array<Record<string, unknown>>>("/api/conversations");
       if (!Array.isArray(rawConversations)) throw new Error('Invalid data from server.');
 
       const conversations = await Promise.all(rawConversations.map(async c => {
-        const participants = c.participants.map((p: any) => ({
-          ...p.user,
-          description: p.user.description,
-          role: p.role,
-          isPinned: p.isPinned  // Include the pinned status
-        }));
+        const participants = (c.participants as unknown[]).map((p: unknown) => {
+          const participant = p as { user: Participant & { description?: string }; role: string; isPinned: boolean };
+          return {
+            ...participant.user,
+            description: participant.user.description,
+            role: participant.role,
+            isPinned: participant.isPinned  // Include the pinned status
+          };
+        });
 
-        let lastMessage = c.messages?.[0] || null;
+        let lastMessage = (c as { messages?: Message[] }).messages?.[0] || null;
         if (lastMessage) {
           try {
             lastMessage = await decryptMessageObject(lastMessage);
           } catch (e) {
-            if (lastMessage.sessionId) {
-              emitSessionKeyRequest(lastMessage.conversationId, lastMessage.sessionId);
+            if ((lastMessage as Message).sessionId) {
+              emitSessionKeyRequest((lastMessage as Message).conversationId, (lastMessage as Message).sessionId!);
             }
-            lastMessage.content = '[Requesting key to decrypt...]';
+            (lastMessage as Message).content = '[Requesting key to decrypt...]';
           }
-          
+
           // Hydrate sender info for the chat list snippet
-          const pInfo = participants.find((p: any) => p.id === lastMessage!.senderId);
+          const pInfo = participants.find((p: { id: string }) => p.id === (lastMessage as Message).senderId);
           if (pInfo) {
-              lastMessage.sender = {
-                  ...(lastMessage.sender || { id: lastMessage.senderId }),
+              (lastMessage as Message).sender = {
+                  ...((lastMessage as Message).sender || { id: (lastMessage as Message).senderId }),
                   ...pInfo
               };
           }
 
-          lastMessage = withPreview(lastMessage);
+          lastMessage = withPreview(lastMessage as Message);
         }
 
         return {
           ...c,
           lastMessage,
           participants
-        };
+        } as unknown as Conversation;
       }));
 
       // [NEW] Offline Catch-up / Diff Detection
       // Check if group participants changed while we were offline/disconnected
       const existingConversations = get().conversations;
       const reconciledConversations = conversations.map(fetched => {
-          if (fetched.isGroup) {
-              const existing = existingConversations.find(e => e.id === fetched.id);
+          if ((fetched as unknown as Conversation).isGroup) {
+              const existing = existingConversations.find(e => e.id === (fetched as unknown as Conversation).id);
               if (existing) {
                   // Compare participant lists (simple ID comparison)
                   const existingIds = existing.participants.map((p: Participant) => p.id).sort().join(',');
-                  const fetchedIds = fetched.participants.map((p: any) => p.id).sort().join(',');
-                  
+                  const fetchedIds = (fetched as unknown as Conversation).participants.map((p: { id: string }) => p.id).sort().join(',');
+
                   if (existingIds !== fetchedIds) {
-                      console.log(`[Ratchet] Membership change detected for group ${fetched.id} while offline. Proactive healing...`);
+                      console.log(`[Ratchet] Membership change detected for group ${(fetched as unknown as Conversation).id} while offline. Proactive healing...`);
                       // Trigger ghost sync from this device to settle state with new/removed members
-                      fireGhostSync(fetched.id, 2000);
+                      fireGhostSync((fetched as unknown as Conversation).id, 2000);
                       return { ...fetched, requiresKeyRotation: true };
                   }
               }
@@ -313,11 +316,11 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
           return fetched;
       });
 
-      set({ conversations: sortConversations(reconciledConversations, useAuthStore.getState().user?.id) });
-      useVerificationStore.getState().loadInitialStatus(conversations);
+      set({ conversations: sortConversations(reconciledConversations as unknown as Conversation[], useAuthStore.getState().user?.id) });
+      useVerificationStore.getState().loadInitialStatus(conversations as unknown as Conversation[]);
 
       const socket = getSocket();
-      conversations.forEach(c => socket.emit("conversation:join", c.id));
+      (conversations as unknown as Conversation[]).forEach(c => socket.emit("conversation:join", c.id));
     } catch (error) {
       console.error("Failed to load conversations", error);
       set({ error: "Failed to load conversations." });
@@ -358,7 +361,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     } catch (error: unknown) {
       console.error("Failed to delete group:", error);
       // Check if error is an ApiError with status property
-      if ((error as any).status === 403) {
+      if ((error as { status?: number }).status === 403) {
         toast.error("Only the group creator can delete the group.");
       } else {
         const errorMessage = (error as Error).message || "Failed to delete group.";
@@ -496,12 +499,21 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     set(state => ({
       conversations: state.conversations.map(c => {
         if (c.id === conversationId) {
-          const newParticipants = participants.map((p: any) => ({
-            ...p.user,
-            description: p.user?.description,
-            role: p.role,
-            isPinned: p.isPinned  // Include the pinned status
-          }));
+          const newParticipants = (participants as unknown[]).map((p: unknown) => {
+            const participant = p as { user?: Participant; role: "ADMIN" | "MEMBER"; isPinned: boolean };
+            return {
+              id: participant.user?.id || '',
+              encryptedProfile: participant.user?.encryptedProfile,
+              publicKey: participant.user?.publicKey,
+              signingKey: participant.user?.signingKey,
+              role: participant.role,
+              isPinned: participant.isPinned,
+              name: participant.user?.name,
+              username: participant.user?.username,
+              avatarUrl: participant.user?.avatarUrl,
+              description: (participant.user as Participant & { description?: string })?.description,
+            } as Participant;
+          });
           return {
             ...c,
             participants: [...c.participants, ...newParticipants],

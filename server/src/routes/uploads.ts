@@ -153,7 +153,7 @@ router.post(
 
       const transformedConversation = {
         ...updatedConversation,
-        participants: updatedConversation.participants.map((p: any) => ({ ...p.user, role: p.role }))
+        participants: updatedConversation.participants.map((p: { user: Record<string, unknown>; role: string }) => ({ ...p.user, role: p.role }))
       }
 
       getIo().to(groupId).emit('conversation:updated', {

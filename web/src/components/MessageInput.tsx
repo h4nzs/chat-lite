@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, ChangeEvent, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiSmile, FiMic, FiSquare, FiAlertTriangle, FiPaperclip, FiSend, FiX, FiClock, FiPlus, FiEye, FiTrash2, FiEdit2, FiCpu, FiVolumeX, FiCrop } from 'react-icons/fi';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { useShallow } from 'zustand/react/shallow';
@@ -25,11 +25,11 @@ interface MessageInputProps {
   onSend: (data: { content: string }) => void;
   onTyping: () => void;
   onVoiceSend: (blob: Blob, duration: number) => void;
-  conversation: any; // Using any to match existing flexibility, ideally Typed
+  conversation: { id: string; isGroup: boolean; participants?: Array<{ id: string; role?: string }> }; // Typed conversation interface
 }
 
 // --- Helper: Debounce ---
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+function debounce<F extends (...args: Parameters<F>) => unknown>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   return (...args: Parameters<F>) => {
     if (timeout !== null) clearTimeout(timeout);
@@ -66,7 +66,7 @@ const ReplyPreview = () => {
     setReplyingTo: state.setReplyingTo,
   })));
 
-  const profile = useUserProfile(replyingTo?.sender as any);
+  const profile = useUserProfile(replyingTo?.sender as unknown as { id: string; encryptedProfile?: string | null; isVerified?: boolean; publicKey?: string });
   const currentUser = useAuthStore(state => state.user);
 
   if (!replyingTo) return null;
@@ -167,7 +167,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
 
   // Permissions & Logic
   const isOneToOne = !conversation.isGroup;
-  const otherParticipant = isOneToOne && conversation.participants?.find((p: any) => p.id !== useAuthStore.getState().user?.id);
+  const otherParticipant = isOneToOne && conversation.participants?.find((p: { id: string }) => p.id !== useAuthStore.getState().user?.id);
   const isOtherParticipantBlocked = isOneToOne && otherParticipant && blockedUserIds.includes(otherParticipant.id);
   const isConnected = connectionStatus === 'connected';
   const hasText = text.trim().length > 0;
@@ -369,7 +369,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
       let finalStream = stream;
 
       if (isVoiceAnonymized) {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          const AudioContextClass = window.AudioContext || (window as unknown as Record<string, unknown>).webkitAudioContext;
           const audioCtx = new AudioContextClass();
           audioContextRef.current = audioCtx;
           const source = audioCtx.createMediaStreamSource(stream);
@@ -475,7 +475,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
 
             {typingLinkPreview && (
             <div className="mb-2">
-                <LinkPreviewCard preview={typingLinkPreview} />
+                <LinkPreviewCard preview={typingLinkPreview as unknown as React.ComponentProps<typeof LinkPreviewCard>['preview']} />
             </div>
             )}
             
@@ -532,7 +532,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
               onEmojiClick={handleEmojiClick}
               autoFocusSearch={false}
               lazyLoadEmojis={true}
-              theme={theme as any}
+              theme={theme as unknown as Theme}
             />
           </Suspense>
         </div>

@@ -103,16 +103,16 @@ export class NyxShadowVault extends Dexie {
         }
 
         // Fix: Persist sender info if it was hydrated, otherwise fallback to existing
-        const mSender = m.sender as any;
+        const mSender = m.sender as Record<string, string | null | undefined>;
         const hasValidName = mSender?.name && mSender.name !== 'Unknown' && mSender.name !== 'Encrypted User';
-        
+
         if (hasValidName) {
-            encryptedSenderName = await encryptVaultText(mSender.name);
+            encryptedSenderName = await encryptVaultText(mSender.name as string);
             if (mSender.username) {
-                encryptedSenderUsername = await encryptVaultText(mSender.username);
+                encryptedSenderUsername = await encryptVaultText(mSender.username as string);
             }
             if (mSender.avatarUrl) {
-                encryptedSenderAvatarUrl = await encryptVaultText(mSender.avatarUrl);
+                encryptedSenderAvatarUrl = await encryptVaultText(mSender.avatarUrl as string);
             }
         } else if (existing?.senderName) {
             // Keep the real name we already have in the vault!
@@ -191,7 +191,7 @@ export class NyxShadowVault extends Dexie {
               name: decryptedSenderName,
               username: decryptedSenderUsername,
               avatarUrl: decryptedSenderAvatarUrl
-          } as any,
+          } as unknown as { id: string; name?: string; username?: string; avatarUrl?: string | null },
           isViewOnce: r.isViewOnce,
           isDeletedLocal: r.isDeletedLocal
         });
@@ -249,7 +249,7 @@ export class NyxShadowVault extends Dexie {
             name: decryptedSenderName,
             username: decryptedSenderUsername,
             avatarUrl: decryptedSenderAvatarUrl
-        } as any,
+        } as unknown as { id: string; name?: string; username?: string; avatarUrl?: string | null },
         isViewOnce: r.isViewOnce,
         isDeletedLocal: r.isDeletedLocal
       };

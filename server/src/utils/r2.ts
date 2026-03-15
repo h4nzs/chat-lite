@@ -16,12 +16,18 @@ export const s3Client = new S3Client({
 // urlTtl: Berapa lama LINK upload valid (detik)
 // deleteAt: Kapan FILE harus dianggap kadaluarsa (untuk Lifecycle Rules / Metadata)
 export const getPresignedUploadUrl = async (key: string, contentType: string, urlTtl: number = 300, deleteAt?: Date) => {
-  const commandInput: any = {
+  const commandInput: {
+    Bucket: string;
+    Key: string;
+    ContentType: string;
+    ChecksumAlgorithm?: undefined;
+    Metadata?: Record<string, string>;
+  } = {
     Bucket: env.r2BucketName,
     Key: key,
     ContentType: contentType,
     // [FIX] Ensure we don't include checksums in the signature as the frontend won't send them
-    ChecksumAlgorithm: undefined 
+    ChecksumAlgorithm: undefined
   };
 
   // Jika ada jadwal penghapusan (Disappearing Messages / Cleanup)

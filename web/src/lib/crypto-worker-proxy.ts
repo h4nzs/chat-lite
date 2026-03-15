@@ -330,7 +330,7 @@ export function worker_dr_ratchet_decrypt(payload: {
     header: unknown,
     ciphertext: Uint8Array
 }): Promise<{ state: SerializedRatchetState, plaintext: Uint8Array, skippedKeys: { dh: string, epk?: string, n: number, mk: string }[], mk: Uint8Array }> {
-    return sendToWorker<{ state: SerializedRatchetState, plaintext: Record<string, number>, skippedKeys: any[], mk: Record<string, number> }>('dr_ratchet_decrypt', {
+    return sendToWorker<{ state: SerializedRatchetState, plaintext: Record<string, number>, skippedKeys: Array<{ dh: string, epk?: string, n: number, mk: string }>, mk: Record<string, number> }>('dr_ratchet_decrypt', {
         serializedState: payload.serializedState,
         header: payload.header,
         ciphertext: Array.from(payload.ciphertext)
@@ -369,8 +369,8 @@ export async function groupRatchetDecrypt(
   ciphertext: Uint8Array,
   signature: string,
   senderSigningPublicKey: Uint8Array
-): Promise<{ state: { CK: string; N: number }, plaintext: Uint8Array, skippedKeys: any[], mk: Uint8Array }> {
-  return sendToWorker<{ state: { CK: string; N: number }, plaintext: Record<string, number>, skippedKeys: any[], mk: Record<string, number> }>('group_ratchet_decrypt', { 
+): Promise<{ state: { CK: string; N: number }, plaintext: Uint8Array, skippedKeys: Array<{ n: number; mk: string }>, mk: Uint8Array }> {
+  return sendToWorker<{ state: { CK: string; N: number }, plaintext: Record<string, number>, skippedKeys: Array<{ n: number; mk: string }>, mk: Record<string, number> }>('group_ratchet_decrypt', { 
     serializedState, 
     header, 
     ciphertext: Array.from(ciphertext), 

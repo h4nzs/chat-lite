@@ -210,7 +210,7 @@ router.post('/', zodValidate({
           expiresAt, // Store expiration time
           isViewOnce: isViewOnce === true,
           statuses: {
-            createMany: { data: statusData as any } // createMany lebih cepat dari nested create
+            createMany: { data: statusData as Array<{ userId: string; status: 'SENT' | 'DELIVERED' | 'READ' }> } // createMany lebih cepat dari nested create
           }
         },
         include: {

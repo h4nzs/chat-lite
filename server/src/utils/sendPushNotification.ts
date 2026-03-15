@@ -2,7 +2,7 @@ import webpush from 'web-push'
 import { prisma } from '../lib/prisma.js'
 import { env } from '../config.js'
 
-export async function sendPushNotification (userId: string, payload: any) {
+export async function sendPushNotification (userId: string, payload: Record<string, unknown>) {
   if (!env.vapidPublicKey || !env.vapidPrivateKey) {
     return // Jangan lakukan apa-apa jika VAPID keys tidak ada
   }
@@ -11,7 +11,7 @@ export async function sendPushNotification (userId: string, payload: any) {
     const subscriptions = await prisma.pushSubscription.findMany({ where: { userId } })
     if (subscriptions.length === 0) return
 
-    let encryptedPushPayload = payload['data']?.encryptedPushPayload;
+    let encryptedPushPayload = (payload['data'] as Record<string, unknown>)?.encryptedPushPayload as string | undefined;
     if (encryptedPushPayload && Buffer.byteLength(encryptedPushPayload, 'utf8') > 3000) {
       // If the encrypted payload exceeds safe limits (Web Push limit is ~4KB),
       // fallback to metadata-only to ensure delivery.
@@ -21,10 +21,10 @@ export async function sendPushNotification (userId: string, payload: any) {
     const safePayload = {
       title: "New Secure Message",
       body: "You received a new encrypted message.",
-      type: payload.type || 'GENERIC_MESSAGE',
+      type: (payload.type as string) || 'GENERIC_MESSAGE',
       data: {
-        conversationId: payload['data']?.conversationId,
-        messageId: payload['data']?.messageId,
+        conversationId: (payload['data'] as Record<string, unknown>)?.conversationId as string | undefined,
+        messageId: (payload['data'] as Record<string, unknown>)?.messageId as string | undefined,
         encryptedPushPayload
       }
     };
@@ -37,17 +37,17 @@ export async function sendPushNotification (userId: string, payload: any) {
           keys: { p256dh: sub.p256dh, auth: sub.auth }
         },
         payloadString
-      ).catch((error: any) => {
+      ).catch((error: unknown) => {
         // Jika subscription tidak valid (misal: user uninstall app), hapus dari DB
-        if (error.statusCode === 410 || error.statusCode === 404) {
+        if ((error as { statusCode?: number }).statusCode === 410 || (error as { statusCode?: number }).statusCode === 404) {
           return prisma.pushSubscription.delete({ where: { id: sub.id } })
         }
-        console.error(`Error sending push notification for sub ${sub.id}: statusCode=${error?.statusCode || 'unknown'}`);
+        console.error(`Error sending push notification for sub ${sub.id}: statusCode=${(error as { statusCode?: number })?.statusCode || 'unknown'}`);
       })
     )
 
     await Promise.all(notifications)
-  } catch (error: any) {
-    console.error(`Failed to send push notifications: statusCode=${error?.statusCode || 'unknown'}`);
+  } catch (error: unknown) {
+    console.error(`Failed to send push notifications: statusCode=${(error as { statusCode?: number })?.statusCode || 'unknown'}`);
   }
 }

@@ -33,7 +33,7 @@ describe('crypto.ts', () => {
             privateKey: new Uint8Array(32).fill(4),
           }),
       })
-    } as any);
+    } as unknown as typeof keychainDb);
   });
 
   afterEach(() => {
@@ -86,7 +86,7 @@ describe('crypto.ts', () => {
             from_base64: () => new Uint8Array(64), // Dummy value
             to_string: (val: Uint8Array) => new TextDecoder().decode(val), // Real implementation
             crypto_aead_xchacha20poly1305_ietf_NPUBBYTES: 24, // Mock constant
-        } as any);
+        } as unknown as Awaited<ReturnType<typeof sodium.getSodium>>);
 
         // 2. Action
         // The cipher text doesn't matter here as the decryption is mocked

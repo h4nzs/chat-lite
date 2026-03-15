@@ -66,8 +66,8 @@ export default function Register() {
       setStep('biometric');
       toast.success("Identity initialized. Setup security.");
       
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Registration failed");
     }
   }
 
@@ -75,10 +75,11 @@ export default function Register() {
     setIsVerifyingBio(true);
     try {
       // 1. Get Options
-      const options = await api<any>("/api/auth/webauthn/register/options");
+      const options = await api<Record<string, unknown>>("/api/auth/webauthn/register/options");
       
       // 2. Browser Prompt
-      const attResp = await startRegistration(options);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const attResp = await startRegistration(options as any);
       
       // 3. Verify on Server
       const verificationResp = await api<{ verified: boolean }>("/api/auth/webauthn/register/verify", {
@@ -92,11 +93,11 @@ export default function Register() {
       } else {
         throw new Error("Verification failed");
       }
-    } catch (error: any) {
-      if (error.name === 'NotAllowedError') {
+    } catch (error: unknown) {
+      if ((error as Error).name === 'NotAllowedError') {
         toast.error("Biometric scan cancelled.");
       } else {
-        toast.error(`Error: ${error.message}`);
+        toast.error(`Error: ${(error as Error).message}`);
       }
     } finally {
       setIsVerifyingBio(false);

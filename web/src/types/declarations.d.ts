@@ -10,23 +10,23 @@ declare module 'react-window' {
   };
 
   export interface FixedSizeListProps {
-    children: React.ComponentType<any>;
+    children: React.ComponentType<{ index: number; style: CSSProperties; data?: unknown }>;
     className?: string;
     direction?: 'horizontal' | 'vertical';
     height: number | string;
     initialScrollOffset?: number;
-    innerRef?: Ref<any>;
+    innerRef?: Ref<unknown>;
     itemCount: number;
-    itemKey?: (index: number, data: any) => any;
+    itemKey?: (index: number, data: unknown) => unknown;
     itemSize: number;
     layout?: 'vertical' | 'horizontal';
-    onItemsRendered?: (props: any) => any;
-    onScroll?: (props: ListOnScrollProps) => any;
-    outerRef?: Ref<any>;
+    onItemsRendered?: (props: unknown) => unknown;
+    onScroll?: (props: ListOnScrollProps) => unknown;
+    outerRef?: Ref<unknown>;
     style?: CSSProperties;
     useIsScrolling?: boolean;
     width: number | string;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   export class FixedSizeList extends Component<FixedSizeListProps> {

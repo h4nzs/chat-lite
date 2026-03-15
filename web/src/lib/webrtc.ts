@@ -162,8 +162,8 @@ export const startCall = async (to: string, isVideo: boolean, callerProfile: Rec
         // Fallback: Try to find 1:1 by participant
         conversation = conversations.find(c =>
           !c.isGroup &&
-          c.participants.some((p) => (p as any).userId === to || p.id === to) &&
-          c.participants.some((p) => (p as any).userId === currentUser?.id || p.id === currentUser?.id)
+          c.participants.some((p) => (p as { userId?: string; id: string }).userId === to || p.id === to) &&
+          c.participants.some((p) => (p as { userId?: string; id: string }).userId === currentUser?.id || p.id === currentUser?.id)
         );
     }
 
@@ -195,7 +195,7 @@ export const startCall = async (to: string, isVideo: boolean, callerProfile: Rec
         // For groups, we might broadcast 'request' or wait? 
         // Simple Mesh: Send 'request' to all other participants.
         conversation.participants.forEach(p => {
-            const pid = (p as any).userId || p.id;
+            const pid = (p as { userId?: string; id: string }).userId || p.id;
             if (pid !== currentUser?.id) {
                  const pc = createPeerConnection(pid, iceServers);
                  // We create offer immediately? Or send 'request' first?
@@ -239,10 +239,11 @@ export const acceptCall = async () => {
 
     // Connect to all known remote users (initiators)
     initiators.forEach(user => {
-        if (!peerConnections.has(user.id)) {
-            createPeerConnection(user.id, iceServers);
+        const u = user as { id: string };
+        if (!peerConnections.has(u.id)) {
+            createPeerConnection(u.id, iceServers);
         }
-        sendSecureSignal(user.id, 'accept');
+        sendSecureSignal(u.id, 'accept');
     });
     
     useCallStore.getState().setCallState('connected');
@@ -254,13 +255,13 @@ export const acceptCall = async () => {
 
 export const rejectCall = () => {
   const state = useCallStore.getState();
-  state.remoteUsers.forEach(u => sendSecureSignal(u.id, 'reject', { reason: 'declined' }));
+  state.remoteUsers.forEach(u => sendSecureSignal((u as { id: string }).id, 'reject', { reason: 'declined' }));
   cleanupCall();
 };
 
 export const hangup = () => {
   const state = useCallStore.getState();
-  state.remoteUsers.forEach(u => sendSecureSignal(u.id, 'end'));
+  state.remoteUsers.forEach(u => sendSecureSignal((u as { id: string }).id, 'end'));
   cleanupCall();
 };
 
@@ -290,15 +291,15 @@ export const initWebRTCListeners = (socket: Socket) => {
         switch (data.type) {
             case 'request':
                 if (state.callState === 'idle') {
-                    useCallStore.getState().setIncomingCall(data.from, decryptedPayload.isVideo, decryptedPayload.callerProfile, callKey);
+                    useCallStore.getState().setIncomingCall(data.from, decryptedPayload.isVideo as boolean, decryptedPayload.callerProfile as Record<string, unknown>, callKey);
                 } else {
-                    // Mesh: If already in call, we can auto-accept or merge? 
+                    // Mesh: If already in call, we can auto-accept or merge?
                     // For simple MVP: Reject if busy (Classic phone behavior)
                     // Or if it's the SAME call key (same room), we accept/add?
                     // "Mesh Topology P2P (Group Call)" implies adding.
                     if (state.ephemeralCallKey === callKey) {
                          // Same call, new participant?
-                         useCallStore.getState().addRemoteUser(decryptedPayload.callerProfile || { id: data.from });
+                         useCallStore.getState().addRemoteUser((decryptedPayload.callerProfile as Record<string, unknown>) || { id: data.from });
                     } else {
                          sendSecureSignal(data.from, 'reject', { reason: 'busy' });
                     }
@@ -337,7 +338,7 @@ export const initWebRTCListeners = (socket: Socket) => {
             case 'offer':
                 if (!pc) pc = createPeerConnection(data.from, iceServers);
                 try {
-                  await pc.setRemoteDescription(new RTCSessionDescription(decryptedPayload.offer));
+                  await pc.setRemoteDescription(new RTCSessionDescription(decryptedPayload.offer as RTCSessionDescriptionInit));
                   const answer = await pc.createAnswer();
                   await pc.setLocalDescription(answer);
                   sendSecureSignal(data.from, 'answer', { answer });
@@ -348,7 +349,7 @@ export const initWebRTCListeners = (socket: Socket) => {
             case 'answer':
                 if (!pc) return; // Should exist if we sent offer
                 try {
-                  await pc.setRemoteDescription(new RTCSessionDescription(decryptedPayload.answer));
+                  await pc.setRemoteDescription(new RTCSessionDescription(decryptedPayload.answer as RTCSessionDescriptionInit));
                 } catch (e) {
                   console.error('Failed to handle answer', e);
                 }
@@ -356,7 +357,7 @@ export const initWebRTCListeners = (socket: Socket) => {
             case 'ice-candidate':
                 if (!pc) return;
                 try {
-                  await pc.addIceCandidate(new RTCIceCandidate(decryptedPayload.candidate));
+                  await pc.addIceCandidate(new RTCIceCandidate(decryptedPayload.candidate as RTCIceCandidateInit));
                 } catch (e) {
                   console.error('Failed to add ice candidate', e);
                 }

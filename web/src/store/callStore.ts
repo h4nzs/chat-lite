@@ -4,7 +4,7 @@ export type CallState = 'idle' | 'ringing' | 'calling' | 'connected';
 
 interface CallStoreState {
   callState: CallState;
-  remoteUsers: any[];
+  remoteUsers: Record<string, unknown>[];
   remoteStreams: Record<string, MediaStream>;
   isVideoCall: boolean;
   isReceivingCall: boolean;
@@ -13,12 +13,12 @@ interface CallStoreState {
   ephemeralCallKey: string | null;
 
   setCallState: (state: CallState) => void;
-  setIncomingCall: (from: string, isVideo: boolean, profile: any, key?: string) => void;
-  setOutgoingCall: (to: string | string[], isVideo: boolean, profile: any, key: string) => void;
+  setIncomingCall: (from: string, isVideo: boolean, profile: Record<string, unknown>, key?: string) => void;
+  setOutgoingCall: (to: string | string[], isVideo: boolean, profile: Record<string, unknown> | Record<string, unknown>[], key: string) => void;
   setLocalStream: (stream: MediaStream | null) => void;
   addRemoteStream: (userId: string, stream: MediaStream) => void;
   removeRemoteStream: (userId: string) => void;
-  addRemoteUser: (profile: any) => void;
+  addRemoteUser: (profile: Record<string, unknown>) => void;
   removeRemoteUser: (userId: string) => void;
   toggleMinimize: () => void;
   setMinimized: (minimized: boolean) => void;
@@ -77,7 +77,7 @@ export const useCallStore = create<CallStoreState>((set) => ({
     // Ideally 'to' implies IDs. We need profiles. 
     // For now, we initialize with minimal profile placeholders if actual profiles aren't passed fully.
     
-    let initialUsers: any[] = [];
+    let initialUsers: Record<string, unknown>[] = [];
     if (Array.isArray(profile)) {
         initialUsers = profile;
     } else if (profile) {

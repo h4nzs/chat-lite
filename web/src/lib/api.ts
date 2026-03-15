@@ -24,7 +24,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    public details?: any
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "ApiError";
@@ -53,6 +53,7 @@ export async function getCsrfToken(): Promise<string> {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function api<T = any>(
   path: string,
   options: RequestInit = {}
@@ -175,7 +176,7 @@ export function handleApiError(e: unknown): string {
   return "An unexpected error occurred";
 }
 
-// Upload menggunakan Axios (untuk Progress Bar)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function apiUpload<T = any>({
   path,
   formData,

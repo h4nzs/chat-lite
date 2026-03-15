@@ -248,9 +248,9 @@ export default function CallOverlay() {
 
   if (callState === 'idle') return null;
 
-  const mainRemoteUser = remoteUsers[0] || { id: 'unknown', name: 'Someone' };
-  const profileName = remoteUsers.length > 1 ? `Group (${remoteUsers.length})` : (mainRemoteUser.name || 'Someone');
-  const profileAvatar = toAbsoluteUrl(mainRemoteUser.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${profileName}`;
+  const mainRemoteUser = (remoteUsers[0] || { id: 'unknown', name: 'Someone' }) as unknown as RemoteUser;
+  const profileName = (remoteUsers.length > 1 ? `Group (${remoteUsers.length})` : (mainRemoteUser.name || 'Someone')) as string;
+  const profileAvatar = (toAbsoluteUrl(mainRemoteUser.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${profileName}`) as string;
 
   return (
     <AnimatePresence>
@@ -366,15 +366,18 @@ export default function CallOverlay() {
                   remoteUsers.length <= 2 ? 'grid-cols-1 md:grid-cols-2' : 
                   'grid-cols-2 md:grid-cols-3'}
               `}>
-                {remoteUsers.map(user => (
-                  <RemoteStream 
-                    key={user.id} 
-                    userId={user.id} 
-                    stream={remoteStreams[user.id]} 
-                    isVideo={isVideoCall} 
-                    profile={user} 
-                  />
-                ))}
+                {remoteUsers.map((u) => {
+                  const user = u as unknown as RemoteUser;
+                  return (
+                    <RemoteStream 
+                      key={user.id} 
+                      userId={user.id} 
+                      stream={remoteStreams[user.id]} 
+                      isVideo={isVideoCall} 
+                      profile={user} 
+                    />
+                  );
+                })}
               </div>
             )}
             
