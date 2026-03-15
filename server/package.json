@@ -24,7 +24,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1005.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.4.2",
+    "@prisma/client": "^7.5.0",
     "@simplewebauthn/server": "^13.3.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@supabase/supabase-js": "^2.98.0",
