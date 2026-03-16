@@ -84,7 +84,8 @@ router.post('/login', authLimiter, zodValidate({
     res.json({
       user: result.user,
       accessToken: result.accessToken,
-      needVerification: result.needVerification
+      needVerification: result.needVerification,
+      encryptedPrivateKey: result.encryptedPrivateKey
     });
   } catch (error) {
     next(error);
@@ -207,7 +208,7 @@ router.post('/webauthn/login/verify', async (req, res, next) => {
       expectedRPID: env.nodeEnv === 'production' ? new URL(env.corsOrigin).hostname : 'localhost'
     });
 
-    res.json({ verified: true, user: result.user });
+    res.json({ verified: true, user: result.user, encryptedPrivateKey: result.encryptedPrivateKey });
   } catch (error) {
     next(error);
   }

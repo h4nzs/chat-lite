@@ -204,7 +204,8 @@ export const loginUser = async (data: LoginDTO, reqIp: string, userAgent: string
     },
     accessToken: access,
     refreshToken: refresh,
-    needVerification: false
+    needVerification: false,
+    encryptedPrivateKey: user.encryptedPrivateKey
   };
 };
 
@@ -384,7 +385,8 @@ export const verifyWebAuthnAuthentication = async (data: WebAuthnAuthenticationV
       encryptedProfile: user.encryptedProfile,
       role: user.role,
       isVerified: user.isVerified
-    }
+    },
+    encryptedPrivateKey: user.encryptedPrivateKey
   };
 };
 
