@@ -107,3 +107,38 @@ export async function unlockWithBiometric(options: Record<string, unknown>): Pro
   return { authResp: asseResp, recoveryPhrase };
 }
 
+// 3. DECRYPT MASTER SEED (Silent, for bootstrap)
+// Attempts to decrypt the master seed from bio vault without user interaction
+export async function decryptWithBiometric(): Promise<Uint8Array | null> {
+  const vaultStr = localStorage.getItem('nyx_bio_vault');
+  if (!vaultStr) return null;
+
+  try {
+    const vault = JSON.parse(vaultStr);
+    
+    // We need to authenticate to get the PRF key
+    const authOptions = {
+      extensions: {
+        prf: { eval: { first: PRF_SALT } }
+      }
+    };
+
+    const asseResp = await startAuthentication({ optionsJSON: authOptions } as any);
+    const prfResults = (asseResp as unknown as { clientExtensionResults?: { prf?: { results?: { first?: ArrayBuffer } } } }).clientExtensionResults?.prf;
+
+    if (prfResults?.results?.first) {
+      const symmetricKey = new Uint8Array(prfResults.results.first).buffer;
+      const recoveryPhrase = await decryptData(vault.ciphertext, vault.iv, symmetricKey);
+      
+      // Convert recovery phrase to master seed using BIP39
+      const { mnemonicToSeedSync } = await import('bip39');
+      const seed = mnemonicToSeedSync(recoveryPhrase);
+      return new Uint8Array(seed.slice(0, 32)); // First 32 bytes = master seed
+    }
+  } catch (e: unknown) {
+    console.error("Failed to decrypt master seed with biometric:", e);
+  }
+
+  return null;
+}
+

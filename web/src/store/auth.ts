@@ -3,7 +3,7 @@
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
 import { authFetch } from "@lib/api";
-import { disconnectSocket, connectSocket } from "@lib/socket";
+import { disconnectSocket, connectSocket, getSocket } from "@lib/socket";
 import { clearAuthCookies } from "@lib/tokenStorage";
 import { useModalStore } from "./modal";
 import { useConversationStore } from "./conversation";
@@ -88,6 +88,7 @@ type State = {
   sendReadReceipts: boolean;
   hasRestoredKeys: boolean;
   blockedUserIds: string[];
+  masterSeed?: Uint8Array;
 };
 
 type RegisterResponse = {
@@ -245,24 +246,33 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
       set({ isBootstrapping: true });
       try {
-        const refreshRes = await refreshTokenApi();
-        if (refreshRes.accessToken) {
-          set({ accessToken: refreshRes.accessToken });
-
-          const me = await getCurrentUserApi();
-          set({ user: me, hasRestoredKeys: await hasStoredKeys() });
-          localStorage.setItem("user", JSON.stringify(me));
-
-          await get().tryAutoUnlock();
-          connectSocket();
-          get().loadBlockedUsers();
-        } else {
-          throw new Error("No valid session.");
+        // Await silentRefresh FIRST
+        const refreshed = await get().silentRefresh();
+        if (!refreshed) {
+          // Token is dead. App should show Login screen.
+          set({ isBootstrapping: false, user: null, accessToken: null });
+          clearAuthCookies();
+          localStorage.removeItem("user");
+          return;
         }
+
+        const me = await getCurrentUserApi();
+        set({ user: me, hasRestoredKeys: await hasStoredKeys() });
+        localStorage.setItem("user", JSON.stringify(me));
+
+        // Pre-fetch Master Seed silently (do not await if it triggers a prompt, just attempt bio/auto-unlock)
+        get().getMasterSeed().catch(() => { /* ignore prompt rejections during bootstrap */ });
+
+        const socket = getSocket();
+        if (socket && !socket.connected) {
+          connectSocket();
+        }
+
+        get().loadBlockedUsers();
       } catch (error: unknown) {
-        console.log("Bootstrap failed (No session):", error);
-        privateKeysCache = null;
-        set({ user: null, accessToken: null, blockedUserIds: [] });
+        console.error("Bootstrap failed:", error);
+        // Stop execution cleanly - don't attempt protected routes if we failed
+        set({ isBootstrapping: false, user: null, accessToken: null });
         clearAuthCookies();
         localStorage.removeItem("user");
       } finally {
@@ -450,8 +460,69 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     async getMasterSeed() {
-      const keys = await retrieveAndCacheKeys();
-      return keys.masterSeed;
+      const state = get();
+      if (state.masterSeed) return state.masterSeed;
+
+      // Try Biometric Vault First (Zero User Interaction)
+      try {
+        const { decryptWithBiometric } = await import('@lib/biometricUnlock');
+        const bioSeed = await decryptWithBiometric();
+        if (bioSeed) {
+          set({ masterSeed: bioSeed });
+          return bioSeed;
+        }
+      } catch (e) {
+        // Bio vault not setup or failed, continue to fallback
+      }
+
+      // Try Fallback Auto-Unlock Key
+      const autoUnlockKey = await getDeviceAutoUnlockKey();
+      const encKeysStr = await getEncryptedKeys();
+      
+      if (autoUnlockKey && encKeysStr) {
+        try {
+          const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
+          const result = await retrievePrivateKeys(encKeysStr, autoUnlockKey);
+          if (result.success && result.keys) {
+            set({ masterSeed: result.keys.masterSeed });
+            return result.keys.masterSeed;
+          }
+        } catch (e) {
+          console.warn("Auto-unlock fallback failed:", e);
+        }
+      }
+
+      // If all silent methods fail, trigger the modal (ensure it only opens once)
+      return new Promise((resolve, reject) => {
+        useModalStore.getState().showPasswordPrompt(async (password) => {
+          if (!password) {
+            reject(new Error("Password prompt closed without input."));
+            return;
+          }
+          try {
+            const encKeys = await getEncryptedKeys();
+            if (!encKeys) throw new Error("No encrypted keys found.");
+            
+            const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
+            const result = await retrievePrivateKeys(encKeys, password);
+            
+            if (!result.success) {
+              reject(new Error(`Failed to decrypt keys: ${result.reason}`));
+              return;
+            }
+            
+            if (!result.keys) {
+              reject(new Error("Keys not found in result"));
+              return;
+            }
+            
+            set({ masterSeed: result.keys.masterSeed });
+            resolve(result.keys.masterSeed);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
     },
     async getSigningPrivateKey() {
       const keys = await retrieveAndCacheKeys();
