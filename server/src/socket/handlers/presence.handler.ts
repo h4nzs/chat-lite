@@ -100,6 +100,28 @@ export const registerPresenceHandlers = (io: Server, socket: AuthenticatedSocket
     }
   });
 
+  // Explicit Presence Update
+  socket.on("presence:update", async ({ online }: { userId: string, online: boolean }) => {
+    if (!userId) return;
+    const userSocketsKey = `user:${userId}:sockets`;
+    
+    if (online) {
+      const added = await redisClient.sAdd(userSocketsKey, socket.id);
+      const currentCount = await redisClient.sCard(userSocketsKey);
+      if (added === 1 && currentCount === 1) {
+        await redisClient.sAdd('online_users', userId);
+        socket.broadcast.emit("presence:user_joined", userId);
+      }
+    } else {
+      await redisClient.sRem(userSocketsKey, socket.id);
+      const remainingSockets = await redisClient.sCard(userSocketsKey);
+      if (remainingSockets === 0) {
+        await redisClient.sRem('online_users', userId);
+        socket.broadcast.emit("presence:user_left", userId);
+      }
+    }
+  });
+
   // Disconnect Handler
   socket.on("disconnect", async () => {
     const userSocketsKey = `user:${userId}:sockets`;

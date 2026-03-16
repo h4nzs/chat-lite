@@ -268,6 +268,23 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       isFetchingMore: { ...state.isFetchingMore, [id]: true }
     }));
 
+    // 1. Load from Shadow Vault (Hydration)
+    try {
+      const cachedMessages = await shadowVault.getMessagesByConversation(id);
+      if (cachedMessages && cachedMessages.length > 0) {
+        // Enforce parsing pipeline on hydration
+        const enriched = enrichMessagesWithSenderProfile(id, cachedMessages);
+        const processed = processMessagesAndReactions(enriched);
+        
+        set((state) => ({
+          messages: { ...state.messages, [id]: processed }
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to hydrate messages from vault:', e);
+    }
+
+    // 2. Fetch from API (Sync)
     try {
       const { messages, hasMore } = await fetchMessagesLogic(id);
 

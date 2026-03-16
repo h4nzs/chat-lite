@@ -24,20 +24,29 @@ export const registerPushHandlers = (io: Server, socket: AuthenticatedSocket) =>
   // Push Subscription
   socket.on("push:subscribe", async (data: PushSubscribePayload) => {
     if (!data.endpoint || !data.keys?.p256dh || !data.keys?.auth) return;
-    
+
     try {
       await prisma.pushSubscription.upsert({
         where: { endpoint: data.endpoint },
         update: { p256dh: data.keys.p256dh, auth: data.keys.auth },
-        create: { 
-          endpoint: data.endpoint, 
-          p256dh: data.keys.p256dh, 
-          auth: data.keys.auth, 
-          userId 
+        create: {
+          endpoint: data.endpoint,
+          p256dh: data.keys.p256dh,
+          auth: data.keys.auth,
+          userId
         },
       });
     } catch (error) {
       console.error("Failed to save push subscription:", error);
     }
   });
-};
+
+  socket.on("push:unsubscribe", async () => {
+    try {
+      await prisma.pushSubscription.deleteMany({
+        where: { userId }
+      });
+    } catch (error) {
+      console.error("Failed to remove push subscriptions:", error);
+    }
+  });};

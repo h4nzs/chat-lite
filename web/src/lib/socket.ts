@@ -19,7 +19,9 @@ import {
   storeReceivedSessionKey,
   rotateGroupKey,
   fulfillGroupKeyRequest,
-  schedulePeriodicGroupKeyRotation
+  schedulePeriodicGroupKeyRotation,
+  type FulfillRequestPayload,
+  type GroupFulfillRequestPayload
 } from "@services/sessionKey.service";
 
 // FIX: Gunakan VITE_WS_URL (Koyeb) jika ada, kalau tidak ada (dev) baru pakai API_URL
@@ -258,6 +260,10 @@ export function getSocket() {
       fireGhostSync(conversationId, 2000);
     });
 
+    socket.on("conversation:participant_updated", ({ conversationId, userId, role }: { conversationId: string; userId: string; role: 'ADMIN' | 'MEMBER' }) => {
+      useConversationStore.getState().updateParticipantRole(conversationId, userId, role);
+    });
+
     socket.on("conversation:participant_removed", ({ conversationId, userId }) => {
       useConversationStore.getState().removeParticipant(conversationId, userId);
       handleKeyRotation(conversationId);
@@ -280,8 +286,13 @@ export function getSocket() {
       }
     });
     
-    socket.on('session:fulfill_request', (data) => fulfillKeyRequest(data).catch(console.error));
-    socket.on('group:fulfill_key_request', (data) => fulfillGroupKeyRequest(data).catch(console.error));
+    socket.on('session:fulfill_request', (data: FulfillRequestPayload) => fulfillKeyRequest(data).catch(console.error));
+    socket.on('session:key_requested', () => {
+      // This event is a notification that someone requested a key
+      // The actual fulfillment happens via session:fulfill_request
+      // No action needed here
+    });
+    socket.on('group:fulfill_key_request', (data: GroupFulfillRequestPayload) => fulfillGroupKeyRequest(data).catch(console.error));
     socket.on('session:new_key', (data) => {
       storeReceivedSessionKey(data)
         .then(() => {
@@ -292,6 +303,12 @@ export function getSocket() {
     });
     socket.on('force_logout', () => {
       toast.error("This session has been logged out remotely.");
+      useAuthStore.getState().logout();
+      disconnectSocket();
+    });
+
+    socket.on('auth:banned', ({ reason }: { reason: string }) => {
+      toast.error(`Account suspended: ${reason}`, { duration: 10000 });
       useAuthStore.getState().logout();
       disconnectSocket();
     });

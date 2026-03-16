@@ -218,4 +218,51 @@ export const registerMessageHandlers = (io: Server, socket: AuthenticatedSocket)
       console.error('Failed to mark message as read:', error);
     }
   });
+
+  // Mark as Delivered
+  socket.on('message:ack_delivered', async ({ messageId, conversationId }: { messageId: string, conversationId: string }) => {
+    if (!messageId || !socket.user) return;
+    const socketUserId = socket.user.id;
+
+    try {
+      const msg = await prisma.message.findUnique({ 
+        select: { id: true, conversationId: true }, 
+        where: { id: messageId } 
+      });
+      if (!msg || msg.conversationId !== conversationId) return;
+
+      const isParticipant = await prisma.participant.findFirst({ 
+        where: { conversationId, userId: socketUserId } 
+      });
+      if (!isParticipant) return;
+
+      const currentStatus = await prisma.messageStatus.findUnique({
+        where: { messageId_userId: { messageId, userId: socketUserId } }
+      });
+
+      if (!currentStatus || currentStatus.status === 'SENT') {
+        await prisma.messageStatus.upsert({
+          where: { messageId_userId: { messageId, userId: socketUserId } },
+          update: { status: 'DELIVERED' },
+          create: { messageId, userId: socketUserId, status: 'DELIVERED' },
+        });
+
+        const message = await prisma.message.findUnique({
+          where: { id: messageId },
+          select: { senderId: true, conversationId: true },
+        });
+
+        if (message && message.senderId !== socketUserId) {
+          io.to(message.senderId).emit('message:status_updated', {
+            messageId,
+            conversationId: message.conversationId,
+            deliveredTo: socketUserId,
+            status: 'DELIVERED',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to ack message delivery:', error);
+    }
+  });
 };

@@ -24,7 +24,8 @@ export async function sendMessageLogic(
 ): Promise<{ message?: Message; error?: string }> {
   const { prepareEncryptedPayload, generatePushPayloads } = await import('@services/messageCrypto');
   const { user } = useAuthStore.getState();
-  const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+  const conversations = useConversationStore.getState().conversations;
+  const conversation = conversations.find(c => c.id === conversationId);
   const isGroup = conversation?.isGroup || false;
   const actualTempId = tempId || Date.now() * 1000 + Math.floor(Math.random() * 1000);
 

@@ -49,6 +49,9 @@ export interface ServerToClientEvents {
     'user:identity_changed': (data: { userId: string; name: string }) => void;
     "group:participants_changed": (payload: { conversationId: string }) => void;
     "session:request_key": (payload: { conversationId: string; requesterId: string; sessionId: string }) => void;
+    "conversation:participant_updated": (payload: { conversationId: string; userId: string; role: 'ADMIN' | 'MEMBER' }) => void;
+    "session:key_requested": (data: { conversationId: string; sessionId: string; requesterId: string }) => void;
+    "auth:banned": (payload: { reason: string }) => void;
 
     // --- WEBRTC E2EE SIGNALING ---
     "webrtc:secure_signal": (payload: { from: string; type: string; payload: string }) => void;

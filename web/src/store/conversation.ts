@@ -48,6 +48,7 @@ export type Message = {
   fileType?: string;
   fileSize?: number;
   sessionId?: string | null;
+  encryptedSessionKey?: string | null;
   ciphertext?: string | null;
   createdAt: string;
   error?: boolean | string;

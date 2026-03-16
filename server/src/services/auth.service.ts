@@ -136,7 +136,9 @@ export const registerUser = async (data: RegisterDTO, reqIp: string, userAgent: 
       usernameHash: true,
       encryptedProfile: true,
       role: true,
-      isVerified: true
+      isVerified: true,
+      hasCompletedOnboarding: true,
+      autoDestructDays: true
     }
   });
 
@@ -200,7 +202,9 @@ export const loginUser = async (data: LoginDTO, reqIp: string, userAgent: string
       usernameHash: user.usernameHash,
       encryptedProfile: user.encryptedProfile,
       role: user.role,
-      isVerified: user.isVerified
+      isVerified: user.isVerified,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
+      autoDestructDays: user.autoDestructDays
     },
     accessToken: access,
     refreshToken: refresh,
@@ -384,7 +388,9 @@ export const verifyWebAuthnAuthentication = async (data: WebAuthnAuthenticationV
       usernameHash: user.usernameHash,
       encryptedProfile: user.encryptedProfile,
       role: user.role,
-      isVerified: user.isVerified
+      isVerified: user.isVerified,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
+      autoDestructDays: user.autoDestructDays
     },
     encryptedPrivateKey: user.encryptedPrivateKey
   };
@@ -431,7 +437,8 @@ export const getUserById = async (userId: string) => {
       encryptedProfile: true,
       role: true,
       isVerified: true,
-      hasCompletedOnboarding: true
+      hasCompletedOnboarding: true,
+      autoDestructDays: true
     }
   });
 
