@@ -3,11 +3,10 @@
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from 'zustand/traditional';
 import { api } from '@lib/api';
-import { getSocket, emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/socket';
+import { emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/socket';
 import { addToQueue, getQueueItems, removeFromQueue, updateQueueAttempt } from '@lib/offlineQueueDb';
 import { useAuthStore, type User } from '@store/auth';
 import { useConversationStore } from '@store/conversation';
-import { useConnectionStore } from '@store/connection';
 import { shadowVault, saveStoryKey } from '@lib/shadowVaultDb';
 import toast from 'react-hot-toast';
 import type { Message, Participant } from '@store/conversation';
@@ -666,35 +665,3 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     }
   }
 }));
-
-// Setup socket listeners
-const socket = getSocket();
-if (socket) {
-  socket.on('message:new', async (message: Message) => {
-    await useMessageStore.getState().addIncomingMessage(message.conversationId, message);
-  });
-
-  socket.on('message:deleted', ({ id, conversationId }: { id: string; conversationId: string }) => {
-    useMessageStore.getState().removeMessage(conversationId, id);
-  });
-
-  socket.on('message:updated', (message: Message) => {
-    useMessageStore.getState().updateMessage(message.conversationId, message.id, message);
-  });
-
-  socket.on('message:status_updated', ({ messageId, conversationId, readBy, status }: { messageId: string; conversationId: string; readBy?: string; status?: 'SENT' | 'DELIVERED' | 'READ' }) => {
-    if (readBy && status) {
-      useMessageStore.getState().updateMessageStatus(conversationId, messageId, readBy, status);
-    }
-  });
-}
-
-// Process offline queue on connection
-socket?.on('connect', () => {
-  useConnectionStore.getState().setStatus('connected');
-  useMessageStore.getState().processOfflineQueue();
-});
-
-socket?.on('disconnect', () => {
-  useConnectionStore.getState().setStatus('disconnected');
-});
