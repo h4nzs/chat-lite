@@ -16,6 +16,12 @@ export interface DecryptedMessageRecord {
   senderAvatarUrl?: string; // Encrypted avatar URL
   isViewOnce?: boolean;
   isDeletedLocal?: boolean;
+  // File metadata (for Blind Attachments)
+  fileUrl?: string; // Encrypted file URL
+  fileKey?: string; // Encrypted file key
+  fileName?: string; // Encrypted file name
+  fileSize?: number;
+  fileType?: string;
 }
 
 // --- CRYPTO ENGINE FOR IRON VAULT ---
@@ -84,17 +90,20 @@ export class NyxShadowVault extends Dexie {
       for (const m of validMessages) {
         // [FIX] PERSISTENCE: Check if we already have a record with better profile data
         const existing = await this.messages.get(m.id);
-        
+
         let encryptedContent: string | null = null;
         let encryptedRepliedTo: string | undefined = undefined;
         let encryptedSenderName: string | undefined = undefined;
         let encryptedSenderUsername: string | undefined = undefined;
         let encryptedSenderAvatarUrl: string | undefined = undefined;
+        let encryptedFileUrl: string | undefined = undefined;
+        let encryptedFileKey: string | undefined = undefined;
+        let encryptedFileName: string | undefined = undefined;
 
         if (m.content && !m.isDeletedLocal) {
             encryptedContent = await encryptVaultText(m.content);
         }
-        
+
         if (m.repliedTo) {
              const repliedToStr = JSON.stringify(m.repliedTo);
              encryptedRepliedTo = await encryptVaultText(repliedToStr);
@@ -122,7 +131,26 @@ export class NyxShadowVault extends Dexie {
         } else if (mSender?.avatarUrl) {
             encryptedSenderAvatarUrl = await encryptVaultText(mSender.avatarUrl);
         }
+
+        // Persist file metadata (Blind Attachments)
+        if (m.fileUrl) {
+            encryptedFileUrl = await encryptVaultText(m.fileUrl);
+        } else if (existing?.fileUrl) {
+            encryptedFileUrl = existing.fileUrl;
+        }
         
+        if (m.fileKey) {
+            encryptedFileKey = await encryptVaultText(m.fileKey);
+        } else if (existing?.fileKey) {
+            encryptedFileKey = existing.fileKey;
+        }
+        
+        if (m.fileName) {
+            encryptedFileName = await encryptVaultText(m.fileName);
+        } else if (existing?.fileName) {
+            encryptedFileName = existing.fileName;
+        }
+
         records.push({
           id: m.id,
           conversationId: m.conversationId,
@@ -134,6 +162,11 @@ export class NyxShadowVault extends Dexie {
           senderName: encryptedSenderName,
           senderUsername: encryptedSenderUsername,
           senderAvatarUrl: encryptedSenderAvatarUrl,
+          fileUrl: encryptedFileUrl,
+          fileKey: encryptedFileKey,
+          fileName: encryptedFileName,
+          fileSize: m.fileSize,
+          fileType: m.fileType,
           isViewOnce: m.isViewOnce,
           isDeletedLocal: m.isDeletedLocal
         });
@@ -154,6 +187,9 @@ export class NyxShadowVault extends Dexie {
         let decryptedSenderName = undefined;
         let decryptedSenderUsername = undefined;
         let decryptedSenderAvatarUrl = undefined;
+        let decryptedFileUrl = undefined;
+        let decryptedFileKey = undefined;
+        let decryptedFileName = undefined;
 
         if (r.content && !r.isDeletedLocal) {
           plainText = await decryptVaultText(r.content);
@@ -177,6 +213,17 @@ export class NyxShadowVault extends Dexie {
         if (r.senderAvatarUrl) {
             decryptedSenderAvatarUrl = await decryptVaultText(r.senderAvatarUrl) || undefined;
         }
+        
+        // Restore file metadata (Blind Attachments)
+        if (r.fileUrl) {
+            decryptedFileUrl = await decryptVaultText(r.fileUrl) || undefined;
+        }
+        if (r.fileKey) {
+            decryptedFileKey = await decryptVaultText(r.fileKey) || undefined;
+        }
+        if (r.fileName) {
+            decryptedFileName = await decryptVaultText(r.fileName) || undefined;
+        }
 
         messages.push({
           id: r.id,
@@ -192,6 +239,11 @@ export class NyxShadowVault extends Dexie {
               username: decryptedSenderUsername,
               avatarUrl: decryptedSenderAvatarUrl
           } as unknown as { id: string; name?: string; username?: string; avatarUrl?: string | null },
+          fileUrl: decryptedFileUrl,
+          fileKey: decryptedFileKey,
+          fileName: decryptedFileName,
+          fileSize: r.fileSize,
+          fileType: r.fileType,
           isViewOnce: r.isViewOnce,
           isDeletedLocal: r.isDeletedLocal
         });

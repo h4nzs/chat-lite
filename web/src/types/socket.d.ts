@@ -4,9 +4,10 @@ import type { User } from '@store/auth';
 export interface ServerToClientEvents {
     connect: () => void;
     disconnect: (reason: string) => void;
+    "error": (payload: { message: string }) => void;
     "message:new": (message: Message) => void;
     "message:updated": (message: Message) => void;
-    "message:deleted": (payload: { conversationId: string; id: string }) => void;
+    "message:deleted": (payload: { conversationId: string; id?: string; ids?: string[] }) => void;
     "message:viewed": (payload: { messageId: string; conversationId: string }) => void;
     "messages:expired": (payload: { messageIds: string[] }) => void; // New event for disappearing messages
     "reaction:new": (payload: { conversationId: string; messageId: string; reaction: Record<string, unknown> }) => void;
@@ -46,7 +47,7 @@ export interface ServerToClientEvents {
         requesterPublicKey: string;
     }) => void;
     force_logout: () => void;
-    'user:identity_changed': (data: { userId: string; name: string }) => void;
+    'user:identity_changed': (data: { userId: string }) => void;
     "group:participants_changed": (payload: { conversationId: string }) => void;
     "session:request_key": (payload: { conversationId: string; requesterId: string; sessionId: string }) => void;
     "conversation:participant_updated": (payload: { conversationId: string; userId: string; role: 'ADMIN' | 'MEMBER' }) => void;
@@ -72,9 +73,9 @@ export interface ClientToServerEvents {
     "typing:start": (payload: { conversationId: string }) => void;
     "typing:stop": (payload: { conversationId: string }) => void;
     "conversation:join": (conversationId: string) => void;
-    "session:request_key": (payload: { 
-        conversationId: string; 
-        sessionId: string; 
+    "session:request_key": (payload: {
+        conversationId: string;
+        sessionId: string;
         targetId?: string;
         requesterId?: string;
     }) => void;
@@ -84,6 +85,7 @@ export interface ClientToServerEvents {
         sessionId: string;
         encryptedKey: string;
     }) => void;
+    "session:request_missing": (payload: { conversationId: string; sessionId: string }) => void;
     "messages:distribute_keys": (payload: {
         conversationId: string;
         keys: { userId: string; key: string }[];
@@ -99,10 +101,11 @@ export interface ClientToServerEvents {
         keys: { p256dh: string; auth: string };
     }) => void;
     "push:unsubscribe": () => void;
-    
+    "error": (payload: { message: string }) => void;
+
     // --- WEBRTC E2EE SIGNALING ---
     "webrtc:secure_signal": (payload: { to: string; type: string; payload: string }) => void;
-    
+
     // --- DEVICE MIGRATION TUNNEL (CLIENT -> SERVER) ---
     "migration:join": (roomId: string) => void;
     "migration:start": (payload: { roomId: string; totalChunks: number; sealedKey: string; iv: string }) => void;

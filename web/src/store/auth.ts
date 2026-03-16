@@ -589,6 +589,14 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
         if (data && data.accessToken) {
           set({ accessToken: data.accessToken });
+          
+          // Update socket auth with new token
+          const socket = getSocket();
+          if (socket?.connected) {
+            (socket.auth as Record<string, unknown>) = { token: data.accessToken };
+            (socket.io.opts as Record<string, unknown>).auth = { token: data.accessToken };
+          }
+          
           return true;
         }
         return false;

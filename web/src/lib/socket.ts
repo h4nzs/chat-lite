@@ -128,6 +128,12 @@ export function getSocket() {
       console.error("❌ Socket connection error:", err?.message ?? err);
     });
 
+    // --- Error Handler ---
+    socket.on("error", (payload: { message: string }) => {
+      console.error("[Socket] Server error:", payload.message);
+      toast.error(`Socket error: ${payload.message}`, { duration: 5000 });
+    });
+
     // --- Application-specific Listeners ---
     socket.on("message:new", async (newMessage) => {
       const meId = useAuthStore.getState().user?.id;
@@ -179,9 +185,18 @@ export function getSocket() {
       updateMessage(updatedMessage.conversationId, updatedMessage.id, updatedMessage);
     });
 
-    socket.on("message:deleted", ({ conversationId, id }) => {
+    socket.on("message:deleted", ({ conversationId, id, ids }) => {
       const { removeMessage } = useMessageStore.getState();
-      removeMessage(conversationId, id);
+      
+      // Handle single delete
+      if (id) {
+        removeMessage(conversationId, id);
+      }
+      
+      // Handle bulk delete
+      if (ids) {
+        ids.forEach(messageId => removeMessage(conversationId, messageId));
+      }
     });
 
     socket.on("messages:expired", ({ messageIds }: { messageIds: string[] }) => {
@@ -313,8 +328,8 @@ export function getSocket() {
       disconnectSocket();
     });
 
-    socket.on("user:identity_changed", (data) => {
-      const message = `The security key for ${data.name} has changed. You may want to verify their identity.`;
+    socket.on("user:identity_changed", (data: { userId: string }) => {
+      const message = `The security key for a contact has changed. You may want to verify their identity.`;
       toast.success(message, { duration: 10000, icon: '🛡️' });
       const { conversations } = useConversationStore.getState();
       const { addSystemMessage } = useMessageStore.getState();

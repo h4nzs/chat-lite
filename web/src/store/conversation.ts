@@ -41,7 +41,7 @@ export type Message = {
     avatarUrl?: string | null;
   };
   content?: string | null;
-  imageUrl?: string | null;
+  imageUrl?: string | null; // DEPRECATED: Use fileUrl with fileType check for images
   fileUrl?: string | null;
   fileKey?: string | null;
   fileName?: string | null;
@@ -49,11 +49,11 @@ export type Message = {
   fileSize?: number;
   sessionId?: string | null;
   encryptedSessionKey?: string | null;
-  ciphertext?: string | null;
+  ciphertext?: string | null; // Internal: Encrypted payload before decryption
   createdAt: string;
   error?: boolean | string;
   preview?: string;
-  reactions?: { id: string; emoji: string; userId?: string; isMessage?: boolean }[];
+  reactions?: { id: string; emoji: string; userId?: string; isMessage?: boolean }[]; // Client-side computed from parsed reaction payloads
   optimistic?: boolean;
   repliedTo?: Message;
   repliedToId?: string;
