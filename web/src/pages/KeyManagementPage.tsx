@@ -30,17 +30,18 @@ export default function KeyManagementPage() {
       try {
         const encryptedKeys = await getEncryptedKeys();
         if (!encryptedKeys) throw new Error("No encrypted key found in storage.");
-        
+
         const phrase = await getRecoveryPhrase(encryptedKeys, password);
-        if (!phrase) {
-          throw new Error("Failed to decrypt keys. Password mismatch.");
+        if (!phrase || phrase.trim() === '') {
+          throw new Error("Empty phrase returned. Legacy account or key corruption.");
         }
-        
+
         setRecoveryPhrase(phrase);
-        setShowRecoveryModal(true);
+        setShowRecoveryModal(true); // ONLY open modal if we have a valid phrase
 
       } catch (error: unknown) {
-        toast.error((error as Error).message || "Operation failed.");
+        console.error("Recovery phrase error:", error);
+        toast.error("Failed to unlock phrase. Incorrect password or legacy account.");
       } finally {
         setIsProcessing(false);
       }

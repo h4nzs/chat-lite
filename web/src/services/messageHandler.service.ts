@@ -7,9 +7,10 @@ import { addToQueue, getQueueItems, removeFromQueue, updateQueueAttempt } from '
 import { useAuthStore } from '@store/auth';
 import { useConversationStore } from '@store/conversation';
 import { useConnectionStore } from '@store/connection';
+import { useMessageStore } from '@store/message';
 import { shadowVault } from '@lib/shadowVaultDb';
 import type { Message } from '@store/conversation';
-import { decryptMessageObject, processMessagesAndReactions, enrichMessagesWithSenderProfile } from './messageDecryption.service';
+import { decryptMessageObject, processMessagesAndReactions, enrichMessagesWithSenderProfile, parseReaction, parseEdit, parseSilent } from './messageDecryption.service';
 
 /**
  * Send message logic (extracted from store)
@@ -208,6 +209,48 @@ export async function fetchMessagesLogic(
 export async function handleIncomingMessage(message: Message): Promise<Message | null> {
   try {
     const decrypted = await decryptMessageObject(message);
+    
+    // INTERCEPT SPECIAL PAYLOADS - Don't render these as chat bubbles
+    const reactionPayload = parseReaction(decrypted.content);
+    const editPayload = parseEdit(decrypted.content);
+    const silentPayload = parseSilent(decrypted.content);
+    
+    // If it's a reaction, add it to the target message and return null
+    if (reactionPayload) {
+      const { user } = useAuthStore.getState();
+      const reaction = {
+        id: decrypted.id,
+        emoji: reactionPayload.emoji,
+        userId: decrypted.senderId,
+        isMessage: true
+      };
+      useMessageStore.getState().addLocalReaction(
+        decrypted.conversationId,
+        reactionPayload.targetMessageId,
+        reaction
+      );
+      return null; // Don't render as new message
+    }
+    
+    // If it's an edit, update the target message and return null
+    if (editPayload) {
+      useMessageStore.getState().updateMessage(
+        decrypted.conversationId,
+        editPayload.targetMessageId,
+        { content: editPayload.text, isEdited: true }
+      );
+      return null; // Don't render as new message
+    }
+    
+    // If it's a silent/system message (GHOST_SYNC, STORY_KEY, CALL_INIT), ignore it
+    if (silentPayload) {
+      if (silentPayload.type === 'GHOST_SYNC' || 
+          silentPayload.type === 'STORY_KEY' || 
+          (silentPayload.type === 'CALL_INIT' && !silentPayload.text)) {
+        return null; // Completely invisible
+      }
+    }
+    
     const enriched = enrichMessagesWithSenderProfile(message.conversationId, [decrypted]);
     const processed = processMessagesAndReactions(enriched);
 

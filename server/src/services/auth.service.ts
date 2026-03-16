@@ -4,7 +4,7 @@
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { ApiError } from '../utils/errors.js';
-import { newJti, refreshExpiryDate, signAccessToken } from '../utils/jwt.js';
+import { newJti, refreshExpiryDate, signAccessToken, verifyJwt } from '../utils/jwt.js';
 import { env } from '../config.js';
 import crypto from 'crypto';
 import {
@@ -476,4 +476,42 @@ export const logoutAllSessions = async (userId: string, endpoint?: string) => {
   });
 
   return { success: true };
+};
+
+/**
+ * Refresh user session (rotate refresh token)
+ */
+export const refreshSession = async (refreshToken: string, reqIp: string, userAgent: string) => {
+  const payload = verifyJwt(refreshToken);
+  if (typeof payload === 'string' || !payload?.jti || !payload?.sub) {
+    throw new ApiError(401, 'Invalid refresh token');
+  }
+
+  const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
+  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    throw new ApiError(401, 'Refresh token expired or revoked');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub as string },
+    select: { id: true, role: true, bannedAt: true, banReason: true }
+  });
+
+  if (!user) throw new ApiError(401, 'User not found');
+  if (user.bannedAt) throw new ApiError(403, `ACCESS DENIED: ${user.banReason || 'Account suspended'}`);
+
+  // Rotate token family (delete old, create new)
+  await prisma.refreshToken.deleteMany({ where: { jti: payload.jti } });
+
+  const access = signAccessToken({ id: user.id, role: user.role });
+  const newJtiToken = newJti();
+  const refresh = signAccessToken({ sub: user.id, jti: newJtiToken }, { expiresIn: '30d' });
+  
+  const ipAddress = crypto.createHash('sha256').update(reqIp || '').digest('hex').substring(0, 16);
+
+  await prisma.refreshToken.create({
+    data: { jti: newJtiToken, userId: user.id, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
+  });
+
+  return { accessToken: access, refreshToken: refresh };
 };

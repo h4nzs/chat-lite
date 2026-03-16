@@ -18,7 +18,8 @@ import {
   changePassword,
   getUserById,
   logoutUser,
-  logoutAllSessions
+  logoutAllSessions,
+  refreshSession
 } from '../services/auth.service.js';
 import { verifyJwt } from '../utils/jwt.js';
 
@@ -88,6 +89,27 @@ router.post('/login', authLimiter, zodValidate({
       encryptedPrivateKey: result.encryptedPrivateKey
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== REFRESH TOKEN ====================
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const token = req.cookies?.rt || req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      res.clearCookie('at');
+      res.clearCookie('rt');
+      throw new ApiError(401, 'No refresh token provided');
+    }
+
+    const result = await refreshSession(token, req.ip || '', req.headers['user-agent'] || '');
+    setAuthCookies(res, result);
+    
+    res.json({ ok: true, accessToken: result.accessToken });
+  } catch (error) {
+    res.clearCookie('at');
+    res.clearCookie('rt');
     next(error);
   }
 });

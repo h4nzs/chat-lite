@@ -20,6 +20,33 @@ const shuffle = <T,>(array: T[]): T[] => {
 };
 
 export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseModalProps) {
+  // --- FAILSAFE: Empty or Invalid Phrase ---
+  if (!phrase || typeof phrase !== 'string' || phrase.trim() === '') {
+    return (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="bg-bg-surface p-8 rounded-3xl max-w-md w-full border border-white/10 text-center shadow-neumorphic-convex">
+          <div className="text-red-500 mb-4 flex justify-center">
+            <FiShield size={48} />
+          </div>
+          <h2 className="text-xl font-bold text-text-primary mb-2">Vault Access Denied</h2>
+          <p className="text-text-secondary text-sm mb-6">
+            Cannot access the recovery phrase. The master key may be missing if this is a legacy account, or the key has been corrupted.
+          </p>
+          <button
+            onClick={onClose}
+            className="
+              px-6 py-3 bg-bg-main text-text-primary hover:text-accent font-bold rounded-xl
+              shadow-neumorphic-convex active:shadow-neumorphic-pressed transition-all
+            "
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+  // -----------------------------------------
+
   const [step, setStep] = useState(1);
   const [showPhrase, setShowPhrase] = useState(false);
   const [userInput, setUserInput] = useState<string[]>([]);

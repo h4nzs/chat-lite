@@ -2,7 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiCoffee, FiHeart, FiFlag, FiHelpCircle, FiShield, FiActivity } from 'react-icons/fi';
 import { Spinner } from '../components/Spinner';
 import ReportBugModal from '../components/ReportBugModal';
@@ -13,12 +13,13 @@ import KeyManagementSection from '../components/settings/KeyManagementSection';
 import DangerZoneSection from '../components/settings/DangerZoneSection';
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const [showReportModal, setShowReportModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const handleNavigate = (path: string) => {
-    // Navigation handler for child components
-    window.location.href = path;
+    // Navigation handler for child components - uses React Router (no hard reload)
+    navigate(path);
   };
 
   const showUpgradeModalHandler = () => {
