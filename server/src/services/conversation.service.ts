@@ -2,8 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { prisma } from '../lib/prisma.js';
-import pkg from '@prisma/client';
-const { Prisma } = pkg;
+import { Prisma } from '@prisma/client';
 import { ApiError } from '../utils/errors.js';
 import { redisClient } from '../lib/redis.js';
 import { rotateAndDistributeSessionKeys } from '../utils/sessionKeys.js';
