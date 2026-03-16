@@ -2,12 +2,20 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
-import { api, authFetch } from "@lib/api";
-import { useMessageStore, decryptMessageObject } from "./message";
+import { authFetch } from "@lib/api";
+import { useMessageStore } from "./message";
+import { decryptMessageObject } from "@services/messageDecryption.service";
 import { getSocket, emitSessionKeyRequest, fireGhostSync } from "@lib/socket";
 import { useVerificationStore } from './verification';
 import { useAuthStore, User } from './auth';
-// Removed all crypto imports
+import {
+  searchUsersApi,
+  createConversationApi,
+  loadConversationsApi,
+  deleteConversationApi,
+  togglePinnedConversationApi,
+  markConversationAsReadApi,
+} from '@services/conversation.service';
 import toast from 'react-hot-toast';
 
 // --- Type Definitions ---
@@ -25,8 +33,8 @@ export type Message = {
   type?: 'USER' | 'SYSTEM';
   conversationId: string;
   senderId: string;
-  sender?: { 
-    id: string; 
+  sender?: {
+    id: string;
     encryptedProfile?: string | null;
     name?: string;
     username?: string;
@@ -42,9 +50,9 @@ export type Message = {
   sessionId?: string | null;
   ciphertext?: string | null;
   createdAt: string;
-  error?: boolean;
+  error?: boolean | string;
   preview?: string;
-  reactions?: { id: string; emoji: string; userId: string; isMessage?: boolean }[];
+  reactions?: { id: string; emoji: string; userId?: string; isMessage?: boolean }[];
   optimistic?: boolean;
   repliedTo?: Message;
   repliedToId?: string;
@@ -202,19 +210,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
 
   searchUsers: async (query) => {
     try {
-      if (!query.trim()) return [];
-
-      // Check if query is already a usernameHash (base64url format, exactly 43 chars)
-      // Argon2id with hashLength: 32 produces 32 bytes = 43 base64url chars (URLSAFE_NO_PADDING)
-      const trimmedQuery = query.trim();
-      const isAlreadyHash = /^[A-Za-z0-9_-]{43}$/.test(trimmedQuery);
-
-      const searchQuery = isAlreadyHash
-        ? trimmedQuery
-        : await import('@lib/crypto-worker-proxy').then(m => m.hashUsername(trimmedQuery));
-
-      const safeQuery = encodeURIComponent(searchQuery);
-      const users = await api<{ id: string; encryptedProfile?: string | null; isVerified?: boolean; publicKey?: string }[]>(`/api/users/search?q=${safeQuery}`);
+      const users = await searchUsersApi(query);
       return users;
     } catch (error) {
       console.error("Failed to search users", error);
@@ -250,8 +246,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     if (!shouldProceed) return;
 
     try {
-      const rawConversations = await api<Array<Record<string, unknown>>>("/api/conversations");
-      if (!Array.isArray(rawConversations)) throw new Error('Invalid data from server.');
+      const rawConversations = await loadConversationsApi();
 
       const conversations = await Promise.all(rawConversations.map(async c => {
         const participants = (c.participants as unknown[]).map((p: unknown) => {
@@ -337,16 +332,16 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     set(state => ({
       activeId: id,
       isSidebarOpen: false,
-      conversations: state.conversations.map(c => 
+      conversations: state.conversations.map(c =>
         c.id === id ? { ...c, unreadCount: 0 } : c
       ),
     }));
-    authFetch(`/api/conversations/${id}/read`, { method: 'POST' }).catch(console.error);
+    markConversationAsReadApi(id).catch(console.error);
   },
 
   deleteConversation: async (id) => {
     try {
-      await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      await deleteConversationApi(id, false);
       get().removeConversation(id);
     } catch (error: unknown) {
       console.error("Failed to delete conversation:", error);
@@ -356,11 +351,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   },
   deleteGroup: async (id) => {
     try {
-      await authFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      await deleteConversationApi(id, true);
       get().removeConversation(id);
     } catch (error: unknown) {
       console.error("Failed to delete group:", error);
-      // Check if error is an ApiError with status property
       if ((error as { status?: number }).status === 403) {
         toast.error("Only the group creator can delete the group.");
       } else {
@@ -378,37 +372,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     }
 
     try {
-      // STATELESS INITIALIZATION (Pure Lazy Init)
-      // No crypto here. Just create room container.
-      
-      const conv = await authFetch<Conversation>("/api/conversations", {
-        method: "POST",
-        body: JSON.stringify({
-          userIds: [peerId],
-          isGroup: false,
-          // [FIX] Don't send dummy session. Let sendMessage create real X3DH session later.
-          initialSession: null, 
-        }),
-      });
-      
-      // Inject Optimistic Profile (Blind Indexing Search Result)
-      if (optimisticProfile) {
-          const knownUsers = get().conversations.flatMap(c => c.participants);
-          
-          conv.participants = conv.participants.map(p => {
-              if (p.id === peerId) {
-                  // Guard: Check if we already know this user's real name from another conversation
-                  const existing = knownUsers.find(u => u.id === peerId);
-                  if (existing?.name && existing.name !== 'Unknown') {
-                      return p; // Keep the real profile data we already have
-                  }
-                  
-                  // Merge optimistic data. Server might return null/unknown initially if not friends.
-                  return { ...p, ...optimisticProfile }; 
-              }
-              return p;
-          });
-      }
+      const conv = await createConversationApi(peerId, optimisticProfile);
 
       getSocket().emit("conversation:join", conv.id);
       get().addOrUpdateConversation(conv);
@@ -587,9 +551,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       });
 
       // Call the API to update the server
-      const response = await authFetch<{ isPinned: boolean }>(`/api/conversations/${conversationId}/pin`, {
-        method: 'POST',
-      });
+      const response = await togglePinnedConversationApi(conversationId, true);
 
       // Update the UI based on the server response
       set(state => {
@@ -609,7 +571,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       });
     } catch (error: unknown) {
       console.error("Failed to toggle pinned conversation", error);
-      // Show error toast
       const errorMessage = (error as Error).message || "Failed to toggle pinned conversation.";
       toast.error(errorMessage);
       // If the API call fails, revert the optimistic update

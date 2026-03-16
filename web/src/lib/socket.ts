@@ -6,15 +6,21 @@ import type { Socket } from "socket.io-client";
 import toast from "react-hot-toast";
 import { useAuthStore, User } from "@store/auth";
 import { useConversationStore, Conversation } from "@store/conversation";
-import { useMessageStore, decryptMessageObject } from "@store/message";
+import { useMessageStore } from "@store/message";
 import { useConnectionStore } from "@store/connection";
 import { usePresenceStore } from "@store/presence";
 import useNotificationStore from '@store/notification';
-import { fulfillKeyRequest, storeReceivedSessionKey, rotateGroupKey, fulfillGroupKeyRequest, schedulePeriodicGroupKeyRotation } from "@utils/crypto";
 import { useKeychainStore } from "@store/keychain";
 import type { Message, Participant } from "@store/conversation";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
 import { triggerReceiveFeedback } from "@utils/feedback";
+import {
+  fulfillKeyRequest,
+  storeReceivedSessionKey,
+  rotateGroupKey,
+  fulfillGroupKeyRequest,
+  schedulePeriodicGroupKeyRotation
+} from "@services/sessionKey.service";
 
 // FIX: Gunakan VITE_WS_URL (Koyeb) jika ada, kalau tidak ada (dev) baru pakai API_URL
 const WS_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;

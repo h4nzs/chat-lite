@@ -2,7 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
-import { authFetch, api, apiUpload } from "@lib/api";
+import { authFetch } from "@lib/api";
 import { disconnectSocket, connectSocket } from "@lib/socket";
 import { clearAuthCookies } from "@lib/tokenStorage";
 import { useModalStore } from "./modal";
@@ -10,8 +10,23 @@ import { useConversationStore } from "./conversation";
 import { useMessageStore } from "./message";
 import toast from "react-hot-toast";
 import { getEncryptedKeys, saveEncryptedKeys, clearKeys, hasStoredKeys, getDeviceAutoUnlockKey, saveDeviceAutoUnlockKey, setDeviceAutoUnlockReady, getDeviceAutoUnlockReady, nuclearWipe } from "@lib/keyStorage";
-import type { RetrievedKeys } from "@lib/crypto-worker-proxy"; 
-import { checkAndRefillOneTimePreKeys, resetOneTimePreKeys } from "@utils/crypto"; 
+import type { RetrievedKeys } from "@lib/crypto-worker-proxy";
+import { checkAndRefillOneTimePreKeys, resetOneTimePreKeys } from "@utils/crypto";
+import {
+  loginApi,
+  registerApi,
+  logoutApi,
+  logoutAllSessionsApi,
+  refreshTokenApi,
+  getCurrentUserApi,
+  updateProfileApi,
+  uploadAvatarApi,
+  blockUserApi,
+  unblockUserApi,
+  getBlockedUsersApi,
+  uploadPreKeyBundleApi,
+  resetOneTimePreKeysApi,
+} from '@services/auth.service';
 
 /**
  * Retrieves the persisted signed pre-key, signs it with the identity signing key,
@@ -42,10 +57,7 @@ export async function setupAndUploadPreKeyBundle() {
         signature: sodium.to_base64(signature, sodium.base64_variants.URLSAFE_NO_PADDING),
       },
     };
-    await authFetch("/api/keys/prekey-bundle", {
-      method: "POST",
-      body: JSON.stringify(bundle),
-    });
+    await uploadPreKeyBundleApi(bundle);
 
     await checkAndRefillOneTimePreKeys();
 
@@ -64,6 +76,7 @@ export type User = {
   name?: string;     // Optimistic/Injected Name
   username?: string; // Optimistic/Injected Username
   autoDestructDays?: number | null;
+  avatarUrl?: string | null;
 };
 
 type State = {
@@ -232,11 +245,11 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
       set({ isBootstrapping: true });
       try {
-        const refreshRes = await api<{ ok: boolean; accessToken?: string }>("/api/auth/refresh", { method: "POST" });
+        const refreshRes = await refreshTokenApi();
         if (refreshRes.accessToken) {
           set({ accessToken: refreshRes.accessToken });
 
-          const me = await authFetch<User>("/api/users/me");
+          const me = await getCurrentUserApi();
           set({ user: me, hasRestoredKeys: await hasStoredKeys() });
           localStorage.setItem("user", JSON.stringify(me));
 
@@ -262,10 +275,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
       set({ isInitializingCrypto: true });
 
       try {
-        const res = await api<{ user: User; accessToken: string; encryptedPrivateKey?: string }>("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify({ usernameHash, password }),
-        });
+        const res = await loginApi(usernameHash, password);
 
         if (res.encryptedPrivateKey) {
           await saveEncryptedKeys(res.encryptedPrivateKey);
@@ -330,17 +340,14 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         } = await registerAndGenerateKeys(password);
 
         // API Call First
-        const res = await api<{ accessToken: string; user: User }>("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify({
-            usernameHash,
-            password,
-            encryptedProfile,
-            publicKey: encryptionPublicKeyB64,
-            signingKey: signingPublicKeyB64,
-            encryptedPrivateKeys,
-            turnstileToken
-          }),
+        const res = await registerApi({
+          usernameHash,
+          password,
+          encryptedProfile,
+          publicKey: encryptionPublicKeyB64,
+          signingKey: signingPublicKeyB64,
+          encryptedPrivateKeys,
+          turnstileToken
         });
 
         // Only persist local vault state if the server registration succeeds
@@ -374,13 +381,12 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
            const subscription = await registration.pushManager.getSubscription();
            if (subscription) {
              const endpoint = subscription.endpoint;
-             await api("/api/auth/logout", { method: "POST", body: JSON.stringify({ endpoint }) }).catch(() => {});
-             await subscription.unsubscribe();
+             await logoutApi(endpoint);
            } else {
-             await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+             await logoutApi();
            }
         } else {
-           await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+           await logoutApi();
         }
       } catch (e) { console.error("Logout error", e); } finally {
         clearAuthCookies();
@@ -397,16 +403,16 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     emergencyLogout: async () => {
       try {
         // 1. Tell server to kill ALL sessions
-        await api("/api/auth/logout-all", { method: "POST" }).catch((e) => console.error("Server kill failed:", e));
-        
+        await logoutAllSessionsApi().catch((e) => console.error("Server kill failed:", e));
+
         // 2. Unsubscribe Push (Optional, best effort)
         if ('serviceWorker' in navigator && 'PushManager' in window) {
            const registration = await navigator.serviceWorker.ready;
            const subscription = await registration.pushManager.getSubscription();
            if (subscription) await subscription.unsubscribe();
         }
-      } catch (e) { 
-        console.error("Emergency logout error", e); 
+      } catch (e) {
+        console.error("Emergency logout error", e);
       } finally {
         // 3. NUCLEAR WIPE LOCAL
         clearAuthCookies();
@@ -425,10 +431,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
     updateProfile: async (data) => {
       // Data is expected to be { encryptedProfile: string } now
-      const updatedUser = await authFetch<User>('/api/users/me', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
+      const updatedUser = await updateProfileApi(data);
       set(state => {
         const newUser = { ...state.user!, ...updatedUser };
         localStorage.setItem("user", JSON.stringify(newUser));
@@ -440,25 +443,10 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     updateAvatar: async (avatar: File) => {
       // Avatar upload is tricky because it needs to update the encrypted profile.
       // For now, just upload the file and return. The UI needs to handle updating the profile JSON.
-      const toastId = toast.loading('Processing avatar...');
-      const { compressImage } = await import('@lib/fileUtils');
-      const { uploadToR2 } = await import('@lib/r2');
-      let fileToProcess = avatar;
-      if (avatar.type.startsWith('image/')) {
-        try { fileToProcess = await compressImage(avatar); } catch (e) {}
-      }
-      try {
-        toast.loading('Uploading to Cloud...', { id: toastId });
-        const fileUrl = await uploadToR2(fileToProcess, 'avatars', () => {});
-        toast.success('Avatar uploaded! (Profile update required)', { id: toastId });
-        // NOTE: We do not call API to save avatarUrl directly anymore.
-        // The caller must update their local profile JSON and call updateProfile.
-        return fileUrl as string; // Returning the URL so caller can use it
-      } catch (e: unknown) {
-        console.error(e);
-        toast.error(`Update failed: ${(e as Error).message}`, { id: toastId });
-        throw e;
-      }
+      const fileUrl = await uploadAvatarApi(avatar);
+      // NOTE: We do not call API to save avatarUrl directly anymore.
+      // The caller must update their local profile JSON and call updateProfile.
+      return fileUrl as string; // Returning the URL so caller can use it
     },
 
     async getMasterSeed() {
@@ -491,7 +479,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     blockUser: async (userId) => {
       const toastId = toast.loading('Blocking user...');
       try {
-        await authFetch(`/api/users/${userId}/block`, { method: 'POST' });
+        await blockUserApi(userId);
         toast.success('User blocked', { id: toastId });
         set(state => ({ blockedUserIds: [...state.blockedUserIds, userId] }));
       } catch (error: unknown) {
@@ -504,7 +492,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     unblockUser: async (userId) => {
       const toastId = toast.loading('Unblocking user...');
       try {
-        await authFetch(`/api/users/${userId}/block`, { method: 'DELETE' });
+        await unblockUserApi(userId);
         toast.success('User unblocked', { id: toastId });
         set(state => ({ blockedUserIds: state.blockedUserIds.filter(id => id !== userId) }));
       } catch (error: unknown) {
@@ -516,7 +504,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
     loadBlockedUsers: async () => {
       try {
-        const blockedUsers = await authFetch<{ id: string }[]>('/api/users/me/blocked');
+        const blockedUsers = await getBlockedUsersApi();
         const blockedIds = blockedUsers.map(user => user.id);
         set({ blockedUserIds: blockedIds });
       } catch (error) {
@@ -526,11 +514,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
     silentRefresh: async () => {
       try {
-        const { api } = await import('@lib/api');
-        const data = await api('/api/auth/refresh', {
-          method: 'POST',
-        });
-        
+        const data = await refreshTokenApi();
+
         if (data && data.accessToken) {
           set({ accessToken: data.accessToken });
           return true;

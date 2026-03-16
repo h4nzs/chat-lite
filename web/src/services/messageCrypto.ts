@@ -1,13 +1,16 @@
-import { 
-  encryptMessage, 
-  retrieveMessageKeySecurely, 
-  storeMessageKeySecurely,
-  retrieveLatestSessionKeySecurely, 
-  establishSessionFromPreKeyBundle, 
-  getMyEncryptionKeyPair, 
-  storeRatchetStateSecurely,
-  PreKeyBundle 
+import {
+  encryptMessage,
+  establishSessionFromPreKeyBundle,
+  getMyEncryptionKeyPair,
+  type PreKeyBundle
 } from "@utils/crypto";
+import {
+  retrieveMessageKeySecurely,
+  storeMessageKeySecurely,
+  retrieveLatestSessionKeySecurely,
+  storeRatchetStateSecurely,
+  retrieveRatchetStateSecurely
+} from "@lib/keyStorage";
 import { getSodium } from "@lib/sodiumInitializer";
 import { useAuthStore } from "@store/auth";
 
@@ -34,7 +37,6 @@ export async function prepareEncryptedPayload({
 
   // 1. Check Ratchet Session State (For 1-on-1)
   if (!isGroup && !isReactionPayload) {
-      const { retrieveRatchetStateSecurely } = await import('@utils/crypto');
       const existingState = await retrieveRatchetStateSecurely(conversationId);
 
       if (!existingState) {

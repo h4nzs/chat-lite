@@ -1,23 +1,30 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import { Router } from 'express'
-import { prisma } from '../lib/prisma.js'
-import { requireAuth } from '../middleware/auth.js'
-import { z } from 'zod'
-import { zodValidate } from '../utils/validate.js'
-import { ApiError } from '../utils/errors.js'
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { z } from 'zod';
+import { zodValidate } from '../utils/validate.js';
+import {
+  uploadPreKeyBundle,
+  uploadOTPKs,
+  countOTPKs,
+  clearOTPKs,
+  getPreKeyBundle,
+  getInitialSession,
+  generateTURNCredentials
+} from '../services/key.service.js';
 
-const router: Router = Router()
+const router: Router = Router();
 
-// === POST: Upload/update a user's pre-key bundle ===
+// ==================== UPLOAD Pre-Key Bundle ====================
 router.post(
   '/prekey-bundle',
   requireAuth,
   zodValidate({
     body: z.object({
       identityKey: z.string(),
-      signingKey: z.string().optional(), // New: Accept signingKey update
+      signingKey: z.string().optional(),
       signedPreKey: z.object({
         key: z.string(),
         signature: z.string()
@@ -26,60 +33,17 @@ router.post(
   }),
   async (req, res, next) => {
     try {
-      if (!req.user) throw new ApiError(401, 'Authentication required.')
-      const userId = req.user.id
-      const { identityKey, signedPreKey, signingKey } = req.body
-
-      // Prepare user update data
-      const userUpdateData: Record<string, string> = { publicKey: identityKey }
-      if (signingKey) {
-        userUpdateData.signingKey = signingKey
-      } else {
-        // If not provided in request, ensure the user already has one.
-        const currentUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { signingKey: true }
-        })
-        if (!currentUser?.signingKey) {
-          throw new ApiError(400, 'Signing key is required for initial bundle upload.')
-        }
-      }
-
-      // Use a transaction to ensure both operations succeed or fail together
-      await prisma.$transaction([
-        // [FIX] Purge old OTPKs on bundle update (New Identity/Session)
-        // This prevents "Identity Crisis" where new identity is mixed with old OTPKs.
-        prisma.oneTimePreKey.deleteMany({
-          where: { userId }
-        }),
-        prisma.preKeyBundle.upsert({
-          where: { userId },
-          update: {
-            identityKey,
-            key: signedPreKey.key,
-            signature: signedPreKey.signature
-          },
-          create: {
-            userId,
-            identityKey,
-            key: signedPreKey.key,
-            signature: signedPreKey.signature
-          }
-        }),
-        prisma.user.update({
-          where: { id: userId },
-          data: userUpdateData
-        })
-      ])
-
-      res.status(201).json({ message: 'Pre-key bundle updated successfully.' })
+      if (!req.user) throw new Error('Authentication required.');
+      
+      const result = await uploadPreKeyBundle(req.user.id, req.body);
+      res.status(201).json(result);
     } catch (e) {
-      next(e)
+      next(e);
     }
   }
-)
+);
 
-// === POST: Upload One-Time Pre-Keys (OTPK) ===
+// ==================== UPLOAD OTPKs ====================
 router.post(
   '/upload-otpk',
   requireAuth,
@@ -93,123 +57,56 @@ router.post(
   }),
   async (req, res, next) => {
     try {
-      if (!req.user) throw new ApiError(401, 'Authentication required.')
-      const userId = req.user.id
-      const { keys } = req.body
-
-      // Use createMany for efficiency
-      // Note: If keyId conflict exists (unique constraint), this might fail.
-      // We assume client manages keyIds correctly (e.g. rolling counter).
-      await prisma.oneTimePreKey.createMany({
-        data: keys.map(k => ({
-          userId,
-          keyId: k.keyId,
-          publicKey: k.publicKey
-        })),
-        skipDuplicates: true // Ignore duplicates if client retries
-      })
-
-      res.status(201).json({ message: `Uploaded ${keys.length} One-Time Pre-Keys.` })
+      if (!req.user) throw new Error('Authentication required.');
+      
+      const result = await uploadOTPKs(req.user.id, req.body.keys);
+      res.status(201).json(result);
     } catch (e) {
-      next(e)
+      next(e);
     }
   }
-)
+);
 
-// === GET: Count One-Time Pre-Keys ===
+// ==================== COUNT OTPKs ====================
 router.get('/count-otpk', requireAuth, async (req, res, next) => {
   try {
-    if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const count = await prisma.oneTimePreKey.count({
-      where: { userId: req.user.id }
-    })
-    res.json({ count })
+    if (!req.user) throw new Error('Authentication required.');
+    
+    const result = await countOTPKs(req.user.id);
+    res.json(result);
   } catch (e) {
-    next(e)
+    next(e);
   }
-})
+});
 
-// === DELETE: Clear all One-Time Pre-Keys ===
+// ==================== CLEAR OTPKs ====================
 router.delete('/otpk', requireAuth, async (req, res, next) => {
   try {
-    await prisma.oneTimePreKey.deleteMany({
-      where: { userId: req.user!.id }
-    })
-    res.status(204).send()
+    if (!req.user) throw new Error('Authentication required.');
+    
+    await clearOTPKs(req.user.id);
+    res.status(204).send();
   } catch (e) {
-    next(e)
+    next(e);
   }
-})
+});
 
-// === GET: Get a pre-key bundle for another user ===
+// ==================== GET Pre-Key Bundle ====================
 router.get(
   '/prekey-bundle/:userId',
   requireAuth,
   zodValidate({ params: z.object({ userId: z.string().cuid() }) }),
   async (req, res, next) => {
     try {
-      const { userId } = req.params
-
-      // 1. Fetch User and Bundle
-      const userWithBundle = await prisma.user.findUnique({
-        where: { id: userId as string },
-        select: {
-          id: true,
-          publicKey: true,
-          signingKey: true,
-          preKeyBundle: true
-        }
-      })
-
-      if (!userWithBundle?.preKeyBundle || !userWithBundle.signingKey) {
-        throw new ApiError(404, 'User does not have a valid pre-key bundle available.')
-      }
-
-      // 2. Atomic Pop: Fetch ONE OTPK and Delete it
-      // Prisma doesn't support "DELETE RETURNING" directly in standard API easily for this logic without raw query or transaction.
-      // We use a transaction: Find First -> Delete ID.
-
-      const otpk = await prisma.$transaction(async (tx) => {
-        const key = await tx.oneTimePreKey.findFirst({
-          where: { userId: userId as string },
-          orderBy: { createdAt: 'asc' }, // Use oldest first
-          select: { id: true, keyId: true, publicKey: true }
-        })
-
-        if (key) {
-          await tx.oneTimePreKey.delete({ where: { id: key.id } })
-        }
-        return key
-      })
-
-      const { preKeyBundle, signingKey } = userWithBundle
-
-      // Assemble the response bundle
-      const responseBundle: Record<string, unknown> = {
-        identityKey: preKeyBundle.identityKey,
-        signedPreKey: {
-          key: preKeyBundle.key,
-          signature: preKeyBundle.signature
-        },
-        signingKey // Include the public signing key for verification
-      }
-
-      // 3. Attach One-Time Pre-Key if available
-      if (otpk) {
-        responseBundle.oneTimePreKey = {
-          keyId: otpk.keyId,
-          key: otpk.publicKey
-        }
-      }
-
-      res.json(responseBundle)
+      const result = await getPreKeyBundle(req.params.userId as string);
+      res.json(result);
     } catch (e: unknown) {
-      next(e as Error)
+      next(e as Error);
     }
   }
-)
+);
 
-// === GET: Get an initial session key record for a recipient ===
+// ==================== GET Initial Session ====================
 router.get(
   '/initial-session/:conversationId/:sessionId',
   requireAuth,
@@ -221,78 +118,29 @@ router.get(
   }),
   async (req, res, next) => {
     try {
-      if (!req.user) throw new ApiError(401, 'Authentication required.')
-      const { conversationId, sessionId } = req.params
-      const userId = req.user.id
-
-      const keyRecord = await prisma.sessionKey.findFirst({
-        where: {
-          conversationId: conversationId as string,
-          sessionId: sessionId as string,
-          userId: userId as string
-        }
-      })
-
-      if (!keyRecord || !keyRecord.initiatorEphemeralKey) {
-        return res.status(404).json({ error: 'Initial session data not found for this user.' })
-      }
-
-      // Find the initiator to get their public identity key
-      const initiatorRecord = await prisma.sessionKey.findFirst({
-        where: {
-          conversationId: conversationId as string,
-          sessionId: sessionId as string,
-          isInitiator: true
-        },
-        include: { user: { select: { id: true, publicKey: true } } }
-      })
-
-      if (!(initiatorRecord as { user?: { publicKey?: string } })?.user?.publicKey) {
-        return res.status(404).json({ error: "Initiator's public key could not be found for this session." })
-      }
-
-      res.json({
-        encryptedKey: keyRecord.encryptedKey,
-        initiatorEphemeralKey: keyRecord.initiatorEphemeralKey,
-        initiatorIdentityKey: (initiatorRecord as { user: { publicKey: string } }).user.publicKey
-      })
+      if (!req.user) throw new Error('Authentication required.');
+      
+      const result = await getInitialSession({
+        userId: req.user.id,
+        conversationId: req.params.conversationId as string,
+        sessionId: req.params.sessionId as string
+      });
+      res.json(result);
     } catch (e) {
-      next(e as Error)
+      next(e as Error);
     }
   }
-)
+);
 
+// ==================== GET TURN Credentials ====================
 router.get('/turn', requireAuth, async (req, res) => {
   try {
-    const { env } = await import('../config.js');
-    if (!env.cfAccountId || !env.cfTurnKeyId || !env.cfTurnApiToken) {
-      return res.json({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }); // Fallback
-    }
-
-    const url = `https://rtc.live.cloudflare.com/v1/turn/keys/${env.cfTurnKeyId}/credentials/generate-ice-servers`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.cfTurnApiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ttl: 86400 }) // 24 hours validity
-    });
-
-    const data: Record<string, unknown> = await response.json();
-
-    if (data.iceServers) {
-      const payload = { 
-          iceServers: data.iceServers
-      };
-      return res.json(payload);
-    }
-
-    return res.json({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const result = await generateTURNCredentials();
+    res.json(result);
   } catch (error) {
     console.error('[TURN] Failed to fetch credentials:', error);
-    return res.json({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    res.json({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   }
 });
 
-export default router
+export default router;

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import express, { Express, Request, Response, NextFunction } from "express";
+import express, { Express, Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import logger from "morgan";
 import cors from "cors";
@@ -13,21 +13,11 @@ import { env } from "./config.js";
 import path from "path";
 import crypto from "crypto";
 
-import authRouter from "./routes/auth.js";
-import usersRouter from "./routes/users.js";
-import conversationsRouter from "./routes/conversations.js";
-import messagesRouter from "./routes/messages.js";
-import uploadsRouter from "./routes/uploads.js";
 import keysRouter from "./routes/keys.js";
-import previewsRouter from "./routes/previews.js";
-import sessionKeysRouter from "./routes/sessionKeys.js";
-import sessionsRouter from "./routes/sessions.js";
-import aiRoutes from "./routes/ai.js";
-import adminRouter from "./routes/admin.js";
-import storiesRoutes from "./routes/stories.js";
 import webpush from "web-push";
 import { generalLimiter } from "./middleware/rateLimiter.js";
-import { reportRoutes } from "./routes/reports.js";
+import routes from "./routes/index.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 // Set VAPID keys for web-push notifications
 if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -54,7 +44,7 @@ if (env.appUrl) {
   try {
     const url = new URL(env.appUrl);
     wsOrigin = `${url.protocol === 'https:' ? 'wss' : 'ws'}://${url.host}`;
-  } catch (e) {
+  } catch {
     console.error("Invalid APP_URL provided for CSP:", env.appUrl);
   }
 }
@@ -154,7 +144,7 @@ const isAllowedOrigin = (origin: string): boolean => {
     if (allowedOrigin.includes('*')) {
       // Securely escape the domain string first, then replace the escaped wildcard
       const escapedOrigin = escapeRegExp(allowedOrigin);
-      const pattern = escapedOrigin.replace(/\\\*/g, '.*'); 
+      const pattern = escapedOrigin.replace(/\\\*/g, '.*');
       const regex = new RegExp('^' + pattern + '$');
       return regex.test(origin);
     }
@@ -214,7 +204,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes publik (Keys & Sessions untuk E2EE)
+// Routes publik (Keys & Sessions untuk E2EE) - Registered at root level
 app.use("/api/keys", keysRouter);
 
 app.post("/api/admin/cleanup", async (req, res) => {
@@ -243,11 +233,11 @@ const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   cookieOptions: {
     httpOnly: true,
     // PENTING: Gunakan 'none' agar cookie dikirim cross-site/subdomain
-    sameSite: "none", 
+    sameSite: "none",
     secure: true, // Wajib true jika sameSite=none
     path: "/",
     // Domain cookie agar bisa dibaca oleh frontend dan backend
-    domain: isProd ? ".nyx-app.my.id" : undefined, 
+    domain: isProd ? ".nyx-app.my.id" : undefined,
   },
   size: 64,
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
@@ -263,15 +253,15 @@ app.get("/api/csrf-token", (req: Request, res: Response) => {
 
 // === STATIC FILES (UPLOAD) ===
 const uploadsPath = path.resolve(process.cwd(), env.uploadDir);
-app.use("/uploads", 
-  corsMiddleware, 
+app.use("/uploads",
+  corsMiddleware,
   (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
   express.static(uploadsPath, {
-    index: false, 
+    index: false,
     setHeaders: (res, filePath) => {
       const mimeType = mime.getType(filePath);
       if (mimeType && !mimeType.startsWith('image/') && !mimeType.startsWith('video/') && !mimeType.startsWith('audio/')) {
@@ -290,39 +280,10 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
-// === ROUTES ===
-app.use("/api/auth", authRouter);
-app.use("/api/users", usersRouter);
-app.use("/api/conversations", conversationsRouter);
-app.use("/api/messages", messagesRouter);
-app.use("/api/uploads", uploadsRouter);
-app.use("/api/previews", previewsRouter);
-app.use("/api/session-keys", sessionKeysRouter);
-app.use("/api/reports", reportRoutes);
-app.use("/api/admin", adminRouter);
-app.use("/api/sessions", sessionsRouter);
-app.use("/api/ai", aiRoutes);
-app.use("/api/stories", storiesRoutes);
+// === CENTRAL ROUTES ===
+app.use("/api", routes);
 
-// === HEALTH CHECK ===
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok bang" });
-});
-
-// === ERROR HANDLING ===
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  if ((err as { code?: string }).code === 'EBADCSRFTOKEN') {
-    return res.status(403).json({ error: 'Invalid CSRF token' });
-  }
-  if ((err as { type?: string })?.type === "entity.parse.failed") {
-    return res.status(400).json({ error: "Invalid JSON" });
-  }
-  if ((err as { status?: number })?.status && (err as { message?: string })?.message) {
-    return res.status((err as { status?: number }).status).json({ error: (err as { message?: string }).message });
-  }
-
-  console.error("❌ Server Error:", err);
-  res.status(500).json({ error: "Internal server error" });
-});
+// === GLOBAL ERROR HANDLER (Must be last) ===
+app.use(errorHandler);
 
 export default app;

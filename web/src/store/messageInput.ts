@@ -3,8 +3,9 @@
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, authFetch, handleApiError } from "@lib/api";
-import { encryptMessage, ensureGroupSession, encryptFile } from "@utils/crypto";
+import { encryptMessage, encryptFile } from "@utils/crypto";
 import { emitGroupKeyDistribution } from "@lib/socket";
+import { ensureGroupSession } from "@services/sessionKey.service";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./auth";
 import { useMessageStore } from "./message";
