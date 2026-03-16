@@ -185,15 +185,15 @@ export function processMessagesAndReactions(
         timestamp: new Date(msg.createdAt).getTime()
       });
     } else {
-      if (silentPayload) {
-        if (silentPayload.type === 'STORY_KEY') {
-          // Ignore this message in the UI completely
+      // Check if message was marked as silent during decryption
+      if (msg.isSilent || silentPayload) {
+        const silentType = silentPayload?.type || (msg as any).type;
+        if (silentType === 'STORY_KEY' || silentType === 'GHOST_SYNC' || silentType === 'CALL_INIT') {
+          // Ignore signaling messages completely
           continue;
         }
-        msg.content = silentPayload.text;
-        msg.isSilent = true;
-        // [FIX] Filter out signaling messages (like CALL_INIT) that have no text content
-        if (!msg.content) {
+        // For other silent messages, keep if they have visible content
+        if (!msg.content && msg.isSilent) {
           continue;
         }
       }
@@ -293,6 +293,68 @@ export async function decryptMessageObject(
 
     if (!contentToDecrypt || contentToDecrypt === 'waiting_for_key' || contentToDecrypt === '[Requesting key to decrypt...]') {
       return decryptedMsg;
+    }
+
+    // [FIX] PARSE PLAIN JSON PAYLOADS (File, Reply, Story Reply, etc.)
+    // These are already decrypted but need to be parsed into proper Message structure
+    if (contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
+      try {
+        const payload = JSON.parse(contentToDecrypt);
+        
+        // File Attachment
+        if (payload.type === 'file') {
+          decryptedMsg.fileUrl = payload.url;
+          decryptedMsg.fileKey = payload.key;
+          decryptedMsg.fileName = payload.name;
+          decryptedMsg.fileSize = payload.size;
+          decryptedMsg.fileType = payload.mimeType;
+          decryptedMsg.content = null;
+          decryptedMsg.isBlindAttachment = true;
+          return decryptedMsg;
+        }
+        
+        // Text Reply
+        if (payload.type === 'reply') {
+          decryptedMsg.content = payload.text;
+          decryptedMsg.repliedToId = payload.targetMessageId;
+          // Note: Full repliedTo object requires fetching the target message
+          return decryptedMsg;
+        }
+        
+        // Story Reply
+        if (payload.type === 'story_reply') {
+          decryptedMsg.content = payload.text;
+          decryptedMsg.repliedTo = {
+            id: 'story_mock',
+            senderId: payload.storyAuthorId,
+            sender: { id: payload.storyAuthorId },
+            content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
+          } as Message;
+          return decryptedMsg;
+        }
+        
+        // Reaction (should be intercepted by processMessagesAndReactions)
+        if (payload.type === 'reaction') {
+          // Keep as content, will be parsed by processMessagesAndReactions
+          return decryptedMsg;
+        }
+        
+        // Edit (should be intercepted by processMessagesAndReactions)
+        if (payload.type === 'edit') {
+          // Keep as content, will be parsed by processMessagesAndReactions
+          return decryptedMsg;
+        }
+        
+        // Silent messages (GHOST_SYNC, STORY_KEY, CALL_INIT, etc.)
+        if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+            payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
+          decryptedMsg.isSilent = true;
+          decryptedMsg.content = null; // Don't display
+          return decryptedMsg;
+        }
+      } catch {
+        // If JSON parsing fails, continue with normal flow
+      }
     }
 
     // [FIX] PREVENT RE-DECRYPTION LOOP
