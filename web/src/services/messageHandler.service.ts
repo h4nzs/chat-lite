@@ -143,6 +143,37 @@ export async function sendMessageLogic(
               status: 'SENT' as const
             };
 
+            // FIX: If this is a file message, we must restore the fileUrl/fileKey 
+            // from the JSON we just sent, otherwise the UI sees raw JSON.
+            if (updatedMsg.isBlindAttachment && updatedMsg.content) {
+                try {
+                    const metadata = JSON.parse(updatedMsg.content);
+                    if (metadata.type === 'file') {
+                        updatedMsg.fileUrl = metadata.url;
+                        updatedMsg.fileKey = metadata.key;
+                        updatedMsg.fileName = metadata.name;
+                        updatedMsg.fileType = metadata.mimeType;
+                        updatedMsg.fileSize = metadata.size;
+                        updatedMsg.content = null; // Hide raw JSON
+                    }
+                } catch (e) {
+                    console.error('Failed to parse own file message', e);
+                }
+            }
+
+            // FIX: Intercept EDIT payloads - do not return as a new message to the store
+            if (updatedMsg.content && updatedMsg.content.trim().startsWith('{')) {
+                try {
+                    const payload = JSON.parse(updatedMsg.content);
+                    if (payload.type === 'edit') {
+                        // It's an edit command. We don't want this added to the message list.
+                        // The store.sendEdit() already applied the optimistic update to the target message.
+                        resolve({ message: undefined }); // Resolve without a message object
+                        return;
+                    }
+                } catch {}
+            }
+
             if (mkToStore) {
               const { retrieveMessageKeySecurely, storeMessageKeySecurely, deleteMessageKeySecurely } = await import('@lib/keyStorage');
               const mk = await retrieveMessageKeySecurely(`temp_${actualTempId}`);
@@ -281,16 +312,14 @@ export async function handleIncomingMessage(message: Message): Promise<Message |
     const enriched = enrichMessagesWithSenderProfile(message.conversationId, [decrypted]);
     const processed = processMessagesAndReactions(enriched);
 
-    if (processed.length === 0) {
-      return null;
+    if (processed.length > 0) {
+        const finalMessage = processed[0];
+        // Save to shadow vault
+        await shadowVault.upsertMessages([finalMessage]);
+        return finalMessage;
     }
-
-    const finalMessage = processed[0];
-
-    // Save to shadow vault
-    await shadowVault.upsertMessages([finalMessage]);
-
-    return finalMessage;
+    
+    return null;
   } catch (error) {
     console.error('Handle incoming message error:', error);
     return null;

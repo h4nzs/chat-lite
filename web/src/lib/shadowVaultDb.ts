@@ -84,8 +84,8 @@ export class NyxShadowVault extends Dexie {
   }
 
   async upsertMessages(messages: Message[]) {
-    // Filter messages: Allow if it has content OR it is a tombstone
-    const validMessages = messages.filter(m => (m.content && m.content !== 'waiting_for_key' && !m.content.startsWith('[')) || m.isDeletedLocal);
+    // Filter messages: Allow if it has content OR it is a tombstone OR it is a blind attachment (file)
+    const validMessages = messages.filter(m => (m.content && m.content !== 'waiting_for_key' && !m.content.startsWith('[')) || m.isDeletedLocal || m.isBlindAttachment || m.fileUrl);
     if (validMessages.length === 0) return;
 
     try {

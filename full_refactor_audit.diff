@@ -11208,7 +11208,7 @@ index f4dcc361..21489aa0 100644
      throw error;
    }
 diff --git a/web/src/lib/shadowVaultDb.ts b/web/src/lib/shadowVaultDb.ts
-index d25bd7ca..4071b470 100644
+index d25bd7ca..6df197bd 100644
 --- a/web/src/lib/shadowVaultDb.ts
 +++ b/web/src/lib/shadowVaultDb.ts
 @@ -16,6 +16,15 @@ export interface DecryptedMessageRecord {
@@ -11336,7 +11336,7 @@ index d25bd7ca..4071b470 100644
  
          if (r.content && !r.isDeletedLocal) {
            plainText = await decryptVaultText(r.content);
-@@ -177,13 +227,96 @@ export class NyxShadowVault extends Dexie {
+@@ -177,13 +227,103 @@ export class NyxShadowVault extends Dexie {
          if (r.senderAvatarUrl) {
              decryptedSenderAvatarUrl = await decryptVaultText(r.senderAvatarUrl) || undefined;
          }
@@ -11363,7 +11363,14 @@ index d25bd7ca..4071b470 100644
 +        let repliedToObj = decryptedRepliedTo;
 +        let isSilent = false;
 +
-+        if (plainText && plainText.trim().startsWith('{')) {
++        // Check if this is a file message stored with metadata (content=null but fileUrl exists)
++        // OR if it's stored as JSON payload in content
++        if (decryptedFileUrl && decryptedFileKey) {
++          // File message stored with metadata fields
++          isBlindAttachment = true;
++          parsedContent = null;
++        } else if (plainText && plainText.trim().startsWith('{')) {
++          // File message stored as JSON payload in content
 +          try {
 +            const payload = JSON.parse(plainText);
 +
@@ -11435,7 +11442,7 @@ index d25bd7ca..4071b470 100644
            createdAt: r.createdAt as string,
            senderId: r.senderId,
            sender: {
-@@ -191,9 +324,18 @@ export class NyxShadowVault extends Dexie {
+@@ -191,9 +331,18 @@ export class NyxShadowVault extends Dexie {
                name: decryptedSenderName,
                username: decryptedSenderUsername,
                avatarUrl: decryptedSenderAvatarUrl
@@ -11456,7 +11463,7 @@ index d25bd7ca..4071b470 100644
          });
        }
        return messages;
-@@ -249,7 +391,7 @@ export class NyxShadowVault extends Dexie {
+@@ -249,7 +398,7 @@ export class NyxShadowVault extends Dexie {
              name: decryptedSenderName,
              username: decryptedSenderUsername,
              avatarUrl: decryptedSenderAvatarUrl

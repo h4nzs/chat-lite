@@ -259,7 +259,8 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
           content: JSON.stringify(metadata),
           repliedTo: replyingTo || undefined,
           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined,
-          isViewOnce
+          isViewOnce,
+          isBlindAttachment: true // FIX: Mark explicitly for parser
       }, tempId);
       
       updateActivity(activityId, { progress: 100, fileName: 'Done!' });
@@ -373,7 +374,8 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
           content: JSON.stringify(metadata),
           repliedTo: replyingTo || undefined,
           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined,
-          isViewOnce
+          isViewOnce,
+          isBlindAttachment: true // FIX: Mark explicitly for parser
       }, tempId);
       
       updateActivity(activityId, { progress: 100, fileName: 'Sent!' });
