@@ -143,35 +143,30 @@ export async function sendMessageLogic(
               status: 'SENT' as const
             };
 
-            // FIX: If this is a file message, we must restore the fileUrl/fileKey 
-            // from the JSON we just sent, otherwise the UI sees raw JSON.
-            if (updatedMsg.isBlindAttachment && updatedMsg.content) {
-                try {
-                    const metadata = JSON.parse(updatedMsg.content);
-                    if (metadata.type === 'file') {
-                        updatedMsg.fileUrl = metadata.url;
-                        updatedMsg.fileKey = metadata.key;
-                        updatedMsg.fileName = metadata.name;
-                        updatedMsg.fileType = metadata.mimeType;
-                        updatedMsg.fileSize = metadata.size;
-                        updatedMsg.content = null; // Hide raw JSON
-                    }
-                } catch (e) {
-                    console.error('Failed to parse own file message', e);
-                }
+            // FIX: If this is a file message or silent payload, intercept it
+            let rawContent = updatedMsg.content || '';
+            if (rawContent.startsWith('STORY_KEY:')) {
+                rawContent = rawContent.replace('STORY_KEY:', '');
             }
 
-            // FIX: Intercept EDIT payloads - do not return as a new message to the store
-            if (updatedMsg.content && updatedMsg.content.trim().startsWith('{')) {
+            if (rawContent.trim().startsWith('{')) {
                 try {
-                    const payload = JSON.parse(updatedMsg.content);
-                    if (payload.type === 'edit') {
-                        // It's an edit command. We don't want this added to the message list.
-                        // The store.sendEdit() already applied the optimistic update to the target message.
-                        resolve({ message: undefined }); // Resolve without a message object
+                    const payload = JSON.parse(rawContent);
+                    if (payload.type === 'file') {
+                        updatedMsg.fileUrl = payload.url;
+                        updatedMsg.fileKey = payload.key;
+                        updatedMsg.fileName = payload.name;
+                        updatedMsg.fileType = payload.mimeType;
+                        updatedMsg.fileSize = payload.size;
+                        updatedMsg.content = null; // Hide raw JSON
+                    } else if (['edit', 'reaction', 'silent', 'GHOST_SYNC', 'STORY_KEY', 'CALL_INIT'].includes(payload.type)) {
+                        // CRITICAL FIX: Do not return silent/system messages to be rendered in UI!
+                        resolve({ message: undefined }); 
                         return;
                     }
-                } catch {}
+                } catch (e) {
+                    console.error('Failed to parse own message', e);
+                }
             }
 
             if (mkToStore) {
@@ -302,9 +297,31 @@ export async function handleIncomingMessage(message: Message): Promise<Message |
     
     // If it's a silent/system message (GHOST_SYNC, STORY_KEY, CALL_INIT), ignore it
     if (silentPayload) {
+      if (silentPayload.type === 'CALL_INIT') {
+        // CRITICAL FIX: Trigger the call overlay before hiding the message!
+        import('@store/callStore').then(({ useCallStore }) => {
+           const callStore = useCallStore.getState();
+           
+           // Extract call data from payload
+           const from = decrypted.senderId;
+           const isVideo = silentPayload.video || false;
+           const key = silentPayload.key;
+           
+           // Get sender profile for the incoming call UI
+           const senderProfile = decrypted.sender || { id: from, name: 'Unknown' };
+           
+           // Trigger incoming call UI
+           if (callStore.setIncomingCall) {
+               callStore.setIncomingCall(from, isVideo, senderProfile, key);
+           }
+        }).catch(console.error);
+        
+        return null; // Keep it invisible from the chat UI
+      }
+
       if (silentPayload.type === 'GHOST_SYNC' || 
           silentPayload.type === 'STORY_KEY' || 
-          (silentPayload.type === 'CALL_INIT' && !silentPayload.text)) {
+          silentPayload.type === 'silent') {
         return null; // Completely invisible
       }
     }

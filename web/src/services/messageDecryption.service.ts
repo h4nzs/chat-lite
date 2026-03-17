@@ -147,7 +147,7 @@ export function parseEdit(content: string | null | undefined): { targetMessageId
 /**
  * Parse silent payload from message content
  */
-export function parseSilent(content: string | null | undefined): { text?: string; type?: string; key?: string } | null {
+export function parseSilent(content: string | null | undefined): { text?: string; type?: string; key?: string; video?: boolean } | null {
   if (!content) return null;
   try {
     let trimmed = content.trim();
@@ -480,15 +480,59 @@ export async function decryptMessageObject(
               plainText = JSON.stringify(parsed);
             }
           }
-        } catch { /* Ignore */ }
+        } catch {
+          // Ignore parse errors
+        }
       }
 
       // CRITICAL FIX: Always update content with plaintext
       decryptedMsg.content = plainText;
 
-      // Apply JSON Parsers
-      if (!options.skipJsonParsing) {
-        parseJsonMessageContent(decryptedMsg);
+      // --- NEW UNIFIED JSON PARSER FOR DECRYPTED CONTENT ---
+      let rawContent = plainText.trim();
+      if (rawContent.startsWith('STORY_KEY:')) {
+          rawContent = rawContent.replace('STORY_KEY:', '');
+      }
+
+      if (rawContent.startsWith('{')) {
+        try {
+          const payload = JSON.parse(rawContent);
+          
+          if (payload.type === 'file') {
+            decryptedMsg.fileUrl = payload.url;
+            decryptedMsg.fileKey = payload.key;
+            decryptedMsg.fileName = payload.name;
+            decryptedMsg.fileSize = payload.size;
+            decryptedMsg.fileType = payload.mimeType;
+            decryptedMsg.content = null;
+            decryptedMsg.isBlindAttachment = true;
+          } else if (payload.type === 'reply') {
+            decryptedMsg.content = payload.text;
+            decryptedMsg.repliedToId = payload.targetMessageId;
+          } else if (payload.type === 'story_reply') {
+            decryptedMsg.content = payload.text;
+            decryptedMsg.repliedTo = {
+              id: 'story_mock',
+              senderId: payload.storyAuthorId,
+              sender: { id: payload.storyAuthorId },
+              content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
+            } as Message;
+          } else if (payload.type === 'STORY_KEY') {
+            decryptedMsg.isSilent = true;
+            decryptedMsg.content = null;
+            // CRITICAL: ACTUALLY SAVE THE STORY KEY SO RECIPIENTS CAN VIEW IT
+            if (payload.key && decryptedMsg.senderId) {
+               import('@lib/shadowVaultDb').then(({ saveStoryKey }) => {
+                   saveStoryKey(decryptedMsg.senderId, payload.key).catch(console.error);
+               });
+            }
+          } else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || payload.type === 'CALL_INIT') {
+            decryptedMsg.isSilent = true;
+            decryptedMsg.content = null;
+          }
+        } catch {
+          // Ignore parse errors
+        }
       }
     } else if (result?.status === 'pending') {
       decryptedMsg.content = result.reason || 'waiting_for_key';
