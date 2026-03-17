@@ -395,6 +395,19 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         const processedMessage = await handleIncomingMessage(message);
         if (!processedMessage) return null;
 
+        // Double-check: Don't add edit/reaction messages to the message list
+        // They should be intercepted by handleIncomingMessage, but this is a safety check
+        const contentStr = typeof processedMessage.content === 'string' ? processedMessage.content : '';
+        if (contentStr.trim().startsWith('{')) {
+          try {
+            const payload = JSON.parse(contentStr);
+            if (payload.type === 'edit' || payload.type === 'reaction') {
+              console.warn('[MessageStore] Blocked special payload from being added to message list:', payload.type);
+              return null;
+            }
+          } catch {}
+        }
+
         set((state) => {
           const current = state.messages[conversationId] || [];
           if (current.some((m) => m.id === processedMessage!.id)) {
