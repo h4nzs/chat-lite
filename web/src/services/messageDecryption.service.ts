@@ -74,6 +74,40 @@ export function enrichMessagesWithSenderProfile(conversationId: string, messages
 }
 
 /**
+ * Parse JSON message content (File, Reply, Story Reply, Silent)
+ */
+export function parseJsonMessageContent(msg: Message) {
+  if (!msg.content || typeof msg.content !== 'string' || !msg.content.trim().startsWith('{')) return;
+  try {
+    const payload = JSON.parse(msg.content);
+    if (payload.type === 'file') {
+      msg.fileUrl = payload.url;
+      msg.fileKey = payload.key;
+      msg.fileName = payload.name;
+      msg.fileSize = payload.size;
+      msg.fileType = payload.mimeType;
+      msg.content = null;
+      msg.isBlindAttachment = true;
+    } else if (payload.type === 'reply') {
+      msg.content = payload.text;
+      msg.repliedToId = payload.targetMessageId;
+    } else if (payload.type === 'story_reply') {
+      msg.content = payload.text;
+      msg.repliedTo = {
+        id: 'story_mock',
+        senderId: payload.storyAuthorId,
+        sender: { id: payload.storyAuthorId },
+        content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
+      } as Message;
+    } else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+               payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
+      msg.isSilent = true;
+      msg.content = null;
+    }
+  } catch { /* Ignore parse errors */ }
+}
+
+/**
  * Parse reaction payload from message content
  */
 export function parseReaction(content: string | null | undefined): { targetMessageId: string; emoji: string } | null {
@@ -279,6 +313,12 @@ export async function decryptMessageObject(
     if (currentUser && decryptedMsg.senderId === currentUser.id) {
       const { decryptSelfMessage } = await import('@services/messageCrypto');
       const selfDecrypted = await decryptSelfMessage(decryptedMsg, seenIds, depth, options);
+
+      // Apply JSON parsing to self-decrypted messages
+      if (!options.skipJsonParsing && selfDecrypted) {
+        parseJsonMessageContent(selfDecrypted as Message);
+      }
+
       if (selfDecrypted && (selfDecrypted as Message).repliedTo) {
         (selfDecrypted as Message).repliedTo = await decryptMessageObject(
           (selfDecrypted as Message).repliedTo as Message,
@@ -293,8 +333,9 @@ export async function decryptMessageObject(
     // 2. Determine Payload to Decrypt
     let contentToDecrypt = decryptedMsg.ciphertext;
 
+    // CRITICAL FIX: Removed `decryptedMsg.fileKey || ` to prevent file keys from being mistakenly decrypted as messages
     if (!contentToDecrypt) {
-      contentToDecrypt = decryptedMsg.fileKey || decryptedMsg.content;
+      contentToDecrypt = decryptedMsg.content;
     }
 
     if (!contentToDecrypt || contentToDecrypt === 'waiting_for_key' || contentToDecrypt === '[Requesting key to decrypt...]') {
@@ -316,62 +357,9 @@ export async function decryptMessageObject(
     // Skip this if we're storing for vault (need raw JSON)
     // CRITICAL: Do NOT run this if it's a DR payload!
     if (!options.skipJsonParsing && !isDrPayload && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
-      try {
-        const payload = JSON.parse(contentToDecrypt);
-
-        // File Attachment
-        if (payload.type === 'file') {
-          decryptedMsg.fileUrl = payload.url;
-          decryptedMsg.fileKey = payload.key;
-          decryptedMsg.fileName = payload.name;
-          decryptedMsg.fileSize = payload.size;
-          decryptedMsg.fileType = payload.mimeType;
-          decryptedMsg.content = null;
-          decryptedMsg.isBlindAttachment = true;
-          return decryptedMsg;
-        }
-
-        // Text Reply
-        if (payload.type === 'reply') {
-          decryptedMsg.content = payload.text;
-          decryptedMsg.repliedToId = payload.targetMessageId;
-          // We don't have the full repliedTo object here, but ID allows lookup
-        }
-
-        // Story Reply
-        if (payload.type === 'story_reply') {
-          decryptedMsg.content = payload.text;
-          decryptedMsg.repliedTo = {
-            id: 'story_mock',
-            senderId: payload.storyAuthorId,
-            sender: { id: payload.storyAuthorId },
-            content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
-          } as Message;
-          return decryptedMsg;
-        }
-
-        // Reaction (should be intercepted by processMessagesAndReactions)
-        if (payload.type === 'reaction') {
-          // Keep as content, will be parsed by processMessagesAndReactions
-          return decryptedMsg;
-        }
-
-        // Edit (should be intercepted by processMessagesAndReactions)
-        if (payload.type === 'edit') {
-          // Keep as content, will be parsed by processMessagesAndReactions
-          return decryptedMsg;
-        }
-
-        // Silent messages (GHOST_SYNC, STORY_KEY, CALL_INIT, etc.)
-        if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' ||
-            payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
-          decryptedMsg.isSilent = true;
-          decryptedMsg.content = null; // Don't display
-          return decryptedMsg;
-        }
-      } catch {
-        // If JSON parsing fails, continue with normal flow
-      }
+      decryptedMsg.content = contentToDecrypt;
+      parseJsonMessageContent(decryptedMsg);
+      return decryptedMsg;
     }
 
     // [FIX] PREVENT RE-DECRYPTION LOOP
@@ -492,62 +480,15 @@ export async function decryptMessageObject(
               plainText = JSON.stringify(parsed);
             }
           }
-        } catch {
-          // Ignore parse errors
-        }
+        } catch { /* Ignore */ }
       }
 
       // CRITICAL FIX: Always update content with plaintext
       decryptedMsg.content = plainText;
 
-      // BLIND ATTACHMENT PARSING
-      if (plainText.startsWith('{') && plainText.includes('"type":"file"')) {
-        try {
-          const metadata = JSON.parse(plainText);
-          if (metadata.type === 'file') {
-            decryptedMsg.fileUrl = metadata.url;
-            decryptedMsg.fileKey = metadata.key;
-            decryptedMsg.fileName = metadata.name;
-            decryptedMsg.fileSize = metadata.size;
-            decryptedMsg.fileType = metadata.mimeType;
-            decryptedMsg.content = null;
-            decryptedMsg.isBlindAttachment = true;
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      }
-
-      // STANDARD REPLY PARSING
-      if (plainText.startsWith('{') && plainText.includes('"type":"reply"')) {
-        try {
-          const metadata = JSON.parse(plainText);
-          if (metadata.type === 'reply') {
-            decryptedMsg.content = metadata.text;
-            decryptedMsg.repliedToId = metadata.targetMessageId;
-            // We don't have the full repliedTo object here, but ID allows lookup
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      }
-
-      // STORY REPLY PARSING
-      if (plainText.startsWith('{') && plainText.includes('"type":"story_reply"')) {
-        try {
-          const metadata = JSON.parse(plainText);
-          if (metadata.type === 'story_reply') {
-            decryptedMsg.content = metadata.text;
-            decryptedMsg.repliedTo = {
-              id: 'story_mock',
-              senderId: metadata.storyAuthorId,
-              sender: { id: metadata.storyAuthorId },
-              content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story')
-            } as Message;
-          }
-        } catch {
-          // Ignore parse errors
-        }
+      // Apply JSON Parsers
+      if (!options.skipJsonParsing) {
+        parseJsonMessageContent(decryptedMsg);
       }
     } else if (result?.status === 'pending') {
       decryptedMsg.content = result.reason || 'waiting_for_key';

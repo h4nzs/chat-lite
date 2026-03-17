@@ -374,6 +374,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
   },
 
   addOptimisticMessage: (conversationId, message) => {
+    // RESTORED VAULT SAVE - Persist optimistic messages for offline access
+    shadowVault.upsertMessages([message]).catch(console.error);
+    
     set((state) => {
       const current = state.messages[conversationId] || [];
       return {
