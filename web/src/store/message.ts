@@ -272,16 +272,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     try {
       const cachedMessages = await shadowVault.getMessagesByConversation(id);
       if (cachedMessages && cachedMessages.length > 0) {
-        // [FIX] Run each message through decryptMessageObject() for JSON payload parsing
-        // This ensures file attachments, replies, story replies, and silent messages are properly parsed
-        const decryptedMessages: Message[] = [];
-        for (const msg of cachedMessages) {
-          const decrypted = await decryptMessageObject(msg);
-          decryptedMessages.push(decrypted);
-        }
-        
-        // Then enrich with sender profiles and process reactions/edits
-        const enriched = enrichMessagesWithSenderProfile(id, decryptedMessages);
+        // Vault already returns parsed messages (file/reply/story/silent parsed in getMessagesByConversation)
+        // Just enrich with sender profiles and process reactions/edits
+        const enriched = enrichMessagesWithSenderProfile(id, cachedMessages);
         const processed = processMessagesAndReactions(enriched);
 
         set((state) => ({

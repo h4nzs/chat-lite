@@ -225,12 +225,63 @@ export class NyxShadowVault extends Dexie {
             decryptedFileName = await decryptVaultText(r.fileName) || undefined;
         }
 
+        // [FIX] Parse JSON payloads from vault (File, Reply, Story Reply, Silent)
+        let parsedContent: string | null = plainText;
+        let parsedFileUrl = decryptedFileUrl;
+        let parsedFileKey = decryptedFileKey;
+        let parsedFileName = decryptedFileName;
+        let parsedFileSize = r.fileSize;
+        let parsedFileType = r.fileType;
+        let isBlindAttachment = false;
+        let repliedToObj = decryptedRepliedTo;
+        let isSilent = false;
+
+        if (plainText && plainText.trim().startsWith('{')) {
+          try {
+            const payload = JSON.parse(plainText);
+            
+            // File Attachment
+            if (payload.type === 'file') {
+              parsedContent = null;
+              parsedFileUrl = payload.url || decryptedFileUrl;
+              parsedFileKey = payload.key || decryptedFileKey;
+              parsedFileName = payload.name || decryptedFileName;
+              parsedFileSize = payload.size || r.fileSize;
+              parsedFileType = payload.mimeType || r.fileType;
+              isBlindAttachment = true;
+            }
+            // Text Reply
+            else if (payload.type === 'reply') {
+              parsedContent = payload.text;
+              // repliedToId would need to be stored separately if needed
+            }
+            // Story Reply
+            else if (payload.type === 'story_reply') {
+              parsedContent = payload.text;
+              repliedToObj = {
+                id: 'story_mock',
+                senderId: payload.storyAuthorId,
+                sender: { id: payload.storyAuthorId },
+                content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
+              };
+            }
+            // Silent messages
+            else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+                     payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
+              parsedContent = null;
+              isSilent = true;
+            }
+          } catch {
+            // Keep original plaintext if parse fails
+          }
+        }
+
         messages.push({
           id: r.id,
           conversationId: r.conversationId,
-          content: plainText,
+          content: parsedContent,
           repliedToId: r.repliedToId,
-          repliedTo: decryptedRepliedTo,
+          repliedTo: repliedToObj,
           createdAt: r.createdAt as string,
           senderId: r.senderId,
           sender: {
@@ -239,13 +290,15 @@ export class NyxShadowVault extends Dexie {
               username: decryptedSenderUsername,
               avatarUrl: decryptedSenderAvatarUrl
           } as unknown as { id: string; name?: string; username?: string; avatarUrl?: string | null },
-          fileUrl: decryptedFileUrl,
-          fileKey: decryptedFileKey,
-          fileName: decryptedFileName,
-          fileSize: r.fileSize,
-          fileType: r.fileType,
+          fileUrl: parsedFileUrl,
+          fileKey: parsedFileKey,
+          fileName: parsedFileName,
+          fileSize: parsedFileSize,
+          fileType: parsedFileType,
+          isBlindAttachment,
           isViewOnce: r.isViewOnce,
-          isDeletedLocal: r.isDeletedLocal
+          isDeletedLocal: r.isDeletedLocal,
+          isSilent
         });
       }
       return messages;
