@@ -21,6 +21,34 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
   const handleClose = () => {
     if (message.isViewOnce && !message.isViewed) {
       useMessageStore.getState().updateMessage(message.conversationId, message.id, { isViewed: true });
+      
+      // CRITICAL FIX: Save the "Opened" state to local IndexedDB so it persists on reload!
+      const { messages, updateMessage } = useMessageStore.getState();
+      const targetMsg = messages[message.conversationId]?.find(m => m.id === message.id);
+      
+      if (targetMsg) {
+        // Create a tombstone message (destroy keys)
+        const openedMsg = {
+          ...targetMsg,
+          fileUrl: undefined,
+          fileKey: undefined,
+          fileName: undefined,
+          fileType: undefined,
+          fileSize: undefined,
+          content: 'Opened',
+          isViewOnce: true,
+          isViewed: true
+        };
+        
+        // 1. Update UI State
+        updateMessage(message.conversationId, message.id, openedMsg);
+        
+        // 2. Save the destroyed state to local IndexedDB so it persists on reload!
+        import('@lib/shadowVaultDb').then(({ shadowVault }) => {
+          shadowVault.upsertMessages([openedMsg]).catch(console.error);
+        });
+      }
+      
       import('@lib/api').then(({ authFetch }) => {
         authFetch(`/api/messages/${message.id}/viewed`, { method: 'PUT' }).catch(console.error);
       });
