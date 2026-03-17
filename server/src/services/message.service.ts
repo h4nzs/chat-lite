@@ -369,3 +369,32 @@ export const markMessageAsRead = async (messageId: string, userId: string, conve
 
   return { success: true };
 };
+
+/**
+ * Delete View Once message (bypasses sender-only restriction)
+ * Used when recipient views a view-once message
+ */
+export const deleteViewOnceMessage = async (messageId: string, userId: string) => {
+  const message = await prisma.message.findUnique({
+    where: { id: messageId }
+  });
+
+  if (!message) throw new ApiError(404, 'Message not found');
+  if (!message.isViewOnce) throw new ApiError(400, 'Not a view once message');
+
+  const participant = await prisma.participant.findUnique({
+    where: { userId_conversationId: { userId, conversationId: message.conversationId } }
+  });
+
+  if (!participant) throw new ApiError(403, 'Not a participant');
+
+  await prisma.message.delete({ where: { id: messageId } });
+
+  const io = getIo();
+  io.to(message.conversationId).emit('message:deleted', {
+    id: messageId,
+    conversationId: message.conversationId
+  });
+
+  return { success: true };
+};

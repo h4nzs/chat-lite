@@ -13,7 +13,8 @@ import {
   deleteMessage,
   deleteMessages,
   updateMessage,
-  markMessageAsRead
+  markMessageAsRead,
+  deleteViewOnceMessage
 } from '../services/message.service.js';
 
 const router: Router = Router();
@@ -162,12 +163,7 @@ router.put('/:id/viewed', async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required.');
 
-    // We can reuse the existing deleteMessage service for view once messages,
-    // as viewing them effectively means they should be deleted from the database.
-    await deleteMessage({
-      messageId: req.params.id as string,
-      userId: req.user.id
-    });
+    await deleteViewOnceMessage(req.params.id as string, req.user.id);
 
     res.json({ success: true, message: 'View once message deleted' });
   } catch (error) {
