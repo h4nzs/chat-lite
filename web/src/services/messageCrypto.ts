@@ -212,25 +212,24 @@ export async function decryptSelfMessage(decryptedMsg: { id?: unknown; ciphertex
     if (mk) {
         let cipherTextToUse = decryptedMsg.ciphertext || decryptedMsg.content;
         
-        // Unwrap nested payloads (X3DH/DR)
         const unwrap = (str: string): string => {
              if (str && typeof str === 'string' && str.trim().startsWith('{')) {
                  try {
                      const p = JSON.parse(str) as Record<string, unknown>;
-                     // If it's a DR payload (has 'dr' header), extract the inner ciphertext
-                     if (p.dr && p.ciphertext) {
-                         return unwrap(p.ciphertext as string);
-                     }
-                     // If it's just a wrapper
-                     if (p.ciphertext) {
-                         return unwrap(p.ciphertext as string);
-                     }
+                     if (p.dr && p.ciphertext) return unwrap(p.ciphertext as string);
+                     if (p.ciphertext) return unwrap(p.ciphertext as string);
                  } catch { return str; }
              }
              return str;
         }
 
         cipherTextToUse = unwrap(cipherTextToUse as string || '');
+
+        // FIX: If it's ALREADY a JSON payload (optimistic storage), skip decryption!
+        if (typeof cipherTextToUse === 'string' && cipherTextToUse.trim().startsWith('{') && cipherTextToUse.includes('"type"')) {
+            decryptedMsg.content = cipherTextToUse;
+            return decryptedMsg;
+        }
 
         if (cipherTextToUse) {
             try {
@@ -240,7 +239,6 @@ export async function decryptSelfMessage(decryptedMsg: { id?: unknown; ciphertex
                 const decryptedBytes = await worker_crypto_secretbox_xchacha20poly1305_open_easy(encrypted, nonce, mk);
                 let plainText = sodium.to_string(decryptedBytes);
                 
-                // Strip profile key
                 if (plainText && plainText.trim().startsWith('{')) {
                     try {
                         const parsed = JSON.parse(plainText);
@@ -263,9 +261,11 @@ export async function decryptSelfMessage(decryptedMsg: { id?: unknown; ciphertex
         }
     }
     
-    // Fallback if MK is missing
+    // FIX: Fallback if MK is missing - Do NOT destroy JSON payloads
     if (decryptedMsg.content && typeof decryptedMsg.content === 'string' && decryptedMsg.content.trim().startsWith('{')) {
-         decryptedMsg.content = "You sent this message (Encrypted)";
+         if (!decryptedMsg.content.includes('"type"')) {
+             decryptedMsg.content = "You sent this message (Encrypted)";
+         }
     }
     return decryptedMsg;
 }
