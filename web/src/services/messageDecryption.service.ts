@@ -500,6 +500,20 @@ export async function decryptMessageObject(
         }
       }
 
+      // STANDARD REPLY PARSING
+      if (plainText.startsWith('{') && plainText.includes('"type":"reply"')) {
+        try {
+          const metadata = JSON.parse(plainText);
+          if (metadata.type === 'reply') {
+            decryptedMsg.content = metadata.text;
+            decryptedMsg.repliedToId = metadata.targetMessageId;
+            // We don't have the full repliedTo object here, but ID allows lookup
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
       // STORY REPLY PARSING
       if (plainText.startsWith('{') && plainText.includes('"type":"story_reply"')) {
         try {

@@ -217,7 +217,14 @@ export async function decryptSelfMessage(decryptedMsg: { id?: unknown; ciphertex
              if (str && typeof str === 'string' && str.trim().startsWith('{')) {
                  try {
                      const p = JSON.parse(str) as Record<string, unknown>;
-                     if (p.ciphertext) return unwrap(p.ciphertext as string);
+                     // If it's a DR payload (has 'dr' header), extract the inner ciphertext
+                     if (p.dr && p.ciphertext) {
+                         return unwrap(p.ciphertext as string);
+                     }
+                     // If it's just a wrapper
+                     if (p.ciphertext) {
+                         return unwrap(p.ciphertext as string);
+                     }
                  } catch { return str; }
              }
              return str;

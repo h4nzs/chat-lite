@@ -366,9 +366,10 @@ async function doDecryptMessage(
       let actualCipher = cipher;
 
       const unwrapCipher = (str: string): string => {
-        if (str.trim().startsWith('{')) {
+        if (str && typeof str === 'string' && str.trim().startsWith('{')) {
           try {
             const p = JSON.parse(str);
+            if (p.dr && p.ciphertext) return unwrapCipher(p.ciphertext);
             if (p.ciphertext) return unwrapCipher(p.ciphertext);
           } catch {}
         }
