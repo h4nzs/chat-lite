@@ -232,11 +232,17 @@ export function processMessagesAndReactions(
  * Check if content is likely encrypted
  */
 function isLikelyEncrypted(str: string): boolean {
+  if (!str) return false;
   const trimmed = str.trim();
+  
   // 1. Check for JSON payload containing encryption markers
-  if (trimmed.startsWith('{') && (trimmed.includes('"header"') || trimmed.includes('"ciphertext"') || trimmed.includes('"dr"'))) {
-    return true;
+  if (trimmed.startsWith('{')) {
+      // Robust check for DR/X3DH/Signal headers
+      if (trimmed.includes('"header"') || trimmed.includes('"ciphertext"') || trimmed.includes('"dr"') || trimmed.includes('"x3dh"')) {
+          return true;
+      }
   }
+  
   // 2. Check for legacy/base64 encoded ciphertexts
   const base64Regex = /^[A-Za-z0-9+/_-]+={0,2}$/;
   if (base64Regex.test(trimmed) && trimmed.length > 20) {
@@ -480,6 +486,7 @@ export async function decryptMessageObject(
         }
       }
 
+      // CRITICAL FIX: Always update content with plaintext
       decryptedMsg.content = plainText;
 
       // BLIND ATTACHMENT PARSING
