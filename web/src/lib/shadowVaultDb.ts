@@ -250,7 +250,14 @@ export class NyxShadowVault extends Dexie {
         let repliedToObj = decryptedRepliedTo;
         let isSilent = false;
 
-        if (plainText && plainText.trim().startsWith('{')) {
+        // Check if this is a file message stored with metadata (content=null but fileUrl exists)
+        // OR if it's stored as JSON payload in content
+        if (decryptedFileUrl && decryptedFileKey) {
+          // File message stored with metadata fields
+          isBlindAttachment = true;
+          parsedContent = null;
+        } else if (plainText && plainText.trim().startsWith('{')) {
+          // File message stored as JSON payload in content
           try {
             const payload = JSON.parse(plainText);
 
