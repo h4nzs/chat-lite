@@ -157,4 +157,22 @@ router.post('/:messageId/read', async (req, res, next) => {
   }
 });
 
+// ==================== MARK VIEW ONCE AS VIEWED ====================
+router.put('/:id/viewed', async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required.');
+
+    // We can reuse the existing deleteMessage service for view once messages,
+    // as viewing them effectively means they should be deleted from the database.
+    await deleteMessage({
+      messageId: req.params.id as string,
+      userId: req.user.id
+    });
+
+    res.json({ success: true, message: 'View once message deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
