@@ -419,12 +419,16 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         });
 
         // Store in vault for persistence across reloads
-        // For files/replies, we need to preserve the JSON content so it can be re-parsed
-        // If the message was parsed (content=null for files), reconstruct the JSON for storage
-        let messageForVault = { ...processedMessage };
+        // IMPORTANT: Store the ORIGINAL message content (before parsing) so vault can re-parse on reload
+        // If message was decrypted/parsed, we need to reconstruct the JSON for storage
+        let messageForVault = { ...message }; // Use ORIGINAL message, not processedMessage
         
-        // Reconstruct JSON payload for files if content was nullified during parsing
-        if (processedMessage.isBlindAttachment && processedMessage.fileUrl && !processedMessage.content) {
+        // Check if original message content is file JSON (already decrypted by handleIncomingMessage)
+        const originalContent = typeof message.content === 'string' ? message.content : '';
+        const isOriginalFileJson = originalContent.trim().startsWith('{') && originalContent.includes('"type":"file"');
+        
+        // If original wasn't file JSON but processed message has file metadata, reconstruct
+        if (!isOriginalFileJson && processedMessage.isBlindAttachment && processedMessage.fileUrl) {
           messageForVault = {
             ...processedMessage,
             content: JSON.stringify({
@@ -437,14 +441,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             })
           };
         }
-        // Reconstruct JSON for replies
-        else if (processedMessage.repliedToId && processedMessage.content && 
-                 !processedMessage.content.trim().startsWith('{')) {
-          // Check if this looks like a reply (has repliedToId but content is plain text)
-          // We need to check the original message to see if it was a reply
-          // For now, don't reconstruct replies since they're stored with plain text content
-        }
-        
+
         // Don't store silent messages
         if (!processedMessage.isSilent) {
           await shadowVault.upsertMessages([messageForVault]);

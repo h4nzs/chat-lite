@@ -253,7 +253,7 @@ export class NyxShadowVault extends Dexie {
         if (plainText && plainText.trim().startsWith('{')) {
           try {
             const payload = JSON.parse(plainText);
-            
+
             // File Attachment
             if (payload.type === 'file') {
               parsedContent = null;
@@ -290,7 +290,7 @@ export class NyxShadowVault extends Dexie {
               parsedContent = plainText;
             }
             // Silent messages
-            else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+            else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' ||
                      payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
               parsedContent = null;
               isSilent = true;
