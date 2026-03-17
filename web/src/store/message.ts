@@ -280,12 +280,21 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         set((state) => ({
           messages: { ...state.messages, [id]: processed }
         }));
+        
+        // If vault has messages, skip API fetch to avoid overwriting with raw ciphertext
+        // API fetch is only needed for fresh sync when vault is empty
+        set((state) => ({
+          hasMore: { ...state.hasMore, [id]: true },
+          hasLoadedHistory: { ...state.hasLoadedHistory, [id]: true },
+          isFetchingMore: { ...state.isFetchingMore, [id]: false }
+        }));
+        return;
       }
     } catch (e) {
       console.warn('Failed to hydrate messages from vault:', e);
     }
 
-    // 2. Fetch from API (Sync)
+    // 2. Fetch from API (Sync) - only if vault was empty
     try {
       const { messages, hasMore } = await fetchMessagesLogic(id);
 

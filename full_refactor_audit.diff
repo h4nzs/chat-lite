@@ -10,6 +10,22 @@ index 866dc85a..e489f80b 100644
  
  /generated/prisma
  server/uploads/
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 165840ff..890e8c23 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -13,7 +13,7 @@ Before you write any code, understand our architectural boundaries:
+ 1. **The Core Crypto is Sacred:** Do **NOT** bump, update, or modify `libsodium-wrappers` or its type definitions. Backward compatibility in the Double Ratchet engine is our absolute highest priority.
+ 2. **Package Manager:** We use `pnpm` exclusively. Do not use `npm` or `yarn`. Do not commit `package-lock.json` or `yarn.lock`.
+ 3. **Strict State:** We use Zustand v5. Do not return objects in selectors without `useShallow`, or you will trigger infinite render loops.
+-4. **Formatting:** We use ESLint v10 (Flat Config). Your code must pass `pnpm run lint` without any warnings.
++4. **Formatting:** We use ESLint v10 (Flat Config). Your code must pass `pnpm run lint` without any warnings (except unused-var warning).
+ 
+ ## 🛠️ Development Workflow
+ 
+diff --git a/full_refactor_audit.diff b/full_refactor_audit.diff
+new file mode 100644
+index 00000000..e69de29b
 diff --git a/package.json b/package.json
 index 6006ce3a..bf54a693 100644
 --- a/package.json
@@ -3339,10 +3355,10 @@ index 52110e32..901490d6 100644
 +export default router;
 diff --git a/server/src/services/auth.service.ts b/server/src/services/auth.service.ts
 new file mode 100644
-index 00000000..daade9ff
+index 00000000..c4f98bed
 --- /dev/null
 +++ b/server/src/services/auth.service.ts
-@@ -0,0 +1,517 @@
+@@ -0,0 +1,524 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -3481,7 +3497,9 @@ index 00000000..daade9ff
 +      usernameHash: true,
 +      encryptedProfile: true,
 +      role: true,
-+      isVerified: true
++      isVerified: true,
++      hasCompletedOnboarding: true,
++      autoDestructDays: true
 +    }
 +  });
 +
@@ -3545,7 +3563,9 @@ index 00000000..daade9ff
 +      usernameHash: user.usernameHash,
 +      encryptedProfile: user.encryptedProfile,
 +      role: user.role,
-+      isVerified: user.isVerified
++      isVerified: user.isVerified,
++      hasCompletedOnboarding: user.hasCompletedOnboarding,
++      autoDestructDays: user.autoDestructDays
 +    },
 +    accessToken: access,
 +    refreshToken: refresh,
@@ -3729,7 +3749,9 @@ index 00000000..daade9ff
 +      usernameHash: user.usernameHash,
 +      encryptedProfile: user.encryptedProfile,
 +      role: user.role,
-+      isVerified: user.isVerified
++      isVerified: user.isVerified,
++      hasCompletedOnboarding: user.hasCompletedOnboarding,
++      autoDestructDays: user.autoDestructDays
 +    },
 +    encryptedPrivateKey: user.encryptedPrivateKey
 +  };
@@ -3776,7 +3798,8 @@ index 00000000..daade9ff
 +      encryptedProfile: true,
 +      role: true,
 +      isVerified: true,
-+      hasCompletedOnboarding: true
++      hasCompletedOnboarding: true,
++      autoDestructDays: true
 +    }
 +  });
 +
@@ -6285,10 +6308,10 @@ index bb000178..213760f0 100644
 +}
 diff --git a/server/src/socket/handlers/message.handler.ts b/server/src/socket/handlers/message.handler.ts
 new file mode 100644
-index 00000000..04733dad
+index 00000000..3e8ed38e
 --- /dev/null
 +++ b/server/src/socket/handlers/message.handler.ts
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,268 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -6509,13 +6532,60 @@ index 00000000..04733dad
 +      console.error('Failed to mark message as read:', error);
 +    }
 +  });
++
++  // Mark as Delivered
++  socket.on('message:ack_delivered', async ({ messageId, conversationId }: { messageId: string, conversationId: string }) => {
++    if (!messageId || !socket.user) return;
++    const socketUserId = socket.user.id;
++
++    try {
++      const msg = await prisma.message.findUnique({ 
++        select: { id: true, conversationId: true }, 
++        where: { id: messageId } 
++      });
++      if (!msg || msg.conversationId !== conversationId) return;
++
++      const isParticipant = await prisma.participant.findFirst({ 
++        where: { conversationId, userId: socketUserId } 
++      });
++      if (!isParticipant) return;
++
++      const currentStatus = await prisma.messageStatus.findUnique({
++        where: { messageId_userId: { messageId, userId: socketUserId } }
++      });
++
++      if (!currentStatus || currentStatus.status === 'SENT') {
++        await prisma.messageStatus.upsert({
++          where: { messageId_userId: { messageId, userId: socketUserId } },
++          update: { status: 'DELIVERED' },
++          create: { messageId, userId: socketUserId, status: 'DELIVERED' },
++        });
++
++        const message = await prisma.message.findUnique({
++          where: { id: messageId },
++          select: { senderId: true, conversationId: true },
++        });
++
++        if (message && message.senderId !== socketUserId) {
++          io.to(message.senderId).emit('message:status_updated', {
++            messageId,
++            conversationId: message.conversationId,
++            deliveredTo: socketUserId,
++            status: 'DELIVERED',
++          });
++        }
++      }
++    } catch (error) {
++      console.error('Failed to ack message delivery:', error);
++    }
++  });
 +};
 diff --git a/server/src/socket/handlers/presence.handler.ts b/server/src/socket/handlers/presence.handler.ts
 new file mode 100644
-index 00000000..3c82361d
+index 00000000..00a228ab
 --- /dev/null
 +++ b/server/src/socket/handlers/presence.handler.ts
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,138 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -6618,6 +6688,28 @@ index 00000000..3c82361d
 +    }
 +  });
 +
++  // Explicit Presence Update
++  socket.on("presence:update", async ({ online }: { userId: string, online: boolean }) => {
++    if (!userId) return;
++    const userSocketsKey = `user:${userId}:sockets`;
++    
++    if (online) {
++      const added = await redisClient.sAdd(userSocketsKey, socket.id);
++      const currentCount = await redisClient.sCard(userSocketsKey);
++      if (added === 1 && currentCount === 1) {
++        await redisClient.sAdd('online_users', userId);
++        socket.broadcast.emit("presence:user_joined", userId);
++      }
++    } else {
++      await redisClient.sRem(userSocketsKey, socket.id);
++      const remainingSockets = await redisClient.sCard(userSocketsKey);
++      if (remainingSockets === 0) {
++        await redisClient.sRem('online_users', userId);
++        socket.broadcast.emit("presence:user_left", userId);
++      }
++    }
++  });
++
 +  // Disconnect Handler
 +  socket.on("disconnect", async () => {
 +    const userSocketsKey = `user:${userId}:sockets`;
@@ -6634,10 +6726,10 @@ index 00000000..3c82361d
 +};
 diff --git a/server/src/socket/handlers/push.handler.ts b/server/src/socket/handlers/push.handler.ts
 new file mode 100644
-index 00000000..5f516b39
+index 00000000..91e3e3c6
 --- /dev/null
 +++ b/server/src/socket/handlers/push.handler.ts
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,52 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -6664,23 +6756,32 @@ index 00000000..5f516b39
 +  // Push Subscription
 +  socket.on("push:subscribe", async (data: PushSubscribePayload) => {
 +    if (!data.endpoint || !data.keys?.p256dh || !data.keys?.auth) return;
-+    
++
 +    try {
 +      await prisma.pushSubscription.upsert({
 +        where: { endpoint: data.endpoint },
 +        update: { p256dh: data.keys.p256dh, auth: data.keys.auth },
-+        create: { 
-+          endpoint: data.endpoint, 
-+          p256dh: data.keys.p256dh, 
-+          auth: data.keys.auth, 
-+          userId 
++        create: {
++          endpoint: data.endpoint,
++          p256dh: data.keys.p256dh,
++          auth: data.keys.auth,
++          userId
 +        },
 +      });
 +    } catch (error) {
 +      console.error("Failed to save push subscription:", error);
 +    }
 +  });
-+};
++
++  socket.on("push:unsubscribe", async () => {
++    try {
++      await prisma.pushSubscription.deleteMany({
++        where: { userId }
++      });
++    } catch (error) {
++      console.error("Failed to remove push subscriptions:", error);
++    }
++  });};
 diff --git a/server/src/socket/handlers/session.handler.ts b/server/src/socket/handlers/session.handler.ts
 new file mode 100644
 index 00000000..47c86523
@@ -11071,10 +11172,46 @@ index f4dcc361..21489aa0 100644
      throw error;
    }
 diff --git a/web/src/lib/shadowVaultDb.ts b/web/src/lib/shadowVaultDb.ts
-index d25bd7ca..f53ee568 100644
+index d25bd7ca..d431ea6d 100644
 --- a/web/src/lib/shadowVaultDb.ts
 +++ b/web/src/lib/shadowVaultDb.ts
-@@ -103,16 +103,16 @@ export class NyxShadowVault extends Dexie {
+@@ -16,6 +16,12 @@ export interface DecryptedMessageRecord {
+   senderAvatarUrl?: string; // Encrypted avatar URL
+   isViewOnce?: boolean;
+   isDeletedLocal?: boolean;
++  // File metadata (for Blind Attachments)
++  fileUrl?: string; // Encrypted file URL
++  fileKey?: string; // Encrypted file key
++  fileName?: string; // Encrypted file name
++  fileSize?: number;
++  fileType?: string;
+ }
+ 
+ // --- CRYPTO ENGINE FOR IRON VAULT ---
+@@ -84,17 +90,20 @@ export class NyxShadowVault extends Dexie {
+       for (const m of validMessages) {
+         // [FIX] PERSISTENCE: Check if we already have a record with better profile data
+         const existing = await this.messages.get(m.id);
+-        
++
+         let encryptedContent: string | null = null;
+         let encryptedRepliedTo: string | undefined = undefined;
+         let encryptedSenderName: string | undefined = undefined;
+         let encryptedSenderUsername: string | undefined = undefined;
+         let encryptedSenderAvatarUrl: string | undefined = undefined;
++        let encryptedFileUrl: string | undefined = undefined;
++        let encryptedFileKey: string | undefined = undefined;
++        let encryptedFileName: string | undefined = undefined;
+ 
+         if (m.content && !m.isDeletedLocal) {
+             encryptedContent = await encryptVaultText(m.content);
+         }
+-        
++
+         if (m.repliedTo) {
+              const repliedToStr = JSON.stringify(m.repliedTo);
+              encryptedRepliedTo = await encryptVaultText(repliedToStr);
+@@ -103,16 +112,16 @@ export class NyxShadowVault extends Dexie {
          }
  
          // Fix: Persist sender info if it was hydrated, otherwise fallback to existing
@@ -11096,16 +11233,153 @@ index d25bd7ca..f53ee568 100644
              }
          } else if (existing?.senderName) {
              // Keep the real name we already have in the vault!
-@@ -191,7 +191,7 @@ export class NyxShadowVault extends Dexie {
+@@ -122,7 +131,26 @@ export class NyxShadowVault extends Dexie {
+         } else if (mSender?.avatarUrl) {
+             encryptedSenderAvatarUrl = await encryptVaultText(mSender.avatarUrl);
+         }
++
++        // Persist file metadata (Blind Attachments)
++        if (m.fileUrl) {
++            encryptedFileUrl = await encryptVaultText(m.fileUrl);
++        } else if (existing?.fileUrl) {
++            encryptedFileUrl = existing.fileUrl;
++        }
++        
++        if (m.fileKey) {
++            encryptedFileKey = await encryptVaultText(m.fileKey);
++        } else if (existing?.fileKey) {
++            encryptedFileKey = existing.fileKey;
++        }
+         
++        if (m.fileName) {
++            encryptedFileName = await encryptVaultText(m.fileName);
++        } else if (existing?.fileName) {
++            encryptedFileName = existing.fileName;
++        }
++
+         records.push({
+           id: m.id,
+           conversationId: m.conversationId,
+@@ -134,6 +162,11 @@ export class NyxShadowVault extends Dexie {
+           senderName: encryptedSenderName,
+           senderUsername: encryptedSenderUsername,
+           senderAvatarUrl: encryptedSenderAvatarUrl,
++          fileUrl: encryptedFileUrl,
++          fileKey: encryptedFileKey,
++          fileName: encryptedFileName,
++          fileSize: m.fileSize,
++          fileType: m.fileType,
+           isViewOnce: m.isViewOnce,
+           isDeletedLocal: m.isDeletedLocal
+         });
+@@ -154,6 +187,9 @@ export class NyxShadowVault extends Dexie {
+         let decryptedSenderName = undefined;
+         let decryptedSenderUsername = undefined;
+         let decryptedSenderAvatarUrl = undefined;
++        let decryptedFileUrl = undefined;
++        let decryptedFileKey = undefined;
++        let decryptedFileName = undefined;
+ 
+         if (r.content && !r.isDeletedLocal) {
+           plainText = await decryptVaultText(r.content);
+@@ -177,13 +213,75 @@ export class NyxShadowVault extends Dexie {
+         if (r.senderAvatarUrl) {
+             decryptedSenderAvatarUrl = await decryptVaultText(r.senderAvatarUrl) || undefined;
+         }
++        
++        // Restore file metadata (Blind Attachments)
++        if (r.fileUrl) {
++            decryptedFileUrl = await decryptVaultText(r.fileUrl) || undefined;
++        }
++        if (r.fileKey) {
++            decryptedFileKey = await decryptVaultText(r.fileKey) || undefined;
++        }
++        if (r.fileName) {
++            decryptedFileName = await decryptVaultText(r.fileName) || undefined;
++        }
++
++        // [FIX] Parse JSON payloads from vault (File, Reply, Story Reply, Silent)
++        let parsedContent: string | null = plainText;
++        let parsedFileUrl = decryptedFileUrl;
++        let parsedFileKey = decryptedFileKey;
++        let parsedFileName = decryptedFileName;
++        let parsedFileSize = r.fileSize;
++        let parsedFileType = r.fileType;
++        let isBlindAttachment = false;
++        let repliedToObj = decryptedRepliedTo;
++        let isSilent = false;
++
++        if (plainText && plainText.trim().startsWith('{')) {
++          try {
++            const payload = JSON.parse(plainText);
++            
++            // File Attachment
++            if (payload.type === 'file') {
++              parsedContent = null;
++              parsedFileUrl = payload.url || decryptedFileUrl;
++              parsedFileKey = payload.key || decryptedFileKey;
++              parsedFileName = payload.name || decryptedFileName;
++              parsedFileSize = payload.size || r.fileSize;
++              parsedFileType = payload.mimeType || r.fileType;
++              isBlindAttachment = true;
++            }
++            // Text Reply
++            else if (payload.type === 'reply') {
++              parsedContent = payload.text;
++              // repliedToId would need to be stored separately if needed
++            }
++            // Story Reply
++            else if (payload.type === 'story_reply') {
++              parsedContent = payload.text;
++              repliedToObj = {
++                id: 'story_mock',
++                senderId: payload.storyAuthorId,
++                sender: { id: payload.storyAuthorId },
++                content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
++              };
++            }
++            // Silent messages
++            else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
++                     payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
++              parsedContent = null;
++              isSilent = true;
++            }
++          } catch {
++            // Keep original plaintext if parse fails
++          }
++        }
+ 
+         messages.push({
+           id: r.id,
+           conversationId: r.conversationId,
+-          content: plainText,
++          content: parsedContent,
+           repliedToId: r.repliedToId,
+-          repliedTo: decryptedRepliedTo,
++          repliedTo: repliedToObj,
+           createdAt: r.createdAt as string,
+           senderId: r.senderId,
+           sender: {
+@@ -191,9 +289,16 @@ export class NyxShadowVault extends Dexie {
                name: decryptedSenderName,
                username: decryptedSenderUsername,
                avatarUrl: decryptedSenderAvatarUrl
 -          } as any,
 +          } as unknown as { id: string; name?: string; username?: string; avatarUrl?: string | null },
++          fileUrl: parsedFileUrl,
++          fileKey: parsedFileKey,
++          fileName: parsedFileName,
++          fileSize: parsedFileSize,
++          fileType: parsedFileType,
++          isBlindAttachment,
            isViewOnce: r.isViewOnce,
-           isDeletedLocal: r.isDeletedLocal
+-          isDeletedLocal: r.isDeletedLocal
++          isDeletedLocal: r.isDeletedLocal,
++          isSilent
          });
-@@ -249,7 +249,7 @@ export class NyxShadowVault extends Dexie {
+       }
+       return messages;
+@@ -249,7 +354,7 @@ export class NyxShadowVault extends Dexie {
              name: decryptedSenderName,
              username: decryptedSenderUsername,
              avatarUrl: decryptedSenderAvatarUrl
@@ -11115,10 +11389,10 @@ index d25bd7ca..f53ee568 100644
          isDeletedLocal: r.isDeletedLocal
        };
 diff --git a/web/src/lib/socket.ts b/web/src/lib/socket.ts
-index a1e8000e..f2679818 100644
+index a1e8000e..0c4f0bb5 100644
 --- a/web/src/lib/socket.ts
 +++ b/web/src/lib/socket.ts
-@@ -6,15 +6,21 @@ import type { Socket } from "socket.io-client";
+@@ -6,15 +6,23 @@ import type { Socket } from "socket.io-client";
  import toast from "react-hot-toast";
  import { useAuthStore, User } from "@store/auth";
  import { useConversationStore, Conversation } from "@store/conversation";
@@ -11138,12 +11412,48 @@ index a1e8000e..f2679818 100644
 +  storeReceivedSessionKey,
 +  rotateGroupKey,
 +  fulfillGroupKeyRequest,
-+  schedulePeriodicGroupKeyRotation
++  schedulePeriodicGroupKeyRotation,
++  type FulfillRequestPayload,
++  type GroupFulfillRequestPayload
 +} from "@services/sessionKey.service";
  
  // FIX: Gunakan VITE_WS_URL (Koyeb) jika ada, kalau tidak ada (dev) baru pakai API_URL
  const WS_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL;
-@@ -204,9 +210,9 @@ export function getSocket() {
+@@ -120,6 +128,12 @@ export function getSocket() {
+       console.error("❌ Socket connection error:", err?.message ?? err);
+     });
+ 
++    // --- Error Handler ---
++    socket.on("error", (payload: { message: string }) => {
++      console.error("[Socket] Server error:", payload.message);
++      toast.error(`Socket error: ${payload.message}`, { duration: 5000 });
++    });
++
+     // --- Application-specific Listeners ---
+     socket.on("message:new", async (newMessage) => {
+       const meId = useAuthStore.getState().user?.id;
+@@ -171,9 +185,18 @@ export function getSocket() {
+       updateMessage(updatedMessage.conversationId, updatedMessage.id, updatedMessage);
+     });
+ 
+-    socket.on("message:deleted", ({ conversationId, id }) => {
++    socket.on("message:deleted", ({ conversationId, id, ids }) => {
+       const { removeMessage } = useMessageStore.getState();
+-      removeMessage(conversationId, id);
++      
++      // Handle single delete
++      if (id) {
++        removeMessage(conversationId, id);
++      }
++      
++      // Handle bulk delete
++      if (ids) {
++        ids.forEach(messageId => removeMessage(conversationId, messageId));
++      }
+     });
+ 
+     socket.on("messages:expired", ({ messageIds }: { messageIds: string[] }) => {
+@@ -204,9 +227,9 @@ export function getSocket() {
        const { replaceOptimisticReaction, addLocalReaction } = useMessageStore.getState();
  
        if (reaction.tempId && me && reaction.userId === me.id) {
@@ -11155,7 +11465,7 @@ index a1e8000e..f2679818 100644
        }
      });
      socket.on("reaction:deleted", ({ conversationId, messageId, reactionId }) => removeLocalReaction(conversationId, messageId, reactionId));
-@@ -247,7 +253,7 @@ export function getSocket() {
+@@ -247,11 +270,15 @@ export function getSocket() {
      });
  
      socket.on("conversation:participants_added", ({ conversationId, newParticipants }) => {
@@ -11164,7 +11474,48 @@ index a1e8000e..f2679818 100644
        useConversationStore.getState().markKeyRotationNeeded(conversationId, true);
        fireGhostSync(conversationId, 2000);
      });
-@@ -315,7 +321,7 @@ export function connectSocket() {
+ 
++    socket.on("conversation:participant_updated", ({ conversationId, userId, role }: { conversationId: string; userId: string; role: 'ADMIN' | 'MEMBER' }) => {
++      useConversationStore.getState().updateParticipantRole(conversationId, userId, role);
++    });
++
+     socket.on("conversation:participant_removed", ({ conversationId, userId }) => {
+       useConversationStore.getState().removeParticipant(conversationId, userId);
+       handleKeyRotation(conversationId);
+@@ -274,8 +301,13 @@ export function getSocket() {
+       }
+     });
+     
+-    socket.on('session:fulfill_request', (data) => fulfillKeyRequest(data).catch(console.error));
+-    socket.on('group:fulfill_key_request', (data) => fulfillGroupKeyRequest(data).catch(console.error));
++    socket.on('session:fulfill_request', (data: FulfillRequestPayload) => fulfillKeyRequest(data).catch(console.error));
++    socket.on('session:key_requested', () => {
++      // This event is a notification that someone requested a key
++      // The actual fulfillment happens via session:fulfill_request
++      // No action needed here
++    });
++    socket.on('group:fulfill_key_request', (data: GroupFulfillRequestPayload) => fulfillGroupKeyRequest(data).catch(console.error));
+     socket.on('session:new_key', (data) => {
+       storeReceivedSessionKey(data)
+         .then(() => {
+@@ -290,8 +322,14 @@ export function getSocket() {
+       disconnectSocket();
+     });
+ 
+-    socket.on("user:identity_changed", (data) => {
+-      const message = `The security key for ${data.name} has changed. You may want to verify their identity.`;
++    socket.on('auth:banned', ({ reason }: { reason: string }) => {
++      toast.error(`Account suspended: ${reason}`, { duration: 10000 });
++      useAuthStore.getState().logout();
++      disconnectSocket();
++    });
++
++    socket.on("user:identity_changed", (data: { userId: string }) => {
++      const message = `The security key for a contact has changed. You may want to verify their identity.`;
+       toast.success(message, { duration: 10000, icon: '🛡️' });
+       const { conversations } = useConversationStore.getState();
+       const { addSystemMessage } = useMessageStore.getState();
+@@ -315,7 +353,7 @@ export function connectSocket() {
    if (socket) {
      // 3. UPDATE TOKEN DI SOCKET AUTH (FIX UTAMA)
      // Ini memastikan socket menggunakan token baru hasil refresh, bukan token null saat init
@@ -11173,7 +11524,7 @@ index a1e8000e..f2679818 100644
  
      // 4. Connect hanya jika belum connect
      if (!socket.connected) {
-@@ -342,7 +348,7 @@ export function emitSessionKeyFulfillment(payload: { requesterId: string; conver
+@@ -342,7 +380,7 @@ export function emitSessionKeyFulfillment(payload: { requesterId: string; conver
    getSocket()?.emit('session:fulfill_response', payload);
  }
  
@@ -13717,10 +14068,10 @@ index 21626817..d1b012a7 100644
      return decryptedMsg;
 diff --git a/web/src/services/messageDecryption.service.ts b/web/src/services/messageDecryption.service.ts
 new file mode 100644
-index 00000000..891ca14e
+index 00000000..2935215d
 --- /dev/null
 +++ b/web/src/services/messageDecryption.service.ts
-@@ -0,0 +1,481 @@
+@@ -0,0 +1,544 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -13908,15 +14259,15 @@ index 00000000..891ca14e
 +        timestamp: new Date(msg.createdAt).getTime()
 +      });
 +    } else {
-+      if (silentPayload) {
-+        if (silentPayload.type === 'STORY_KEY') {
-+          // Ignore this message in the UI completely
++      // Check if message was marked as silent during decryption
++      if (msg.isSilent || silentPayload) {
++        const silentType = silentPayload?.type || (msg as any).type;
++        if (silentType === 'STORY_KEY' || silentType === 'GHOST_SYNC' || silentType === 'CALL_INIT') {
++          // Ignore signaling messages completely
 +          continue;
 +        }
-+        msg.content = silentPayload.text;
-+        msg.isSilent = true;
-+        // [FIX] Filter out signaling messages (like CALL_INIT) that have no text content
-+        if (!msg.content) {
++        // For other silent messages, keep if they have visible content
++        if (!msg.content && msg.isSilent) {
 +          continue;
 +        }
 +      }
@@ -13976,7 +14327,7 @@ index 00000000..891ca14e
 +  message: Message,
 +  seenIds = new Set<string>(),
 +  depth = 0,
-+  options: { skipRetries?: boolean } = {}
++  options: { skipRetries?: boolean; skipJsonParsing?: boolean } = {}
 +): Promise<Message> {
 +  // 1. Clone message and add recursion guard
 +  const decryptedMsg = { ...message };
@@ -14016,6 +14367,69 @@ index 00000000..891ca14e
 +
 +    if (!contentToDecrypt || contentToDecrypt === 'waiting_for_key' || contentToDecrypt === '[Requesting key to decrypt...]') {
 +      return decryptedMsg;
++    }
++
++    // [FIX] PARSE PLAIN JSON PAYLOADS (File, Reply, Story Reply, etc.)
++    // These are already decrypted but need to be parsed into proper Message structure
++    // Skip this if we're storing for vault (need raw JSON)
++    if (!options.skipJsonParsing && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
++      try {
++        const payload = JSON.parse(contentToDecrypt);
++
++        // File Attachment
++        if (payload.type === 'file') {
++          decryptedMsg.fileUrl = payload.url;
++          decryptedMsg.fileKey = payload.key;
++          decryptedMsg.fileName = payload.name;
++          decryptedMsg.fileSize = payload.size;
++          decryptedMsg.fileType = payload.mimeType;
++          decryptedMsg.content = null;
++          decryptedMsg.isBlindAttachment = true;
++          return decryptedMsg;
++        }
++
++        // Text Reply
++        if (payload.type === 'reply') {
++          decryptedMsg.content = payload.text;
++          decryptedMsg.repliedToId = payload.targetMessageId;
++          // Note: Full repliedTo object requires fetching the target message
++          return decryptedMsg;
++        }
++
++        // Story Reply
++        if (payload.type === 'story_reply') {
++          decryptedMsg.content = payload.text;
++          decryptedMsg.repliedTo = {
++            id: 'story_mock',
++            senderId: payload.storyAuthorId,
++            sender: { id: payload.storyAuthorId },
++            content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
++          } as Message;
++          return decryptedMsg;
++        }
++
++        // Reaction (should be intercepted by processMessagesAndReactions)
++        if (payload.type === 'reaction') {
++          // Keep as content, will be parsed by processMessagesAndReactions
++          return decryptedMsg;
++        }
++
++        // Edit (should be intercepted by processMessagesAndReactions)
++        if (payload.type === 'edit') {
++          // Keep as content, will be parsed by processMessagesAndReactions
++          return decryptedMsg;
++        }
++
++        // Silent messages (GHOST_SYNC, STORY_KEY, CALL_INIT, etc.)
++        if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' ||
++            payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
++          decryptedMsg.isSilent = true;
++          decryptedMsg.content = null; // Don't display
++          return decryptedMsg;
++        }
++      } catch {
++        // If JSON parsing fails, continue with normal flow
++      }
 +    }
 +
 +    // [FIX] PREVENT RE-DECRYPTION LOOP
@@ -14204,10 +14618,10 @@ index 00000000..891ca14e
 +}
 diff --git a/web/src/services/messageHandler.service.ts b/web/src/services/messageHandler.service.ts
 new file mode 100644
-index 00000000..e570f3bc
+index 00000000..dee95110
 --- /dev/null
 +++ b/web/src/services/messageHandler.service.ts
-@@ -0,0 +1,393 @@
+@@ -0,0 +1,401 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -14234,7 +14648,8 @@ index 00000000..e570f3bc
 +): Promise<{ message?: Message; error?: string }> {
 +  const { prepareEncryptedPayload, generatePushPayloads } = await import('@services/messageCrypto');
 +  const { user } = useAuthStore.getState();
-+  const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
++  const conversations = useConversationStore.getState().conversations;
++  const conversation = conversations.find(c => c.id === conversationId);
 +  const isGroup = conversation?.isGroup || false;
 +  const actualTempId = tempId || Date.now() * 1000 + Math.floor(Math.random() * 1000);
 +
@@ -14391,16 +14806,23 @@ index 00000000..e570f3bc
 +    }
 +
 +    const decryptedItems: Message[] = [];
++    const itemsForVault: Message[] = []; // Store with raw JSON content
++    
 +    for (const item of res.items) {
++      // Decrypt for display (with JSON parsing)
 +      const decrypted = await decryptMessageObject(item);
 +      decryptedItems.push(decrypted);
++      
++      // Decrypt for vault storage (skip JSON parsing to preserve raw JSON)
++      const forVault = await decryptMessageObject(item, new Set(), 0, { skipJsonParsing: true });
++      itemsForVault.push(forVault);
 +    }
 +
 +    const enrichedMessages = enrichMessagesWithSenderProfile(conversationId, decryptedItems);
 +    const processedMessages = processMessagesAndReactions(enrichedMessages);
 +
-+    // Save to shadow vault
-+    await shadowVault.upsertMessages(processedMessages);
++    // Save to shadow vault - use messages with raw JSON content preserved
++    await shadowVault.upsertMessages(itemsForVault);
 +
 +    return {
 +      messages: processedMessages,
@@ -15499,7 +15921,7 @@ index 91b41fd1..f6a5c029 100644
  }));
  
 diff --git a/web/src/store/auth.ts b/web/src/store/auth.ts
-index 1e9a44d6..af3aecfa 100644
+index 1e9a44d6..5aa3d23f 100644
 --- a/web/src/store/auth.ts
 +++ b/web/src/store/auth.ts
 @@ -2,16 +2,31 @@
@@ -15848,7 +16270,7 @@ index 1e9a44d6..af3aecfa 100644
          const blockedIds = blockedUsers.map(user => user.id);
          set({ blockedUserIds: blockedIds });
        } catch (error) {
-@@ -526,11 +585,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) =>
+@@ -526,13 +585,18 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) =>
  
      silentRefresh: async () => {
        try {
@@ -15861,7 +16283,17 @@ index 1e9a44d6..af3aecfa 100644
 +
          if (data && data.accessToken) {
            set({ accessToken: data.accessToken });
++          
++          // Update socket auth with new token
++          const socket = getSocket();
++          if (socket?.connected) {
++            (socket.auth as Record<string, unknown>) = { token: data.accessToken };
++            (socket.io.opts as Record<string, unknown>).auth = { token: data.accessToken };
++          }
++          
            return true;
+         }
+         return false;
 diff --git a/web/src/store/callStore.ts b/web/src/store/callStore.ts
 index 091d7d5b..3c26fa0b 100644
 --- a/web/src/store/callStore.ts
@@ -15901,7 +16333,7 @@ index 091d7d5b..3c26fa0b 100644
          initialUsers = profile;
      } else if (profile) {
 diff --git a/web/src/store/conversation.ts b/web/src/store/conversation.ts
-index c9fedd97..abd91870 100644
+index c9fedd97..3cef9021 100644
 --- a/web/src/store/conversation.ts
 +++ b/web/src/store/conversation.ts
 @@ -2,12 +2,20 @@
@@ -15928,7 +16360,7 @@ index c9fedd97..abd91870 100644
  import toast from 'react-hot-toast';
  
  // --- Type Definitions ---
-@@ -25,8 +33,8 @@ export type Message = {
+@@ -25,30 +33,31 @@ export type Message = {
    type?: 'USER' | 'SYSTEM';
    conversationId: string;
    senderId: string;
@@ -15939,15 +16371,26 @@ index c9fedd97..abd91870 100644
      encryptedProfile?: string | null;
      name?: string;
      username?: string;
-@@ -42,13 +50,13 @@ export type Message = {
+     avatarUrl?: string | null;
+   };
+   content?: string | null;
+-  imageUrl?: string | null;
++  imageUrl?: string | null; // DEPRECATED: Use fileUrl with fileType check for images
+   fileUrl?: string | null;
+   fileKey?: string | null;
+   fileName?: string | null;
+   fileType?: string;
+   fileSize?: number;
    sessionId?: string | null;
-   ciphertext?: string | null;
+-  ciphertext?: string | null;
++  encryptedSessionKey?: string | null;
++  ciphertext?: string | null; // Internal: Encrypted payload before decryption
    createdAt: string;
 -  error?: boolean;
 +  error?: boolean | string;
    preview?: string;
 -  reactions?: { id: string; emoji: string; userId: string; isMessage?: boolean }[];
-+  reactions?: { id: string; emoji: string; userId?: string; isMessage?: boolean }[];
++  reactions?: { id: string; emoji: string; userId?: string; isMessage?: boolean }[]; // Client-side computed from parsed reaction payloads
    optimistic?: boolean;
    repliedTo?: Message;
    repliedToId?: string;
@@ -15956,7 +16399,7 @@ index c9fedd97..abd91870 100644
    duration?: number;
    statuses?: MessageStatus[]; // Server delivery statuses (for other users)
    status?: 'SENDING' | 'SENT' | 'FAILED'; // Local status for UI
-@@ -202,19 +210,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -202,19 +211,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
  
    searchUsers: async (query) => {
      try {
@@ -15977,7 +16420,7 @@ index c9fedd97..abd91870 100644
        return users;
      } catch (error) {
        console.error("Failed to search users", error);
-@@ -237,7 +233,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -237,7 +234,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
           lastMessage: { id: 'msg-1', content: 'Welcome to NYX. No active chats found.', senderId: 'bot-1', createdAt: new Date().toISOString(), conversationId: 'decoy-1', type: 'SYSTEM' }
        };
@@ -15986,7 +16429,7 @@ index c9fedd97..abd91870 100644
        return;
      }
  
-@@ -250,62 +246,64 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -250,62 +247,64 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
      if (!shouldProceed) return;
  
      try {
@@ -16076,7 +16519,7 @@ index c9fedd97..abd91870 100644
                        return { ...fetched, requiresKeyRotation: true };
                    }
                }
-@@ -313,11 +311,11 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -313,11 +312,11 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
            return fetched;
        });
  
@@ -16091,7 +16534,7 @@ index c9fedd97..abd91870 100644
      } catch (error) {
        console.error("Failed to load conversations", error);
        set({ error: "Failed to load conversations." });
-@@ -334,16 +332,16 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -334,16 +333,16 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
      set(state => ({
        activeId: id,
        isSidebarOpen: false,
@@ -16111,7 +16554,7 @@ index c9fedd97..abd91870 100644
        get().removeConversation(id);
      } catch (error: unknown) {
        console.error("Failed to delete conversation:", error);
-@@ -353,12 +351,11 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -353,12 +352,11 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
    },
    deleteGroup: async (id) => {
      try {
@@ -16126,7 +16569,7 @@ index c9fedd97..abd91870 100644
          toast.error("Only the group creator can delete the group.");
        } else {
          const errorMessage = (error as Error).message || "Failed to delete group.";
-@@ -375,37 +372,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -375,37 +373,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
      }
  
      try {
@@ -16165,7 +16608,7 @@ index c9fedd97..abd91870 100644
  
        getSocket().emit("conversation:join", conv.id);
        get().addOrUpdateConversation(conv);
-@@ -496,12 +463,21 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -496,12 +464,21 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
      set(state => ({
        conversations: state.conversations.map(c => {
          if (c.id === conversationId) {
@@ -16193,7 +16636,7 @@ index c9fedd97..abd91870 100644
            return {
              ...c,
              participants: [...c.participants, ...newParticipants],
-@@ -575,9 +551,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -575,9 +552,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
        });
  
        // Call the API to update the server
@@ -16204,7 +16647,7 @@ index c9fedd97..abd91870 100644
  
        // Update the UI based on the server response
        set(state => {
-@@ -597,7 +571,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
+@@ -597,7 +572,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set,
        });
      } catch (error: unknown) {
        console.error("Failed to toggle pinned conversation", error);
@@ -16213,7 +16656,7 @@ index c9fedd97..abd91870 100644
        toast.error(errorMessage);
        // If the API call fails, revert the optimistic update
 diff --git a/web/src/store/message.ts b/web/src/store/message.ts
-index ff69ce06..f4ef7586 100644
+index ff69ce06..0815a466 100644
 --- a/web/src/store/message.ts
 +++ b/web/src/store/message.ts
 @@ -1,440 +1,33 @@
@@ -16832,7 +17275,7 @@ index ff69ce06..f4ef7586 100644
    fetchTypingLinkPreview: async (text: string) => {
      try {
        const res = await api('/api/previews/link', { method: 'POST', body: JSON.stringify({ text }) });
-@@ -594,1126 +187,481 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get)
+@@ -594,1126 +187,499 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get)
        set({ typingLinkPreview: null });
      }
    },
@@ -16855,7 +17298,7 @@ index ff69ce06..f4ef7586 100644
 -          isMessage: true
 -      };
 -      get().addLocalReaction(conversationId, messageId, optimisticReaction);
--
+ 
 -      const metadata = {
 -          type: 'reaction',
 -          targetMessageId: messageId,
@@ -16866,7 +17309,8 @@ index ff69ce06..f4ef7586 100644
 -          content: JSON.stringify(metadata)
 -      }, timestamp);
 -  },
--
++  clearTypingLinkPreview: () => set({ typingLinkPreview: null }),
+ 
 -  sendMessage: async (conversationId, data, tempId?: number, isSilent = false) => {
 -    const { user, hasRestoredKeys } = useAuthStore.getState();
 -    if (!user) return;
@@ -16883,12 +17327,25 @@ index ff69ce06..f4ef7586 100644
 -            get().addOptimisticMessage(conversationId, msg);
 -        }
 -        return;
--    }
--
++  sendReaction: async (conversationId, messageId, emoji) => {
++    const result = await handleReactionLogic(conversationId, messageId, emoji);
++    if (!result.success) {
++      toast.error(result.error || 'Failed to send reaction');
+     }
++  },
+ 
 -    if (!hasRestoredKeys) {
 -      toast.error("You must restore your keys from your recovery phrase before you can send messages.");
 -      return;
 -    }
++  uploadFile: async (conversationId, file) => {
++    const activityId = Date.now().toString();
++    useDynamicIslandStore.getState().addActivity({
++      id: activityId,
++      type: 'upload',
++      title: file.name,
++      progress: 0
++    } as unknown as UploadActivity);
  
 -    const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
 -    if (!conversation) {
@@ -16898,7 +17355,10 @@ index ff69ce06..f4ef7586 100644
 -    }
 -    const isGroup = conversation.isGroup;
 -    const forceRotate = conversation.requiresKeyRotation === true;
-+  clearTypingLinkPreview: () => set({ typingLinkPreview: null }),
++    try {
++      const { compressImage } = await import('@lib/fileUtils');
++      const { encryptFile } = await import('@utils/crypto');
++      let fileToUpload = file;
  
 -    if (isGroup && useConnectionStore.getState().status === 'connected') {
 -      try {
@@ -16914,14 +17374,11 @@ index ff69ce06..f4ef7586 100644
 -        }
 -      } catch (e) {
 -        console.error("Failed to ensure group session", e);
--      }
-+  sendReaction: async (conversationId, messageId, emoji) => {
-+    const result = await handleReactionLogic(conversationId, messageId, emoji);
-+    if (!result.success) {
-+      toast.error(result.error || 'Failed to send reaction');
-     }
-+  },
- 
++      if (file.type.startsWith('image/')) {
++        fileToUpload = await compressImage(file);
+       }
+-    }
+-
 -    const actualTempId = tempId !== undefined ? tempId : generateTempId();
 -    const isReactionPayload = !!parseReaction(data.content);
 -    const silentPayload = parseSilent(data.content);
@@ -16955,7 +17412,7 @@ index ff69ce06..f4ef7586 100644
 -            repliedTo: data.repliedTo,
 -            isSilent: isOptimisticSilent || data.isSilent
 -        };
--
+ 
 -        // Parse optimistic content for special message types
 -        if (silentPayload) {
 -            optimisticMessage.isSilent = true;
@@ -16980,7 +17437,8 @@ index ff69ce06..f4ef7586 100644
 -        } else {
 -            optimisticMessage.content = optimisticContent;
 -        }
--
++      const { encryptedBlob, key: rawFileKey } = await encryptFile(fileToUpload);
+ 
 -        if (optimisticMessage.content) {
 -            optimisticMessage.preview = optimisticMessage.content;
 -        }
@@ -17000,16 +17458,8 @@ index ff69ce06..f4ef7586 100644
 -        useConversationStore.getState().updateConversationLastMessage(conversationId, { ...optimisticMessage, content: lastMsgPreview, fileType: data.fileType, fileName: data.fileName });
 -        set({ replyingTo: null, typingLinkPreview: null });
 -    }
-+  uploadFile: async (conversationId, file) => {
-+    const activityId = Date.now().toString();
-+    useDynamicIslandStore.getState().addActivity({
-+      id: activityId,
-+      type: 'upload',
-+      title: file.name,
-+      progress: 0
-+    } as unknown as UploadActivity);
- 
-     try {
+-
+-    try {
 -      const { prepareEncryptedPayload, generatePushPayloads } = await import('@services/messageCrypto');
 -      
 -      const contentToEncrypt = data.content || '';
@@ -17021,19 +17471,22 @@ index ff69ce06..f4ef7586 100644
 -          actualTempId,
 -          participants: conversation.participants as unknown[],
 -          isReactionPayload
--      });
-+      const { compressImage } = await import('@lib/fileUtils');
-+      const { encryptFile } = await import('@utils/crypto');
-+      let fileToUpload = file;
++      const presignedRes = await api<{ uploadUrl: string; publicUrl: string; key: string }>('/api/uploads/presigned', {
++        method: 'POST',
++        body: JSON.stringify({
++          fileName: file.name,
++          fileType: 'application/octet-stream',
++          folder: 'attachments',
++          fileSize: encryptedBlob.size
++        })
+       });
  
 -      if (mkToStore) {
 -           await import('@utils/crypto').then(({ storeMessageKeySecurely }) => 
 -               storeMessageKeySecurely(`temp_${actualTempId}`, mkToStore)
 -           );
-+      if (file.type.startsWith('image/')) {
-+        fileToUpload = await compressImage(file);
-       }
- 
+-      }
+-
 -      let finalCiphertext = ciphertext;
 -      if (x3dhHeader) {
 -          finalCiphertext = JSON.stringify({
@@ -17043,15 +17496,27 @@ index ff69ce06..f4ef7586 100644
 -      }
 -
 -      const pushPayloads = await generatePushPayloads(contentToEncrypt, conversationId, conversation.participants as unknown[], data);
--
++      await fetch(presignedRes.uploadUrl, {
++        method: 'PUT',
++        body: encryptedBlob,
++        headers: { 'Content-Type': 'application/octet-stream' }
++      });
+ 
 -      const payload = {
 -          ...data,
 -          content: finalCiphertext,
 -          sessionId: undefined,
 -          fileKey: undefined, fileName: undefined, fileType: undefined, fileSize: undefined,
 -          pushPayloads: Object.keys(pushPayloads).length > 0 ? pushPayloads : undefined
--      };
--
++      const metadata = {
++        type: 'file',
++        url: presignedRes.publicUrl,
++        key: rawFileKey,
++        name: file.name,
++        size: file.size,
++        mimeType: file.type
+       };
+ 
 -      const socket = getSocket();
 -      const isConnected = socket?.connected;
 -
@@ -17060,8 +17525,7 @@ index ff69ce06..f4ef7586 100644
 -        await addToQueue(conversationId, queueMsg, actualTempId);
 -        return;
 -      }
-+      const { encryptedBlob, key: rawFileKey } = await encryptFile(fileToUpload);
- 
+-
 -      socket?.emit("message:send", { ...payload, conversationId, tempId: actualTempId }, async (res: { ok: boolean, msg?: Message, error?: string }) => {
 -        if (res.ok && res.msg) {
 -            if (!isReactionPayload) {
@@ -17115,14 +17579,13 @@ index ff69ce06..f4ef7586 100644
 -                toast.error("Failed to send reaction");
 -            }
 -        }
-+      const presignedRes = await api<{ uploadUrl: string; publicUrl: string; key: string }>('/api/uploads/presigned', {
-+        method: 'POST',
-+        body: JSON.stringify({
-+          fileName: file.name,
-+          fileType: 'application/octet-stream',
-+          folder: 'attachments',
-+          fileSize: encryptedBlob.size
-+        })
++      get().sendMessage(conversationId, {
++        content: JSON.stringify(metadata),
++        fileUrl: presignedRes.publicUrl,
++        fileKey: rawFileKey,
++        fileName: file.name,
++        fileSize: file.size,
++        fileType: file.type
        });
  
 -    } catch (error: unknown) {
@@ -17130,20 +17593,27 @@ index ff69ce06..f4ef7586 100644
 -      if (!isReactionPayload) {
 -         get().updateMessage(conversationId, `temp_${actualTempId}`, { error: true, status: 'FAILED' });
 -      }
--    }
--  },
--
++      useDynamicIslandStore.getState().updateActivity(activityId, { progress: 100 } as unknown as Partial<UploadActivity>);
++      setTimeout(() => useDynamicIslandStore.getState().removeActivity(activityId), 1000);
++    } catch (error) {
++      console.error('Upload error:', error);
++      const errorMsg = error instanceof Error ? error.message : 'Upload failed';
++      toast.error(`File upload failed: ${errorMsg}`);
++      useDynamicIslandStore.getState().removeActivity(activityId);
+     }
+   },
+ 
 -  processOfflineQueue: async () => {
 -    const queue = await getQueueItems();
 -    if (queue.length === 0) return;
--
++  loadMessagesForConversation: async (id) => {
++    if (get().hasLoadedHistory[id]) return;
+ 
 -    const socket = getSocket();
 -    if (!socket?.connected) return;
-+      await fetch(presignedRes.uploadUrl, {
-+        method: 'PUT',
-+        body: encryptedBlob,
-+        headers: { 'Content-Type': 'application/octet-stream' }
-+      });
++    set((state) => ({
++      isFetchingMore: { ...state.isFetchingMore, [id]: true }
++    }));
  
 -    for (const item of queue) {
 -      const { tempId, conversationId, data, attempt } = item;
@@ -17153,16 +17623,20 @@ index ff69ce06..f4ef7586 100644
 -        await removeFromQueue(tempId);
 -        get().updateMessage(conversationId, `temp_${tempId}`, { error: true, status: 'FAILED' });
 -        continue;
--      }
-+      const metadata = {
-+        type: 'file',
-+        url: presignedRes.publicUrl,
-+        key: rawFileKey,
-+        name: file.name,
-+        size: file.size,
-+        mimeType: file.type
-+      };
- 
++    // 1. Load from Shadow Vault (Hydration)
++    try {
++      const cachedMessages = await shadowVault.getMessagesByConversation(id);
++      if (cachedMessages && cachedMessages.length > 0) {
++        // Vault already returns parsed messages (file/reply/story/silent parsed in getMessagesByConversation)
++        // Just enrich with sender profiles and process reactions/edits
++        const enriched = enrichMessagesWithSenderProfile(id, cachedMessages);
++        const processed = processMessagesAndReactions(enriched);
++
++        set((state) => ({
++          messages: { ...state.messages, [id]: processed }
++        }));
+       }
+-
 -      get().updateMessage(conversationId, `temp_${tempId}`, { status: 'SENDING', error: false });
 -
 -      // Wrap emit in a Promise to strictly wait for server ACK
@@ -17205,33 +17679,17 @@ index ff69ce06..f4ef7586 100644
 -          }
 -          resolve(); // Unblock the loop to process the next message
 -        });
-+      get().sendMessage(conversationId, {
-+        content: JSON.stringify(metadata),
-+        fileUrl: presignedRes.publicUrl,
-+        fileKey: rawFileKey,
-+        fileName: file.name,
-+        fileSize: file.size,
-+        fileType: file.type
-       });
- 
+-      });
+-
 -      // Add a small delay between successful sends to not overwhelm the server
 -      await new Promise(r => setTimeout(r, 100));
-+      useDynamicIslandStore.getState().updateActivity(activityId, { progress: 100 } as unknown as Partial<UploadActivity>);
-+      setTimeout(() => useDynamicIslandStore.getState().removeActivity(activityId), 1000);
-+    } catch (error) {
-+      console.error('Upload error:', error);
-+      const errorMsg = error instanceof Error ? error.message : 'Upload failed';
-+      toast.error(`File upload failed: ${errorMsg}`);
-+      useDynamicIslandStore.getState().removeActivity(activityId);
-     }
-   },
- 
+-    }
+-  },
+-
 -  uploadFile: async (conversationId, file) => {
 -    const { user, hasRestoredKeys } = useAuthStore.getState();
 -    if (!user) return;
-+  loadMessagesForConversation: async (id) => {
-+    if (get().hasLoadedHistory[id]) return;
- 
+-
 -    if (!hasRestoredKeys) {
 -      toast.error("You must restore your keys from your recovery phrase before you can send files.");
 -      return;
@@ -17241,10 +17699,9 @@ index ff69ce06..f4ef7586 100644
 -    if (!conversation) {
 -      toast.error("Conversation not found.");
 -      return;
--    }
-+    set((state) => ({
-+      isFetchingMore: { ...state.isFetchingMore, [id]: true }
-+    }));
++    } catch (e) {
++      console.warn('Failed to hydrate messages from vault:', e);
+     }
  
 -    const { addActivity, updateActivity, removeActivity } = useDynamicIslandStore.getState();
 -    const activity: Omit<UploadActivity, 'id'> = { type: 'upload', fileName: file.name, progress: 0 };
@@ -17269,6 +17726,7 @@ index ff69ce06..f4ef7586 100644
 -    get().addOptimisticMessage(conversationId, optimisticMessage);
 -    useConversationStore.getState().updateConversationLastMessage(conversationId, optimisticMessage);
 -    
++    // 2. Fetch from API (Sync)
      try {
 -      const { processAndUploadAttachment } = await import('@services/attachmentService');
 -      const uploadResult = await processAndUploadAttachment(file, (progress) => {
@@ -17453,11 +17911,11 @@ index ff69ce06..f4ef7586 100644
 -
 -        // [UI UPDATE] Keep tombstones visible
 -        // const visibleMessages = allMessages.filter(m => !m.isDeletedLocal);
+-
+-        const newState: any = { messages: { ...state.messages, [conversationId]: enrichedMessages } };
 +      const res = await api<{ items: Message[]; conversationId: string }>(`/api/messages/context/${messageId}`);
 +      const decryptedItems: Message[] = [];
  
--        const newState: any = { messages: { ...state.messages, [conversationId]: enrichedMessages } };
--
 -        if (fetchedItems.length < 50) {
 -            newState.hasMore = { ...state.hasMore, [conversationId]: false };
 -        }
@@ -17517,11 +17975,11 @@ index ff69ce06..f4ef7586 100644
 -        // Separate reactions and normal messages
 -        const finalMessages = processMessagesAndReactions(uniqueMessages, []);
 -        const enrichedMessages = enrichMessagesWithSenderProfile(convoId, finalMessages);
+-
+-        shadowVault.upsertMessages(enrichedMessages);
 +      const enrichedMessages = enrichMessagesWithSenderProfile(res.conversationId, decryptedItems);
 +      const processedMessages = processMessagesAndReactions(enrichedMessages);
  
--        shadowVault.upsertMessages(enrichedMessages);
--
 -        // [UI UPDATE] Keep tombstones visible
 -        // const visibleMessages = finalMessages.filter(m => !m.isDeletedLocal);
 -
@@ -18505,11 +18963,18 @@ index b05beec1..cdb4f80c 100644
  
    export class FixedSizeList extends Component<FixedSizeListProps> {
 diff --git a/web/src/types/socket.d.ts b/web/src/types/socket.d.ts
-index 2b834e08..3d9ffe62 100644
+index 2b834e08..97e43a2e 100644
 --- a/web/src/types/socket.d.ts
 +++ b/web/src/types/socket.d.ts
-@@ -9,12 +9,12 @@ export interface ServerToClientEvents {
-     "message:deleted": (payload: { conversationId: string; id: string }) => void;
+@@ -4,17 +4,18 @@ import type { User } from '@store/auth';
+ export interface ServerToClientEvents {
+     connect: () => void;
+     disconnect: (reason: string) => void;
++    "error": (payload: { message: string }) => void;
+     "message:new": (message: Message) => void;
+     "message:updated": (message: Message) => void;
+-    "message:deleted": (payload: { conversationId: string; id: string }) => void;
++    "message:deleted": (payload: { conversationId: string; id?: string; ids?: string[] }) => void;
      "message:viewed": (payload: { messageId: string; conversationId: string }) => void;
      "messages:expired": (payload: { messageIds: string[] }) => void; // New event for disappearing messages
 -    "reaction:new": (payload: { conversationId: string; messageId: string; reaction: any }) => void;
@@ -18523,7 +18988,20 @@ index 2b834e08..3d9ffe62 100644
      "conversation:participant_removed": (payload: { conversationId: string; userId: string }) => void;
      "user:updated": (user: Partial<User> & { id: string }) => void;
      "message:status_updated": (payload: {
-@@ -55,7 +55,7 @@ export interface ServerToClientEvents {
+@@ -46,16 +47,19 @@ export interface ServerToClientEvents {
+         requesterPublicKey: string;
+     }) => void;
+     force_logout: () => void;
+-    'user:identity_changed': (data: { userId: string; name: string }) => void;
++    'user:identity_changed': (data: { userId: string }) => void;
+     "group:participants_changed": (payload: { conversationId: string }) => void;
+     "session:request_key": (payload: { conversationId: string; requesterId: string; sessionId: string }) => void;
++    "conversation:participant_updated": (payload: { conversationId: string; userId: string; role: 'ADMIN' | 'MEMBER' }) => void;
++    "session:key_requested": (data: { conversationId: string; sessionId: string; requesterId: string }) => void;
++    "auth:banned": (payload: { reason: string }) => void;
+ 
+     // --- WEBRTC E2EE SIGNALING ---
+     "webrtc:secure_signal": (payload: { from: string; type: string; payload: string }) => void;
  
      // --- DEVICE MIGRATION TUNNEL (SERVER -> CLIENT) ---
      "migration:start": (payload: { roomId: string; totalChunks: number; sealedKey: string; iv: string }) => void;
@@ -18532,7 +19010,38 @@ index 2b834e08..3d9ffe62 100644
      "migration:ack": (payload: { roomId: string; success: boolean }) => void;
  }
  
-@@ -103,6 +103,6 @@ export interface ClientToServerEvents {
+@@ -69,9 +73,9 @@ export interface ClientToServerEvents {
+     "typing:start": (payload: { conversationId: string }) => void;
+     "typing:stop": (payload: { conversationId: string }) => void;
+     "conversation:join": (conversationId: string) => void;
+-    "session:request_key": (payload: { 
+-        conversationId: string; 
+-        sessionId: string; 
++    "session:request_key": (payload: {
++        conversationId: string;
++        sessionId: string;
+         targetId?: string;
+         requesterId?: string;
+     }) => void;
+@@ -81,6 +85,7 @@ export interface ClientToServerEvents {
+         sessionId: string;
+         encryptedKey: string;
+     }) => void;
++    "session:request_missing": (payload: { conversationId: string; sessionId: string }) => void;
+     "messages:distribute_keys": (payload: {
+         conversationId: string;
+         keys: { userId: string; key: string }[];
+@@ -96,13 +101,14 @@ export interface ClientToServerEvents {
+         keys: { p256dh: string; auth: string };
+     }) => void;
+     "push:unsubscribe": () => void;
+-    
++    "error": (payload: { message: string }) => void;
++
+     // --- WEBRTC E2EE SIGNALING ---
+     "webrtc:secure_signal": (payload: { to: string; type: string; payload: string }) => void;
+-    
++
      // --- DEVICE MIGRATION TUNNEL (CLIENT -> SERVER) ---
      "migration:join": (roomId: string) => void;
      "migration:start": (payload: { roomId: string; totalChunks: number; sealedKey: string; iv: string }) => void;
