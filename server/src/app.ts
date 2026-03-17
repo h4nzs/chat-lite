@@ -80,6 +80,20 @@ app.use(helmet({
         "https://nyx-app.my.id",
         "https://*.nyx-app.my.id"
       ],
+      // 👇 INI YANG WAJIB LU TAMBAHIN 👇
+      mediaSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://*.r2.dev",
+        "https://*.cloudflarestorage.com",
+        "https://*.nyx-app.my.id"
+      ],
+      workerSrc: [
+        "'self'",
+        "blob:"
+      ],
+      // 👆 SAMPAI SINI 👆
       connectSrc: [
         "'self'",
         wsOrigin,
