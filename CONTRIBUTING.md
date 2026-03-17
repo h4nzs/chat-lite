@@ -13,7 +13,7 @@ Before you write any code, understand our architectural boundaries:
 1. **The Core Crypto is Sacred:** Do **NOT** bump, update, or modify `libsodium-wrappers` or its type definitions. Backward compatibility in the Double Ratchet engine is our absolute highest priority.
 2. **Package Manager:** We use `pnpm` exclusively. Do not use `npm` or `yarn`. Do not commit `package-lock.json` or `yarn.lock`.
 3. **Strict State:** We use Zustand v5. Do not return objects in selectors without `useShallow`, or you will trigger infinite render loops.
-4. **Formatting:** We use ESLint v10 (Flat Config). Your code must pass `pnpm run lint` without any warnings.
+4. **Formatting:** We use ESLint v10 (Flat Config). Your code must pass `pnpm run lint` without any warnings (except unused-var warning).
 
 ## 🛠️ Development Workflow
 
