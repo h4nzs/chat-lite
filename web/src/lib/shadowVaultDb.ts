@@ -22,6 +22,9 @@ export interface DecryptedMessageRecord {
   fileName?: string; // Encrypted file name
   fileSize?: number;
   fileType?: string;
+  // Message metadata
+  isEdited?: boolean;
+  reactions?: string; // Encrypted JSON string of reactions array
 }
 
 // --- CRYPTO ENGINE FOR IRON VAULT ---
@@ -138,17 +141,26 @@ export class NyxShadowVault extends Dexie {
         } else if (existing?.fileUrl) {
             encryptedFileUrl = existing.fileUrl;
         }
-        
+
         if (m.fileKey) {
             encryptedFileKey = await encryptVaultText(m.fileKey);
         } else if (existing?.fileKey) {
             encryptedFileKey = existing.fileKey;
         }
-        
+
         if (m.fileName) {
             encryptedFileName = await encryptVaultText(m.fileName);
         } else if (existing?.fileName) {
             encryptedFileName = existing.fileName;
+        }
+
+        // Persist message metadata (isEdited, reactions)
+        let encryptedReactions: string | undefined = undefined;
+        if (m.reactions && m.reactions.length > 0) {
+            const reactionsStr = JSON.stringify(m.reactions);
+            encryptedReactions = await encryptVaultText(reactionsStr);
+        } else if (existing?.reactions) {
+            encryptedReactions = existing.reactions;
         }
 
         records.push({
@@ -168,7 +180,9 @@ export class NyxShadowVault extends Dexie {
           fileSize: m.fileSize,
           fileType: m.fileType,
           isViewOnce: m.isViewOnce,
-          isDeletedLocal: m.isDeletedLocal
+          isDeletedLocal: m.isDeletedLocal,
+          isEdited: m.isEdited || existing?.isEdited,
+          reactions: encryptedReactions
         });
       }
       await this.messages.bulkPut(records);
@@ -286,6 +300,17 @@ export class NyxShadowVault extends Dexie {
           }
         }
 
+        // Restore message metadata (isEdited, reactions)
+        let decryptedReactions = undefined;
+        if (r.reactions) {
+            const rawReactions = await decryptVaultText(r.reactions);
+            if (rawReactions) {
+                try {
+                    decryptedReactions = JSON.parse(rawReactions);
+                } catch {}
+            }
+        }
+
         messages.push({
           id: r.id,
           conversationId: r.conversationId,
@@ -308,7 +333,9 @@ export class NyxShadowVault extends Dexie {
           isBlindAttachment,
           isViewOnce: r.isViewOnce,
           isDeletedLocal: r.isDeletedLocal,
-          isSilent
+          isSilent,
+          isEdited: r.isEdited,
+          reactions: decryptedReactions
         });
       }
       return messages;

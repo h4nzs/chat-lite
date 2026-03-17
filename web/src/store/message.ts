@@ -418,6 +418,38 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           };
         });
 
+        // Store in vault for persistence across reloads
+        // For files/replies, we need to preserve the JSON content so it can be re-parsed
+        // If the message was parsed (content=null for files), reconstruct the JSON for storage
+        let messageForVault = { ...processedMessage };
+        
+        // Reconstruct JSON payload for files if content was nullified during parsing
+        if (processedMessage.isBlindAttachment && processedMessage.fileUrl && !processedMessage.content) {
+          messageForVault = {
+            ...processedMessage,
+            content: JSON.stringify({
+              type: 'file',
+              url: processedMessage.fileUrl,
+              key: processedMessage.fileKey,
+              name: processedMessage.fileName,
+              size: processedMessage.fileSize,
+              mimeType: processedMessage.fileType
+            })
+          };
+        }
+        // Reconstruct JSON for replies
+        else if (processedMessage.repliedToId && processedMessage.content && 
+                 !processedMessage.content.trim().startsWith('{')) {
+          // Check if this looks like a reply (has repliedToId but content is plain text)
+          // We need to check the original message to see if it was a reply
+          // For now, don't reconstruct replies since they're stored with plain text content
+        }
+        
+        // Don't store silent messages
+        if (!processedMessage.isSilent) {
+          await shadowVault.upsertMessages([messageForVault]);
+        }
+
         return processedMessage;
       } finally {
         incomingMessageLocks.delete(lockKey);
