@@ -14170,10 +14170,10 @@ index 21626817..7f23c053 100644
      return decryptedMsg;
 diff --git a/web/src/services/messageDecryption.service.ts b/web/src/services/messageDecryption.service.ts
 new file mode 100644
-index 00000000..9b096966
+index 00000000..33d264d0
 --- /dev/null
 +++ b/web/src/services/messageDecryption.service.ts
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,576 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -14477,10 +14477,21 @@ index 00000000..9b096966
 +      return decryptedMsg;
 +    }
 +
++    // [FIX] EXPLICIT DOUBLE RATCHET CHECK
++    // Ensure we capture DR payloads even if regex check fails
++    let isDrPayload = false;
++    if (contentToDecrypt.trim().startsWith('{')) {
++        try {
++            const p = JSON.parse(contentToDecrypt);
++            if (p.dr && p.ciphertext) isDrPayload = true;
++        } catch {}
++    }
++
 +    // [FIX] PARSE PLAIN JSON PAYLOADS (File, Reply, Story Reply, etc.)
 +    // These are already decrypted but need to be parsed into proper Message structure
 +    // Skip this if we're storing for vault (need raw JSON)
-+    if (!options.skipJsonParsing && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
++    // CRITICAL: Do NOT run this if it's a DR payload!
++    if (!options.skipJsonParsing && !isDrPayload && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
 +      try {
 +        const payload = JSON.parse(contentToDecrypt);
 +
@@ -14500,8 +14511,7 @@ index 00000000..9b096966
 +        if (payload.type === 'reply') {
 +          decryptedMsg.content = payload.text;
 +          decryptedMsg.repliedToId = payload.targetMessageId;
-+          // Note: Full repliedTo object requires fetching the target message
-+          return decryptedMsg;
++          // We don't have the full repliedTo object here, but ID allows lookup
 +        }
 +
 +        // Story Reply
@@ -14541,7 +14551,8 @@ index 00000000..9b096966
 +    }
 +
 +    // [FIX] PREVENT RE-DECRYPTION LOOP
-+    if (!isLikelyEncrypted(contentToDecrypt)) {
++    // But force decryption if it's explicitly identified as a DR payload
++    if (!isLikelyEncrypted(contentToDecrypt) && !isDrPayload) {
 +      return decryptedMsg;
 +    }
 +
