@@ -182,16 +182,23 @@ export async function fetchMessagesLogic(
     }
 
     const decryptedItems: Message[] = [];
+    const itemsForVault: Message[] = []; // Store with raw JSON content
+    
     for (const item of res.items) {
+      // Decrypt for display (with JSON parsing)
       const decrypted = await decryptMessageObject(item);
       decryptedItems.push(decrypted);
+      
+      // Decrypt for vault storage (skip JSON parsing to preserve raw JSON)
+      const forVault = await decryptMessageObject(item, new Set(), 0, { skipJsonParsing: true });
+      itemsForVault.push(forVault);
     }
 
     const enrichedMessages = enrichMessagesWithSenderProfile(conversationId, decryptedItems);
     const processedMessages = processMessagesAndReactions(enrichedMessages);
 
-    // Save to shadow vault
-    await shadowVault.upsertMessages(processedMessages);
+    // Save to shadow vault - use messages with raw JSON content preserved
+    await shadowVault.upsertMessages(itemsForVault);
 
     return {
       messages: processedMessages,

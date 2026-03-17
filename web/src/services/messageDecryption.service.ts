@@ -253,7 +253,7 @@ export async function decryptMessageObject(
   message: Message,
   seenIds = new Set<string>(),
   depth = 0,
-  options: { skipRetries?: boolean } = {}
+  options: { skipRetries?: boolean; skipJsonParsing?: boolean } = {}
 ): Promise<Message> {
   // 1. Clone message and add recursion guard
   const decryptedMsg = { ...message };
@@ -297,10 +297,11 @@ export async function decryptMessageObject(
 
     // [FIX] PARSE PLAIN JSON PAYLOADS (File, Reply, Story Reply, etc.)
     // These are already decrypted but need to be parsed into proper Message structure
-    if (contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
+    // Skip this if we're storing for vault (need raw JSON)
+    if (!options.skipJsonParsing && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
       try {
         const payload = JSON.parse(contentToDecrypt);
-        
+
         // File Attachment
         if (payload.type === 'file') {
           decryptedMsg.fileUrl = payload.url;
@@ -312,7 +313,7 @@ export async function decryptMessageObject(
           decryptedMsg.isBlindAttachment = true;
           return decryptedMsg;
         }
-        
+
         // Text Reply
         if (payload.type === 'reply') {
           decryptedMsg.content = payload.text;
@@ -320,7 +321,7 @@ export async function decryptMessageObject(
           // Note: Full repliedTo object requires fetching the target message
           return decryptedMsg;
         }
-        
+
         // Story Reply
         if (payload.type === 'story_reply') {
           decryptedMsg.content = payload.text;
@@ -332,21 +333,21 @@ export async function decryptMessageObject(
           } as Message;
           return decryptedMsg;
         }
-        
+
         // Reaction (should be intercepted by processMessagesAndReactions)
         if (payload.type === 'reaction') {
           // Keep as content, will be parsed by processMessagesAndReactions
           return decryptedMsg;
         }
-        
+
         // Edit (should be intercepted by processMessagesAndReactions)
         if (payload.type === 'edit') {
           // Keep as content, will be parsed by processMessagesAndReactions
           return decryptedMsg;
         }
-        
+
         // Silent messages (GHOST_SYNC, STORY_KEY, CALL_INIT, etc.)
-        if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+        if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' ||
             payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
           decryptedMsg.isSilent = true;
           decryptedMsg.content = null; // Don't display
