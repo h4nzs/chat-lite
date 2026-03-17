@@ -301,10 +301,21 @@ export async function decryptMessageObject(
       return decryptedMsg;
     }
 
+    // [FIX] EXPLICIT DOUBLE RATCHET CHECK
+    // Ensure we capture DR payloads even if regex check fails
+    let isDrPayload = false;
+    if (contentToDecrypt.trim().startsWith('{')) {
+        try {
+            const p = JSON.parse(contentToDecrypt);
+            if (p.dr && p.ciphertext) isDrPayload = true;
+        } catch {}
+    }
+
     // [FIX] PARSE PLAIN JSON PAYLOADS (File, Reply, Story Reply, etc.)
     // These are already decrypted but need to be parsed into proper Message structure
     // Skip this if we're storing for vault (need raw JSON)
-    if (!options.skipJsonParsing && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
+    // CRITICAL: Do NOT run this if it's a DR payload!
+    if (!options.skipJsonParsing && !isDrPayload && contentToDecrypt.trim().startsWith('{') && !isLikelyEncrypted(contentToDecrypt)) {
       try {
         const payload = JSON.parse(contentToDecrypt);
 
@@ -324,8 +335,7 @@ export async function decryptMessageObject(
         if (payload.type === 'reply') {
           decryptedMsg.content = payload.text;
           decryptedMsg.repliedToId = payload.targetMessageId;
-          // Note: Full repliedTo object requires fetching the target message
-          return decryptedMsg;
+          // We don't have the full repliedTo object here, but ID allows lookup
         }
 
         // Story Reply
@@ -365,7 +375,8 @@ export async function decryptMessageObject(
     }
 
     // [FIX] PREVENT RE-DECRYPTION LOOP
-    if (!isLikelyEncrypted(contentToDecrypt)) {
+    // But force decryption if it's explicitly identified as a DR payload
+    if (!isLikelyEncrypted(contentToDecrypt) && !isDrPayload) {
       return decryptedMsg;
     }
 

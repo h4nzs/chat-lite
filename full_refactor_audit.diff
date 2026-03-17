@@ -11208,7 +11208,7 @@ index f4dcc361..21489aa0 100644
      throw error;
    }
 diff --git a/web/src/lib/shadowVaultDb.ts b/web/src/lib/shadowVaultDb.ts
-index d25bd7ca..6df197bd 100644
+index d25bd7ca..c2612454 100644
 --- a/web/src/lib/shadowVaultDb.ts
 +++ b/web/src/lib/shadowVaultDb.ts
 @@ -16,6 +16,15 @@ export interface DecryptedMessageRecord {
@@ -11227,6 +11227,17 @@ index d25bd7ca..6df197bd 100644
  }
  
  // --- CRYPTO ENGINE FOR IRON VAULT ---
+@@ -75,8 +84,8 @@ export class NyxShadowVault extends Dexie {
+   }
+ 
+   async upsertMessages(messages: Message[]) {
+-    // Filter messages: Allow if it has content OR it is a tombstone
+-    const validMessages = messages.filter(m => (m.content && m.content !== 'waiting_for_key' && !m.content.startsWith('[')) || m.isDeletedLocal);
++    // Filter messages: Allow if it has content OR it is a tombstone OR it is a blind attachment (file)
++    const validMessages = messages.filter(m => (m.content && m.content !== 'waiting_for_key' && !m.content.startsWith('[')) || m.isDeletedLocal || m.isBlindAttachment || m.fileUrl);
+     if (validMessages.length === 0) return;
+ 
+     try {
 @@ -84,17 +93,20 @@ export class NyxShadowVault extends Dexie {
        for (const m of validMessages) {
          // [FIX] PERSISTENCE: Check if we already have a record with better profile data
@@ -13975,7 +13986,7 @@ index 00000000..f1948d23
 +  return () => clearInterval(intervalId);
 +}
 diff --git a/web/src/services/messageCrypto.ts b/web/src/services/messageCrypto.ts
-index 21626817..d1b012a7 100644
+index 21626817..7f23c053 100644
 --- a/web/src/services/messageCrypto.ts
 +++ b/web/src/services/messageCrypto.ts
 @@ -1,13 +1,16 @@
@@ -14121,7 +14132,7 @@ index 21626817..d1b012a7 100644
      if (!mk && decryptedMsg.tempId) {
          mk = await retrieveMessageKeySecurely(`temp_${decryptedMsg.tempId}`);
      }
-@@ -204,14 +216,14 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
+@@ -204,14 +216,21 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
          const unwrap = (str: string): string => {
               if (str && typeof str === 'string' && str.trim().startsWith('{')) {
                   try {
@@ -14129,7 +14140,14 @@ index 21626817..d1b012a7 100644
 -                     if (p.ciphertext) return unwrap(p.ciphertext);
 -                 } catch {}
 +                     const p = JSON.parse(str) as Record<string, unknown>;
-+                     if (p.ciphertext) return unwrap(p.ciphertext as string);
++                     // If it's a DR payload (has 'dr' header), extract the inner ciphertext
++                     if (p.dr && p.ciphertext) {
++                         return unwrap(p.ciphertext as string);
++                     }
++                     // If it's just a wrapper
++                     if (p.ciphertext) {
++                         return unwrap(p.ciphertext as string);
++                     }
 +                 } catch { return str; }
               }
               return str;
@@ -14141,7 +14159,7 @@ index 21626817..d1b012a7 100644
  
          if (cipherTextToUse) {
              try {
-@@ -245,7 +257,7 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
+@@ -245,7 +264,7 @@ export async function decryptSelfMessage(decryptedMsg: any, seenIds: Set<string>
      }
      
      // Fallback if MK is missing
@@ -14152,10 +14170,10 @@ index 21626817..d1b012a7 100644
      return decryptedMsg;
 diff --git a/web/src/services/messageDecryption.service.ts b/web/src/services/messageDecryption.service.ts
 new file mode 100644
-index 00000000..2935215d
+index 00000000..9b096966
 --- /dev/null
 +++ b/web/src/services/messageDecryption.service.ts
-@@ -0,0 +1,544 @@
+@@ -0,0 +1,565 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -14390,11 +14408,17 @@ index 00000000..2935215d
 + * Check if content is likely encrypted
 + */
 +function isLikelyEncrypted(str: string): boolean {
++  if (!str) return false;
 +  const trimmed = str.trim();
++  
 +  // 1. Check for JSON payload containing encryption markers
-+  if (trimmed.startsWith('{') && (trimmed.includes('"header"') || trimmed.includes('"ciphertext"') || trimmed.includes('"dr"'))) {
-+    return true;
++  if (trimmed.startsWith('{')) {
++      // Robust check for DR/X3DH/Signal headers
++      if (trimmed.includes('"header"') || trimmed.includes('"ciphertext"') || trimmed.includes('"dr"') || trimmed.includes('"x3dh"')) {
++          return true;
++      }
 +  }
++  
 +  // 2. Check for legacy/base64 encoded ciphertexts
 +  const base64Regex = /^[A-Za-z0-9+/_-]+={0,2}$/;
 +  if (base64Regex.test(trimmed) && trimmed.length > 20) {
@@ -14638,6 +14662,7 @@ index 00000000..2935215d
 +        }
 +      }
 +
++      // CRITICAL FIX: Always update content with plaintext
 +      decryptedMsg.content = plainText;
 +
 +      // BLIND ATTACHMENT PARSING
@@ -14652,6 +14677,20 @@ index 00000000..2935215d
 +            decryptedMsg.fileType = metadata.mimeType;
 +            decryptedMsg.content = null;
 +            decryptedMsg.isBlindAttachment = true;
++          }
++        } catch {
++          // Ignore parse errors
++        }
++      }
++
++      // STANDARD REPLY PARSING
++      if (plainText.startsWith('{') && plainText.includes('"type":"reply"')) {
++        try {
++          const metadata = JSON.parse(plainText);
++          if (metadata.type === 'reply') {
++            decryptedMsg.content = metadata.text;
++            decryptedMsg.repliedToId = metadata.targetMessageId;
++            // We don't have the full repliedTo object here, but ID allows lookup
 +          }
 +        } catch {
 +          // Ignore parse errors
@@ -14702,10 +14741,10 @@ index 00000000..2935215d
 +}
 diff --git a/web/src/services/messageHandler.service.ts b/web/src/services/messageHandler.service.ts
 new file mode 100644
-index 00000000..8e7f886a
+index 00000000..429d7872
 --- /dev/null
 +++ b/web/src/services/messageHandler.service.ts
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,449 @@
 +// Copyright (c) 2026 [han]. All rights reserved.
 +// This file is part of NYX, licensed under the AGPL-3.0.
 +// For commercial licensing, contact [admin@nyx-app.my.id].
@@ -14851,6 +14890,37 @@ index 00000000..8e7f886a
 +              status: 'SENT' as const
 +            };
 +
++            // FIX: If this is a file message, we must restore the fileUrl/fileKey 
++            // from the JSON we just sent, otherwise the UI sees raw JSON.
++            if (updatedMsg.isBlindAttachment && updatedMsg.content) {
++                try {
++                    const metadata = JSON.parse(updatedMsg.content);
++                    if (metadata.type === 'file') {
++                        updatedMsg.fileUrl = metadata.url;
++                        updatedMsg.fileKey = metadata.key;
++                        updatedMsg.fileName = metadata.name;
++                        updatedMsg.fileType = metadata.mimeType;
++                        updatedMsg.fileSize = metadata.size;
++                        updatedMsg.content = null; // Hide raw JSON
++                    }
++                } catch (e) {
++                    console.error('Failed to parse own file message', e);
++                }
++            }
++
++            // FIX: Intercept EDIT payloads - do not return as a new message to the store
++            if (updatedMsg.content && updatedMsg.content.trim().startsWith('{')) {
++                try {
++                    const payload = JSON.parse(updatedMsg.content);
++                    if (payload.type === 'edit') {
++                        // It's an edit command. We don't want this added to the message list.
++                        // The store.sendEdit() already applied the optimistic update to the target message.
++                        resolve({ message: undefined }); // Resolve without a message object
++                        return;
++                    }
++                } catch {}
++            }
++
 +            if (mkToStore) {
 +              const { retrieveMessageKeySecurely, storeMessageKeySecurely, deleteMessageKeySecurely } = await import('@lib/keyStorage');
 +              const mk = await retrieveMessageKeySecurely(`temp_${actualTempId}`);
@@ -14989,16 +15059,14 @@ index 00000000..8e7f886a
 +    const enriched = enrichMessagesWithSenderProfile(message.conversationId, [decrypted]);
 +    const processed = processMessagesAndReactions(enriched);
 +
-+    if (processed.length === 0) {
-+      return null;
++    if (processed.length > 0) {
++        const finalMessage = processed[0];
++        // Save to shadow vault
++        await shadowVault.upsertMessages([finalMessage]);
++        return finalMessage;
 +    }
-+
-+    const finalMessage = processed[0];
-+
-+    // Save to shadow vault
-+    await shadowVault.upsertMessages([finalMessage]);
-+
-+    return finalMessage;
++    
++    return null;
 +  } catch (error) {
 +    console.error('Handle incoming message error:', error);
 +    return null;
@@ -18978,7 +19046,7 @@ index ff69ce06..cc97e3d8 100644
 +  }
  }));
 diff --git a/web/src/store/messageInput.ts b/web/src/store/messageInput.ts
-index 8e3647d8..202dce77 100644
+index 8e3647d8..6f7ad334 100644
 --- a/web/src/store/messageInput.ts
 +++ b/web/src/store/messageInput.ts
 @@ -3,8 +3,9 @@
@@ -19013,7 +19081,15 @@ index 8e3647d8..202dce77 100644
        return false;
      }
    }
-@@ -264,7 +265,7 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
+@@ -258,13 +259,14 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
+           content: JSON.stringify(metadata),
+           repliedTo: replyingTo || undefined,
+           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined,
+-          isViewOnce
++          isViewOnce,
++          isBlindAttachment: true // FIX: Mark explicitly for parser
+       }, tempId);
+       
        updateActivity(activityId, { progress: 100, fileName: 'Done!' });
        setTimeout(() => removeActivity(activityId), 1000); 
  
@@ -19022,7 +19098,15 @@ index 8e3647d8..202dce77 100644
        console.error("Upload error:", error);
        const errorMsg = handleApiError(error);
        toast.error(`File upload failed: ${errorMsg}`);
-@@ -378,7 +379,7 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
+@@ -372,13 +374,14 @@ export const useMessageInputStore = createWithEqualityFn<State>((set, get) => ({
+           content: JSON.stringify(metadata),
+           repliedTo: replyingTo || undefined,
+           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined,
+-          isViewOnce
++          isViewOnce,
++          isBlindAttachment: true // FIX: Mark explicitly for parser
+       }, tempId);
+       
        updateActivity(activityId, { progress: 100, fileName: 'Sent!' });
        setTimeout(() => removeActivity(activityId), 1000); 
  
@@ -19266,7 +19350,7 @@ index b3708262..6ac54a2f 100644
          // 2. Action
          // The cipher text doesn't matter here as the decryption is mocked
 diff --git a/web/src/utils/crypto.ts b/web/src/utils/crypto.ts
-index 6834fc16..d9749fc4 100644
+index 6834fc16..42e4d68e 100644
 --- a/web/src/utils/crypto.ts
 +++ b/web/src/utils/crypto.ts
 @@ -1,235 +1,46 @@
@@ -20061,7 +20145,7 @@ index 6834fc16..d9749fc4 100644
    messageId?: string
  ): Promise<DecryptResult> {
    const release = await acquireRatchetLock(conversationId);
-@@ -696,121 +352,153 @@ async function doDecryptMessage(
+@@ -696,121 +352,154 @@ async function doDecryptMessage(
  ): Promise<DecryptResult> {
    if (!cipher) return { status: 'success', value: '' };
  
@@ -20097,7 +20181,7 @@ index 6834fc16..d9749fc4 100644
 +      let actualCipher = cipher;
  
 +      const unwrapCipher = (str: string): string => {
-+        if (str.trim().startsWith('{')) {
++        if (str && typeof str === 'string' && str.trim().startsWith('{')) {
            try {
 -              const combined = sodium.from_base64(actualCipher, sodium.base64_variants.URLSAFE_NO_PADDING);
 -              const nonce = combined.slice(0, XCHACHA20_NONCE_BYTES);
@@ -20108,6 +20192,7 @@ index 6834fc16..d9749fc4 100644
 -              // Fail silently and try fallback
 -          }
 +            const p = JSON.parse(str);
++            if (p.dr && p.ciphertext) return unwrapCipher(p.ciphertext);
 +            if (p.ciphertext) return unwrapCipher(p.ciphertext);
 +          } catch {}
 +        }
@@ -20313,7 +20398,7 @@ index 6834fc16..d9749fc4 100644
      }
    } else {
      // DOUBLE RATCHET & LEGACY FALLBACK
-@@ -819,30 +507,46 @@ async function doDecryptMessage(
+@@ -819,30 +508,46 @@ async function doDecryptMessage(
        try {
          payload = JSON.parse(cipher);
        } catch {
@@ -20368,7 +20453,7 @@ index 6834fc16..d9749fc4 100644
          return { status: 'success', value: sodium.to_string(decrypted) };
        }
  
-@@ -854,71 +558,107 @@ async function doDecryptMessage(
+@@ -854,71 +559,107 @@ async function doDecryptMessage(
  
        const skippedMkStr = await retrieveSkippedMessageKeySecurely(headerKey);
        if (skippedMkStr) {
@@ -20509,7 +20594,7 @@ index 6834fc16..d9749fc4 100644
    }
  
    const result = await worker_x3dh_initiator({
-@@ -927,7 +667,7 @@ export async function establishSessionFromPreKeyBundle(
+@@ -927,7 +668,7 @@ export async function establishSessionFromPreKeyBundle(
      theirSignedPreKey,
      theirSigningKey,
      signature,
@@ -20518,7 +20603,7 @@ index 6834fc16..d9749fc4 100644
    });
  
    return {
-@@ -936,230 +676,18 @@ export async function establishSessionFromPreKeyBundle(
+@@ -936,230 +677,18 @@ export async function establishSessionFromPreKeyBundle(
    };
  }
  
@@ -20758,7 +20843,7 @@ index 6834fc16..d9749fc4 100644
    const { encryptedData, iv, key } = await worker_file_encrypt(fileData);
  
    const combined = new Uint8Array(iv.length + encryptedData.byteLength);
-@@ -1172,30 +700,69 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
+@@ -1172,30 +701,69 @@ export async function encryptFile(blob: Blob): Promise<{ encryptedBlob: Blob; ke
    return { encryptedBlob, key: keyB64 };
  }
  
