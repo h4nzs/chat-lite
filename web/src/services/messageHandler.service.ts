@@ -191,13 +191,21 @@ export async function fetchMessagesLogic(
       
       // Decrypt for vault storage (skip JSON parsing to preserve raw JSON)
       const forVault = await decryptMessageObject(item, new Set(), 0, { skipJsonParsing: true });
-      itemsForVault.push(forVault);
+      
+      // Don't store reaction/edit messages in vault - they're metadata, not actual messages
+      const contentStr = typeof forVault.content === 'string' ? forVault.content : '';
+      const isSpecialPayload = contentStr.trim().startsWith('{') && 
+        (contentStr.includes('"type":"reaction"') || contentStr.includes('"type":"edit"'));
+      
+      if (!isSpecialPayload) {
+        itemsForVault.push(forVault);
+      }
     }
 
     const enrichedMessages = enrichMessagesWithSenderProfile(conversationId, decryptedItems);
     const processedMessages = processMessagesAndReactions(enrichedMessages);
 
-    // Save to shadow vault - use messages with raw JSON content preserved
+    // Save to shadow vault - use messages with raw JSON content preserved (excluding reactions/edits)
     await shadowVault.upsertMessages(itemsForVault);
 
     return {
@@ -242,11 +250,22 @@ export async function handleIncomingMessage(message: Message): Promise<Message |
     
     // If it's an edit, update the target message and return null
     if (editPayload) {
-      useMessageStore.getState().updateMessage(
+      const { updateMessage, messages } = useMessageStore.getState();
+      
+      // Update UI state
+      updateMessage(
         decrypted.conversationId,
         editPayload.targetMessageId,
         { content: editPayload.text, isEdited: true }
       );
+      
+      // Also update the vault - find the target message and update its content
+      const targetMessage = messages[decrypted.conversationId]?.find(m => m.id === editPayload.targetMessageId);
+      if (targetMessage) {
+        const updatedTarget = { ...targetMessage, content: editPayload.text, isEdited: true };
+        await shadowVault.upsertMessages([updatedTarget]);
+      }
+      
       return null; // Don't render as new message
     }
     

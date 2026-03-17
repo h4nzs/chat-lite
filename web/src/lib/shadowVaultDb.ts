@@ -265,6 +265,16 @@ export class NyxShadowVault extends Dexie {
                 content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
               };
             }
+            // Reaction - KEEP JSON content for processMessagesAndReactions to parse
+            else if (payload.type === 'reaction') {
+              // Keep the JSON string intact - will be parsed by processMessagesAndReactions
+              parsedContent = plainText;
+            }
+            // Edit - KEEP JSON content for processMessagesAndReactions to parse
+            else if (payload.type === 'edit') {
+              // Keep the JSON string intact - will be parsed by processMessagesAndReactions
+              parsedContent = plainText;
+            }
             // Silent messages
             else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
                      payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {

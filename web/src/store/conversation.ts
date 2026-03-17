@@ -120,7 +120,7 @@ const withPreview = (msg: Message): Message => {
     if (contentToParse.startsWith('STORY_KEY:')) {
         return { ...msg, preview: '', isSilent: true };
     }
-    
+
     // Check for Reaction, Silent, or Edit Payload
     if (contentToParse.startsWith('{')) {
        try {
@@ -134,20 +134,28 @@ const withPreview = (msg: Message): Message => {
          if (payload.type === 'edit' && typeof payload.text === 'string') {
             return { ...msg, preview: `✎ ${payload.text}`, content: payload.text, isEdited: true };
          }
+         if (payload.type === 'reply' && typeof payload.text === 'string') {
+            return { ...msg, preview: payload.text };
+         }
+         if (payload.type === 'story_reply' && typeof payload.text === 'string') {
+            return { ...msg, preview: `📷 Story: ${payload.text}` };
+         }
          if (payload.type === 'CALL_INIT' || payload.type === 'GHOST_SYNC') {
-            // These should ideally not be last messages, but if they are (e.g. fresh convo)
-            // we return a placeholder or just null out the preview
             return { ...msg, preview: '', isSilent: true };
          }
        } catch {}
     }
     return { ...msg, preview: msg.content };
   }
+  
+  // File attachments (check fileUrl if content is null)
   if (msg.fileUrl) {
     if (msg.fileType?.startsWith('image/')) return { ...msg, preview: "📷 Image" };
     if (msg.fileType?.startsWith('video/')) return { ...msg, preview: "🎥 Video" };
-    return { ...msg, preview: `${msg.fileName || "File"}` };
+    if (msg.fileType?.startsWith('audio/')) return { ...msg, preview: "🎤 Voice Message" };
+    return { ...msg, preview: `📎 ${msg.fileName || "File"}` };
   }
+  
   return msg;
 };
 
