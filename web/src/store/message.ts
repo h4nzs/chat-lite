@@ -272,15 +272,21 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     try {
       const cachedMessages = await shadowVault.getMessagesByConversation(id);
       if (cachedMessages && cachedMessages.length > 0) {
-        // Vault already returns parsed messages (file/reply/story/silent parsed in getMessagesByConversation)
-        // Just enrich with sender profiles and process reactions/edits
-        const enriched = enrichMessagesWithSenderProfile(id, cachedMessages);
+        // CRITICAL FIX: We MUST decrypt the messages loaded from the vault because they are stored encrypted!
+        // The vault only handles Iron Vault encryption, NOT Double Ratchet decryption
+        const decryptedItems: Message[] = [];
+        for (const item of cachedMessages) {
+          const decrypted = await decryptMessageObject(item);
+          decryptedItems.push(decrypted);
+        }
+
+        const enriched = enrichMessagesWithSenderProfile(id, decryptedItems);
         const processed = processMessagesAndReactions(enriched);
 
         set((state) => ({
           messages: { ...state.messages, [id]: processed }
         }));
-        
+
         // If vault has messages, skip API fetch to avoid overwriting with raw ciphertext
         // API fetch is only needed for fresh sync when vault is empty
         set((state) => ({
