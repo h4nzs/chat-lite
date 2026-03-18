@@ -1,226 +1,217 @@
-# NYX Chat - Project Context
+# NYX Chat - Project Context Guide
 
 ## Project Overview
 
-**NYX** is a zero-knowledge, end-to-end encrypted (E2EE) messaging application built with a "Trust No One" (TNO) architecture. It operates without requiring any Personally Identifiable Information (PII) such as phone numbers, email addresses, or real names. The project implements the Signal Protocol (X3DH + Double Ratchet) entirely in the browser using WebAssembly.
+**NYX** is a zero-knowledge, end-to-end encrypted (E2EE) messaging application built on the Signal Protocol. It operates under a "Trust No One" (TNO) architecture where the server is mathematically incapable of reading messages or knowing user identities.
 
-### Core Philosophy
-- **Pure Anonymity**: No PII storage; usernames are blind-indexed client-side using Argon2id
-- **Zero-Knowledge Architecture**: Server cannot read messages or user profiles (all encrypted client-side)
-- **Local-First Sovereignty**: Chat history stored exclusively in IndexedDB; never synced to cloud in plaintext
+### Core Principles
+- **No PII Storage**: No phone numbers, emails, IP addresses, or plaintext usernames stored
+- **Blind Indexing**: Usernames hashed client-side with Argon2id; server only sees random hashes
+- **Ghost Profiles**: Profile data encrypted locally with symmetric keys shared only via Double Ratchet
+- **Local-First**: Chat history stored exclusively in IndexedDB; no cloud sync of plaintext data
 
 ## Architecture
 
 ### Tech Stack (2026)
 
-**Frontend (`/web`)**
-- React 19 + Vite 7 (TypeScript)
-- Zustand v5 (state management with persist middleware)
-- Tailwind CSS v4 (Lightning CSS engine)
-- Crypto Engine: `libsodium-wrappers` v0.8.2 (Web Worker isolation)
-- IndexedDB: `idb-keyval`, `dexie` for "The Shadow Vault"
-- Real-time: Socket.IO client v4.8+
-- PWA: Workbox-based service worker with injectManifest strategy
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 19, Vite 7, TypeScript, Tailwind CSS v4, Zustand v5 |
+| **Backend** | Node.js, Express, Socket.IO v4 |
+| **Database** | PostgreSQL via Prisma ORM v7 |
+| **Cache** | Redis (Socket.IO adapter, rate limiting) |
+| **Crypto** | libsodium-wrappers (v0.8.x - pinned for compatibility) |
+| **Package Manager** | pnpm (monorepo workspace) |
 
-**Backend (`/server`)**
-- Node.js + Express v5
-- PostgreSQL via Prisma ORM v7 (`@prisma/adapter-pg`)
-- Redis: Rate limiting, Socket.IO adapter, ephemeral state
-- Socket.IO v4.8+ with Redis adapter for clustering
-- Object Storage: Cloudflare R2 (encrypted blobs only)
-- Auth: JWT + WebAuthn (FIDO2/Passkeys)
+### Cryptography Implementation
+- **Key Exchange**: X3DH (Extended Triple Diffie-Hellman)
+- **Message Encryption**: Double Ratchet Algorithm (PFS + PCS)
+- **Cipher**: XChaCha20-Poly1305 via libsodium
+- **Hashing**: SHA-256, Argon2id
+- **KDF**: HKDF
+- **Signatures**: Ed25519
+- **WebAuthn**: FIDO2/Biometric authentication for VIP trust tier
 
-### Key Security Features
-
-1. **Cryptography** (Web Worker isolated)
-   - XChaCha20-Poly1305 for message encryption
-   - X3DH for asynchronous key exchange
-   - Double Ratchet for Perfect Forward Secrecy (PFS) + Post-Compromise Security (PCS)
-   - HKDF for key derivation, Ed25519 for signatures
-
-2. **Trust-Tier System** (Anti-Spam without PII)
-   - Sandbox Mode (default): Rate-limited, restricted features
-   - VIP Status: Unlocked via WebAuthn or Proof-of-Work puzzles
-
-3. **Ghost Profiles**: User profiles encrypted with symmetric `ProfileKey`, shared only via Double Ratchet header
-
-4. **Device Migration**: E2EE WebSocket tunnel for transferring history between devices via QR code
-
-## Project Structure
-
+### Project Structure
 ```
 nyx-chat/
-├── web/                    # Frontend React application
+├── web/                    # React frontend (PWA)
 │   ├── src/
 │   │   ├── components/     # UI components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── lib/            # Utility libraries
 │   │   ├── pages/          # Route pages
-│   │   ├── services/       # API/Socket services
-│   │   ├── store/          # Zustand stores
+│   │   ├── store/          # Zustand state
+│   │   ├── services/       # API/Socket clients
 │   │   ├── workers/        # Crypto Web Worker
-│   │   ├── types/          # TypeScript types
+│   │   ├── lib/            # Low-level utilities
 │   │   └── utils/          # Helper functions
-│   ├── public/             # Static assets
-│   ├── index.html
-│   ├── vite.config.ts
-│   └── package.json
-├── server/                 # Backend Express application
+│   ├── sw.ts               # Service Worker (injectManifest)
+│   └── vite.config.ts
+├── server/
 │   ├── src/
-│   │   ├── routes/         # API route handlers
-│   │   ├── middleware/     # Auth, rate limiting, CORS
-│   │   ├── jobs/           # Cron jobs (message sweeper)
-│   │   ├── lib/            # Crypto, database utilities
-│   │   ├── types/          # TypeScript types
-│   │   └── utils/          # Helper functions
+│   │   ├── routes/         # Express routes
+│   │   ├── socket/         # Socket.IO handlers
+│   │   ├── services/       # Business logic
+│   │   ├── middleware/     # Auth, rate limiting
+│   │   ├── jobs/           # Cron (message sweeper)
+│   │   └── lib/            # Crypto utilities
 │   ├── prisma/
-│   │   ├── schema.prisma   # Database schema
-│   │   └── seed.ts         # Seed data
-│   ├── tests/              # Test files
-│   └── package.json
-├── scripts/                # Build/deployment scripts
-├── docker-compose.yml      # Local development stack
-└── package.json            # Root workspace config
+│   │   └── schema.prisma   # Database schema
+│   └── ecosystem.config.js # PM2 cluster config
+└── scripts/                # Workspace scripts
 ```
 
 ## Building and Running
 
 ### Prerequisites
 - Node.js 20+
-- pnpm (package manager)
+- pnpm
 - PostgreSQL 15+
 - Redis
 
 ### Installation
-
 ```bash
 git clone https://github.com/h4nzs/nyx-chat.git
 cd nyx-chat
 pnpm install
 ```
 
-### Environment Setup
-
-Create `server/.env`:
-
+### Environment Setup (server/.env)
 ```env
 DATABASE_URL="postgresql://user:pass@localhost:5432/nyx_db"
 REDIS_URL="redis://localhost:6379"
-JWT_SECRET="super-long-random-string-min-32-chars"
-CLIENT_URL="http://localhost:5173"
+JWT_SECRET="<min-32-char-random-string>"
+CLIENT_URL="http://localhost"
 CORS_ORIGIN="http://localhost:5173"
 ```
 
-### Database Setup
-
-```bash
-cd server
-npx prisma db push
-pnpm run seed  # Optional: seed initial data
-```
-
 ### Development
-
 ```bash
-# Root (runs both web and server if configured)
-pnpm dev
+# Initialize database
+cd server && npx prisma db push
 
-# Or run individually
-cd web && pnpm dev      # Frontend on http://localhost:5173
-cd server && pnpm dev   # Backend on http://localhost:4000
+# Run frontend (port 5173)
+cd web && pnpm dev
+
+# Run backend (port 4000)
+cd server && pnpm dev
 ```
 
-### Building
-
+### Production Build
 ```bash
 # Build all packages
-pnpm run build
+pnpm build
 
-# Build individually
-cd web && pnpm build
-cd server && pnpm build
-```
+# Preview (frontend)
+cd web && pnpm preview
 
-### Testing
-
-```bash
-pnpm test
-```
-
-### Linting
-
-```bash
-pnpm lint
+# Start server
+cd server && pnpm start
 ```
 
 ### Docker Deployment
-
 ```bash
 docker-compose up -d
 ```
 
-## Development Conventions
+## Testing
+```bash
+# Run all tests
+pnpm test
 
-### Strict Rules
+# Frontend tests (Vitest + jsdom)
+cd web && pnpm test
 
-1. **Crypto Immutability**: DO NOT update `libsodium-wrappers` or its type definitions. Cryptographic backward compatibility is the highest priority.
+# Backend tests
+cd server && pnpm test
+```
 
-2. **Package Manager**: Use `pnpm` exclusively. Never commit `package-lock.json` or `yarn.lock`.
+## Linting
+```bash
+pnpm lint  # ESLint v10 (Flat Config)
+```
 
-3. **State Management**: When using Zustand selectors, always wrap with `useShallow` to prevent infinite render loops.
+## Key Development Constraints
 
-4. **Code Quality**: ESLint v10 (Flat Config) must pass with zero warnings before PR.
+### ⚠️ CRITICAL RULES
+1. **DO NOT update `libsodium-wrappers`** - Cryptographic backward compatibility is the highest priority. The package is pinned at v0.8.x.
+2. **Use `pnpm` only** - No npm/yarn. Do not commit `package-lock.json` or `yarn.lock`.
+3. **Zustand selectors** - Always use `useShallow` when returning objects from selectors to prevent infinite render loops.
+4. **ESLint compliance** - Code must pass `pnpm run lint` with zero warnings (except unused-var).
 
-### Testing Practices
+### State Management (Zustand v5)
+```typescript
+// CORRECT
+const { data } = useStore(useShallow(state => ({ data: state.data })));
 
-- Frontend: Vitest + React Testing Library (jsdom environment)
-- Backend: TypeScript + native test runner
-- E2E testing: Needed for crypto worker and real-time synchronization
+// WRONG - triggers infinite re-renders
+const { data } = useStore(state => ({ data: state.data }));
+```
 
-### Commit Style
+### Path Aliases (web/)
+```typescript
+import Component from '@/components/Component';
+import useStore from '@/store/store';
+import { api } from '@/services/api';
+```
 
-Use Conventional Commits:
-- `feat: add markdown support`
-- `fix: decrypt worker memory leak`
-- `chore: update dependencies`
+## Database Schema Highlights
 
-### Key Architectural Boundaries
+### Core Models
+- **User**: Stores `usernameHash` (Argon2id), `encryptedProfile`, `publicKey`, `signingKey`
+- **Conversation**: Supports 1:1 and group chats
+- **Message**: E2EE content with optional `expiresAt` for disappearing messages
+- **SessionKey**: Stores Double Ratchet session state per conversation
+- **PreKeyBundle**: X3DH pre-key material for asynchronous key exchange
+- **Authenticator**: WebAuthn credentials for passwordless auth
 
-- **Web Worker Isolation**: All crypto operations run in `crypto.worker.ts` to avoid blocking the main UI thread
-- **IndexedDB for Keys**: Cryptographic keys stored in IndexedDB (`keychain-db-${userId}`), NOT localStorage
-- **Memory Hygiene**: Sensitive data (keys, seeds) must be wiped with `sodium.memzero()` after use
-- **Tombstone Pattern**: Local message deletion uses soft-delete (`isDeletedLocal: true`) to prevent re-fetch resurrection
+### Key Indexes
+- `Message(conversationId, createdAt DESC)` - Fast chat history loading
+- `User(createdAt)` - User discovery
+- `Story(expiresAt)` - Auto-deletion scheduling
 
-## Key Files Reference
+## Security Features
 
-| File | Purpose |
-|------|---------|
-| `web/src/workers/crypto.worker.ts` | Web Worker for all cryptographic operations |
-| `web/src/store/` | Zustand state management (auth, chat, keys) |
-| `server/src/app.ts` | Express application setup |
-| `server/src/socket.ts` | Socket.IO configuration |
-| `server/prisma/schema.prisma` | Database schema (users, messages, conversations) |
-| `web/src/lib/` | Core utilities (encryption helpers, API clients) |
+### Trust-Tier System (Anti-Spam)
+1. **Sandbox Mode** (default): Rate-limited, restricted features
+2. **VIP Status**: Unlocked via WebAuthn or cryptographic puzzles
 
-## Deployment Architecture
+### Zero-Inbound Deployment
+- Production uses Cloudflare Tunnels
+- No inbound firewall ports except SSH
+- Traffic routed to localhost:3000 (PWA) and localhost:4000 (API)
 
-### Production (Zero-Inbound Policy)
-- All traffic routed through Cloudflare Tunnels
-- No inbound firewall ports (except SSH)
-- Frontend: localhost:3000 (Nginx reverse proxy)
-- Backend: localhost:4000
+### Data Ownership (NYX Vault)
+- Export encrypted `.nyxvault` files containing keys/metadata
+- Device-to-device migration via E2EE WebSocket tunnel (server as blind relay)
 
-### PM2 Cluster Mode (Zero-Downtime)
-- Uses `ecosystem.config.js` with `exec_mode: cluster`
-- Rolling restart ensures no dropped connections
-- Requires `process.send('ready')` signal in server startup
+## Deployment Notes
 
-## License
+### PM2 Zero-Downtime (Production)
+Server uses PM2 cluster mode with `ecosystem.config.js`:
+```bash
+pm2 reload ecosystem.config.js --update-env
+```
 
-**AGPL-3.0**: Network use (SaaS) requires open-sourcing your entire project. Commercial licenses available for closed-source deployments (see `COMMERCIAL.md`).
+### Version Management
+```bash
+pnpm version patch  # Auto-updates README.md, package.json files
+```
 
 ## Contributing
 
-- Requires signing CLA (automated via @cla-assistant on PR)
-- Check `CONTRIBUTING.md` for detailed guidelines
-- Use PR templates provided
+- **CLA Required**: Contributors must sign the Contributor License Agreement via @cla-assistant bot on first PR
+- **Atomic Commits**: Use Conventional Commits (`feat:`, `fix:`, `chore:`)
+- **PR Template**: Follow provided templates
+
+## License
+
+**AGPL-3.0** - Network use (SaaS) requires open-sourcing your entire project. Commercial licenses available for closed-source deployments.
+
+## Common Pitfalls
+
+| Issue | Solution |
+|-------|----------|
+| libsodium not loading | Exclude from Vite `optimizeDeps` |
+| Zustand infinite renders | Wrap selectors with `useShallow` |
+| PWA cache size errors | `maximumFileSizeToCacheInBytes: 5 * 1024 * 1024` |
+| PM2 wrong release path | Use `fs.realpathSync()` in ecosystem config |

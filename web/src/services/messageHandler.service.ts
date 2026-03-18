@@ -251,12 +251,49 @@ export async function fetchMessagesLogic(
 export async function handleIncomingMessage(message: Message): Promise<Message | null> {
   try {
     const decrypted = await decryptMessageObject(message);
-    
+
+    // CRITICAL FIX: Read the attached silentPayload from decryptMessageObject
+    const silentPayload = (decrypted as any).silentPayload;
+
+    // If it's a silent/system message, process state but DO NOT render
+    if (decrypted.isSilent || silentPayload) {
+      
+      if (silentPayload?.type === 'CALL_INIT') {
+        import('@store/callStore').then(({ useCallStore }) => {
+          const callStore = useCallStore.getState();
+
+          // Extract call data from payload
+          const from = decrypted.senderId;
+          const isVideo = silentPayload.video || false;
+          const key = silentPayload.key;
+
+          // Get sender profile for the incoming call UI
+          const senderProfile = decrypted.sender || { id: from, name: 'Unknown' };
+
+          // Trigger incoming call UI using the exact method from callStore
+          if (callStore.setIncomingCall) {
+              callStore.setIncomingCall(from, isVideo, senderProfile, key);
+          }
+        }).catch(console.error);
+        return null; // Invisible in chat UI
+      }
+
+      if (silentPayload?.type === 'STORY_KEY') {
+        import('@store/story').then(({ useStoryStore }) => {
+          if (useStoryStore.getState().fetchActiveStories) {
+              useStoryStore.getState().fetchActiveStories(decrypted.senderId); // Trigger UI Refresh for sender's stories!
+          }
+        }).catch(console.error);
+        return null; // Invisible in chat UI
+      }
+
+      return null; // Drop GHOST_SYNC and normal silent messages
+    }
+
     // INTERCEPT SPECIAL PAYLOADS - Don't render these as chat bubbles
     const reactionPayload = parseReaction(decrypted.content);
     const editPayload = parseEdit(decrypted.content);
-    const silentPayload = parseSilent(decrypted.content);
-    
+
     // If it's a reaction, add it to the target message and return null
     if (reactionPayload) {
       const { user } = useAuthStore.getState();
@@ -273,59 +310,28 @@ export async function handleIncomingMessage(message: Message): Promise<Message |
       );
       return null; // Don't render as new message
     }
-    
+
     // If it's an edit, update the target message and return null
     if (editPayload) {
       const { updateMessage, messages } = useMessageStore.getState();
-      
+
       // Update UI state
       updateMessage(
         decrypted.conversationId,
         editPayload.targetMessageId,
         { content: editPayload.text, isEdited: true }
       );
-      
+
       // Also update the vault - find the target message and update its content
       const targetMessage = messages[decrypted.conversationId]?.find(m => m.id === editPayload.targetMessageId);
       if (targetMessage) {
         const updatedTarget = { ...targetMessage, content: editPayload.text, isEdited: true };
         await shadowVault.upsertMessages([updatedTarget]);
       }
-      
+
       return null; // Don't render as new message
     }
-    
-    // If it's a silent/system message (GHOST_SYNC, STORY_KEY, CALL_INIT), ignore it
-    if (silentPayload) {
-      if (silentPayload.type === 'CALL_INIT') {
-        // CRITICAL FIX: Trigger the call overlay before hiding the message!
-        import('@store/callStore').then(({ useCallStore }) => {
-           const callStore = useCallStore.getState();
-           
-           // Extract call data from payload
-           const from = decrypted.senderId;
-           const isVideo = silentPayload.video || false;
-           const key = silentPayload.key;
-           
-           // Get sender profile for the incoming call UI
-           const senderProfile = decrypted.sender || { id: from, name: 'Unknown' };
-           
-           // Trigger incoming call UI
-           if (callStore.setIncomingCall) {
-               callStore.setIncomingCall(from, isVideo, senderProfile, key);
-           }
-        }).catch(console.error);
-        
-        return null; // Keep it invisible from the chat UI
-      }
 
-      if (silentPayload.type === 'GHOST_SYNC' || 
-          silentPayload.type === 'STORY_KEY' || 
-          silentPayload.type === 'silent') {
-        return null; // Completely invisible
-      }
-    }
-    
     const enriched = enrichMessagesWithSenderProfile(message.conversationId, [decrypted]);
     const processed = processMessagesAndReactions(enriched);
 
@@ -335,7 +341,7 @@ export async function handleIncomingMessage(message: Message): Promise<Message |
         await shadowVault.upsertMessages([finalMessage]);
         return finalMessage;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Handle incoming message error:', error);

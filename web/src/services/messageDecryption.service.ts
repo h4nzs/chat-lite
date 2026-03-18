@@ -99,9 +99,10 @@ export function parseJsonMessageContent(msg: Message) {
         sender: { id: payload.storyAuthorId },
         content: payload.storyText || (payload.hasMedia ? '📷 Story' : 'Story')
       } as Message;
-    } else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || 
+    } else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' ||
                payload.type === 'STORY_KEY' || payload.type === 'CALL_INIT') {
       msg.isSilent = true;
+      (msg as any).silentPayload = payload; // CRITICAL: Pass payload to handler
       msg.content = null;
     }
   } catch { /* Ignore parse errors */ }
@@ -519,6 +520,7 @@ export async function decryptMessageObject(
             } as Message;
           } else if (payload.type === 'STORY_KEY') {
             decryptedMsg.isSilent = true;
+            (decryptedMsg as any).silentPayload = payload; // CRITICAL: Pass payload to handler
             decryptedMsg.content = null;
             // CRITICAL: ACTUALLY SAVE THE STORY KEY SO RECIPIENTS CAN VIEW IT
             if (payload.key && decryptedMsg.senderId) {
@@ -528,6 +530,7 @@ export async function decryptMessageObject(
             }
           } else if (payload.type === 'silent' || payload.type === 'GHOST_SYNC' || payload.type === 'CALL_INIT') {
             decryptedMsg.isSilent = true;
+            (decryptedMsg as any).silentPayload = payload; // CRITICAL: Pass payload to handler
             decryptedMsg.content = null;
           }
         } catch {
