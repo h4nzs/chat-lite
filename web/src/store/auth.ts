@@ -128,6 +128,19 @@ type Actions = {
 
 let privateKeysCache: RetrievedKeys | null = null;
 
+/**
+ * Sets the private keys cache directly (used during registration)
+ * This prevents the need to unlock keys from storage for newly registered users
+ */
+export const setPrivateKeysCache = (keys: RetrievedKeys | null) => {
+  privateKeysCache = keys;
+};
+
+/**
+ * Gets the current private keys cache (for debugging)
+ */
+export const getPrivateKeysCache = (): RetrievedKeys | null => privateKeysCache;
+
 export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => {
   const savedUser = localStorage.getItem("user");
   const savedReadReceipts = localStorage.getItem('sendReadReceipts');
@@ -366,15 +379,21 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         await setDeviceAutoUnlockReady(true);
         set({ hasRestoredKeys: true });
 
-        // Cache keys
-        try {
-          const result = await retrievePrivateKeys(encryptedPrivateKeys, password);
-          if (result.success) privateKeysCache = result.keys;
-        } catch (e) {}
+        // CRITICAL FIX: Cache keys IMMEDIATELY after decryption so setupAndUploadPreKeyBundle can access them
+        // This prevents the "Failed to fetch pre-keys" error for newly registered users
+        const result = await retrievePrivateKeys(encryptedPrivateKeys, password);
+        if (result.success && result.keys) {
+          setPrivateKeysCache(result.keys);
+          // Also update the zustand store state for masterSeed
+          set({ masterSeed: result.keys.masterSeed });
+        } else if (!result.success) {
+          console.error("Failed to cache keys after registration:", result.reason);
+        }
 
         set({ user: res.user, accessToken: res.accessToken });
         localStorage.setItem("user", JSON.stringify(res.user));
-        
+
+        // Now this will succeed because the keys are already cached in memory!
         setupAndUploadPreKeyBundle().catch(e => console.error("Failed to upload initial pre-key bundle:", e));
         connectSocket();
 
