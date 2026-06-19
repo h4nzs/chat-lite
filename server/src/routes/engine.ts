@@ -88,39 +88,15 @@ router.post('/rooms', requireTenantAuth, async (req: Request, res: Response) => 
       processUser(userB)
     ]);
 
-    // Upsert conversation
-    let conversation = await prisma.conversation.findFirst({
-      where: {
-        tenantId: tenant.id,
+    // In Opaque Mailbox, we can't find a conversation by participant IDs.
+    // The B2B caller must manage conversationIds locally or we always create a new one.
+    const conversation = await prisma.conversation.create({
+      data: {
         isGroup: false,
-        AND: [
-          { participants: { some: { userId: dbUserA.id } } },
-          { participants: { some: { userId: dbUserB.id } } }
-        ]
-      },
-      include: {
-        participants: true
+        tenantId: tenant.id,
+        metadata: metadata || {},
       }
     });
-
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          isGroup: false,
-          tenantId: tenant.id,
-          metadata: metadata || {},
-          participants: {
-            create: [
-              { userId: dbUserA.id, role: 'ADMIN' },
-              { userId: dbUserB.id, role: 'ADMIN' }
-            ]
-          }
-        },
-        include: {
-          participants: true
-        }
-      });
-    }
 
     const [tokenA, tokenB] = await Promise.all([
       issueIframeTokens(dbUserA, req),

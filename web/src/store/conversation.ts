@@ -177,13 +177,34 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     if (!shouldProceed) return;
 
     try {
-      const rawConversations = await api<Conversation[]>("/api/conversations");
-      if (!Array.isArray(rawConversations)) throw new Error('Invalid data from server.');
-
       const { shadowVault } = await import('@lib/shadowVaultDb');
 
-      const conversations = await Promise.all(rawConversations.map(async c => {
-        const participants = c.participants;
+      // 1. Get local conversations (participants stored client-side for Opaque Mailbox)
+      const localConversations = await shadowVault.getAllConversations();
+      const localIds = localConversations.map(c => c.id);
+
+      // 2. Sync with server by local IDs
+      let rawConversations: Conversation[] = [];
+      if (localIds.length > 0) {
+        rawConversations = await api<Conversation[]>(`/api/conversations/sync?ids=${localIds.join(',')}`);
+      }
+      if (!Array.isArray(rawConversations)) throw new Error('Invalid data from server.');
+
+      // 3. Merge: server metadata + local participants
+      const serverMap = new Map(rawConversations.map(c => [c.id, c]));
+      const mergedSource = localConversations.map(local => {
+        const server = serverMap.get(local.id);
+        return { ...local, ...server, participants: local.participants, unreadCount: 0 };
+      });
+      // Also include server-only conversations (newly created on another device)
+      for (const server of rawConversations) {
+        if (!mergedSource.find(c => c.id === server.id)) {
+          mergedSource.push({ ...server, participants: [], unreadCount: 0 } as Conversation);
+        }
+      }
+
+      const conversations = await Promise.all(mergedSource.map(async c => {
+        const participants = c.participants || [];
 
         let localLastMessage: Message | null = null;
         try {
@@ -243,7 +264,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
 
       const existingConversations = get().conversations;
       const reconciledConversations = await Promise.all(conversations.map(async fetched => {
-          fetched.encryptionMode = 'SENDER_KEY';
+          fetched.encryptionMode = fetched.isGroup ? 'SENDER_KEY' : 'SPQR';
           if (fetched.isGroup) {
               const existing = existingConversations.find(e => e.id === fetched.id);
               if (existing) {
@@ -345,23 +366,13 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         }),
       });
       
-      if (optimisticProfile) {
-          const knownUsers = get().conversations.flatMap(c => c.participants);
-          
-          conv.participants = conv.participants.map(p => {
-              if (p.id === peerId) {
-                  const existing = knownUsers.find(u => u.id === peerId);
-                  if (existing?.name && existing.name !== 'Unknown') {
-                      return p; 
-                  }
-                  return { ...p, ...optimisticProfile }; 
-              }
-              return p;
-          });
-      }
+      // Opaque Mailbox: server returns empty participants, reconstruct locally
+      conv.participants = [
+        { id: user.id as any, name: '', username: '' } as any,
+        { id: peerId as any, name: optimisticProfile?.name || '', username: optimisticProfile?.username || '' } as any
+      ];
 
-
-      get().addOrUpdateConversation(conv);
+      get().addOrUpdateConversation({ ...conv, encryptionMode: 'SPQR' });
       set({ activeId: conv.id, isSidebarOpen: false });
       return conv.id;
     } catch (error: unknown) {
@@ -377,7 +388,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     let conv: Conversation | null = null;
 
     try {
-        conv = await authFetch<Conversation>("/api/conversations", {
+        const createRes = await authFetch<Conversation & { authSecret: string }>("/api/conversations", {
             method: "POST",
             body: JSON.stringify({
                 userIds,
@@ -385,22 +396,26 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                 encryptedMetadata: null 
             })
         });
+        conv = createRes;
+        const authSecret = createRes.authSecret;
 
         const distributionKeys = await ensureGroupSession(conv.id, conv.participants as unknown as Participant[], true);
         if (distributionKeys) {
             await emitGroupKeyDistribution(conv.id, distributionKeys as { userId: string; key: string }[]);
         }
         
-        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl }, conv.id);
+        // Include authSecret in encrypted metadata so other participants can manage the group
+        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl, participants: userIds, authSecret } as any, conv.id);
         
         await authFetch(`/api/conversations/${conv.id}/details`, {
             method: 'PUT',
+            headers: { 'X-Group-Token': authSecret },
             body: JSON.stringify({ encryptedMetadata })
         });
         
         const updatedConv: Conversation = {
             ...conv,
-            decryptedMetadata: { title: name, avatarUrl },
+            decryptedMetadata: { title: name, avatarUrl, authSecret },
             encryptedMetadata
         };
         
@@ -434,8 +449,9 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
 
     set(state => {
       const existing = state.conversations.find(c => c.id === conversation.id);
+      let updatedConv: Conversation;
       if (existing) {
-        const updated = {
+        updatedConv = {
           ...existing,
           encryptedMetadata: conversation.encryptedMetadata,
           decryptedMetadata: decryptedMetadata || existing.decryptedMetadata,
@@ -444,13 +460,22 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
           lastMessage: conversation.lastMessage || existing.lastMessage,
           updatedAt: conversation.updatedAt,
           unreadCount: conversation.unreadCount ?? existing.unreadCount,
-        };
+        } as Conversation;
+
+        // PERSIST TO SHADOW VAULT (Opaque Mailbox)
+        import('@lib/shadowVaultDb').then(m => m.shadowVault.saveConversation(updatedConv));
+
         return {
-          conversations: sortConversations(state.conversations.map(c => c.id === conversation.id ? updated : c), useAuthStore.getState().user?.id)
+          conversations: sortConversations(state.conversations.map(c => c.id === conversation.id ? updatedConv : c), useAuthStore.getState().user?.id)
         };
       } else {
+        updatedConv = { ...conversation, decryptedMetadata } as Conversation;
+
+        // PERSIST TO SHADOW VAULT (Opaque Mailbox)
+        import('@lib/shadowVaultDb').then(m => m.shadowVault.saveConversation(updatedConv));
+
         return {
-          conversations: sortConversations([{ ...conversation, decryptedMetadata }, ...state.conversations], useAuthStore.getState().user?.id)
+          conversations: sortConversations([updatedConv, ...state.conversations], useAuthStore.getState().user?.id)
         };
       }
     });
@@ -712,7 +737,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                     }).then(() => {
                         set(state => ({
                             conversations: state.conversations.map(c => 
-                                c.id === conversationId ? { ...c, handshakeStatus: 'secure', encryptionMode: 'PQ_DR' } : c
+                                c.id === conversationId ? { ...c, handshakeStatus: 'secure', encryptionMode: 'SPQR' } : c
                             )
                         }));
                         resolve();

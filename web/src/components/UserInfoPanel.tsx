@@ -36,7 +36,7 @@ export default function UserInfoPanel({ userId }: { userId: UserId }) {
   const [activeTab, setActiveTab] = useState('details');
 
   const activeConversation = conversations.find(c => c.id === activeId);
-  const isPqDr = activeConversation?.encryptionMode === 'PQ_DR';
+  const isPqDr = activeConversation?.encryptionMode === 'SPQR';
 
   const tabs = [
     { id: 'details', label: t('modals:user_info.tabs.details') },

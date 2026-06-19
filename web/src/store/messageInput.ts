@@ -57,6 +57,9 @@ const ensureGroupSessionIfNeeded = async (conversationId: string): Promise<boole
     toast.error(i18n.t('errors:internal_error_active_conversation_not_f', 'Internal error: Active conversation not found.'));
     return false;
   }
+
+  // SPQR 1-1: session handled by doEncryptMessage, no group key distribution needed
+  if (!conversation.isGroup) return true;
   
   try {
     const distributionKeys = await ensureGroupSession(conversationId, conversation.participants);

@@ -126,22 +126,6 @@ router.put('/me',
 
       if (encryptedProfile !== undefined && (!existingUser || encryptedProfile !== existingUser.encryptedProfile)) {
         await emitEventToUser(userId, 'user:updated', { id: updatedUser.id as UserId, encryptedProfile: updatedUser.encryptedProfile })
-
-        const conversations = await prisma.conversation.findMany({
-          where: { participants: { some: { userId } } },
-          include: { participants: { select: { userId: true } } }
-        })
-
-        const recipients = new Set<string>()
-        for (const c of conversations) {
-          for (const p of c.participants) {
-            if (p.userId !== userId) recipients.add(p.userId);
-          }
-        }
-
-        for (const recipientId of recipients) {
-          await emitEventToUser(recipientId, 'user:updated', { id: updatedUser.id as UserId, encryptedProfile: updatedUser.encryptedProfile })
-        }
       }
 
       res.json(updatedUser)
@@ -274,20 +258,6 @@ router.put('/me/keys',
             installationId: installationId || undefined
         }
       })
-
-      const conversations = await prisma.conversation.findMany({
-        where: { participants: { some: { userId } } },
-        include: { participants: { select: { userId: true } } }
-      })
-
-      const recipients = new Set<string>()
-      conversations.forEach(c => c.participants.forEach(p => {
-        if (p.userId !== userId) recipients.add(p.userId)
-      }))
-
-      for (const recipientId of recipients) {
-        await emitEventToUser(recipientId, 'user:identity_changed', { userId })
-      }
 
       res.status(200).json({ message: 'Keys updated successfully.' })
     } catch (error) { next(error) }

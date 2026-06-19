@@ -34,11 +34,9 @@ model User {
 
   // --- RELASI PENGGUNA ---
   messages             Message[]
-  participants         Participant[]
   messageStatuses      MessageStatus[]
   stories              Story[]
   hiddenConversations  UserHiddenConversation[]
-  createdConversations Conversation[]           @relation("CreatedConversations")
   authenticators       Authenticator[]
   blockedUsers         BlockedUser[]            @relation("Blocker")
   blockedBy            BlockedUser[]            @relation("Blocked")
@@ -182,8 +180,7 @@ model Conversation {
   id                String  @id @default(cuid())
   isGroup           Boolean @default(false)
   encryptedMetadata String?
-  creatorId         String?
-  creator           User?   @relation("CreatedConversations", fields: [creatorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  authSecret        String? // Secret token for blind authorization (Opaque Mailbox)
 
   // --- MULTI-TENANCY (B2B BaaS) ---
   tenantId String?
@@ -193,7 +190,6 @@ model Conversation {
   lastMessageAt DateTime?                @db.Timestamptz(6)
   createdAt     DateTime                 @default(now())
   updatedAt     DateTime                 @updatedAt
-  participants  Participant[]
   messages      Message[]
   sessionKeys   SessionKey[]
   hiddenBy      UserHiddenConversation[]
@@ -203,23 +199,7 @@ model Conversation {
   @@index([isGroup])
 }
 
-model Participant {
-  id             String       @id @default(cuid())
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  conversationId String
-  joinedAt       DateTime     @default(now())
-  lastReadMsgId  String?
-  role           String       @default("MEMBER")
-  isPinned       Boolean      @default(false)
 
-  @@unique([userId, conversationId])
-  @@index([conversationId])
-  @@index([userId])
-  @@index([joinedAt])
-  @@index([lastReadMsgId])
-}
 
 enum MessageType {
   USER
@@ -235,10 +215,11 @@ model Message {
   id             String       @id @default(cuid())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  senderId       String
+  sender         User?        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String?
   content        String?      @db.Text
   type           MessageType  @default(USER)
+  deleteSecret   String? // Secret token for blind deletion authorization
 
   sessionId           String?
   encryptedSessionKey String?

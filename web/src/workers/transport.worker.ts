@@ -5,6 +5,67 @@ let controlStream: WebTransportBidirectionalStream | null = null;
 let controlWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 let datagramWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 
+// --- TRAFFIC COVER: CHAFFING ---
+const CHAFF_INTERVAL_MS = 3000;
+const CHAFF_JITTER_MS = 500;
+const PADDING_BLOCK_SIZE = 8192;
+let outgoingQueue: { opCode: number, payload: Uint8Array, useStream: boolean }[] = [];
+let isChaffingActive = false;
+
+async function chaffingLoop() {
+    if (isChaffingActive) return;
+    isChaffingActive = true;
+
+    while (isChaffingActive) {
+        if (!transport) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+        }
+
+        let item = outgoingQueue.shift();
+        if (!item) {
+            // Generate encrypted-looking dummy data
+            const dummyPayload = new Uint8Array(PADDING_BLOCK_SIZE);
+            self.crypto.getRandomValues(dummyPayload);
+            // TRAFFIC COVER: Use Datagram (false) for Chaff to save memory and avoid stream exhaustion
+            item = { opCode: TransportOpCode.CHAFF, payload: dummyPayload, useStream: false };
+        }
+
+        try {
+            if (item.useStream) {
+                const stream = await transport.createUnidirectionalStream();
+                const writer = stream.getWriter();
+                const frame = new Uint8Array(5 + item.payload.length);
+                frame[0] = item.opCode;
+                new DataView(frame.buffer).setUint32(1, item.payload.length, false);
+                frame.set(item.payload, 5);
+                await writer.write(frame);
+                await writer.close();
+            } else if (datagramWriter) {
+                const frame = new Uint8Array(5 + item.payload.length);
+                frame[0] = item.opCode;
+                new DataView(frame.buffer).setUint32(1, item.payload.length, false);
+                frame.set(item.payload, 5);
+                await datagramWriter.write(frame);
+            }
+        } catch (e) {
+            console.error("Traffic Cover: Failed to send packet", e);
+        }
+
+        // Wait for next interval with jitter
+        const jitter = Math.floor(Math.random() * (CHAFF_JITTER_MS * 2)) - CHAFF_JITTER_MS;
+        await new Promise(r => setTimeout(r, Math.max(500, CHAFF_INTERVAL_MS + jitter)));
+    }
+}
+
+function startChaffing() {
+    chaffingLoop().catch(console.error);
+}
+
+function stopChaffing() {
+    isChaffingActive = false;
+}
+
 async function initWebTransport(url: string, token: string, certificateHash?: string, deviceIdentity?: string) {
   try {
     const options: WebTransportOptions = {};
@@ -24,11 +85,13 @@ async function initWebTransport(url: string, token: string, certificateHash?: st
     
     // Prevent "Uncaught (in promise)" error when connection is rejected
     transport.closed.then((info) => {
+      stopChaffing();
       postMessage({ 
         type: 'DISCONNECTED', 
         reason: info?.reason || 'connection closed' 
       } satisfies TransportWorkerToMain);
     }).catch((err) => {
+      stopChaffing();
       postMessage({ 
         type: 'DISCONNECTED', 
         reason: err?.message || 'connection error' 
@@ -56,6 +119,7 @@ async function initWebTransport(url: string, token: string, certificateHash?: st
     await controlWriter.write(authFrame);
 
     postMessage({ type: 'CONNECTED' } satisfies TransportWorkerToMain);
+    startChaffing();
 
     // Start reading streams
     readIncomingStreams(transport.incomingUnidirectionalStreams).catch(console.error);
@@ -200,6 +264,7 @@ self.onmessage = async (event: MessageEvent<MainToTransportWorker>) => {
       break;
     case 'DISCONNECT':
       if (transport) {
+        stopChaffing();
         if (datagramWriter) {
           try { datagramWriter.releaseLock(); } catch (e) {}
           datagramWriter = null;
@@ -211,36 +276,12 @@ self.onmessage = async (event: MessageEvent<MainToTransportWorker>) => {
       break;
     case 'SEND_STREAM':
       if (transport) {
-        try {
-          const stream = await transport.createUnidirectionalStream();
-          const writer = stream.getWriter();
-          
-          const frame = new Uint8Array(5 + data.payload.length);
-          frame[0] = data.opCode;
-          const view = new DataView(frame.buffer);
-          view.setUint32(1, data.payload.length, false);
-          frame.set(data.payload, 5);
-          
-          await writer.write(frame);
-          await writer.close();
-        } catch (e) {
-          console.error("Failed to send stream", e);
-        }
+        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: true });
       }
       break;
     case 'SEND_DATAGRAM':
-      if (transport && datagramWriter) {
-        try {
-          const frame = new Uint8Array(5 + data.payload.length);
-          frame[0] = data.opCode;
-          const view = new DataView(frame.buffer);
-          view.setUint32(1, data.payload.length, false);
-          frame.set(data.payload, 5);
-          
-          await datagramWriter.write(frame);
-        } catch (e) {
-          console.error("Failed to send datagram", e);
-        }
+      if (transport) {
+        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: false });
       }
       break;
     case 'START_HANDSHAKE':

@@ -404,6 +404,11 @@ async fn handle_connection(
                         let op_code = header[0];
                         let length = u32::from_be_bytes([header[1], header[2], header[3], header[4]]) as usize;
                         
+                        // TRAFFIC COVER: Ignore Chaff packets
+                        if op_code == 0x00 {
+                            return;
+                        }
+                        
                         // MAX 32KB for Handshake/Bi-stream payloads
                         if length > 32768 {
                             warn!("Payload too large: {} bytes", length);
@@ -468,6 +473,12 @@ async fn handle_connection(
                         if buffer.len() >= 5 {
                             let op_code = buffer[0];
                             let length = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
+
+                            // TRAFFIC COVER: Ignore Chaff packets
+                            if op_code == 0x00 {
+                                return;
+                            }
+
                             if buffer.len() >= 5 + length {
                                 let payload = &buffer[5..5+length];
                                 let b64_payload = data_encoding::BASE64URL_NOPAD.encode(payload);
@@ -503,6 +514,12 @@ async fn handle_connection(
                     if datagram.len() >= 5 {
                         let op_code = datagram[0];
                         let length = u32::from_be_bytes([datagram[1], datagram[2], datagram[3], datagram[4]]) as usize;
+
+                        // TRAFFIC COVER: Ignore Chaff packets
+                        if op_code == 0x00 {
+                            continue;
+                        }
+
                         if datagram.len() >= 5 + length {
                             let payload = &datagram[5..5+length];
                             let b64_payload = data_encoding::BASE64URL_NOPAD.encode(payload);

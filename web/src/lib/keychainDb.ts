@@ -560,3 +560,38 @@ export async function importDatabaseFromJson(jsonString: string, password?: stri
       });
   });
 }
+
+export async function getGroupReceiverStateByKeyId(conversationId: string, keyId: string): Promise<GroupReceiverState | null> {
+  return enqueueWrite(async () => {
+    const records = await db.groupReceiverStates
+      .where('id')
+      .startsWith(conversationId + '_')
+      .toArray();
+
+    const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
+
+    for (const record of records) {
+        let ckString = '';
+        if (typeof record.state.CK === 'string') {
+            ckString = record.state.CK;
+        } else if ((record.state.CK as unknown) instanceof Uint8Array) {
+            ckString = sodium.to_base64(record.state.CK as unknown as Uint8Array, sodium.base64_variants.URLSAFE_NO_PADDING);
+        }
+
+        if (ckString.substring(0, 8) === keyId) {
+            const parts = record.id.split('_');
+            const senderId = parts[1];
+            
+            return {
+                id: record.id,
+                conversationId: asConversationId(conversationId),
+                senderId: asUserId(senderId),
+                CK: ckString,
+                N: record.state.N,
+                skippedKeys: record.state.skippedKeys || {}
+            };
+        }
+    }
+    return null;
+  });
+}

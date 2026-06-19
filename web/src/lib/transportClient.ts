@@ -359,7 +359,7 @@ export async function emitGroupKeyRequest(conversationId: string, targetSenderId
   });
 }
 
-export function emitGroupKeyFulfillment(payload: { requesterId: string; conversationId: string; encryptedKey: string; targetDeviceId?: string; senderDeviceKey?: string; }) {
+export function emitGroupKeyFulfillment(payload: { requesterId: string; conversationId: string; encryptedKey: string; targetDeviceId?: string; senderDeviceKey?: string; drHeader?: any; }) {
   transportClient.sendEvent('group:fulfilled_key', payload);
 }
 

@@ -25,6 +25,7 @@ import {
   getGroupSenderState,
   saveGroupSenderState,
   getGroupReceiverState,
+  getGroupReceiverStateByKeyId,
   saveGroupReceiverState,
   deleteGroupStates,
   deleteConversationKeychain,
@@ -46,7 +47,7 @@ import type { Participant } from '@store/conversation';
 // --- Group Metadata Helpers ---
 
 export async function encryptGroupMetadata(
-  metadata: { title?: string; description?: string; avatarUrl?: string },
+  metadata: { title?: string; description?: string; avatarUrl?: string; participants?: string[] },
   conversationId: string
 ): Promise<string> {
   // Ensure we have a valid session before encrypting metadata
@@ -86,7 +87,7 @@ export async function encryptGroupMetadata(
 export async function decryptGroupMetadata(
   encryptedMetadataStr: string,
   conversationId: string
-): Promise<{ title?: string; description?: string; avatarUrl?: string } | null> {
+): Promise<{ title?: string; description?: string; avatarUrl?: string; participants?: string[] } | null> {
   try {
     const wrapper = JSON.parse(encryptedMetadataStr);
     
@@ -110,7 +111,19 @@ export async function decryptGroupMetadata(
     const result = await decryptMessage(cipherPayload, conversationId, true, senderId, `meta_${conversationId}`);
     
     if (result.status === 'success') {
-      return JSON.parse(result.value);
+      try {
+        let text = result.value as string;
+        // Unwrap Sealed Sender wrapper if present
+        if (text.startsWith('{') && text.includes('"senderId"')) {
+           try {
+               const p = JSON.parse(text);
+               if (p.content) text = p.content;
+           } catch {}
+        }
+        return JSON.parse(text);
+      } catch (e) {
+        return null;
+      }
     } else {
       console.warn(`Group metadata decryption failed: ${result.status}`, result);
       return null;
@@ -592,7 +605,7 @@ export async function ensureGroupSession(conversationId: string, participants: P
       }
 
       const sodium = await getSodiumLib();
-      const { groupInitSenderKey, worker_pq_box_seal } = await getWorkerProxy();
+      const { groupInitSenderKey } = await getWorkerProxy();
       const { publicKey: myPublicKey } = await getMyEncryptionKeyPair();
       const myIdentityKeyB64 = sodium.to_base64(myPublicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
 
@@ -603,7 +616,7 @@ export async function ensureGroupSession(conversationId: string, participants: P
       const distributionKeys: Record<string, unknown>[] = [];
       const missingKeys: string[] = [];
 
-      // 2. ✅ FAN-OUT (Optimized with Bulk Fetch): Ambil semua bundle dalam 1 query
+      // 2. FAN-OUT via SPQR: Ensure SPQR session with each participant, then encrypt sender key via DR ratchet
       const userIdsToFetch: string[] = [];
       for (const p of participants) {
           const extP = p as Participant;
@@ -611,20 +624,17 @@ export async function ensureGroupSession(conversationId: string, participants: P
           if (uId) userIdsToFetch.push(uId);
       }
       
-      // ✅ FIX: Selalu masukkan myId agar Sender Key juga didistribusikan ke linked devices kita sendiri
       if (myId && !userIdsToFetch.includes(myId)) {
           userIdsToFetch.push(myId);
       }
 
       let fetchedBundlesMap: Record<string, PreKeyBundle[]> = {};
       try {
-          // Hanya 1 request HTTP ke server
           fetchedBundlesMap = await fetchPreKeyBundles(userIdsToFetch);
       } catch (e) {
           console.error("Failed to fetch prekey bundles in bulk", e);
       }
 
-      // Lakukan enkripsi Fan-Out untuk setiap bundle yang didapat
       for (const uId of userIdsToFetch) {
           const bundles = fetchedBundlesMap[uId] || [];
           if (bundles.length === 0) {
@@ -632,90 +642,66 @@ export async function ensureGroupSession(conversationId: string, participants: P
               missingKeys.push(uId);
               continue;
           }
-          
-          for (const bundle of bundles) {
-              // Bypass pengenkripsian ke perangkat yang sedang kita gunakan saat ini
-              if (uId === myId && bundle.identityKey === myIdentityKeyB64) {
-                  continue;
-              }
 
-              // [SECURITY WARNING] Check Identity Change
-              const { getPeerIdentityKey, savePeerIdentityKey } = await import('@lib/keychainDb');
-              const existingKey = await getPeerIdentityKey(uId);
-              if (existingKey && existingKey !== bundle.identityKey) {
-                  const { useMessageStore } = await import('@store/message');
-                  const { t } = await import('i18next');
-                  const { default: toast } = await import('react-hot-toast');
-                  const useDynamicIslandStore = (await import('@store/dynamicIsland')).default;
+          const firstBundle = bundles[0];
 
-                  const peer = participants.find(p => (p.userId || p.user?.id || p.id) === uId);
-                  const peerName = peer?.name || peer?.user?.name || t('common:defaults.unknown_user');
-                  const warningText = t('common:security_key_changed', { name: peerName });
-                  
-                  // 1. Persistent chat message
-                  useMessageStore.getState().addSystemMessage(conversationId, warningText);
-
-                  // 2. Immediate Toast
-                  toast.error(warningText, { icon: '🛡️', duration: 6000 });
-
-                  // 3. Dynamic Island Alert
-                  useDynamicIslandStore.getState().addActivity({
-                      type: 'notification',
-                      sender: { name: 'NYX_SHIELD' },
-                      message: warningText,
-                      link: `/chat/${conversationId}`
-                  }, 6000);
-              }
-              await savePeerIdentityKey(uId, bundle.identityKey);
-
-              const theirPublicKey = sodium.from_base64(bundle.identityKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-              const theirPqPublicKey = bundle.pqIdentityKey ? sodium.from_base64(bundle.pqIdentityKey, sodium.base64_variants.URLSAFE_NO_PADDING) : new Uint8Array(0);
-              
-              if (theirPqPublicKey.length === 0) {
-                  console.warn(`Skipping device ${bundle.deviceId} for user ${uId} due to missing PQ Identity Key.`);
-                  continue;
-              }
-
-              // Validate key lengths before calling worker
-              if (theirPublicKey.length !== 32) {
-                  console.error(`Invalid classical public key length for device ${bundle.deviceId}: expected 32, got ${theirPublicKey.length}`);
-                  continue;
-              }
-              if (theirPqPublicKey.length !== sodium.crypto_kem_xwing_PUBLICKEYBYTES) {
-                  console.error(`Invalid PQ public key length for device ${bundle.deviceId}: expected ${sodium.crypto_kem_xwing_PUBLICKEYBYTES}, got ${theirPqPublicKey.length}`);
-                  continue;
-              }
-
-              // Always use static PQC (X-Wing) for fan-out key distribution
-              let finalEncryptedKeyStr = '';
-
-              try {
-                  const ckBytes = sodium.from_base64(senderKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-                  const packed = new Uint8Array(4 + ckBytes.length);
-                  new DataView(packed.buffer).setUint32(0, 0, false); // Starting N is always 0 for new sessions
-                  packed.set(ckBytes, 4);
-
-                  const encryptedKey = await worker_pq_box_seal(
-                      packed, 
-                      theirPqPublicKey,
-                      theirPublicKey
-                  );
-                  finalEncryptedKeyStr = sodium.to_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-              } catch (e) {
-                  console.error(`[Crypto] Gagal mengenkripsi Sender Key untuk user ${uId} device ${bundle.deviceId}:`, e);
-                  continue;
-              }
-              
-              distributionKeys.push({
-                  userId: uId,
-                  targetDeviceId: bundle.deviceId, 
-                  targetDeviceKey: bundle.identityKey,
-                  key: finalEncryptedKeyStr,
-                  type: 'GROUP_KEY',
-                  senderId: myId,
-                  senderDeviceKey: myIdentityKeyB64
-              });
+          const { getPeerIdentityKey, savePeerIdentityKey } = await import('@lib/keychainDb');
+          const existingKey = await getPeerIdentityKey(uId);
+          if (existingKey && existingKey !== firstBundle.identityKey) {
+              const { useMessageStore } = await import('@store/message');
+              const { t } = await import('i18next');
+              const { default: toast } = await import('react-hot-toast');
+              const useDynamicIslandStore = (await import('@store/dynamicIsland')).default;
+              const peer = participants.find(p => (p.userId || p.user?.id || p.id) === uId);
+              const peerName = peer?.name || peer?.user?.name || t('common:defaults.unknown_user');
+              const warningText = t('common:security_key_changed', { name: peerName });
+              useMessageStore.getState().addSystemMessage(conversationId, warningText);
+              toast.error(warningText, { icon: '🛡️', duration: 6000 });
+              useDynamicIslandStore.getState().addActivity({
+                  type: 'notification',
+                  sender: { name: 'NYX_SHIELD' },
+                  message: warningText,
+                  link: `/chat/${conversationId}`
+              }, 6000);
           }
+          await savePeerIdentityKey(uId, firstBundle.identityKey);
+
+          // Ensure SPQR session once per user (not per device)
+          try {
+              await ensureSpqrSessionWithPeer(uId, firstBundle);
+          } catch (e) {
+              console.error(`[SPQR] Failed to establish SPQR session with user ${uId}:`, e);
+              missingKeys.push(uId);
+              continue;
+          }
+
+          const ckBytes = sodium.from_base64(senderKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+          const packed = new Uint8Array(4 + ckBytes.length);
+          new DataView(packed.buffer).setUint32(0, 0, false);
+          packed.set(ckBytes, 4);
+
+          try {
+              const { header, ciphertext } = await encryptWithSpqrSession(uId, packed);
+              const finalEncryptedKeyStr = sodium.to_base64(ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING);
+
+              // Create one distribution entry per device
+              for (const bundle of bundles) {
+                  if (uId === myId && bundle.identityKey === myIdentityKeyB64) continue;
+                  distributionKeys.push({
+                      userId: uId,
+                      targetDeviceId: bundle.deviceId,
+                      targetDeviceKey: bundle.identityKey,
+                      key: finalEncryptedKeyStr,
+                      drHeader: header,
+                      type: 'GROUP_KEY',
+                      senderId: myId,
+                      senderDeviceKey: myIdentityKeyB64
+                  });
+              }
+          } catch (e) {
+                  console.error(`[SPQR] Gagal mengenkripsi Sender Key untuk user ${uId}:`, e);
+                  continue;
+              }
       }
 
       if (distributionKeys.length === 0) {
@@ -723,7 +709,6 @@ export async function ensureGroupSession(conversationId: string, participants: P
           return null;
       }
 
-      // 3. Save Initial Sender State
       await saveGroupSenderState({
           conversationId: conversationId as ConversationId,
           CK: senderKeyB64,
@@ -751,32 +736,44 @@ export async function handleGroupKeyDistribution(
     conversationId: string,
     encryptedKey: string,
     senderId: string,
-    senderDeviceKey?: string
+    senderDeviceKey?: string,
+    drHeader?: any
 ): Promise<void> {
-  const { privateKey: classicalPrivateKey } = await getMyEncryptionKeyPair();
-  const { privateKey: pqPrivateKey } = await useAuthStore.getState().getPqEncryptionKeyPair();
   const sodium = await getSodiumLib();
-  const { worker_pq_box_seal_open } = await getWorkerProxy();
 
-  // 1. Decrypt the Sender Key (Chain Key)
   let senderKeyBytes: Uint8Array | null = null;
-  
-  try {
-      // [BUGFIX: SENDER KEY OFFLINE SYNC] - Graceful Base64 decoding fallback
-      let encryptedKeyBytes: Uint8Array;
-      try {
-          encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-      } catch (err1) {
-          try {
-              encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.ORIGINAL);
-          } catch (err2) {
-              encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.URLSAFE);
-          }
-      }
-      senderKeyBytes = await worker_pq_box_seal_open(encryptedKeyBytes, pqPrivateKey, classicalPrivateKey);
-  } catch (e) {
-      console.error('[Crypto] FATAL: Gagal unseal Sender Key:', e);
-      throw new Error('DECRYPTION_FAILED'); // Propagate to let caller know
+
+  if (drHeader) {
+    // SPQR channel: decrypt via DR ratchet session with the sender
+    try {
+      const ciphertextBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+      senderKeyBytes = await decryptWithSpqrSession(senderId, drHeader, ciphertextBytes);
+    } catch (e) {
+      console.error('[SPQR] Gagal decrypt sender key via SPQR session:', e);
+      throw new Error('DECRYPTION_FAILED');
+    }
+  } else {
+    // Legacy fallback: pq_box_seal open (backward compat)
+    const { privateKey: classicalPrivateKey } = await getMyEncryptionKeyPair();
+    const { privateKey: pqPrivateKey } = await useAuthStore.getState().getPqEncryptionKeyPair();
+    const { worker_pq_box_seal_open } = await getWorkerProxy();
+
+    try {
+        let encryptedKeyBytes: Uint8Array;
+        try {
+            encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+        } catch (err1) {
+            try {
+                encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.ORIGINAL);
+            } catch (err2) {
+                encryptedKeyBytes = sodium.from_base64(encryptedKey, sodium.base64_variants.URLSAFE);
+            }
+        }
+        senderKeyBytes = await worker_pq_box_seal_open(encryptedKeyBytes, pqPrivateKey, classicalPrivateKey);
+    } catch (e) {
+        console.error('[Crypto] FATAL: Gagal unseal Sender Key:', e);
+        throw new Error('DECRYPTION_FAILED');
+    }
   }
   
   if (!senderKeyBytes) {
@@ -787,14 +784,12 @@ export async function handleGroupKeyDistribution(
   let finalCKBytes = senderKeyBytes;
 
   if (senderKeyBytes.length === 36) {
-      // Format: N (4 bytes) + CK (32 bytes)
       currentN = new DataView(senderKeyBytes.buffer, senderKeyBytes.byteOffset, senderKeyBytes.byteLength).getUint32(0, false);
       finalCKBytes = senderKeyBytes.slice(4);
   }
 
   const senderKeyB64 = sodium.to_base64(finalCKBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
 
-  // 2. Save as Receiver State
   const stateId = senderDeviceKey ? `${conversationId}_${senderId}_${senderDeviceKey}` : `${conversationId}_${senderId}`;
 
   await saveGroupReceiverState({
@@ -983,9 +978,18 @@ async function doEncryptMessage(
       }
 
       const { worker_dr_ratchet_encrypt } = await getWorkerProxy();
+
+      const { publicKey } = await getMyEncryptionKeyPair();
+      const myPublicKeyB64 = sodium.to_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+      const sealedPayload = JSON.stringify({
+          content: text,
+          senderId: myId,
+          senderDeviceKey: myPublicKeyB64
+      });
+
       const result = await worker_dr_ratchet_encrypt({
           serializedState: state,
-          plaintext: text
+          plaintext: sealedPayload
       });
 
       if (messageId && result.mk) {
@@ -998,7 +1002,6 @@ async function doEncryptMessage(
       const payload = JSON.stringify({
           dr: result.header,
           ciphertext: sodium.to_base64(new Uint8Array(result.ciphertext), sodium.base64_variants.URLSAFE_NO_PADDING),
-          senderId: myId,
           ...(x3dhData ? { x3dh: x3dhData } : {})
       });
 
@@ -1055,10 +1058,20 @@ async function doEncryptMessage(
   
   const signingPrivateKey = await useAuthStore.getState().getSigningPrivateKey();
   
+  const myId = useAuthStore.getState().user?.id;
+  const { publicKey } = await getMyEncryptionKeyPair();
+  const myPublicKeyB64 = sodium.to_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+
+  const sealedPayload = JSON.stringify({
+      content: text,
+      senderId: myId,
+      senderDeviceKey: myPublicKeyB64
+  });
+
   // Encrypt & Ratchet
   const result = await groupRatchetEncrypt(
       { CK: senderState.CK, N: senderState.N },
-      text,
+      sealedPayload,
       signingPrivateKey
   );
   
@@ -1067,19 +1080,13 @@ async function doEncryptMessage(
       await storeMessageKeySecurely(messageId, result.mk);
   }
 
-  const myId = useAuthStore.getState().user?.id;
-  const { publicKey } = await getMyEncryptionKeyPair();
-  const myPublicKeyB64 = sodium.to_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-
   const keyId = senderState.CK.substring(0, 8);
 
-  // ✅ FIX: Menyisipkan senderId dan senderDeviceKey langsung ke dalam cipher agar Decryptor bisa Auto-Detect
+  // Sealed Sender: Hanya menyertakan keyId sebagai pengidentifikasi state penerima
   const payload = JSON.stringify({
       header: result.header,
       ciphertext: sodium.to_base64(result.ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING),
       signature: result.signature,
-      senderId: myId,
-      senderDeviceKey: myPublicKeyB64,
       keyId: keyId
   });
   
@@ -1157,31 +1164,44 @@ async function doDecryptMessage(
   const isSenderKeyProtocol = payloadObj && payloadObj.signature !== undefined && payloadObj.header !== undefined;
 
   if (isSenderKeyProtocol || isGroup) {
-    const senderId = (payloadObj && payloadObj.senderId) ? payloadObj.senderId : sessionId;
-    const senderDeviceKey = payloadObj && payloadObj.senderDeviceKey; // Ini adalah identityKey (publicKey) perangkat pengirim
+    const keyId = payloadObj && payloadObj.keyId;
+    let senderId = (payloadObj && payloadObj.senderId) ? payloadObj.senderId : sessionId;
+    const senderDeviceKey = payloadObj && payloadObj.senderDeviceKey;
 
-    if (!senderId) return { status: 'error', error: new Error('Missing senderId for group decryption') };
+    let receiverState = null;
 
-    let receiverState = await getGroupReceiverState(conversationId, senderId, senderDeviceKey);
+    if (keyId) {
+        receiverState = await getGroupReceiverStateByKeyId(conversationId, keyId);
+        if (receiverState) {
+            senderId = receiverState.senderId;
+        }
+    } 
 
-    if (!receiverState && senderDeviceKey) {
-        // Fallback backward compatibility
-        receiverState = await getGroupReceiverState(conversationId, senderId);
+    if (!receiverState) {
+        if (!senderId) {
+            return { status: 'error', error: new Error('Missing senderId and keyId for group decryption (Sealed Sender failed to resolve)') };
+        }
+        receiverState = await getGroupReceiverState(conversationId, senderId, senderDeviceKey);
+
+        if (!receiverState && senderDeviceKey) {
+            // Fallback backward compatibility
+            receiverState = await getGroupReceiverState(conversationId, senderId);
+        }
     }
 
-    if (!receiverState) {        
-        requestGroupKeyWithTimeout(conversationId, 0, senderId, senderDeviceKey); 
+    if (!receiverState) {
+        if (senderId && senderDeviceKey) {
+            requestGroupKeyWithTimeout(conversationId, 0, senderId, senderDeviceKey);
+        }
         return { status: 'pending', reason: 'waiting_for_key' };
     }
-    
+
     try {
         const payload = JSON.parse(cipher);
         const { header, ciphertext, signature } = payload;
-        
+
         let keyToUse: string | undefined = undefined;
 
-        // --- Resolve Sender Signing Key ---
-        // ✅ FIX: Jika pengirim melampirkan senderDeviceKey, kita bisa mencari signingKey perangkat tersebut secara langsung
         // --- Resolve Sender Signing Key ---
         // ✅ FIX: Perbaikan Key Resolution untuk Sinkronisasi Perangkat (Device Migration)
         if (senderDeviceKey) {
@@ -1543,8 +1563,9 @@ interface ReceiveKeyPayload {
   sessionId?: string;
   encryptedKey: string;
   type?: 'GROUP_KEY' | 'SESSION_KEY';
-  senderId?: string; // New: Needed for Group Sender Keys
+  senderId?: string;
   senderDeviceKey?: string;
+  drHeader?: any;
   initiatorCiphertextsStr?: string;
   initiatorSigningKey?: string;
 }
@@ -1564,27 +1585,41 @@ export async function fulfillGroupKeyRequest(payload: GroupFulfillRequestPayload
       console.warn("Group key fulfillment: Provided keys do not perfectly match registered device keys. Bypassing strict validation as requester is a valid participant.");
   }
 
-  // [FIX] Send the CURRENT Sender Key (Ratchet Chain Key)
   const senderState = await getGroupSenderState(conversationId);
   if (!senderState) return;
 
   const sodium = await getSodiumLib();
-  const { worker_pq_box_seal } = await getWorkerProxy();
-
-  const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-  if (!requesterPqPublicKeyB64) {
-      console.warn("Group key fulfillment: Missing PQ key for requester. Cannot safely fulfill.");
-      return;
-  }
-  const requesterPqPublicKey = sodium.from_base64(requesterPqPublicKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
   const senderKeyBytes = sodium.from_base64(senderState.CK, sodium.base64_variants.URLSAFE_NO_PADDING);
-  
-  // Pack N (4 bytes) + CK (32 bytes)
+
   const payloadToEncrypt = new Uint8Array(4 + senderKeyBytes.length);
-  new DataView(payloadToEncrypt.buffer).setUint32(0, senderState.N || 0, false); // Big Endian
+  new DataView(payloadToEncrypt.buffer).setUint32(0, senderState.N || 0, false);
   payloadToEncrypt.set(senderKeyBytes, 4);
 
-  const encryptedKeyForRequester = await worker_pq_box_seal(payloadToEncrypt, requesterPqPublicKey, requesterPublicKey);
+  // Ensure SPQR session with requester, then encrypt via DR ratchet
+  try {
+    await ensureSpqrSessionWithPeer(requesterId);
+  } catch (e) {
+    console.warn("[SPQR] Could not establish SPQR session for fulfillment, falling back to pq_box_seal:", e);
+    const { worker_pq_box_seal } = await getWorkerProxy();
+    const requesterPublicKey = sodium.from_base64(requesterPublicKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+    const requesterPqPublicKey = requesterPqPublicKeyB64 ? sodium.from_base64(requesterPqPublicKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING) : null;
+    if (!requesterPqPublicKey) return;
+
+    const encryptedKeyForRequester = await worker_pq_box_seal(payloadToEncrypt, requesterPqPublicKey, requesterPublicKey);
+    const { publicKey: myIdentityKey } = await getMyEncryptionKeyPair();
+    const myIdentityKeyB64 = sodium.to_base64(myIdentityKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+
+    emitGroupKeyFulfillment({
+      requesterId,
+      conversationId,
+      encryptedKey: sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.URLSAFE_NO_PADDING),
+      targetDeviceId: payload.requesterDeviceId,
+      senderDeviceKey: myIdentityKeyB64
+    });
+    return;
+  }
+
+  const { header, ciphertext } = await encryptWithSpqrSession(requesterId, payloadToEncrypt);
 
   const { publicKey: myIdentityKey } = await getMyEncryptionKeyPair();
   const myIdentityKeyB64 = sodium.to_base64(myIdentityKey, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -1592,7 +1627,8 @@ export async function fulfillGroupKeyRequest(payload: GroupFulfillRequestPayload
   emitGroupKeyFulfillment({
     requesterId,
     conversationId,
-    encryptedKey: sodium.to_base64(encryptedKeyForRequester, sodium.base64_variants.URLSAFE_NO_PADDING),
+    encryptedKey: sodium.to_base64(ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING),
+    drHeader: header,
     targetDeviceId: payload.requesterDeviceId,
     senderDeviceKey: myIdentityKeyB64
   });
@@ -1636,7 +1672,7 @@ export async function fulfillKeyRequest(payload: FulfillRequestPayload): Promise
 
 export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promise<void> {
   if (!payload || typeof payload !== 'object') return;
-  const { conversationId, sessionId, encryptedKey, type, senderId, senderDeviceKey, initiatorCiphertextsStr, initiatorSigningKey } = payload;
+  const { conversationId, sessionId, encryptedKey, type, senderId, senderDeviceKey, drHeader, initiatorCiphertextsStr, initiatorSigningKey } = payload;
   
   if (encryptedKey === 'dummy' || (sessionId && sessionId.startsWith('dummy'))) {
       console.warn("🛡️ [Crypto] BERHASIL MEMBLOKIR KUNCI DUMMY DARI SERVER!", { conversationId, sessionId });
@@ -1658,7 +1694,7 @@ export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promi
     }
 
     try {
-        await handleGroupKeyDistribution(conversationId, encryptedKey, senderId, senderDeviceKey);
+        await handleGroupKeyDistribution(conversationId, encryptedKey, senderId, senderDeviceKey, drHeader);
         import('@store/message').then(({ useMessageStore }) => {
             useMessageStore.getState().reDecryptPendingMessages(conversationId);
         });
@@ -1780,6 +1816,66 @@ export async function forceRotateGroupSenderKey(conversationId: string) {
     } catch (e) {
         console.error('Failed to rotate group key:', e);
     }
+}
+
+const SPQR_SESSION_PREFIX = 'gspqr_';
+
+export async function ensureSpqrSessionWithPeer(peerId: string, peerBundle?: PreKeyBundle): Promise<void> {
+  const sessionKey = SPQR_SESSION_PREFIX + peerId;
+  const existing = await retrieveRatchetStateSecurely(sessionKey);
+  if (existing) return;
+
+  const bundle = peerBundle || await fetchPreKeyBundle(peerId);
+
+  const signingPrivateKey = await useAuthStore.getState().getSigningPrivateKey();
+  if (!signingPrivateKey) throw new Error("My signing key missing");
+  const mySigningKey = {
+    publicKey: signingPrivateKey.slice(32),
+    privateKey: signingPrivateKey
+  };
+
+  const { sessionKey: sk, initiatorCiphertexts, otpkId } = await establishSessionFromPreKeyBundle(mySigningKey, bundle, peerId);
+
+  if (!bundle.signedPreKey.pqKey) throw new Error("Peer does not have PQ keys");
+
+  const sodium = await getSodiumLib();
+  const theirPqSignedPreKeyPublic = sodium.from_base64(bundle.signedPreKey.pqKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const { worker_dr_init_alice } = await getWorkerProxy();
+
+  const state = await worker_dr_init_alice({
+    sk: sk,
+    theirPqSignedPreKeyPublic
+  });
+
+  await storeRatchetStateSecurely(sessionKey, state);
+}
+
+export async function encryptWithSpqrSession(peerId: string, plaintext: Uint8Array): Promise<{ header: any, ciphertext: Uint8Array }> {
+  const sessionKey = SPQR_SESSION_PREFIX + peerId;
+  let state = await retrieveRatchetStateSecurely(sessionKey);
+  if (!state) throw new Error(`No SPQR session with peer ${peerId}`);
+
+  const { worker_dr_ratchet_encrypt } = await getWorkerProxy();
+  const result = await worker_dr_ratchet_encrypt({ serializedState: state, plaintext });
+  await storeRatchetStateSecurely(sessionKey, result.state);
+  return { header: result.header, ciphertext: result.ciphertext };
+}
+
+export async function decryptWithSpqrSession(peerId: string, header: any, ciphertext: Uint8Array): Promise<Uint8Array> {
+  const sessionKey = SPQR_SESSION_PREFIX + peerId;
+  let state = await retrieveRatchetStateSecurely(sessionKey);
+  if (!state) throw new Error(`No SPQR session with peer ${peerId}`);
+
+  const { worker_dr_ratchet_decrypt } = await getWorkerProxy();
+  const result = await worker_dr_ratchet_decrypt({ serializedState: state, header, ciphertext });
+
+  for (const sk of result.skippedKeys) {
+    const hKey = `${sessionKey}_${sk.kemPk}_${sk.n}`;
+    await storeSkippedMessageKeySecurely(hKey, sk.mk);
+  }
+
+  await storeRatchetStateSecurely(sessionKey, result.state);
+  return result.plaintext;
 }
 
 

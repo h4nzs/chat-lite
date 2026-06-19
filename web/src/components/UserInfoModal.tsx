@@ -32,7 +32,7 @@ export default function UserInfoModal() {
   })));
   
   const activeConversation = conversations.find(c => c.id === activeId);
-  const isPqDr = activeConversation?.encryptionMode === 'PQ_DR';
+  const isPqDr = activeConversation?.encryptionMode === 'SPQR';
 
   const { verifiedStatus, setVerified } = useVerificationStore(useShallow(s => ({ verifiedStatus: s.verifiedStatus, setVerified: s.setVerified })));
   const onlineUsers = usePresenceStore(s => s.onlineUsers);
