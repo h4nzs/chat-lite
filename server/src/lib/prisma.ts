@@ -1,9 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { Pool, PoolConfig } from 'pg';
+import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import fs from 'fs'; // 1. Impor fs
-import path from 'path';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -11,37 +9,28 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not defined in the environment variables.');
 }
 
-const caPath = path.resolve(process.cwd(), 'ca.pem');
 const env = process.env.NODE_ENV || 'development';
-const isLocalEnv = env === 'development' || env === 'test';
 
-// 1. Buat connection pool standar PostgreSQL
-const poolConfig: PoolConfig = { connectionString };
-
-if (!isLocalEnv) {
-  if (!fs.existsSync(caPath)) {
-    if (env === 'production') {
-      throw new Error("Production environment requires ca.pem for database connection.");
-    } else {
-      poolConfig.ssl = { rejectUnauthorized: false };
-    }
-  } else {
-    poolConfig.ssl = {
-      rejectUnauthorized: true,
-      ca: fs.readFileSync(caPath, 'utf8')
-    };
-  }
+// Build final connection string with SSL encoded as URL parameter.
+// This avoids passing a JavaScript Object (`ssl`) in the Pool config,
+// which crashes pg-protocol's startup serialization (Buffer.byteLength
+// throws on Object values in Node v24 when used with @prisma/adapter-pg).
+//
+// For non-local environments, we add sslmode=require (TLS without cert
+// verification). Production deployments that need verify-full should
+// configure SSL directly in the DATABASE_URL (e.g., 
+// ?sslmode=verify-full) and trust the CA cert at the OS level.
+let finalUrl = connectionString;
+if (env !== 'development' && env !== 'test') {
+  finalUrl += `${connectionString.includes('?') ? '&' : '?'}sslmode=require`;
 }
 
-const pool = new Pool(poolConfig);
-
-// 2. Bungkus pool tersebut dengan Prisma Adapter
+const pool = new Pool({ connectionString: finalUrl });
 const adapter = new PrismaPg(pool);
 
-// 3. Masukkan adapter ke dalam konstruktor Prisma
 export const prisma = new PrismaClient({
-  adapter, // <--- INI KUNCI UTAMANYA!
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  adapter,
+  log: env === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
 export default prisma;

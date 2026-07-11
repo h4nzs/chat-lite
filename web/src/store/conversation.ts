@@ -422,8 +422,13 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
             await emitGroupKeyDistribution(conv.id, distributionKeys as { userId: string; key: string }[]);
         }
         
-        // Include authSecret in encrypted metadata so other participants can manage the group
-        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl, participants: userIds, authSecret } as any, conv.id);
+        // 🛡️ Fix: Include ALL participants (creator + invited users) in the encrypted metadata.
+        // Previously only userIds (other members) were included, causing the decrypted metadata
+        // to show only the member's own ID (count=1). This left conversation.participants incomplete
+        // for Opaque Mailbox, which meant targetRecipients was empty and ensureGroupSessionIfNeeded
+        // couldn't distribute the member's sender key to the creator.
+        const allParticipantIds = Array.from(new Set([user.id, ...userIds]));
+        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl, participants: allParticipantIds, authSecret } as any, conv.id);
         
         await authFetch(`/api/conversations/${conv.id}/details`, {
             method: 'PUT',
@@ -468,30 +473,50 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   addOrUpdateConversation: async (conversation) => {
     let decryptedMetadata = conversation.decryptedMetadata;
     
+    // 🛡️ Guard: Skip re-decryption if the conversation already exists in store with
+    // decrypted metadata and the encrypted payload hasn't changed. Without this guard,
+    // redundant decryptGroupMetadata calls will ratchet the sender key state past N=0
+    // while metadata was encrypted at N=0, causing permanent decrypt failure.
     if (!decryptedMetadata && conversation.isGroup && conversation.encryptedMetadata) {
-        try {
-            console.log(`[DIAG:addOrUpdateConv] decrypting metadata for conv=${conversation.id} encMetaLen=${conversation.encryptedMetadata.length}`);
-            const dec = await decryptGroupMetadata(conversation.encryptedMetadata as string, conversation.id);
-            if (dec) {
-                console.log(`[DIAG:addOrUpdateConv] metadata decrypted for conv=${conversation.id} title=${dec.title} participants=${dec.participants?.length}`);
-                decryptedMetadata = dec;
-                // Opaque Mailbox: extract participants from encrypted metadata
-                const metaParticipants = (dec as any).participants;
-                if (Array.isArray(metaParticipants) && metaParticipants.length > 0 &&
-                    (!conversation.participants || conversation.participants.length === 0)) {
-                    const currentUser = useAuthStore.getState().user;
-                    conversation.participants = metaParticipants.map((id: string) => ({
-                        id, name: id === currentUser?.id ? currentUser.name || '' : ''
-                    })) as any;
-                    console.log(`[DIAG:addOrUpdateConv] set participants for conv=${conversation.id} count=${metaParticipants.length}`);
-                    // Persist to IndexedDB so non-creator members can send messages even before metadata is re-decrypted
-                    import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(conversation.id, metaParticipants));
-                }
-            } else {
-                console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata returned null for conv=${conversation.id}`);
+        const existing = useConversationStore.getState().conversations.find(c => c.id === conversation.id);
+        if (existing?.decryptedMetadata && existing.encryptedMetadata === conversation.encryptedMetadata) {
+            decryptedMetadata = existing.decryptedMetadata;
+            console.log(`[DIAG:addOrUpdateConv] metadata already decrypted for conv=${conversation.id}, skipping`);
+            // Also forward participants from cached metadata to prevent overwrite with empty
+            // (caller may pass conversation with empty participants in Opaque Mailbox)
+            const metaParticipants = (decryptedMetadata as any).participants;
+            if (Array.isArray(metaParticipants) && metaParticipants.length > 0 &&
+                (!conversation.participants || conversation.participants.length === 0)) {
+                const currentUser = useAuthStore.getState().user;
+                conversation.participants = metaParticipants.map((pid: string) => ({
+                    id: pid, name: pid === currentUser?.id ? currentUser.name || '' : ''
+                })) as any;
             }
-        } catch (e) {
-            console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata threw for conv=${conversation.id}`, e);
+        } else {
+            try {
+                console.log(`[DIAG:addOrUpdateConv] decrypting metadata for conv=${conversation.id} encMetaLen=${conversation.encryptedMetadata.length}`);
+                const dec = await decryptGroupMetadata(conversation.encryptedMetadata as string, conversation.id);
+                if (dec) {
+                    console.log(`[DIAG:addOrUpdateConv] metadata decrypted for conv=${conversation.id} title=${dec.title} participants=${dec.participants?.length}`);
+                    decryptedMetadata = dec;
+                    // Opaque Mailbox: extract participants from encrypted metadata
+                    const metaParticipants = (dec as any).participants;
+                    if (Array.isArray(metaParticipants) && metaParticipants.length > 0 &&
+                        (!conversation.participants || conversation.participants.length === 0)) {
+                        const currentUser = useAuthStore.getState().user;
+                        conversation.participants = metaParticipants.map((id: string) => ({
+                            id, name: id === currentUser?.id ? currentUser.name || '' : ''
+                        })) as any;
+                        console.log(`[DIAG:addOrUpdateConv] set participants for conv=${conversation.id} count=${metaParticipants.length}`);
+                        // Persist to IndexedDB so non-creator members can send messages even before metadata is re-decrypted
+                        import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(conversation.id, metaParticipants));
+                    }
+                } else {
+                    console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata returned null for conv=${conversation.id}`);
+                }
+            } catch (e) {
+                console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata threw for conv=${conversation.id}`, e);
+            }
         }
     }
 
@@ -549,6 +574,20 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     let decryptedMetadata = undefined;
     console.log(`[DIAG:updateConvs] called id=${id} hasEncMeta=${!!data.encryptedMetadata} hasPart=${!!data.participants} partLen=${data.participants?.length}`);
     if (data.encryptedMetadata) {
+         // 🛡️ Guard: Skip re-decryption if metadata is already cached and the encrypted payload
+         // hasn't changed. Otherwise, the second call would ratchet the sender key state past N=0
+         // while the metadata was encrypted at N=0, causing permanent decrypt failure:
+         //   "Ratchet Advanced! Cannot decrypt old message (header.n=0, state.N=1)"
+         const existing = get().conversations.find(c => c.id === id);
+         if (existing?.decryptedMetadata && existing.encryptedMetadata === data.encryptedMetadata) {
+             console.log(`[DIAG:updateConvs] metadata already decrypted for id=${id}, skipping re-decrypt`);
+             decryptedMetadata = existing.decryptedMetadata;
+             if (Array.isArray((decryptedMetadata as any).participants) && (decryptedMetadata as any).participants.length > 0) {
+                 data.participants = (decryptedMetadata as any).participants.map((pid: string) => ({
+                     id: pid, name: pid === useAuthStore.getState().user?.id ? useAuthStore.getState().user?.name || '' : ''
+                 })) as any;
+             }
+         } else {
          try {
              const dec = await decryptGroupMetadata(data.encryptedMetadata, id);
              if (dec) {
@@ -570,6 +609,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
              }
          } catch (e) {
              console.warn(`[DIAG:updateConvs] Failed to decrypt updated metadata for id=${id}`, e);
+         }
          }
     }
 

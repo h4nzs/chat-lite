@@ -508,7 +508,7 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
 
            for (const targetId of targetRecipients) {
                if (typeof targetId === 'string') {
-                   await emitEventToUser(targetId, 'conversation:updated', { id: asConversationId(conversationId), encryptedMetadata });
+                   await emitEventToUser(targetId, 'conversation:updated', { id: conversationId, encryptedMetadata });
                }
            }
            break;
