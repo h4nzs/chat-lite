@@ -141,8 +141,8 @@ export async function decryptMessageObject(
   const isGroup = conversation?.isGroup || false;
 
   try {
-    // 1. SELF-MESSAGE DECRYPTION
-    if (currentUser && (rawMsg.senderId === currentUser.id || !rawMsg.senderId)) {
+    // 1. SELF-MESSAGE DECRYPTION (skip for group — uses sender key ratchet, not secretbox)
+    if (currentUser && !isGroup && (rawMsg.senderId === currentUser.id || !rawMsg.senderId)) {
         const { retrieveMessageKeySecurely } = await import('@utils/crypto');
         let mk = await retrieveMessageKeySecurely(rawMsg.id);
         if (!mk && rawMsg.tempId) {
@@ -1368,7 +1368,44 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       return;
     }
 
-    const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    let conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    if (!conversation) {
+      toast.error(i18n.t('errors:conversation_not_found', 'Conversation not found.'));
+      return;
+    }
+
+    // [OPAQUE MAILBOX FIX] Populate participants from IndexedDB cache if empty,
+    // so non-creator members can send messages before metadata is re-decrypted.
+    if (conversation.isGroup && (!conversation.participants || conversation.participants.length === 0)) {
+        const { getCachedGroupParticipants } = await import('@lib/keychainDb');
+        const cachedUserIds = await getCachedGroupParticipants(conversationId);
+        if (cachedUserIds && cachedUserIds.length > 0) {
+            const currentUser = useAuthStore.getState().user;
+            const reconstructedParticipants = cachedUserIds.map(id => ({
+                id, name: id === currentUser?.id ? currentUser.name || '' : ''
+            })) as any;
+            console.log(`[OpaqueMailbox] Reconstructed participants from cache for conv=${conversationId} count=${cachedUserIds.length}`);
+            // Update the store so both ensureGroupSession and targetRecipients use the correct list
+            await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
+            conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+        } else {
+            // Fallback: try to fetch encryptedMetadata from server and decrypt to get participants
+            console.log(`[OpaqueMailbox] No cached participants for conv=${conversationId}, trying server fetch...`);
+            try {
+                const { authFetch } = await import('@lib/api');
+                const serverConv: any = await authFetch(`/api/conversations/${conversationId}`);
+                if (serverConv?.encryptedMetadata) {
+                    await useConversationStore.getState().updateConversation(conversationId, {
+                        encryptedMetadata: serverConv.encryptedMetadata as string
+                    });
+                    conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+                }
+            } catch (e) {
+                console.warn(`[OpaqueMailbox] Failed to fetch conversation ${conversationId} from server`, e);
+            }
+        }
+    }
+
     if (!conversation) {
       toast.error(i18n.t('errors:conversation_not_found', 'Conversation not found.'));
       return;
@@ -1513,7 +1550,19 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             console.error("Failed to inject profile key", e);
         }
 
+        // Save sender state before silent group message encryption to prevent
+        // SYSTEM/GHOST messages from ratcheting the state used for user messages.
+        const isSilentGroupMsg = conversation.isGroup && shouldBeSilent;
+        let savedSenderState: any = null;
+        if (isSilentGroupMsg) {
+            const { getGroupSenderState } = await import('@lib/keychainDb');
+            savedSenderState = await getGroupSenderState(conversationId);
+        }
         const result = await encryptMessage(contentToEncrypt, conversationId, !!conversation.isGroup, undefined, `temp_${actualTempId}`);
+        if (isSilentGroupMsg && savedSenderState) {
+            const { saveGroupSenderState } = await import('@lib/keychainDb');
+            await saveGroupSenderState(savedSenderState).catch(e => console.warn("Failed to restore sender state after silent msg", e));
+        }
         ciphertext = result.ciphertext;
         
         // [FIX PERSISTENCE] Store MK for ALL chats (Group + 1on1)
@@ -1851,7 +1900,23 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       const payloadData = data as Partial<Message> & { 
           sessionId?: string; 
           pushPayloads?: Record<string, string> 
-      }; 
+      };
+
+      // [OPAQUE MAILBOX FIX] Populate targetRecipients for ALL conversations
+      // so offline-queued messages get forwarded to the right participants.
+      let targetRecipients: string[] | undefined;
+      const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+      if (conv?.participants && conv.participants.length > 0) {
+          targetRecipients = conv.participants.map(p => p.userId || p.id);
+      } else if (conv?.isGroup) {
+          // Group with empty participants: fallback to cache (Opaque Mailbox)
+          const { getCachedGroupParticipants } = await import('@lib/keychainDb');
+          const cachedUserIds = await getCachedGroupParticipants(conversationId);
+          if (cachedUserIds && cachedUserIds.length > 0) {
+              targetRecipients = cachedUserIds;
+          }
+      }
+
       const sendPayload: MessageSendPayload = {
           conversationId: asConversationId(conversationId),
           content: payloadData.content || "",
@@ -1860,7 +1925,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           expiresAt: payloadData.expiresAt ?? undefined,
           pushPayloads: payloadData.pushPayloads ?? undefined,
           repliedToId: payloadData.repliedToId ?? undefined,
-          isViewOnce: payloadData.isViewOnce ?? false
+          isViewOnce: payloadData.isViewOnce ?? false,
+          targetRecipients
       };
 
       await new Promise<void>((resolve) => {
@@ -2152,6 +2218,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             if (timeA !== timeB) return timeA - timeB;
             
             // Jika di detik yang sama, proses Control Message DULUAN agar kunci terdistribusi sebelum mendekripsi normal message
+            const aIsMeta = a.type === 'SYSTEM' && (typeof a.content === 'string' && a.content.includes('"type":"METADATA_UPDATED"'));
+            const bIsMeta = b.type === 'SYSTEM' && (typeof b.content === 'string' && b.content.includes('"type":"METADATA_UPDATED"'));
+            if (aIsMeta && !bIsMeta) return -1;
+            if (!aIsMeta && bIsMeta) return 1;
             const aIsControl = a.type === 'SYSTEM' && (typeof a.content === 'string' && (a.content.includes('GROUP_KEY_DISTRIBUTION') || a.content.includes('"type":"GROUP_KEY"')));
             const bIsControl = b.type === 'SYSTEM' && (typeof b.content === 'string' && (b.content.includes('GROUP_KEY_DISTRIBUTION') || b.content.includes('"type":"GROUP_KEY"')));
             if (aIsControl && !bIsControl) return -1;
@@ -2191,16 +2261,19 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       let success = false;
 
                       if (myDistributions.length > 0) {
+                          console.log(`[DIAG:offlineSync] myId=${myId} myKeyB64=${myIdentityKeyB64} nDistributions=${payload.distributions?.length} myMatches=${myDistributions.length}`);
                           for (const dist of myDistributions) {
                               const extractedKey = dist.encryptedKey || dist.key;
                               if (!extractedKey) continue;
                               try {
                                   const { storeReceivedSessionKey } = await import('@utils/crypto');
+                                  const senderIdToUse = message.senderId || payload.senderId || "";
+                                  console.log(`[DIAG:offlineSync] calling storeReceivedSessionKey senderId=${senderIdToUse} myId=${myId} skip=${senderIdToUse === myId}`);
                                   await storeReceivedSessionKey({
                                       ...payload,
                                       type: 'GROUP_KEY',
                                       conversationId: message.conversationId || payload.conversationId || "",
-                                      senderId: message.senderId || payload.senderId || "",
+                                      senderId: senderIdToUse,
                                       encryptedKey: extractedKey,
                                       senderDeviceKey: dist.senderDeviceKey || payload.senderDeviceKey
                                   });
@@ -2210,19 +2283,25 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                                   // Abaikan jika device salah
                               }
                           }
-                      } else if (payload.encryptedKey || payload.key) {
-                          try {
-                              const { storeReceivedSessionKey } = await import('@utils/crypto');
-                              await storeReceivedSessionKey({
-                                  ...payload,
-                                  type: 'GROUP_KEY',
-                                  conversationId: message.conversationId || payload.conversationId || "",
-                                  senderId: message.senderId || payload.senderId || "",
-                                  encryptedKey: (payload.encryptedKey || payload.key || ""),
-                              });
-                              success = true;
-                          } catch(e) {}
-                      }
+                    } else if (payload.encryptedKey || payload.key) {
+                        try {
+                            const finalConvId = message.conversationId || payload.conversationId || "";
+                            const finalSenderId = message.senderId || payload.senderId || "";
+                            const finalEncKey = (payload.encryptedKey || payload.key || "");
+                            console.log(`[Offline Sync KEY] conv=${finalConvId} senderId=${finalSenderId} senderDeviceKey=${payload.senderDeviceKey} keyLen=${finalEncKey.length} hasDrHeader=${!!payload.drHeader}`);
+                            const { storeReceivedSessionKey } = await import('@utils/crypto');
+                            await storeReceivedSessionKey({
+                                ...payload,
+                                type: 'GROUP_KEY',
+                                conversationId: finalConvId,
+                                senderId: finalSenderId,
+                                encryptedKey: finalEncKey,
+                            });
+                            success = true;
+                        } catch(e) {
+                            console.warn(`[Offline Sync] Gagal decrypt key for conv ${message.conversationId || payload.conversationId}: senderId=${payload.senderId}, senderDeviceKey=${payload.senderDeviceKey}, hasDrHeader=${!!payload.drHeader}`, e);
+                        }
+                    }
 
                       if (success) {
                           useKeychainStore.getState().keysUpdated();
@@ -2232,13 +2311,30 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                           console.warn(`[Offline Sync] Kunci tidak dapat di-unseal. Mungkin dienkripsi untuk device lain.`);
                       }
                     }
-                 } catch (e) {
-                    console.error("Failed to process control message", e);
-                 }
-                 continue; // Selesai memproses pesan kontrol, lanjut ke pesan berikutnya
-            }
+                  } catch (e) {
+                     console.error("Failed to process control message", e);
+                  }
+                  continue; // Selesai memproses pesan kontrol, lanjut ke pesan berikutnya
+             }
 
-            // --- DEKRIPSI NORMAL MESSAGES (termasuk PROTOCOL_UPGRADE_REQ yg masih terenkripsi) ---
+              // Opaque Mailbox: process persisted metadata updates from offline sync
+              if (message.type === 'SYSTEM' && message.content && message.content.includes('"type":"METADATA_UPDATED"')) {
+                  try {
+                      const payload = JSON.parse(message.content);
+                      if (payload.encryptedMetadata) {
+                          console.log(`[Offline Sync] Memproses Metadata Update untuk conversation: ${message.conversationId}`);
+                          const { useConversationStore } = await import('@store/conversation');
+                          await useConversationStore.getState().updateConversation(message.conversationId, {
+                              encryptedMetadata: payload.encryptedMetadata
+                          });
+                      }
+                  } catch (e) {
+                      console.error("Failed to process metadata update", e);
+                  }
+                  continue;
+              }
+
+             // --- DEKRIPSI NORMAL MESSAGES (termasuk PROTOCOL_UPGRADE_REQ yg masih terenkripsi) ---
             
             // Cek Local Cache Lebih Dulu
             const localMessage = await shadowVault.getMessage(message.id);
@@ -2517,6 +2613,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       }
                   ] as any
               });
+          }
+      }
+
+      // Opaque Mailbox: reconstruct group participants from encrypted metadata if empty
+      if (currentUser) {
+          const groupConv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+          if (groupConv?.isGroup && groupConv.participants.length === 0) {
+              useConversationStore.getState().addOrUpdateConversation(groupConv);
           }
       }
 

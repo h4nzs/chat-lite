@@ -441,6 +441,28 @@ export async function clearAllKeys(): Promise<void> {
 
 export type { VaultEntry };
 
+// --- Opaque Mailbox: Cached Group Participants ---
+
+/**
+ * Menyimpan daftar user IDs partisipan grup ke IndexedDB.
+ * Digunakan oleh Opaque Mailbox agar non-creator tetap tahu anggota grup
+ * meskipun metadata belum didekripsi.
+ */
+export async function saveCachedGroupParticipants(conversationId: string, userIds: string[]): Promise<void> {
+  return enqueueWrite(async () => {
+      await db.groupCachedParticipants.put({ conversationId, userIds });
+  });
+}
+
+/**
+ * Mengembalikan daftar user IDs partisipan grup dari cache IndexedDB.
+ * Returns null jika belum pernah di-cache.
+ */
+export async function getCachedGroupParticipants(conversationId: string): Promise<string[] | null> {
+  const record = await db.groupCachedParticipants.get(conversationId);
+  return record ? record.userIds : null;
+}
+
 /**
  * Mengekspor seluruh isi brankas kunci menjadi string JSON.
  */
@@ -569,6 +591,13 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
       .toArray();
 
     const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
+
+    console.log(`[DIAG:gRBSkeyId] conv=${conversationId} keyId=${keyId} totalRecords=${records.length}`);
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const ckPrefix = typeof r.state.CK === 'string' ? r.state.CK.substring(0, 8) : 'NONSTRING';
+        console.log(`[DIAG:gRBSkeyId]   [${i}] id=${r.id} ckPrefix=${ckPrefix} match=${ckPrefix === keyId}`);
+    }
 
     for (const record of records) {
         let ckString = '';

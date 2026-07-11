@@ -158,6 +158,7 @@ export class NyxDatabase extends Dexie {
   groupSkippedKeys!: Table<{ key: string; mk: string }, string>;
   pqDrSessions!: Table<Record<string, unknown>, string>; // Legacy
   pqDrSessionsV2!: Table<PqDrSessionRecord, string>;
+  groupCachedParticipants!: Table<{ conversationId: string; userIds: string[] }, string>;
 
   constructor() {
     super('NyxUnifiedDB');
@@ -216,6 +217,10 @@ export class NyxDatabase extends Dexie {
     this.version(6).stores({
       conversations: 'id, isGroup',
       profileCache: 'id'
+    });
+
+    this.version(7).stores({
+      groupCachedParticipants: 'conversationId'
     });
   }
 }

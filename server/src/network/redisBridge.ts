@@ -478,17 +478,43 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        }
 
        case 'group:fulfilled_key': {
-          const { requesterId, conversationId, encryptedKey, targetDeviceId, senderDeviceKey, drHeader } = data as KeyFulfillmentPayload;
-          if (!requesterId || !conversationId || !encryptedKey) return;
-          if (!await checkRateLimit(userId, 'group_fulfilled_key', 60, 60)) return;
+           const { requesterId, conversationId, encryptedKey, targetDeviceId, senderDeviceKey, drHeader } = data as KeyFulfillmentPayload;
+           if (!requesterId || !conversationId || !encryptedKey) return;
+           if (!await checkRateLimit(userId, 'group_fulfilled_key', 60, 60)) return;
 
-          const emitPayload: Record<string, unknown> = { conversationId, encryptedKey, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
-          if (drHeader) emitPayload.drHeader = drHeader;
-          await emitEventToUser(requesterId, 'session:new_key', emitPayload, targetDeviceId);
-          break;
-        }
+           const emitPayload: Record<string, unknown> = { conversationId, encryptedKey, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
+           if (drHeader) emitPayload.drHeader = drHeader;
+           await emitEventToUser(requesterId, 'session:new_key', emitPayload, targetDeviceId);
+           break;
+         }
 
-       case 'auth:request_linking_qr': {
+        case 'metadata:updated': {
+           const { conversationId, encryptedMetadata, targetRecipients } = data as { conversationId: string; encryptedMetadata: string; targetRecipients: string[] };
+           if (!conversationId || !encryptedMetadata || !Array.isArray(targetRecipients)) return;
+           if (!await checkRateLimit(userId, 'metadata_updated', 20, 60)) return;
+
+           // Persist to DB for offline delivery (like messages:distribute_keys)
+           await prisma.message.create({
+               data: {
+                   id: `msg_sys_meta_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                   conversationId,
+                   senderId: userId,
+                   type: 'SYSTEM',
+                   content: JSON.stringify({ type: 'METADATA_UPDATED', encryptedMetadata }),
+                   isViewOnce: false,
+                   expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+               }
+           });
+
+           for (const targetId of targetRecipients) {
+               if (typeof targetId === 'string') {
+                   await emitEventToUser(targetId, 'conversation:updated', { id: asConversationId(conversationId), encryptedMetadata });
+               }
+           }
+           break;
+         }
+
+        case 'auth:request_linking_qr': {
          if (!await checkRateLimit(userId, 'linking_qr', 5, 60)) return;
          const sodium = await getSodium();
          const linkingToken = sodium.to_hex(sodium.randombytes_buf(32));

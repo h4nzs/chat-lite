@@ -363,6 +363,11 @@ export function emitGroupKeyFulfillment(payload: { requesterId: string; conversa
   transportClient.sendEvent('group:fulfilled_key', payload);
 }
 
+export function emitMetadataUpdated(conversationId: string, encryptedMetadata: string, targetRecipients: string[]): void {
+  console.log(`[DIAG:emitMetadataUpdated] conv=${conversationId} targets=${targetRecipients.join(',')} metaLen=${encryptedMetadata.length}`);
+  transportClient.sendEvent('metadata:updated', { conversationId, encryptedMetadata, targetRecipients });
+}
+
 export const fireGhostSync = (conversationId: string, baseDelay: number = 1000) => {
     const randomDelay = Math.floor(Math.random() * 2500) + baseDelay;
     setTimeout(async () => {

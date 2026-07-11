@@ -206,7 +206,8 @@ const corsMiddleware = cors({
     "CSRF-Token", 
     "x-csrf-token",
     "x-nyx-fingerprint",
-    "x-nyx-installation-id"
+    "x-nyx-installation-id",
+    "x-group-token"
   ],
 });
 
