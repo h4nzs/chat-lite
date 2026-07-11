@@ -57,9 +57,28 @@ const ensureGroupSessionIfNeeded = async (conversationId: string): Promise<boole
     toast.error(i18n.t('errors:internal_error_active_conversation_not_f', 'Internal error: Active conversation not found.'));
     return false;
   }
+
+  // SPQR 1-1: session handled by doEncryptMessage, no group key distribution needed
+  if (!conversation.isGroup) return true;
+
+  // [OPAQUE MAILBOX FIX] Populate participants from cache if empty
+  if (!conversation.participants || conversation.participants.length === 0) {
+    const { getCachedGroupParticipants } = await import('@lib/keychainDb');
+    const cachedUserIds = await getCachedGroupParticipants(conversationId);
+    if (cachedUserIds && cachedUserIds.length > 0) {
+      const currentUser = useAuthStore.getState().user;
+      const reconstructedParticipants = cachedUserIds.map(id => ({
+        id, name: id === currentUser?.id ? currentUser.name || '' : ''
+      })) as any;
+      await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
+    }
+  }
+  
+  // Re-read conversation after potential participant update
+  const updatedConversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
   
   try {
-    const distributionKeys = await ensureGroupSession(conversationId, conversation.participants);
+    const distributionKeys = await ensureGroupSession(conversationId, updatedConversation?.participants || conversation.participants);
     if (distributionKeys && distributionKeys.length > 0) {
       await emitGroupKeyDistribution(conversationId, distributionKeys as { userId: string; key: string, targetDeviceId?: string, senderDeviceKey?: string }[]);
     }

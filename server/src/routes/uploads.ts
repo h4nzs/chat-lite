@@ -162,11 +162,6 @@ router.post(
       if (!req.user) throw new ApiError(401, 'Unauthorized')
       if (!fileUrl) throw new ApiError(400, 'Missing fileUrl.')
 
-      const participant = await prisma.participant.findFirst({
-        where: { userId: req.user.id, conversationId: groupId as string }
-      })
-      if (!participant || participant.role !== 'ADMIN') throw new ApiError(403, 'Forbidden: Only admin can change group avatar')
-
       const oldGroup = await prisma.conversation.findUnique({
         where: { id: groupId as string }
       })

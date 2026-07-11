@@ -1,6 +1,6 @@
 import { db, DecryptedMessageRecord, PqDrSessionRecord } from './db';
 import { Dexie } from 'dexie';
-import type { Message } from '@store/conversation';
+import type { Message, Conversation } from '@store/conversation';
 import { getSodium } from '@lib/sodiumInitializer';
 import { getMyEncryptionKeyPair } from '@utils/crypto';
 import { asMessageId, asConversationId, asUserId } from '@nyx/shared';
@@ -401,6 +401,46 @@ class NyxShadowVaultProxy {
       await db.messages.where('conversationId').equals(conversationId).delete();
     } catch (e) {
       console.error("Failed to delete conversation messages from vault", e);
+    }
+  }
+
+  // --- CONVERSATION METHODS ---
+
+  async saveConversation(conv: Conversation) {
+    try {
+      const encryptedParticipants = await encryptVaultText(JSON.stringify(conv.participants || []));
+      await db.conversations.put({
+        id: conv.id,
+        isGroup: conv.isGroup,
+        encryptedMetadata: conv.encryptedMetadata || null,
+        lastMessageAt: (conv.lastMessageAt as string | Date | null) || null,
+        participants: encryptedParticipants
+      });
+    } catch (e) {
+      console.error("Failed to save conversation to vault", e);
+    }
+  }
+
+  async getAllConversations(): Promise<Conversation[]> {
+    try {
+      const records = await db.conversations.toArray();
+      const conversations = await Promise.all(records.map(async r => {
+        const decryptedParticipantsStr = await decryptVaultText(r.participants);
+        const participants = decryptedParticipantsStr ? JSON.parse(decryptedParticipantsStr) : [];
+        return {
+          id: r.id,
+          isGroup: r.isGroup,
+          encryptedMetadata: r.encryptedMetadata,
+          lastMessageAt: r.lastMessageAt ? new Date(r.lastMessageAt).toISOString() : null,
+          participants,
+          unreadCount: 0,
+          encryptionMode: 'SENDER_KEY'
+        } as unknown as Conversation;
+      }));
+      return conversations;
+    } catch (e) {
+      console.error("Failed to get all conversations from vault", e);
+      return [];
     }
   }
 }

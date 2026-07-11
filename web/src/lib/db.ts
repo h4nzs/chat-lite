@@ -119,9 +119,20 @@ export interface ProfileCacheRecord {
   updatedAt: number;
 }
 
+export interface ConversationRecord {
+  id: ConversationId;
+  isGroup: boolean;
+  encryptedMetadata: string | null;
+  lastMessageAt: string | Date | null;
+  participants: string; // Encrypted JSON string of Participant[]
+  isPinned?: boolean;
+  isArchived?: boolean;
+}
+
 export class NyxDatabase extends Dexie {
   // ShadowVault
   messages!: Table<DecryptedMessageRecord, string>;
+  conversations!: Table<ConversationRecord, string>;
   storyKeys!: Table<{ storyId: StoryId; key: string }, string>;
 
   // Profile Cache
@@ -147,6 +158,7 @@ export class NyxDatabase extends Dexie {
   groupSkippedKeys!: Table<{ key: string; mk: string }, string>;
   pqDrSessions!: Table<Record<string, unknown>, string>; // Legacy
   pqDrSessionsV2!: Table<PqDrSessionRecord, string>;
+  groupCachedParticipants!: Table<{ conversationId: string; userIds: string[] }, string>;
 
   constructor() {
     super('NyxUnifiedDB');
@@ -202,8 +214,13 @@ export class NyxDatabase extends Dexie {
       await trans.table('pqDrSessionsV2').bulkAdd(newSessions);
     });
 
-    this.version(5).stores({
-      profileCache: 'id, encryptedHash'
+    this.version(6).stores({
+      conversations: 'id, isGroup',
+      profileCache: 'id'
+    });
+
+    this.version(7).stores({
+      groupCachedParticipants: 'conversationId'
     });
   }
 }

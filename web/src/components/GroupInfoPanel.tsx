@@ -131,11 +131,11 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: Conversat
       await forceRotateGroupSenderKey(conversation.id);
       
       const distributionKeys = await ensureGroupSession(conversation.id, conversation.participants, true);
-      if (distributionKeys) {
+      if (distributionKeys && distributionKeys.length > 0) {
           await emitGroupKeyDistribution(conversation.id, distributionKeys as { userId: string; key: string }[]);
           toast.success('Encryption keys rotated successfully via ML-KEM', { id: toastId });
       } else {
-          throw new Error("Failed to generate new keys");
+          toast.error('Failed to distribute new keys — no participants synced yet', { id: toastId });
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : t('common:errors.unknown');

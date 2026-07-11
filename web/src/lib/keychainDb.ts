@@ -441,6 +441,28 @@ export async function clearAllKeys(): Promise<void> {
 
 export type { VaultEntry };
 
+// --- Opaque Mailbox: Cached Group Participants ---
+
+/**
+ * Menyimpan daftar user IDs partisipan grup ke IndexedDB.
+ * Digunakan oleh Opaque Mailbox agar non-creator tetap tahu anggota grup
+ * meskipun metadata belum didekripsi.
+ */
+export async function saveCachedGroupParticipants(conversationId: string, userIds: string[]): Promise<void> {
+  return enqueueWrite(async () => {
+      await db.groupCachedParticipants.put({ conversationId, userIds });
+  });
+}
+
+/**
+ * Mengembalikan daftar user IDs partisipan grup dari cache IndexedDB.
+ * Returns null jika belum pernah di-cache.
+ */
+export async function getCachedGroupParticipants(conversationId: string): Promise<string[] | null> {
+  const record = await db.groupCachedParticipants.get(conversationId);
+  return record ? record.userIds : null;
+}
+
 /**
  * Mengekspor seluruh isi brankas kunci menjadi string JSON.
  */
@@ -558,5 +580,47 @@ export async function importDatabaseFromJson(jsonString: string, password?: stri
               }
           }
       });
+  });
+}
+
+export async function getGroupReceiverStateByKeyId(conversationId: string, keyId: string): Promise<GroupReceiverState | null> {
+  return enqueueWrite(async () => {
+    const records = await db.groupReceiverStates
+      .where('id')
+      .startsWith(conversationId + '_')
+      .toArray();
+
+    const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
+
+    console.log(`[DIAG:gRBSkeyId] conv=${conversationId} keyId=${keyId} totalRecords=${records.length}`);
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const ckPrefix = typeof r.state.CK === 'string' ? r.state.CK.substring(0, 8) : 'NONSTRING';
+        console.log(`[DIAG:gRBSkeyId]   [${i}] id=${r.id} ckPrefix=${ckPrefix} match=${ckPrefix === keyId}`);
+    }
+
+    for (const record of records) {
+        let ckString = '';
+        if (typeof record.state.CK === 'string') {
+            ckString = record.state.CK;
+        } else if ((record.state.CK as unknown) instanceof Uint8Array) {
+            ckString = sodium.to_base64(record.state.CK as unknown as Uint8Array, sodium.base64_variants.URLSAFE_NO_PADDING);
+        }
+
+        if (ckString.substring(0, 8) === keyId) {
+            const parts = record.id.split('_');
+            const senderId = parts[1];
+            
+            return {
+                id: record.id,
+                conversationId: asConversationId(conversationId),
+                senderId: asUserId(senderId),
+                CK: ckString,
+                N: record.state.N,
+                skippedKeys: record.state.skippedKeys || {}
+            };
+        }
+    }
+    return null;
   });
 }

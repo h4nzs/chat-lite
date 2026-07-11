@@ -149,7 +149,9 @@ export function initSocketListeners() {
     import('../utils/crypto').then(m => m.storeReceivedSessionKey(data))
       .then(() => {
         import('../store/keychain').then(m => m.useKeychainStore.getState().keysUpdated());
-        useMessageStore.getState().reDecryptPendingMessages(data.conversationId);
+        // storeReceivedSessionKey already schedules reDecryptPendingMessages internally
+        // when metadata is decrypted. Don't call it here unconditionally — it would
+        // advance the sender key ratchet (CK N=0→N=1) before group metadata decrypts.
       })
       .catch(console.error);
   });

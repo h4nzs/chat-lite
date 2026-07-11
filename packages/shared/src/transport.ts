@@ -1,4 +1,5 @@
 export enum TransportOpCode {
+  CHAFF = 0x00,
   CHAT_MESSAGE = 0x01,
   KEY_SYNC = 0x02,
   WEBRTC_SIGNAL = 0x03,

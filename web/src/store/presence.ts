@@ -40,9 +40,19 @@ export const usePresenceStore = create<State>((set) => ({
        });
 
        convIdsToRetry.forEach(cid => {
-           console.log(`[Offline Sync] User ${userId} came online. Retrying decryptions for ${cid}...`);
-           messageStore.reDecryptPendingMessages(cid);
-       });
+            // Don't advance group sender key ratchet if metadata hasn't been decrypted yet.
+            // The metadata decrypt needs CK at N=0, and reDecryptPendingMessages would
+            // ratchet it to N=1 first, causing permanent decrypt failure.
+            import('./conversation').then(({ useConversationStore }) => {
+                const conv = useConversationStore.getState().conversations.find(c => c.id === cid);
+                if (conv?.isGroup && !conv.decryptedMetadata) {
+                    console.log(`[Offline Sync] Skipping reDecrypt for group ${cid} — metadata not yet decrypted`);
+                    return;
+                }
+                console.log(`[Offline Sync] User ${userId} came online. Retrying decryptions for ${cid}...`);
+                messageStore.reDecryptPendingMessages(cid);
+            });
+        });
     });
 
     return set(state => ({ onlineUsers: new Set(state.onlineUsers).add(userId) }));

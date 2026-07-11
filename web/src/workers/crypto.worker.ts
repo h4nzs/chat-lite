@@ -52,6 +52,26 @@ const HANDSHAKE_VERSION = 0x01;
 const X_WING_CT_SIZE = 1120;
 const X25519_PK_SIZE = 32;
 
+// --- TRAFFIC COVER PADDING ---
+// Fixed size for encrypted blobs to prevent size analysis.
+// Standard size: 8KB. Larger messages will be padded to the next 8KB block.
+const PADDING_BLOCK_SIZE = 8192; 
+
+function padBuffer(buf: Uint8Array, blockSize: number): Uint8Array {
+    const paddingLen = blockSize - (buf.length % blockSize);
+    const padded = new Uint8Array(buf.length + paddingLen);
+    padded.set(buf);
+    padded[buf.length] = 0x80;
+    return padded;
+}
+
+function unpadBuffer(buf: Uint8Array, blockSize: number): Uint8Array {
+    let i = buf.length - 1;
+    while (i >= 0 && buf[i] === 0) i--;
+    if (i < 0 || buf[i] !== 0x80) return buf;
+    return buf.slice(0, i);
+}
+
 function serializeHandshake(
     ephemeralPublicKey: Uint8Array,
     ctId: Uint8Array,
@@ -1659,7 +1679,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           mk = messageKey;
 
           nonce = sodium.randombytes_buf(24);
-          ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(plaintextBytes, null, null, nonce, mk);
+          
+          // TRAFFIC COVER: Pad plaintext to a uniform size (multiple of 8KB)
+          // We pad so that the final payload [nonce + mac + ciphertext] matches the block size.
+          const FINAL_OVERHEAD = 24 + 16; // 24 (nonce) + 16 (MAC)
+          const paddedPlaintext = padBuffer(plaintextBytes, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
+          
+          ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(paddedPlaintext, null, null, nonce, mk);
           
           if (!nonce || !ciphertext) throw new Error("Encryption failed");
 
@@ -1801,8 +1827,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
           const nonce = ciphertextBytes.slice(0, 24);
           const ctext = ciphertextBytes.slice(24);
-          plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ctext, null, nonce, mk);
-          if (!plaintext) throw new Error("Decryption failed");
+          const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ctext, null, nonce, mk);
+          if (!decrypted) throw new Error("Decryption failed");
+
+          // TRAFFIC COVER: Unpad plaintext
+          const FINAL_OVERHEAD = 24 + 16;
+          plaintext = unpadBuffer(decrypted, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
 
           result = {
             state: serializeState(state),
@@ -1852,10 +1882,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             const currentN = serializedState.N || 0;
 
             const nonce = sodium.randombytes_buf(24);
+
+            // TRAFFIC COVER: Pad plaintext to a uniform size (multiple of 8KB)
+            const FINAL_OVERHEAD = 24 + 16; 
+            const paddedPlaintext = padBuffer(plaintextBytes, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
+
             const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-                plaintextBytes, null, null, nonce, mk
+                paddedPlaintext, null, null, nonce, mk
             );
-            
             const combined = new Uint8Array(nonce.length + ciphertext.length);
             combined.set(nonce);
             combined.set(ciphertext, nonce.length);
@@ -1941,10 +1975,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
         const nonce = ciphertextBytes.slice(0, 24);
         const ctext = ciphertextBytes.slice(24);
-        const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+        const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
             null, ctext, null, nonce, mk
         );
-        if (!plaintext) throw new Error("Decryption failed");
+        if (!decrypted) throw new Error("Decryption failed");
+
+        // TRAFFIC COVER: Unpad plaintext
+        const FINAL_OVERHEAD = 24 + 16;
+        const plaintext = unpadBuffer(decrypted, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
 
         if (!serializedState.skippedKeys) serializedState.skippedKeys = {};
         for (const sk of skippedKeys) {
@@ -1982,9 +2020,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
           const nonce = ciphertextBytes.slice(0, 24);
           const ctext = ciphertextBytes.slice(24);
-          const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+          const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
               null, ctext, null, nonce, mkBytes
           );
+          if (!decrypted) throw new Error("Decryption failed");
+
+          // TRAFFIC COVER: Unpad plaintext
+          const FINAL_OVERHEAD = 24 + 16;
+          const plaintext = unpadBuffer(decrypted, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
 
           result = { plaintext };
         } finally {
@@ -2281,8 +2324,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
           const nonce = ciphertextBytes.slice(0, 24);
           const ctext = ciphertextBytes.slice(24);
-          plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ctext, null, nonce, mk);
-          if (!plaintext) throw new Error("Decryption failed");
+          const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ctext, null, nonce, mk);
+          if (!decrypted) throw new Error("Decryption failed");
+
+          // TRAFFIC COVER: Unpad plaintext
+          const FINAL_OVERHEAD = 24 + 16;
+          plaintext = unpadBuffer(decrypted, PADDING_BLOCK_SIZE - FINAL_OVERHEAD);
 
           if (!state.skippedKeys) state.skippedKeys = {};
           for (const sk of skippedKeys) {

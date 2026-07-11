@@ -4,6 +4,7 @@ import { redisClient } from '../lib/redis.js';
 import { getSodium } from '../lib/sodium.js';
 import { toRawServerMessage } from '../utils/mappers.js';
 import { sendPushNotification } from '../utils/sendPushNotification.js';
+import { sanitizeForLog } from '../utils/logger.js';
 import { TransportOpCode, MessageSendPayloadSchema } from '@nyx/shared';
 import type { MessageSendPayload, ServerToClientEvents, ClientToServerEvents, RawServerMessage, KeyRequestPayload, KeyFulfillmentPayload, GroupKeyRequestPayload, DistributeKeysPayload, PushSubscribePayload } from '@nyx/shared';
 
@@ -59,17 +60,9 @@ export async function emitEventToUser(userId: string, event: string, data: unkno
  * Emits a named event to all participants of a conversation.
  */
 export async function emitEventToConversation(conversationId: string, event: string, data: unknown, excludeUserId?: string) {
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { participants: { select: { userId: true } } }
-  });
-  
-  if (!conversation) return;
-  
-  for (const participant of conversation.participants) {
-    if (participant.userId === excludeUserId) continue;
-    await emitEventToUser(participant.userId, event, data);
-  }
+  // In Opaque Mailbox, we can't query participants from the DB.
+  // Real-time delivery must be handled via explicit subscriptions or client-side routing.
+  console.log(`[Opaque Mailbox] Dropped emitEventToConversation for ${conversationId}`);
 }
 
 /**
@@ -93,17 +86,8 @@ export async function sendJsonToUser(targetUserId: string, opCode: TransportOpCo
  * Broadcasts a message to all participants of a conversation.
  */
 export async function broadcastToConversation(conversationId: string, opCode: TransportOpCode, data: unknown, excludeUserId?: string) {
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { participants: { select: { userId: true } } }
-  });
-  
-  if (!conversation) return;
-  
-  for (const participant of conversation.participants) {
-    if (participant.userId === excludeUserId) continue;
-    await sendJsonToUser(participant.userId, opCode, data);
-  }
+  // In Opaque Mailbox, we can't query participants from the DB.
+  console.log(`[Opaque Mailbox] Dropped broadcastToConversation for ${conversationId}`);
 }
 
 /**
@@ -262,24 +246,25 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
     return;
   }
 
-  const { conversationId, content, sessionId, tempId, expiresAt, isViewOnce, pushPayloads, repliedToId } = validatedPayload;
+  const { conversationId, content, sessionId, tempId, expiresAt, isViewOnce, pushPayloads, repliedToId, targetRecipients, deleteSecret } = validatedPayload;
 
   try {
     const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: { participants: { select: { userId: true } } },
+      where: { id: conversationId }
     });
 
-    if (!conversation || !conversation.participants.some(p => p.userId === userId)) {
-      if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: "Conversation not found or access denied" });
+    if (!conversation) {
+      if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: "Conversation not found" });
       return;
     }
 
     const [newMessageRaw] = await prisma.$transaction([
       prisma.message.create({
         data: {
-            conversationId, senderId: userId, content, sessionId: sessionId || null,
-            repliedToId: repliedToId || null, expiresAt: expiresAt ? new Date(expiresAt) : null, isViewOnce: isViewOnce === true
+            conversationId, senderId: null, content, sessionId: sessionId || null,
+            repliedToId: repliedToId || null, expiresAt: expiresAt ? new Date(expiresAt) : null, 
+            isViewOnce: isViewOnce === true,
+            deleteSecret
         },
         include: { sender: { select: { id: true, encryptedProfile: true } } }
       }),
@@ -295,20 +280,26 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
     // Acknowledge the sender
     if (msgId) await sendAck(userId, deviceId, msgId, { ok: true, msg: safeMessage });
 
-    // Relay to all participants
-    // ✅ FIX: Enable Self-Relay. Do not skip `userId`.
-    // This allows other devices logged into the same account to receive the message.
-    for (const participant of conversation.participants) {
-      // Broadcast to the user's devices via Redis PubSub
-      await sendJsonToUser(participant.userId, TransportOpCode.CHAT_MESSAGE, safeMessage);
-      
-      // Do not send push notifications to ourselves
-      if (participant.userId !== userId) {
-        sendPushNotification(participant.userId, {
-            type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
-            data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
-        }).catch(console.error);
-      }
+    // Relay to target recipients explicitly passed by the sender (Opaque Mailbox routing)
+    const targetRecipients = (validatedPayload as any).targetRecipients || [];
+    if (Array.isArray(targetRecipients)) {
+        if (targetRecipients.length > 500) {
+            console.warn('[Security] User', sanitizeForLog(userId), 'attempted to send message to', targetRecipients.length, 'recipients (max 500)');
+            if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: 'Too many recipients (max 500)' });
+            return;
+        }
+        for (const targetId of targetRecipients) {
+            if (typeof targetId === 'string') {
+                await sendJsonToUser(targetId, TransportOpCode.CHAT_MESSAGE, safeMessage);
+
+                if (targetId !== userId) {
+                    sendPushNotification(targetId, {
+                        type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
+                        data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
+                    }).catch(console.error);
+                }
+            }
+        }
     }
   } catch (error) {
     console.error('Failed to handle chat message:', error);
@@ -379,13 +370,6 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
          if (!await checkRateLimit(userId, 'session_request_key', 20, 60)) return;
 
          if (targetId) {
-             const participants = await prisma.participant.findMany({
-                 where: { conversationId, userId: { in: [userId, targetId] } },
-                 select: { userId: true }
-             });
-             const participantIds = participants.map(p => p.userId);
-             if (!participantIds.includes(userId) || !participantIds.includes(targetId)) return;
-
              const me = await prisma.user.findUnique({ where: { id: userId }, include: { devices: { where: { id: deviceId } } } });
              const meDevice = me?.devices[0];
 
@@ -398,33 +382,9 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
                  requesterDeviceId: deviceId
              });
          } else if (sessionId) {
-             const isParticipant = await prisma.participant.findFirst({ where: { conversationId, userId } });
-             if (!isParticipant) return;
-
-             const participants = await prisma.participant.findMany({
-                 where: { conversationId, userId: { not: userId } },
-                 select: { userId: true },
-             });
-             const allOnlineUsers = await redisClient.sMembers('online_users');
-             const onlineParticipants = participants.filter(p => allOnlineUsers.includes(p.userId));
-             
-             if (onlineParticipants.length > 0) {
-                 const fulfillerId = onlineParticipants[0].userId;
-                 const me = await prisma.user.findUnique({ where: { id: userId }, include: { devices: { where: { id: deviceId } } } });
-                 const meDevice = me?.devices[0];
-
-                 if (meDevice?.publicKey && meDevice?.pqPublicKey) {
-                     await emitEventToUser(fulfillerId, 'session:fulfill_request', { 
-                        conversationId, 
-                        sessionId, 
-                        requesterId: userId, 
-                        requesterPublicKey: Buffer.from(meDevice.publicKey).toString('base64url'), 
-                        requesterPqPublicKey: Buffer.from(meDevice.pqPublicKey).toString('base64url') 
-                     });
-                 } else {
-                     await emitEventToUser(userId, "session:request_key_failed", { sessionId, targetId: fulfillerId, reason: "Missing PQ or classical public key" });
-                 }
-             }
+             // In Opaque Mailbox, we can't find an online participant automatically because we don't know who they are.
+             // We require the client to provide targetId.
+             await emitEventToUser(userId, "session:request_key_failed", { sessionId, targetId: "UNKNOWN", reason: "Opaque Mailbox requires targetId" });
          }
          break;
        }
@@ -461,22 +421,18 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
             if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: 'Rate limit exceeded' });
             return;
          }
-         const isParticipant = await prisma.participant.findFirst({ where: { conversationId, userId } });
-         if (!isParticipant) {
-            if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: 'Not a member' });
-            return;
-         }
 
          for (const k of keys) {
-             const { userId: targetId, key, targetDeviceId, senderDeviceKey } = k;
-             const emitPayload = { conversationId, encryptedKey: key, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
+              const { userId: targetId, key, targetDeviceId, senderDeviceKey, drHeader } = k;
+              const emitPayload: Record<string, unknown> = { conversationId, encryptedKey: key, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
+              if (drHeader) emitPayload.drHeader = drHeader;
              
              // Restore offline catchup: persist distributed keys to the database
              await prisma.message.create({
                  data: {
                      id: `msg_sys_key_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                      conversationId,
-                     senderId: userId,
+                     senderId: null,
                      type: 'SYSTEM',
                      content: JSON.stringify(emitPayload),
                      isViewOnce: false,
@@ -495,20 +451,10 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
          if (!conversationId) return;
          if (!await checkRateLimit(userId, 'group_request_key', 20, 60)) return;
 
-         const isParticipant = await prisma.participant.findFirst({ where: { conversationId, userId } });
-         if (!isParticipant) return;
-
          let fulfillerId = targetSenderId;
          if (!fulfillerId) {
-             const participants = await prisma.participant.findMany({
-                 where: { conversationId, userId: { not: userId } },
-                 select: { userId: true },
-             });
-             const allOnlineUsers = await redisClient.sMembers('online_users');
-             const onlineParticipants = participants.filter(p => allOnlineUsers.includes(p.userId));
-             if (onlineParticipants.length > 0) {
-                 fulfillerId = onlineParticipants[0].userId;
-             }
+             // Opaque Mailbox requires targetSenderId to be provided by client
+             return;
          }
 
          if (fulfillerId) {
@@ -521,7 +467,8 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
                      requesterId: userId,
                      requesterPublicKey: Buffer.from(meDevice.publicKey).toString('base64url'),
                      requesterPqPublicKey: Buffer.from(meDevice.pqPublicKey).toString('base64url'),
-                     requesterDeviceId: deviceId
+                     requesterDeviceId: deviceId,
+                     targetDeviceKey
                  });
              } else {
                  await emitEventToUser(userId, "group:key_request_failed", { conversationId, reason: "Missing classical or PQ public key" });
@@ -531,16 +478,43 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        }
 
        case 'group:fulfilled_key': {
-         const { requesterId, conversationId, encryptedKey, targetDeviceId, senderDeviceKey } = data as KeyFulfillmentPayload;
-         if (!requesterId || !conversationId || !encryptedKey) return;
-         if (!await checkRateLimit(userId, 'group_fulfilled_key', 60, 60)) return;
+           const { requesterId, conversationId, encryptedKey, targetDeviceId, senderDeviceKey, drHeader } = data as KeyFulfillmentPayload;
+           if (!requesterId || !conversationId || !encryptedKey) return;
+           if (!await checkRateLimit(userId, 'group_fulfilled_key', 60, 60)) return;
 
-         const emitPayload = { conversationId, encryptedKey, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
-         await emitEventToUser(requesterId, 'session:new_key', emitPayload, targetDeviceId);
-         break;
-       }
+           const emitPayload: Record<string, unknown> = { conversationId, encryptedKey, type: 'GROUP_KEY', senderId: userId, senderDeviceKey };
+           if (drHeader) emitPayload.drHeader = drHeader;
+           await emitEventToUser(requesterId, 'session:new_key', emitPayload, targetDeviceId);
+           break;
+         }
 
-       case 'auth:request_linking_qr': {
+        case 'metadata:updated': {
+           const { conversationId, encryptedMetadata, targetRecipients } = data as { conversationId: string; encryptedMetadata: string; targetRecipients: string[] };
+           if (!conversationId || !encryptedMetadata || !Array.isArray(targetRecipients)) return;
+           if (!await checkRateLimit(userId, 'metadata_updated', 20, 60)) return;
+
+           // Persist to DB for offline delivery (like messages:distribute_keys)
+           await prisma.message.create({
+               data: {
+                   id: `msg_sys_meta_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                   conversationId,
+                   senderId: userId,
+                   type: 'SYSTEM',
+                   content: JSON.stringify({ type: 'METADATA_UPDATED', encryptedMetadata }),
+                   isViewOnce: false,
+                   expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+               }
+           });
+
+           for (const targetId of targetRecipients) {
+               if (typeof targetId === 'string') {
+                   await emitEventToUser(targetId, 'conversation:updated', { id: asConversationId(conversationId), encryptedMetadata });
+               }
+           }
+           break;
+         }
+
+        case 'auth:request_linking_qr': {
          if (!await checkRateLimit(userId, 'linking_qr', 5, 60)) return;
          const sodium = await getSodium();
          const linkingToken = sodium.to_hex(sodium.randombytes_buf(32));
@@ -555,9 +529,9 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        case 'message:unsend': {
          const { messageId, conversationId } = data as { messageId: string, conversationId: string };
          if (!messageId || !conversationId) return;
-         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { senderId: true, conversationId: true } });
-         if (!msg || msg.conversationId !== conversationId || msg.senderId !== userId) return;
-         await prisma.message.deleteMany({ where: { id: messageId, senderId: userId } });
+         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
+         if (!msg || msg.conversationId !== conversationId) return;
+         await prisma.message.delete({ where: { id: messageId } });
          await emitEventToConversation(conversationId, 'message:deleted_remotely', { messageId, conversationId, deletedBy: userId }, userId);
          break;
        }
@@ -565,9 +539,9 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        case 'message:view_once_opened': {
          const { messageId, conversationId } = data as { messageId: string, conversationId: string };
          if (!messageId || !conversationId) return;
-         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { senderId: true, conversationId: true } });
-         if (!msg || msg.senderId === userId || msg.conversationId !== conversationId) return;
-         
+         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
+         if (!msg || msg.conversationId !== conversationId) return;
+
          // Emit viewed event then OBLITERATE from server
          await emitEventToConversation(conversationId, 'message:viewed', { messageId, conversationId }, userId);
          await prisma.message.delete({ where: { id: messageId } }).catch(() => {});
@@ -742,14 +716,6 @@ async function handleMessageStatusUpdate(userId: string, conversationId: string,
       create: { messageId, userId, status }
     });
 
-    // [+] RESTORE: UPDATE BATAS BACA PARTICIPANT
-    if (status === 'READ') {
-       await prisma.participant.updateMany({
-           where: { userId, conversationId },
-           data: { lastReadMsgId: messageId }
-       });
-    }
-
     await emitEventToConversation(conversationId, 'message:status_updated', {
       conversationId,
       messageId,
@@ -762,16 +728,9 @@ async function handleMessageStatusUpdate(userId: string, conversationId: string,
         if (!msg.conversation.isGroup) {
             // Dalam chat 1:1, jika penerima sudah baca, hapus dari server.
             await prisma.message.delete({ where: { id: messageId } }).catch(() => {});
-        } else {
-            // Dalam grup, hapus jika SEMUA partisipan sudah baca
-            const participants = await prisma.participant.count({ where: { conversationId } });
-            const readCount = await prisma.messageStatus.count({ where: { messageId, status: 'READ' } });
-            
-            // participants - 1 (pengirim tidak dihitung status bacanya di DB)
-            if (readCount >= (participants - 1)) {
-                await prisma.message.delete({ where: { id: messageId } }).catch(() => {});
-            }
         }
+        // Dalam grup (Opaque Mailbox), server tidak tahu jumlah partisipan.
+        // Pesan akan dihapus otomatis oleh TTL (expiresAt).
     }
   } catch (e: unknown) {
     // Tangani P2003 (FK Violation) jika pesan dihapus tepat saat kueri berjalan

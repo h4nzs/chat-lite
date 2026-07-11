@@ -8,6 +8,16 @@ import {
   type MinimalProfile
 } from '@nyx/shared';
 
+export { 
+  asUserId,
+  asConversationId,
+  asMessageId,
+  type RawServerMessage, 
+  type Conversation, 
+  type Participant, 
+  type MinimalProfile
+};
+
 // --- 1. DEFINISI INPUT (Aman & Sesuai E2EE Schema) ---
 
 export interface PrismaUserProfileInput {
@@ -33,7 +43,7 @@ export interface PrismaMessageInput {
   tempId?: number | null;
   type?: string;
   conversationId: string;
-  senderId: string;
+  senderId: string | null;
   content?: string | null; // Pengganti ciphertext dalam E2EE payload
   fileKey?: string | null;
   sessionId?: string | null;
@@ -165,7 +175,7 @@ export const toRawServerMessage = (msg: PrismaMessageInput): RawServerMessage =>
   tempId: msg.tempId ?? undefined,
   type: (msg.type === 'USER' || msg.type === 'SYSTEM') ? msg.type : 'USER',
   conversationId: asConversationId(msg.conversationId),
-  senderId: asUserId(msg.senderId),
+  senderId: asUserId(msg.senderId || ''),
   sender: msg.sender ? toMinimalProfile(msg.sender) : undefined,
   // Hapus map ciphertext yang salah, fokus ke content
   ciphertext: msg.content ?? '', 

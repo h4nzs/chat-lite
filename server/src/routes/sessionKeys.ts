@@ -1,25 +1,20 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
-import { relaySessionKeys, ClientSessionKeyPayload } from '../utils/sessionKeys.js'
 import { ApiError } from '../utils/errors.js'
+import { relaySessionKeys } from '../utils/sessionKeys.js'
+import type { ClientSessionKeyPayload } from '../utils/sessionKeys.js'
 
 const router: Router = Router()
 router.use(requireAuth)
 
-// GET all encrypted session keys for a user's device in a conversation
-router.get('/:conversationId', async (req, res, next) => {
+// GET: Fetch session keys for a conversation and device
+router.get('/:conversationId/devices/:deviceId', async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
-    const { conversationId } = req.params
-    const { deviceId } = req.query
+    const { conversationId, deviceId } = req.params
 
-    // Kunci sesi sekarang spesifik per-perangkat (Per-Device E2EE)
-    if (!deviceId || typeof deviceId !== 'string') {
-      throw new ApiError(400, 'deviceId query parameter is required.')
-    }
-
-    // Verifikasi kepemilikan perangkat untuk keamanan tambahan
+    // Verify device belongs to requester
     const device = await prisma.device.findFirst({
       where: { id: deviceId, userId: req.user.id }
     })
@@ -28,15 +23,7 @@ router.get('/:conversationId', async (req, res, next) => {
       throw new ApiError(403, 'Device not found or unauthorized.')
     }
 
-    const isParticipant = await prisma.participant.findFirst({
-      where: { conversationId, userId: req.user.id }
-    })
-
-    if (!isParticipant) {
-      throw new ApiError(403, 'You are not a participant in this conversation.')
-    }
-
-    // Cari SessionKey berdasarkan deviceId, bukan userId
+    // Cari SessionKey berdasarkan deviceId
     const sessionKeys = await prisma.sessionKey.findMany({
       where: { conversationId, deviceId },
       select: { sessionId: true, encryptedKey: true, initiatorCiphertexts: true },
@@ -50,7 +37,7 @@ router.get('/:conversationId', async (req, res, next) => {
       initiatorCiphertexts: sk.initiatorCiphertexts ? Buffer.from(sk.initiatorCiphertexts).toString('base64url') : null
     }))
 
-    res.json({ keys: formattedKeys })
+    res.json(formattedKeys)
   } catch (error) {
     next(error)
   }
@@ -67,17 +54,12 @@ router.post('/:conversationId/ratchet', async (req, res, next) => {
       throw new ApiError(400, 'sessionId and an array of encrypted keys are required.')
     }
 
-    const userId = req.user.id
-
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: conversationId,
-        participants: { some: { userId } }
-      }
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId }
     })
 
     if (!conversation) {
-      throw new ApiError(404, 'Conversation not found or you are not a participant.')
+      throw new ApiError(404, 'Conversation not found')
     }
 
     // Relay client-encrypted keys to the database

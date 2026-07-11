@@ -14,7 +14,7 @@ export const StoryIdSchema = z.string().min(1).transform((val) => asStoryId(val)
 
 // --- Minimal Shared Schemas ---
 // Digunakan sebagai pondasi awal sebelum kita memvalidasi seluruh entitas
-export const EncryptionModeEnum = z.enum(['SENDER_KEY', 'PQ_DR']);
+export const EncryptionModeEnum = z.enum(['SENDER_KEY', 'PQ_DR', 'SPQR']);
 export type EncryptionMode = z.infer<typeof EncryptionModeEnum>;
 
 import { SubscriptionTier } from './constants.js';
@@ -89,6 +89,8 @@ export const MessageSendPayloadSchema = z.object({
   pushPayloads: z.record(z.string(), z.string()).optional(),
   repliedToId: z.string().optional(),
   isViewOnce: z.boolean().optional(),
+  targetRecipients: z.array(z.string()).max(500).optional(), // Hard limit of 500 recipients
+  deleteSecret: z.string().optional()
 });
 
 export const IncomingMessageSchema = z.object({
@@ -213,7 +215,8 @@ export const DistributeKeysPayloadSchema = z.object({
     targetDeviceId: z.string().optional(),
     targetDeviceKey: z.string().optional(),
     key: z.string(),
-    senderDeviceKey: z.string().optional()
+    senderDeviceKey: z.string().optional(),
+    drHeader: z.any().optional()
   }))
 });
 
@@ -243,6 +246,7 @@ export const KeyFulfillmentPayloadSchema = z.object({
   encryptedKey: z.string().min(1),
   targetDeviceId: z.string().optional(),
   senderDeviceKey: z.string().optional(),
+  drHeader: z.any().optional(),
 });
 
 export const PushSubscribePayloadSchema = z.object({

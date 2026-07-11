@@ -32,22 +32,15 @@ router.get('/:conversationId', async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
     const { conversationId } = req.params
-    const userId = req.user.id
-
-    // Validasi member grup
-    const participant = await prisma.participant.findUnique({
-      where: { userId_conversationId: { userId, conversationId } }
-    })
-    if (!participant) return res.status(403).json({ error: 'You are not a member of this conversation.' })
 
     const now = new Date();
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-    // AMBIL PESAN TERTUNDA (Hanya pesan setelah user join dan belum kadaluarsa)
+    // AMBIL PESAN TERTUNDA (Maksimal 14 hari terakhir)
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
-        createdAt: { gte: participant.joinedAt, gt: fourteenDaysAgo },
+        createdAt: { gt: fourteenDaysAgo },
         OR: [
           { expiresAt: null },
           { expiresAt: { gt: now } }
@@ -66,7 +59,7 @@ router.get('/:conversationId', async (req, res, next) => {
       where: {
         conversationId,
         type: 'SYSTEM',
-        createdAt: { gte: participant.joinedAt, gt: fourteenDaysAgo },
+        createdAt: { gt: fourteenDaysAgo },
         OR: [
           { expiresAt: null },
           { expiresAt: { gt: now } }
@@ -85,7 +78,7 @@ router.get('/:conversationId', async (req, res, next) => {
       where: {
         conversationId,
         type: 'SYSTEM',
-        createdAt: { gte: participant.joinedAt, gt: fourteenDaysAgo },
+        createdAt: { gt: fourteenDaysAgo },
         OR: [
           { expiresAt: null },
           { expiresAt: { gt: now } }
@@ -144,13 +137,6 @@ router.post('/', zodValidate({
     const senderId = req.user.id
     const { conversationId, content, sessionId, tempId, expiresIn, isViewOnce } = req.body
 
-    const { getParticipantIds } = await import('../utils/participantCache.js');
-    const participantIds = await getParticipantIds(conversationId);
-
-    if (!participantIds.includes(senderId)) {
-      return res.status(403).json({ error: 'You are not a participant.' })
-    }
-
     // HITUNG TTL (Umur Pesan di Server)
     // Jika tidak ada expiresIn, set otomatis dihancurkan dalam 14 Hari (Store-and-Forward rules)
     const defaultTTL = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); 
@@ -163,13 +149,11 @@ router.post('/', zodValidate({
       prisma.message.create({
         data: {
           conversationId,
-          senderId,
+          senderId: null,
           content,
           sessionId: sessionId || null,
-          expiresAt: finalExpiresAt, 
+          expiresAt: finalExpiresAt,
           isViewOnce: isViewOnce === true
-          // Kita TIDAK menyimpan statuses: { createMany: ... } lagi,
-          // biarkan Socket.IO (message:status_updated) yang menangani centang biru
         },
         include: {
           sender: { select: { id: true, encryptedProfile: true } },
@@ -199,13 +183,9 @@ router.post('/', zodValidate({
     // EMIT & PUSH NOTIFICATION
     await broadcastToConversation(conversationId, TransportOpCode.CHAT_MESSAGE, safeMessage);
 
-    const pushRecipients = participantIds.filter(pid => pid !== senderId)
-    if (pushRecipients.length > 0) {
-      const payload = {
-        data: { conversationId, messageId: safeMessage.id }
-      }
-      Promise.all(pushRecipients.map(pId => sendPushNotification(pId, payload))).catch(err => console.error('[Push] Failed:', err))
-    }
+    // PUSH NOTIFICATIONS DEFERRED FOR OPAQUE MAILBOX
+    // Push payloads are now handled completely separately by the client directly calling a new push endpoint,
+    // or we omit it here since the server doesn't know the participants.
   } catch (error) {
     next(error)
   }
@@ -220,11 +200,30 @@ router.delete('/:id', async (req, res, next) => {
     const userId = req.user.id
     const messageId = req.params.id
     const r2Key = req.query.r2Key as string | undefined
+    const deleteToken = req.headers['x-delete-token']
+
+    // OPAQUE MAILBOX: Blind authorization check
+    const message = await (prisma.message as any).findUnique({
+        where: { id: messageId },
+        select: { deleteSecret: true }
+    }) as { deleteSecret: string | null } | null;
+
+    if (!message) {
+        return res.status(404).json({ error: 'Message not found' });
+    }
+    if (!message.deleteSecret) {
+        return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Message cannot be deleted (no delete secret)' });
+    }
+    if (message.deleteSecret !== deleteToken) {
+        return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid X-Delete-Token' });
+    }
 
     // Dalam E2EE, server mungkin sudah menghapus pesannya dari DB (Kadaluarsa otomatis).
     // Jika pesan masih ada, kita hapus secara eksplisit.
     try {
-      await prisma.message.deleteMany({ where: { id: messageId, senderId: userId } });
+      if (message) {
+        await prisma.message.delete({ where: { id: messageId } });
+      }
     } catch (e) {
       console.error('[Messages] Failed to delete message:', e);
     }

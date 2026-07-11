@@ -4,6 +4,7 @@
 import type { UserId, ConversationId, MessageId, MessageSendPayload, SystemMessagePayload, GroupKeyDistributionPayload, SystemKeyRequestPayload } from '@nyx/shared';
 import { asUserId, asConversationId, asMessageId } from '@nyx/shared';
 import { createWithEqualityFn } from "zustand/traditional";
+import { v4 as uuidv4 } from 'uuid';
 import { api, authFetch } from "@lib/api"; 
 import { transportClient, emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/transportClient';
 import { 
@@ -140,14 +141,15 @@ export async function decryptMessageObject(
   const isGroup = conversation?.isGroup || false;
 
   try {
-    // 1. SELF-MESSAGE DECRYPTION
-    if (currentUser && rawMsg.senderId === currentUser.id) {
+    // 1. SELF-MESSAGE DECRYPTION (skip for group — uses sender key ratchet, not secretbox)
+    if (currentUser && !isGroup && (rawMsg.senderId === currentUser.id || !rawMsg.senderId)) {
         const { retrieveMessageKeySecurely } = await import('@utils/crypto');
         let mk = await retrieveMessageKeySecurely(rawMsg.id);
         if (!mk && rawMsg.tempId) {
             mk = await retrieveMessageKeySecurely(`temp_${rawMsg.tempId}`);
         }
-        
+
+        // Self-message: decrypt with stored MK first, fallback to DR ratchet for own multi-device
         if (mk) {
             const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
             const sodium = await getSodium();
@@ -176,14 +178,41 @@ export async function decryptMessageObject(
                     
                     if (plainText && plainText.trim().startsWith('{')) {
                         try {
-                            const parsed = JSON.parse(plainText) as { profileKey?: string, text?: string };
+                            const parsed = JSON.parse(plainText) as Record<string, unknown>;
+                            if (parsed.senderId) {
+                                finalMessage.senderId = asUserId(parsed.senderId as string);
+                                if (!finalMessage.sender) finalMessage.sender = { id: asUserId(parsed.senderId as string) } as any;
+                                else finalMessage.sender.id = asUserId(parsed.senderId as string);
+                            }
                             if (parsed.profileKey) {
+                                const { saveProfileKey } = await import('@lib/keychainDb');
+                                const profileKeyToSave = parsed.profileKey as string;
+                                await saveProfileKey(finalMessage.senderId || '', profileKeyToSave).catch(() => {});
                                 delete parsed.profileKey;
-                                if (parsed.text !== undefined && Object.keys(parsed).length === 1) {
-                                    plainText = parsed.text;
-                                } else {
-                                    plainText = JSON.stringify(parsed);
-                                }
+                            }
+                            delete parsed.senderId;
+                            delete parsed.senderDeviceKey;
+                            const innerValue = parsed.content !== undefined ? String(parsed.content) : (parsed.text !== undefined ? String(parsed.text) : null);
+                            if (innerValue !== null && Object.keys(parsed).length === 1) {
+                                plainText = innerValue;
+                                // Recursively strip profileKey from inner value
+                                try {
+                                    const innerParsed = JSON.parse(plainText) as Record<string, unknown>;
+                                    if (innerParsed && typeof innerParsed === 'object' && innerParsed.profileKey) {
+                                        const { saveProfileKey } = await import('@lib/keychainDb');
+                                        await saveProfileKey(finalMessage.senderId || '', innerParsed.profileKey as string).catch(() => {});
+                                        delete innerParsed.profileKey;
+                                        if (innerParsed.text !== undefined && Object.keys(innerParsed).length === 1) {
+                                            plainText = String(innerParsed.text);
+                                        } else if (innerParsed.content !== undefined && Object.keys(innerParsed).length === 1) {
+                                            plainText = String(innerParsed.content);
+                                        } else {
+                                            plainText = JSON.stringify(innerParsed);
+                                        }
+                                    }
+                                } catch (_e) {}
+                            } else {
+                                plainText = JSON.stringify(parsed);
                             }
                         } catch (_e) {}
                     }
@@ -244,9 +273,11 @@ export async function decryptMessageObject(
                 }
             }
         }
-        // JIKA TIDAK ADA MK, JANGAN RETURN DI SINI! 
-        // Biarkan jatuh ke bawah (Fall-through) agar logika Dekripsi Receiver (Fan-Out) 
-        // bisa mencoba mendekripsi pesan kita sendiri dari perangkat lain.
+        // Self-message without stored MK: skip DR ratchet only for known senderId
+        // (optimistic update handles it); sealed sender falls through to DR path
+        if (rawMsg.senderId === currentUser.id) {
+            return finalMessage;
+        }
     }
 
     let contentToDecrypt: string | undefined = ('ciphertext' in rawMsg ? rawMsg.ciphertext : undefined) as string | undefined;
@@ -275,79 +306,90 @@ export async function decryptMessageObject(
         return finalMessage;
     }
 
+    // Skip X3DH re-processing if we already have a ratchet state
+    // (prevents DR state corruption from sealed sender self-messages)
     if (!isGroup && contentToDecrypt.startsWith('{') && contentToDecrypt.includes('"x3dh":')) {
-       try {
-           const payload = JSON.parse(contentToDecrypt) as { ciphertext?: string, x3dh?: { initiatorSigningKey: string, initiatorCiphertexts: string, otpkId: number } };
-           const { retrieveMessageKeySecurely } = await import('@utils/crypto');
-           const mk = await retrieveMessageKeySecurely(rawMsg.id);
-           
-           if (mk) {
-               contentToDecrypt = payload.ciphertext;
-           } else if (payload.x3dh && payload.ciphertext) {
-               const { initiatorSigningKey, initiatorCiphertexts, otpkId } = payload.x3dh;
-               const ciphertext = payload.ciphertext;
+        const existingState = await retrieveRatchetStateSecurely(rawMsg.conversationId);
+        if (!existingState) {
+            try {
+                const payload = JSON.parse(contentToDecrypt) as { ciphertext?: string, x3dh?: { initiatorSigningKey: string, initiatorCiphertexts: string, otpkId: number } };
+                const { retrieveMessageKeySecurely } = await import('@utils/crypto');
+                const mk = await retrieveMessageKeySecurely(rawMsg.id);
+                
+                if (mk) {
+                    contentToDecrypt = payload.ciphertext;
+                } else if (payload.x3dh && payload.ciphertext) {
+                    const { initiatorSigningKey, initiatorCiphertexts, otpkId } = payload.x3dh;
+                    const ciphertext = payload.ciphertext;
 
-               // [SECURITY] Fetch peer's PreKeyBundle to verify identity and update keychain
-               try {
-                   const { fetchPreKeyBundle } = await import('@utils/crypto');
-                   const bundle = await fetchPreKeyBundle(rawMsg.senderId);
-                   const { getPeerIdentityKey, savePeerIdentityKey } = await import('@lib/keychainDb');
-                   const existingKey = await getPeerIdentityKey(rawMsg.senderId);
-                   if (existingKey && existingKey !== bundle.identityKey) {
-                       const { t } = await import('i18next');
-                       const { default: toast } = await import('react-hot-toast');
-                       const useDynamicIslandStore = (await import('@store/dynamicIsland')).default;
-                       
-                       const peerName = rawMsg.sender?.name || t('common:defaults.unknown_user');
-                       const warningText = t('common:security_key_changed', { name: peerName });
-                       
-                       useMessageStore.getState().addSystemMessage(rawMsg.conversationId, warningText);
-                       toast.error(warningText, { icon: '🛡️', duration: 6000 });
-                       
-                       useDynamicIslandStore.getState().addActivity({
-                           type: 'notification',
-                           sender: { name: 'NYX_SHIELD' },
-                           message: warningText,
-                           link: `/chat/${rawMsg.conversationId}`
-                       }, 6000);
-                   }
-                   await savePeerIdentityKey(rawMsg.senderId, bundle.identityKey);
-               } catch (e) {
-                   console.error("[X3DH] Failed to verify peer identity", e);
-               }
+                    // [SECURITY] Fetch peer's PreKeyBundle to verify identity and update keychain
+                    try {
+                        const { fetchPreKeyBundle } = await import('@utils/crypto');
+                        const myId = useAuthStore.getState().user?.id;
+                        const conv = (await import('@store/conversation')).useConversationStore.getState().conversations.find(c => c.id === rawMsg.conversationId);
+                        const peerId = conv?.participants.find(p => (('userId' in p ? p.userId : p.id) || p.id) !== myId)?.userId || rawMsg.senderId;
 
-               const myIdentityKeyPair = await getMyEncryptionKeyPair();
-               const { getSignedPreKeyPair, getPqEncryptionKeyPair, getPqSignedPreKeyPair } = useAuthStore.getState();
-               const mySignedPreKeyPair = await getSignedPreKeyPair();
+                        if (peerId) {
+                            const bundle = await fetchPreKeyBundle(peerId);
+                            const { getPeerIdentityKey, savePeerIdentityKey } = await import('@lib/keychainDb');
+                            const existingKey = await getPeerIdentityKey(peerId);
+                            if (existingKey && existingKey !== bundle.identityKey) {
+                                const { t } = await import('i18next');
+                                const { default: toast } = await import('react-hot-toast');
+                                const useDynamicIslandStore = (await import('@store/dynamicIsland')).default;
 
-               const myPqIdentityKeyPair = await getPqEncryptionKeyPair();
-               const myPqSignedPreKeyPair = await getPqSignedPreKeyPair();
+                                const peerName = rawMsg.sender?.name || t('common:defaults.unknown_user');
+                                const warningText = t('common:security_key_changed', { name: peerName });
 
-               const sessionKey = await deriveSessionKeyAsRecipient(
-                   myIdentityKeyPair,
-                   mySignedPreKeyPair,
-                   myPqIdentityKeyPair,
-                   myPqSignedPreKeyPair,
-                   initiatorSigningKey,
-                   initiatorCiphertexts,
-                   otpkId
-               );
-               
-               const { worker_dr_init_bob } = await import('@lib/crypto-worker-proxy');
-               const newState = await worker_dr_init_bob({
-                   sk: sessionKey,
-                   myPqSignedPreKey: myPqSignedPreKeyPair // <--- FIX: Ubah key object-nya
-               });
+                                useMessageStore.getState().addSystemMessage(rawMsg.conversationId, warningText);
+                                toast.error(warningText, { icon: '🛡️', duration: 6000 });
 
-               await storeRatchetStateSecurely(rawMsg.conversationId, newState);
-               contentToDecrypt = JSON.stringify(payload); // Ensure the whole payload is passed to decryptMessage
-           }
-       } catch (e) {
-           console.error("[X3DH] Failed to parse/derive from header:", e);
-           if (e instanceof Error && (e.message.includes("Account upgrade required") || e.message.includes("PQ keys missing"))) {
-               throw e;
-           }
-       }
+                                useDynamicIslandStore.getState().addActivity({
+                                    type: 'notification',
+                                    sender: { name: 'NYX_SHIELD' },
+                                    message: warningText,
+                                    link: `/chat/${rawMsg.conversationId}`
+                                }, 6000);
+                            }
+                            await savePeerIdentityKey(peerId, bundle.identityKey);
+                        }
+                    } catch (e) {
+                        console.error("[X3DH] Failed to verify peer identity", e);
+                    }
+
+                    const myIdentityKeyPair = await getMyEncryptionKeyPair();
+                    const { getSignedPreKeyPair, getPqEncryptionKeyPair, getPqSignedPreKeyPair } = useAuthStore.getState();
+                    const mySignedPreKeyPair = await getSignedPreKeyPair();
+
+                    const myPqIdentityKeyPair = await getPqEncryptionKeyPair();
+                    const myPqSignedPreKeyPair = await getPqSignedPreKeyPair();
+
+                    const sessionKey = await deriveSessionKeyAsRecipient(
+                        myIdentityKeyPair,
+                        mySignedPreKeyPair,
+                        myPqIdentityKeyPair,
+                        myPqSignedPreKeyPair,
+                        initiatorSigningKey,
+                        initiatorCiphertexts,
+                        otpkId
+                    );
+                    
+                    const { worker_dr_init_bob } = await import('@lib/crypto-worker-proxy');
+                    const newState = await worker_dr_init_bob({
+                        sk: sessionKey,
+                        myPqSignedPreKey: myPqSignedPreKeyPair
+                    });
+
+                    await storeRatchetStateSecurely(rawMsg.conversationId, newState);
+                    contentToDecrypt = JSON.stringify(payload);
+                }
+            } catch (e) {
+                console.error("[X3DH] Failed to parse/derive from header:", e);
+                if (e instanceof Error && (e.message.includes("Account upgrade required") || e.message.includes("PQ keys missing"))) {
+                    throw e;
+                }
+            }
+        }
     }
 
     let result;
@@ -378,30 +420,54 @@ export async function decryptMessageObject(
     }
 
     if (result?.status === 'success') {
-      let plainText = result.value as string;
+        let plainText = result.value as string;
 
-      if (plainText && plainText.trim().startsWith('{')) {
-          try {
-              const parsed = JSON.parse(plainText) as { profileKey?: string, text?: string };
-              if (parsed.profileKey) {
-                  const { saveProfileKey } = await import('@lib/keychainDb');
-                  const { useProfileStore } = await import('@store/profile');
-                  
-                  await saveProfileKey(rawMsg.senderId, parsed.profileKey);
-                  useProfileStore.getState().decryptAndCache(rawMsg.senderId, rawMsg.sender?.encryptedProfile || null);
-                  
-                  delete parsed.profileKey;
-                  
-                  if (parsed.text !== undefined && Object.keys(parsed).length === 1) {
-                      plainText = parsed.text;
-                  } else {
-                      plainText = JSON.stringify(parsed);
-                  }
-              }
-          } catch (_e) {}
-      }
+        const stripProfileKey = async (text: string): Promise<string> => {
+            if (!text || !text.trim().startsWith('{')) return text;
+            try {
+                const parsed = JSON.parse(text) as Record<string, unknown>;
 
-      finalMessage = { ...finalMessage, content: plainText };
+                if (parsed.senderId) {
+                    finalMessage.senderId = asUserId(parsed.senderId as string);
+                    if (!finalMessage.sender) finalMessage.sender = { id: asUserId(parsed.senderId as string) } as any;
+                    else finalMessage.sender.id = asUserId(parsed.senderId as string);
+                }
+
+                if (parsed.profileKey) {
+                    const { saveProfileKey } = await import('@lib/keychainDb');
+                    const { useProfileStore } = await import('@store/profile');
+                    await saveProfileKey(finalMessage.senderId, parsed.profileKey as string);
+                    const ep = (parsed.encryptedProfile as string) || rawMsg.sender?.encryptedProfile || null;
+                    useProfileStore.getState().decryptAndCache(finalMessage.senderId, ep);
+                    if (ep && finalMessage.sender) {
+                        (finalMessage.sender as any).encryptedProfile = ep;
+                    }
+                    delete parsed.profileKey;
+                    delete parsed.encryptedProfile;
+                }
+
+                delete parsed.senderId;
+                delete parsed.senderDeviceKey;
+
+                if (parsed.text !== undefined && Object.keys(parsed).length === 1) return await stripProfileKey(String(parsed.text));
+                if (parsed.content !== undefined && Object.keys(parsed).length === 1) return await stripProfileKey(String(parsed.content));
+
+                if (parsed.content && typeof parsed.content === 'string') {
+                    const inner = await stripProfileKey(parsed.content);
+                    if (inner !== parsed.content) return inner;
+                }
+                if (parsed.text && typeof parsed.text === 'string') {
+                    const inner = await stripProfileKey(parsed.text);
+                    if (inner !== parsed.text) return inner;
+                }
+
+                return JSON.stringify(parsed);
+            } catch { return text; }
+        };
+
+        plainText = await stripProfileKey(plainText);
+
+        finalMessage = { ...finalMessage, content: plainText };
 
       if (plainText.startsWith('{') && plainText.includes('"type":"file"')) {
         try {
@@ -1141,7 +1207,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 }
             }
 
-            api(`/api/messages/${message.id}${query}`, { method: 'DELETE' }).catch((error) => {
+            api(`/api/messages/${message.id}${query}`, { 
+                method: 'DELETE',
+                headers: message.deleteSecret ? { 'X-Delete-Token': message.deleteSecret } : undefined
+            }).catch((error) => {
                 console.error(`Failed to delete message ${message.id} from server:`, error);
             });
         });
@@ -1299,33 +1368,74 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       return;
     }
 
-    const conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    let conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    if (!conversation) {
+      toast.error(i18n.t('errors:conversation_not_found', 'Conversation not found.'));
+      return;
+    }
+
+    // [OPAQUE MAILBOX FIX] Populate participants from IndexedDB cache if empty,
+    // so non-creator members can send messages before metadata is re-decrypted.
+    if (conversation.isGroup && (!conversation.participants || conversation.participants.length === 0)) {
+        const { getCachedGroupParticipants } = await import('@lib/keychainDb');
+        const cachedUserIds = await getCachedGroupParticipants(conversationId);
+        if (cachedUserIds && cachedUserIds.length > 0) {
+            const currentUser = useAuthStore.getState().user;
+            const reconstructedParticipants = cachedUserIds.map(id => ({
+                id, name: id === currentUser?.id ? currentUser.name || '' : ''
+            })) as any;
+            console.log(`[OpaqueMailbox] Reconstructed participants from cache for conv=${conversationId} count=${cachedUserIds.length}`);
+            // Update the store so both ensureGroupSession and targetRecipients use the correct list
+            await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
+            conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+        } else {
+            // Fallback: try to fetch encryptedMetadata from server and decrypt to get participants
+            console.log(`[OpaqueMailbox] No cached participants for conv=${conversationId}, trying server fetch...`);
+            try {
+                const { authFetch } = await import('@lib/api');
+                const serverConv: any = await authFetch(`/api/conversations/${conversationId}`);
+                if (serverConv?.encryptedMetadata) {
+                    await useConversationStore.getState().updateConversation(conversationId, {
+                        encryptedMetadata: serverConv.encryptedMetadata as string
+                    });
+                    conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+                }
+            } catch (e) {
+                console.warn(`[OpaqueMailbox] Failed to fetch conversation ${conversationId} from server`, e);
+            }
+        }
+    }
+
     if (!conversation) {
       toast.error(i18n.t('errors:conversation_not_found', 'Conversation not found.'));
       return;
     }
     const forceRotate = conversation.requiresKeyRotation === true;
 
-    // ✅ FASE 3: Selalu gunakan protokol Fan-Out Sender Key untuk SEMUA tipe percakapan (termasuk 1-on-1)
-    try {
-      const distributionKeys = await ensureGroupSession(conversationId, conversation.participants, forceRotate);
-      if (distributionKeys && distributionKeys.length > 0) {
-        await emitGroupKeyDistribution(
-          conversationId,
-          distributionKeys as { userId: string; key: string }[]
-        );
-        if (forceRotate) {
-            useConversationStore.getState().markKeyRotationNeeded(conversationId, false);
+    // ✅ FASE 3: Distribusi Sender Key (hanya untuk grup, SPQR 1-1 pakai DR langsung)
+    if (conversation.isGroup) {
+      try {
+        const distributionKeys = await ensureGroupSession(conversationId, conversation.participants, forceRotate);
+        if (distributionKeys && distributionKeys.length > 0) {
+          await emitGroupKeyDistribution(
+            conversationId,
+            distributionKeys as { userId: string; key: string }[]
+          );
+          if (forceRotate) {
+              useConversationStore.getState().markKeyRotationNeeded(conversationId, false);
+          }
+          await new Promise(r => setTimeout(r, 300)); 
         }
-        await new Promise(r => setTimeout(r, 300)); 
+      } catch (e) {
+        console.error("Failed to ensure session", e);
+        toast.error(i18n.t('errors:failed_to_establish_secure_session', 'Failed to establish secure session. Please try again.'));
+        return;
       }
-    } catch (e) {
-      console.error("Failed to ensure session", e);
-      toast.error(i18n.t('errors:failed_to_establish_secure_session', 'Failed to establish secure session. Please try again.'));
-      return; // ✅ FIX: Stop execution if session establishment fails
     }
 
     const actualTempId = tempId !== undefined ? tempId : generateTempId();
+    const deleteSecret = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '');
+
     const isReactionPayload = !!parseReaction(data.content);
     const silentPayload = parseSilent(data.content);
     const isEditPayload = !!parseEdit(data.content);
@@ -1360,7 +1470,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             statuses: [{ userId: asUserId(user.id), status: 'READ', messageId: asMessageId(`temp_${actualTempId}`), id: `temp_status_${actualTempId}`, updatedAt: new Date().toISOString() }],
             status: 'SENDING',
             repliedTo: data.repliedTo,
-            isSilent: isOptimisticSilent || data.isSilent
+            isSilent: isOptimisticSilent || data.isSilent,
+            deleteSecret // Persist locally for blind deletion auth
         };
 
         // Parse optimistic content for special message types
@@ -1422,18 +1533,36 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                     try { parsedObj = JSON.parse(contentToEncrypt) as Record<string, unknown>; } catch (e) {}
                 }
                 
+                const myUser = useAuthStore.getState().user;
+                const myEncryptedProfile = myUser?.encryptedProfile;
+                
                 if (parsedObj && typeof parsedObj === 'object') {
                     parsedObj.profileKey = profileKey;
+                    if (myEncryptedProfile) parsedObj.encryptedProfile = myEncryptedProfile;
                     contentToEncrypt = JSON.stringify(parsedObj);
                 } else {
-                    contentToEncrypt = JSON.stringify({ text: contentToEncrypt, profileKey });
+                    const obj: Record<string, unknown> = { text: contentToEncrypt, profileKey };
+                    if (myEncryptedProfile) obj.encryptedProfile = myEncryptedProfile;
+                    contentToEncrypt = JSON.stringify(obj);
                 }
             }
         } catch (e) {
             console.error("Failed to inject profile key", e);
         }
 
+        // Save sender state before silent group message encryption to prevent
+        // SYSTEM/GHOST messages from ratcheting the state used for user messages.
+        const isSilentGroupMsg = conversation.isGroup && shouldBeSilent;
+        let savedSenderState: any = null;
+        if (isSilentGroupMsg) {
+            const { getGroupSenderState } = await import('@lib/keychainDb');
+            savedSenderState = await getGroupSenderState(conversationId);
+        }
         const result = await encryptMessage(contentToEncrypt, conversationId, !!conversation.isGroup, undefined, `temp_${actualTempId}`);
+        if (isSilentGroupMsg && savedSenderState) {
+            const { saveGroupSenderState } = await import('@lib/keychainDb');
+            await saveGroupSenderState(savedSenderState).catch(e => console.warn("Failed to restore sender state after silent msg", e));
+        }
         ciphertext = result.ciphertext;
         
         // [FIX PERSISTENCE] Store MK for ALL chats (Group + 1on1)
@@ -1591,7 +1720,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         expiresAt: payload.expiresAt ?? undefined,
         pushPayloads: payload.pushPayloads ?? undefined,
         repliedToId: payload.repliedToId ?? undefined,
-        isViewOnce: payload.isViewOnce ?? false
+        isViewOnce: payload.isViewOnce ?? false,
+        targetRecipients: conversation.participants.map(p => p.userId || p.id),
+        deleteSecret
       };
 
       socket?.timeout(15000).emit(
@@ -1664,6 +1795,11 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
 
             let finalContent = existingMsg !== undefined ? existingMsg.content : res.msg!.content;
             
+            // Sealed Sender: pastikan senderId pesan kita sendiri tidak kosong
+            if (!res.msg!.senderId && existingMsg?.senderId) {
+                res.msg!.senderId = existingMsg.senderId;
+            }
+
             // Jaring pengaman: Dekripsi Diri Sendiri
             if (finalContent && typeof finalContent === 'string' && finalContent.trim().startsWith('{') && finalContent.includes('"ciphertext"')) {
                  finalContent = "🔒 You sent this message (Encrypted)";
@@ -1764,7 +1900,23 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       const payloadData = data as Partial<Message> & { 
           sessionId?: string; 
           pushPayloads?: Record<string, string> 
-      }; 
+      };
+
+      // [OPAQUE MAILBOX FIX] Populate targetRecipients for ALL conversations
+      // so offline-queued messages get forwarded to the right participants.
+      let targetRecipients: string[] | undefined;
+      const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+      if (conv?.participants && conv.participants.length > 0) {
+          targetRecipients = conv.participants.map(p => p.userId || p.id);
+      } else if (conv?.isGroup) {
+          // Group with empty participants: fallback to cache (Opaque Mailbox)
+          const { getCachedGroupParticipants } = await import('@lib/keychainDb');
+          const cachedUserIds = await getCachedGroupParticipants(conversationId);
+          if (cachedUserIds && cachedUserIds.length > 0) {
+              targetRecipients = cachedUserIds;
+          }
+      }
+
       const sendPayload: MessageSendPayload = {
           conversationId: asConversationId(conversationId),
           content: payloadData.content || "",
@@ -1773,7 +1925,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           expiresAt: payloadData.expiresAt ?? undefined,
           pushPayloads: payloadData.pushPayloads ?? undefined,
           repliedToId: payloadData.repliedToId ?? undefined,
-          isViewOnce: payloadData.isViewOnce ?? false
+          isViewOnce: payloadData.isViewOnce ?? false,
+          targetRecipients
       };
 
       await new Promise<void>((resolve) => {
@@ -2065,6 +2218,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             if (timeA !== timeB) return timeA - timeB;
             
             // Jika di detik yang sama, proses Control Message DULUAN agar kunci terdistribusi sebelum mendekripsi normal message
+            const aIsMeta = a.type === 'SYSTEM' && (typeof a.content === 'string' && a.content.includes('"type":"METADATA_UPDATED"'));
+            const bIsMeta = b.type === 'SYSTEM' && (typeof b.content === 'string' && b.content.includes('"type":"METADATA_UPDATED"'));
+            if (aIsMeta && !bIsMeta) return -1;
+            if (!aIsMeta && bIsMeta) return 1;
             const aIsControl = a.type === 'SYSTEM' && (typeof a.content === 'string' && (a.content.includes('GROUP_KEY_DISTRIBUTION') || a.content.includes('"type":"GROUP_KEY"')));
             const bIsControl = b.type === 'SYSTEM' && (typeof b.content === 'string' && (b.content.includes('GROUP_KEY_DISTRIBUTION') || b.content.includes('"type":"GROUP_KEY"')));
             if (aIsControl && !bIsControl) return -1;
@@ -2104,16 +2261,19 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       let success = false;
 
                       if (myDistributions.length > 0) {
+                          console.log(`[DIAG:offlineSync] myId=${myId} myKeyB64=${myIdentityKeyB64} nDistributions=${payload.distributions?.length} myMatches=${myDistributions.length}`);
                           for (const dist of myDistributions) {
                               const extractedKey = dist.encryptedKey || dist.key;
                               if (!extractedKey) continue;
                               try {
                                   const { storeReceivedSessionKey } = await import('@utils/crypto');
+                                  const senderIdToUse = message.senderId || payload.senderId || "";
+                                  console.log(`[DIAG:offlineSync] calling storeReceivedSessionKey senderId=${senderIdToUse} myId=${myId} skip=${senderIdToUse === myId}`);
                                   await storeReceivedSessionKey({
                                       ...payload,
                                       type: 'GROUP_KEY',
                                       conversationId: message.conversationId || payload.conversationId || "",
-                                      senderId: message.senderId || payload.senderId || "",
+                                      senderId: senderIdToUse,
                                       encryptedKey: extractedKey,
                                       senderDeviceKey: dist.senderDeviceKey || payload.senderDeviceKey
                                   });
@@ -2123,19 +2283,25 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                                   // Abaikan jika device salah
                               }
                           }
-                      } else if (payload.encryptedKey || payload.key) {
-                          try {
-                              const { storeReceivedSessionKey } = await import('@utils/crypto');
-                              await storeReceivedSessionKey({
-                                  ...payload,
-                                  type: 'GROUP_KEY',
-                                  conversationId: message.conversationId || payload.conversationId || "",
-                                  senderId: message.senderId || payload.senderId || "",
-                                  encryptedKey: (payload.encryptedKey || payload.key || ""),
-                              });
-                              success = true;
-                          } catch(e) {}
-                      }
+                    } else if (payload.encryptedKey || payload.key) {
+                        try {
+                            const finalConvId = message.conversationId || payload.conversationId || "";
+                            const finalSenderId = message.senderId || payload.senderId || "";
+                            const finalEncKey = (payload.encryptedKey || payload.key || "");
+                            console.log(`[Offline Sync KEY] conv=${finalConvId} senderId=${finalSenderId} senderDeviceKey=${payload.senderDeviceKey} keyLen=${finalEncKey.length} hasDrHeader=${!!payload.drHeader}`);
+                            const { storeReceivedSessionKey } = await import('@utils/crypto');
+                            await storeReceivedSessionKey({
+                                ...payload,
+                                type: 'GROUP_KEY',
+                                conversationId: finalConvId,
+                                senderId: finalSenderId,
+                                encryptedKey: finalEncKey,
+                            });
+                            success = true;
+                        } catch(e) {
+                            console.warn(`[Offline Sync] Gagal decrypt key for conv ${message.conversationId || payload.conversationId}: senderId=${payload.senderId}, senderDeviceKey=${payload.senderDeviceKey}, hasDrHeader=${!!payload.drHeader}`, e);
+                        }
+                    }
 
                       if (success) {
                           useKeychainStore.getState().keysUpdated();
@@ -2145,13 +2311,30 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                           console.warn(`[Offline Sync] Kunci tidak dapat di-unseal. Mungkin dienkripsi untuk device lain.`);
                       }
                     }
-                 } catch (e) {
-                    console.error("Failed to process control message", e);
-                 }
-                 continue; // Selesai memproses pesan kontrol, lanjut ke pesan berikutnya
-            }
+                  } catch (e) {
+                     console.error("Failed to process control message", e);
+                  }
+                  continue; // Selesai memproses pesan kontrol, lanjut ke pesan berikutnya
+             }
 
-            // --- DEKRIPSI NORMAL MESSAGES (termasuk PROTOCOL_UPGRADE_REQ yg masih terenkripsi) ---
+              // Opaque Mailbox: process persisted metadata updates from offline sync
+              if (message.type === 'SYSTEM' && message.content && message.content.includes('"type":"METADATA_UPDATED"')) {
+                  try {
+                      const payload = JSON.parse(message.content);
+                      if (payload.encryptedMetadata) {
+                          console.log(`[Offline Sync] Memproses Metadata Update untuk conversation: ${message.conversationId}`);
+                          const { useConversationStore } = await import('@store/conversation');
+                          await useConversationStore.getState().updateConversation(message.conversationId, {
+                              encryptedMetadata: payload.encryptedMetadata
+                          });
+                      }
+                  } catch (e) {
+                      console.error("Failed to process metadata update", e);
+                  }
+                  continue;
+              }
+
+             // --- DEKRIPSI NORMAL MESSAGES (termasuk PROTOCOL_UPGRADE_REQ yg masih terenkripsi) ---
             
             // Cek Local Cache Lebih Dulu
             const localMessage = await shadowVault.getMessage(message.id);
@@ -2408,8 +2591,40 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       // 1. ALWAYS decrypt to ensure cryptographic integrity
       let decrypted = await decryptMessageObject(message);
       if (!decrypted) return null;
+      const decryptedMsg = decrypted;
 
-      if (currentUser && message.senderId === currentUser.id && message.tempId) {
+      // Opaque Mailbox: reconstruct conversation participants if empty,
+      // so the peer's name is resolvable and outbound messages have valid targetRecipients
+      if (currentUser && decryptedMsg.senderId && decryptedMsg.senderId !== currentUser.id) {
+          const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+          if (conv && !conv.isGroup && conv.participants.length === 0) {
+              const cachedProfiles = useProfileStore.getState().profiles;
+              const profileKey = Object.keys(cachedProfiles).find(k => k.startsWith(decryptedMsg.senderId));
+              const peerProfile = profileKey ? cachedProfiles[profileKey] : null;
+              const peerEncryptedProfile = (decryptedMsg.sender as any)?.encryptedProfile;
+              useConversationStore.getState().addOrUpdateConversation({
+                  ...conv,
+                  participants: [
+                      { id: currentUser.id },
+                      {
+                          id: decryptedMsg.senderId,
+                          name: peerProfile?.name || '',
+                          encryptedProfile: peerEncryptedProfile
+                      }
+                  ] as any
+              });
+          }
+      }
+
+      // Opaque Mailbox: reconstruct group participants from encrypted metadata if empty
+      if (currentUser) {
+          const groupConv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+          if (groupConv?.isGroup && groupConv.participants.length === 0) {
+              useConversationStore.getState().addOrUpdateConversation(groupConv);
+          }
+      }
+
+      if (currentUser && decrypted.senderId === currentUser.id && message.tempId) {
           const optimistic = get().messages[conversationId]?.find(m => m.tempId && String(m.tempId) === String(message.tempId));
           if (optimistic) {
               // 2. Do NOT copy optimistic.content. Only merge UI statuses.
@@ -2458,7 +2673,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       const conversation = (await import('@store/conversation')).useConversationStore.getState().conversations.find(c => c.id === conversationId);
       const isGroup = conversation?.isGroup ?? false;
 
-      if (!isGroup && currentUser && message.senderId !== currentUser.id && !decrypted.isSilent && decrypted.type !== 'SYSTEM') {
+      if (!isGroup && currentUser && decrypted.senderId !== currentUser.id && !decrypted.isSilent && decrypted.type !== 'SYSTEM') {
           try {
               const { getGroupSenderState, saveGroupSenderState } = await import('@lib/keychainDb');
               const senderState = await getGroupSenderState(conversationId);

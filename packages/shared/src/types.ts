@@ -119,6 +119,7 @@ export type Message = z.infer<typeof IncomingMessageSchema> & {
   isEdited?: boolean;
   isSilent?: boolean;
   isDeletedLocal?: boolean;
+  deleteSecret?: string; // Secret for blind authorization of message deletion
 };
 export type Participant = {
   id: UserId;
@@ -148,6 +149,7 @@ export type Conversation = z.infer<typeof MinimalConversationSchema> & {
   participants: Participant[];
   lastMessage: (Message & { preview?: string }) | null;
   lastUpdated?: number;
+  authSecret?: string; // Secret for blind authorization of group management
 };
 
 export type ConversationUi = Conversation & {
@@ -155,6 +157,7 @@ export type ConversationUi = Conversation & {
     title?: string;
     description?: string;
     avatarUrl?: string;
+    authSecret?: string; // Stored inside encrypted metadata for participants
   };
 };
 

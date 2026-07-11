@@ -9,7 +9,7 @@ export interface TypingPayload {
 
 export interface DistributeKeysPayload {
   conversationId: string;
-  keys: { userId: string; targetDeviceId?: string; targetDeviceKey?: string; key: string; senderDeviceKey?: string }[];
+  keys: { userId: string; targetDeviceId?: string; targetDeviceKey?: string; key: string; senderDeviceKey?: string; drHeader?: any }[];
 }
 
 export interface MessageSendPayload {
@@ -21,6 +21,8 @@ export interface MessageSendPayload {
   pushPayloads?: Record<string, string>; // { userId: encryptedPushPayload }
   repliedToId?: string;
   isViewOnce?: boolean;
+  targetRecipients?: string[]; // Opaque Mailbox: list of user IDs to receive this message
+  deleteSecret?: string; // Secret for blind authorization of message deletion
 }
 
 export interface PushSubscribePayload {
@@ -62,6 +64,7 @@ export interface KeyFulfillmentPayload {
   encryptedKey: string;
   targetDeviceId?: string;
   senderDeviceKey?: string;
+  drHeader?: any;
 }
 
 export interface ServerToClientEvents {

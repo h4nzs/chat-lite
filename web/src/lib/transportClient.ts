@@ -359,8 +359,13 @@ export async function emitGroupKeyRequest(conversationId: string, targetSenderId
   });
 }
 
-export function emitGroupKeyFulfillment(payload: { requesterId: string; conversationId: string; encryptedKey: string; targetDeviceId?: string; senderDeviceKey?: string; }) {
+export function emitGroupKeyFulfillment(payload: { requesterId: string; conversationId: string; encryptedKey: string; targetDeviceId?: string; senderDeviceKey?: string; drHeader?: any; }) {
   transportClient.sendEvent('group:fulfilled_key', payload);
+}
+
+export function emitMetadataUpdated(conversationId: string, encryptedMetadata: string, targetRecipients: string[]): void {
+  console.log(`[DIAG:emitMetadataUpdated] conv=${conversationId} targets=${targetRecipients.join(',')} metaLen=${encryptedMetadata.length}`);
+  transportClient.sendEvent('metadata:updated', { conversationId, encryptedMetadata, targetRecipients });
 }
 
 export const fireGhostSync = (conversationId: string, baseDelay: number = 1000) => {
