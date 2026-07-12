@@ -409,10 +409,15 @@ class NyxShadowVaultProxy {
   async saveConversation(conv: Conversation) {
     try {
       const encryptedParticipants = await encryptVaultText(JSON.stringify(conv.participants || []));
+      let encryptedDecryptedMetadata: string | null = null;
+      if (conv.decryptedMetadata) {
+        encryptedDecryptedMetadata = await encryptVaultText(JSON.stringify(conv.decryptedMetadata));
+      }
       await db.conversations.put({
         id: conv.id,
         isGroup: conv.isGroup,
         encryptedMetadata: conv.encryptedMetadata || null,
+        decryptedMetadata: encryptedDecryptedMetadata,
         lastMessageAt: (conv.lastMessageAt as string | Date | null) || null,
         participants: encryptedParticipants
       });
@@ -427,10 +432,20 @@ class NyxShadowVaultProxy {
       const conversations = await Promise.all(records.map(async r => {
         const decryptedParticipantsStr = await decryptVaultText(r.participants);
         const participants = decryptedParticipantsStr ? JSON.parse(decryptedParticipantsStr) : [];
+        let decryptedMetadata: Record<string, unknown> | undefined = undefined;
+        if (r.decryptedMetadata) {
+          const decryptedMetaStr = await decryptVaultText(r.decryptedMetadata);
+          if (decryptedMetaStr) {
+            try {
+              decryptedMetadata = JSON.parse(decryptedMetaStr);
+            } catch {}
+          }
+        }
         return {
           id: r.id,
           isGroup: r.isGroup,
           encryptedMetadata: r.encryptedMetadata,
+          decryptedMetadata,
           lastMessageAt: r.lastMessageAt ? new Date(r.lastMessageAt).toISOString() : null,
           participants,
           unreadCount: 0,

@@ -364,7 +364,6 @@ export function emitGroupKeyFulfillment(payload: { requesterId: string; conversa
 }
 
 export function emitMetadataUpdated(conversationId: string, encryptedMetadata: string, targetRecipients: string[]): void {
-  console.log(`[DIAG:emitMetadataUpdated] conv=${conversationId} targets=${targetRecipients.join(',')} metaLen=${encryptedMetadata.length}`);
   transportClient.sendEvent('metadata:updated', { conversationId, encryptedMetadata, targetRecipients });
 }
 

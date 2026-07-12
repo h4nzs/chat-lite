@@ -592,13 +592,6 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
 
     const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
 
-    console.log(`[DIAG:gRBSkeyId] conv=${conversationId} keyId=${keyId} totalRecords=${records.length}`);
-    for (let i = 0; i < records.length; i++) {
-        const r = records[i];
-        const ckPrefix = typeof r.state.CK === 'string' ? r.state.CK.substring(0, 8) : 'NONSTRING';
-        console.log(`[DIAG:gRBSkeyId]   [${i}] id=${r.id} ckPrefix=${ckPrefix} match=${ckPrefix === keyId}`);
-    }
-
     for (const record of records) {
         let ckString = '';
         if (typeof record.state.CK === 'string') {

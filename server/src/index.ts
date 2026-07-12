@@ -2,11 +2,9 @@
 import { connectRedis } from './lib/redis.js'
 import { createServer } from 'http'
 
-// ❌ HAPUS import statis di bawah ini
-// import app from './app.js'
-// import { registerSocket } from './socket.js'
-// import { startMessageSweeper } from './jobs/messageSweeper.js'
-// import { startSystemSweeper } from './jobs/systemSweeper.js'
+// Initialize Sentry BEFORE loading any application modules
+import { initSentry } from './utils/sentry.js';
+await initSentry();
 
 async function main() {
   // 1. Konek Redis DULU, tungguin sampai beneran sukses

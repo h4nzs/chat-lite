@@ -123,6 +123,7 @@ export interface ConversationRecord {
   id: ConversationId;
   isGroup: boolean;
   encryptedMetadata: string | null;
+  decryptedMetadata: string | null; // Encrypted JSON string of decrypted group metadata
   lastMessageAt: string | Date | null;
   participants: string; // Encrypted JSON string of Participant[]
   isPinned?: boolean;

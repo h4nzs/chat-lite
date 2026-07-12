@@ -2261,14 +2261,12 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       let success = false;
 
                       if (myDistributions.length > 0) {
-                          console.log(`[DIAG:offlineSync] myId=${myId} myKeyB64=${myIdentityKeyB64} nDistributions=${payload.distributions?.length} myMatches=${myDistributions.length}`);
                           for (const dist of myDistributions) {
                               const extractedKey = dist.encryptedKey || dist.key;
                               if (!extractedKey) continue;
                               try {
                                   const { storeReceivedSessionKey } = await import('@utils/crypto');
                                   const senderIdToUse = message.senderId || payload.senderId || "";
-                                  console.log(`[DIAG:offlineSync] calling storeReceivedSessionKey senderId=${senderIdToUse} myId=${myId} skip=${senderIdToUse === myId}`);
                                   await storeReceivedSessionKey({
                                       ...payload,
                                       type: 'GROUP_KEY',

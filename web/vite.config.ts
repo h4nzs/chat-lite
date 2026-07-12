@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { compression } from 'vite-plugin-compression2';
 import tailwindcss from '@tailwindcss/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
 import { createRequire } from 'module';
 import packageJson from './package.json';
@@ -15,6 +16,19 @@ export default defineConfig(({ mode }) => {
 
   return {
   plugins: [
+    // Sentry source maps upload (prod only, requires SENTRY_AUTH_TOKEN and SENTRY_ORG/SENTRY_PROJECT)
+    ...(mode === 'production' && process.env.SENTRY_AUTH_TOKEN
+      ? [sentryVitePlugin({
+          org: process.env.SENTRY_ORG || 'nyx-chat',
+          project: process.env.SENTRY_PROJECT || 'nyx-chat-frontend',
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          telemetry: false,
+          // Don't fail build on source map upload error
+          sourceMaps: {
+            assets: ['./dist/**'],
+          },
+        })]
+      : []),
     tailwindcss(),
     react(),
     // 1. Kompresi Brotli (Terbaik untuk Browser Modern)

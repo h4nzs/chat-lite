@@ -2,6 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import express, { Express, Request, Response, NextFunction } from "express";
+import * as Sentry from "@sentry/node";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import logger from "morgan";
@@ -321,6 +322,19 @@ app.use("/uploads",
   })
 );
 
+// === SENTRY REQUEST CONTEXT ===
+app.use("/api", (req, _res, next) => {
+  // Tag request with route and method for Sentry filtering
+  Sentry.setTag('route', req.path);
+  Sentry.setTag('method', req.method);
+  // Tag with user ID if authenticated
+  const userId = (req as any).user?.id;
+  if (userId) {
+    Sentry.setUser({ id: userId });
+  }
+  next();
+});
+
 // === DISABLE CACHING FOR API ===
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -352,7 +366,7 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok bang" });
 });
 
-// === ERROR HANDLING ===
+// === GENERIC ERROR HANDLING ===
 app.use((err: Error & { type?: string, status?: number, code?: string }, _req: Request, res: Response, _next: NextFunction) => {
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ error: 'Invalid CSRF token' });
@@ -363,6 +377,12 @@ app.use((err: Error & { type?: string, status?: number, code?: string }, _req: R
   if (err?.status && err?.message) {
     return res.status(err.status).json({ error: err.message });
   }
+
+  // Report unhandled errors to Sentry
+  Sentry.captureException(err, {
+    level: 'error',
+    tags: { handler: 'express_generic' },
+  });
 
   console.error("❌ Server Error:", err);
   res.status(500).json({ error: "Internal server error" });

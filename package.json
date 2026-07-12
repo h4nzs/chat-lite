@@ -63,6 +63,8 @@
     "prisma",
     "puppeteer",
     "sharp",
-    "unrs-resolver"
+    "unrs-resolver",
+    "@sentry/cli",
+    "@sentry/node-cpu-profiler"
   ]
 }

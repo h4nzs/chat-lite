@@ -1,6 +1,10 @@
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
+// Initialize Sentry error tracking BEFORE anything else
+import { initSentry } from '@lib/sentry';
+initSentry();
+
 import './i18n';
 import React from 'react';
 import { createRoot } from 'react-dom/client';

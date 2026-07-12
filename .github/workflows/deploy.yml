@@ -3,7 +3,7 @@ name: Deploy NYX to VPS (PNPM Monorepo)
 on:
   push:
     branches:
-      - main # ⚠️ Pastikan ini sesuai nama branch kamu! (misal: 'main' atau 'setup-deploy')
+      - main
 
 jobs:
   build-and-deploy:
@@ -37,13 +37,17 @@ jobs:
       - name: 🏗️ Build Shared Package
         run: pnpm --filter @nyx/shared run build
 
-      - name: 🔐 Assert Turnstile Site Key
+      - name: 🔐 Assert Required Secrets
         env:
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: |
           if [ -z "$VITE_TURNSTILE_SITE_KEY" ]; then
             echo "::error::VITE_TURNSTILE_SITE_KEY secret is missing or empty!"
             exit 1
+          fi
+          if [ -z "$VITE_SENTRY_DSN" ]; then
+            echo "::warning::VITE_SENTRY_DSN secret is missing! Sentry frontend tracking will be disabled."
           fi
 
       # --- PHASE 3: BUILD WEB ---
@@ -56,6 +60,11 @@ jobs:
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
           INDEXNOW_API_KEY: ${{ secrets.INDEXNOW_API_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          # Source maps for readable Sentry stack traces (optional)
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: pnpm --filter nyx-web run build
 
       - name: 🚀 Build Marketing (Sisi Publik)
@@ -164,7 +173,7 @@ jobs:
             if [ -f "$TARGET_DIR/.env" ]; then
                 cp $TARGET_DIR/.env $TARGET_DIR/server/.env
             else
-                echo "⚠️ WARNING: File .env server Production tidak ditemukan di root aplikasi!"
+                echo "⚠️ WARNING: File .env server Production tidak ditemukan di root aplikasi! Pastikan SENTRY_DSN sudah ada di .env"
             fi
             
             # 5. GENERATE PRISMA ENGINE (Wajib di dalam server/)

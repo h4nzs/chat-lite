@@ -244,13 +244,16 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
             finalLastMessage = withPreview(finalLastMessage);
         }
         
-        let decryptedMetadata = undefined;
-        if (c.isGroup && c.encryptedMetadata) {
-             console.log(`[DIAG:loadConvs] trying decrypt metadata for group=${c.id} len=${c.encryptedMetadata.length}`);
+        // 🛡️ Guard: Use cached decryptedMetadata from ShadowVault if available.
+        // If we always try to decrypt on every page load, the second load will fail
+        // because the sender key ratchet has advanced past N=0 (messages were decrypted
+        // in the previous session), while metadata was encrypted at N=0.
+        // Result: decryptedMetadata gets overwritten with undefined → "Unknown Group".
+        let decryptedMetadata = c.decryptedMetadata;
+        if (!decryptedMetadata && c.isGroup && c.encryptedMetadata) {
              try {
                  const decrypted = await decryptGroupMetadata(c.encryptedMetadata, c.id);
                  if (decrypted) {
-                     console.log(`[DIAG:loadConvs] metadata decrypted for group=${c.id}`);
                      decryptedMetadata = decrypted;
                      // Cache participants so non-creator members can send messages even before
                      // addOrUpdateConversation is called (which also caches). This handles the
@@ -260,14 +263,12 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                      if (Array.isArray(metaParticipants) && metaParticipants.length > 0) {
                          import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(c.id, metaParticipants));
                      }
-                 } else {
-                     console.warn(`[DIAG:loadConvs] decryptGroupMetadata returned null for group=${c.id}`);
                  }
              } catch (e) {
-                 console.warn(`[DIAG:loadConvs] Failed to decrypt metadata for group ${c.id}`, e);
+                 console.warn("Failed to decrypt metadata for group", e);
              }
         } else {
-            if (c.isGroup) console.log(`[DIAG:loadConvs] cannot decrypt metadata for group=${c.id} hasEncMeta=${!!c.encryptedMetadata}`);
+            if (c.isGroup && !decryptedMetadata) console.log("cannot decrypt metadata for group");
         }
 
         return {
@@ -481,7 +482,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         const existing = useConversationStore.getState().conversations.find(c => c.id === conversation.id);
         if (existing?.decryptedMetadata && existing.encryptedMetadata === conversation.encryptedMetadata) {
             decryptedMetadata = existing.decryptedMetadata;
-            console.log(`[DIAG:addOrUpdateConv] metadata already decrypted for conv=${conversation.id}, skipping`);
             // Also forward participants from cached metadata to prevent overwrite with empty
             // (caller may pass conversation with empty participants in Opaque Mailbox)
             const metaParticipants = (decryptedMetadata as any).participants;
@@ -494,10 +494,8 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
             }
         } else {
             try {
-                console.log(`[DIAG:addOrUpdateConv] decrypting metadata for conv=${conversation.id} encMetaLen=${conversation.encryptedMetadata.length}`);
                 const dec = await decryptGroupMetadata(conversation.encryptedMetadata as string, conversation.id);
                 if (dec) {
-                    console.log(`[DIAG:addOrUpdateConv] metadata decrypted for conv=${conversation.id} title=${dec.title} participants=${dec.participants?.length}`);
                     decryptedMetadata = dec;
                     // Opaque Mailbox: extract participants from encrypted metadata
                     const metaParticipants = (dec as any).participants;
@@ -507,15 +505,12 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                         conversation.participants = metaParticipants.map((id: string) => ({
                             id, name: id === currentUser?.id ? currentUser.name || '' : ''
                         })) as any;
-                        console.log(`[DIAG:addOrUpdateConv] set participants for conv=${conversation.id} count=${metaParticipants.length}`);
                         // Persist to IndexedDB so non-creator members can send messages even before metadata is re-decrypted
                         import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(conversation.id, metaParticipants));
                     }
-                } else {
-                    console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata returned null for conv=${conversation.id}`);
                 }
             } catch (e) {
-                console.warn(`[DIAG:addOrUpdateConv] decryptGroupMetadata threw for conv=${conversation.id}`, e);
+                console.warn("Failed to decrypt metadata for conversation", e);
             }
         }
     }
@@ -572,7 +567,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
 
   updateConversation: async (id, data) => {
     let decryptedMetadata = undefined;
-    console.log(`[DIAG:updateConvs] called id=${id} hasEncMeta=${!!data.encryptedMetadata} hasPart=${!!data.participants} partLen=${data.participants?.length}`);
     if (data.encryptedMetadata) {
          // 🛡️ Guard: Skip re-decryption if metadata is already cached and the encrypted payload
          // hasn't changed. Otherwise, the second call would ratchet the sender key state past N=0
@@ -580,7 +574,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
          //   "Ratchet Advanced! Cannot decrypt old message (header.n=0, state.N=1)"
          const existing = get().conversations.find(c => c.id === id);
          if (existing?.decryptedMetadata && existing.encryptedMetadata === data.encryptedMetadata) {
-             console.log(`[DIAG:updateConvs] metadata already decrypted for id=${id}, skipping re-decrypt`);
              decryptedMetadata = existing.decryptedMetadata;
              if (Array.isArray((decryptedMetadata as any).participants) && (decryptedMetadata as any).participants.length > 0) {
                  data.participants = (decryptedMetadata as any).participants.map((pid: string) => ({
@@ -591,7 +584,6 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
          try {
              const dec = await decryptGroupMetadata(data.encryptedMetadata, id);
              if (dec) {
-                 console.log(`[DIAG:updateConvs] metadata decrypted for id=${id} title=${dec.title}`);
                  decryptedMetadata = dec;
                  // Opaque Mailbox: extract participants from decrypted metadata
                  const metaParticipants = (dec as any).participants;
@@ -600,15 +592,14 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                      data.participants = metaParticipants.map((pid: string) => ({
                          id: pid, name: pid === currentUser?.id ? currentUser.name || '' : ''
                      })) as any;
-                     console.log(`[DIAG:updateConvs] set participants from metadata for id=${id} count=${metaParticipants.length}`);
                      // Persist to IndexedDB cache for offline/early message sending
                      import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(id, metaParticipants));
                  }
              } else {
-                 console.warn(`[DIAG:updateConvs] decryptGroupMetadata returned null for id=${id}`);
+                 console.warn("Failed to decrypt metadata");
              }
          } catch (e) {
-             console.warn(`[DIAG:updateConvs] Failed to decrypt updated metadata for id=${id}`, e);
+             console.warn("Failed to decrypt updated metadata", e);
          }
          }
     }

@@ -2,6 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
+import * as Sentry from '@sentry/react';
 import { MinimalUserSchema } from '@nyx/shared';
 import { authFetch, api } from "@lib/api";
 import { disconnectSocket, connectSocket } from '@lib/transportClient';
@@ -178,19 +179,9 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
   const retrieveAndCacheKeys = async (): Promise<RetrievedKeys> => {
     if (privateKeysCache) {
-        (async () => {
-            try {
-                const { getSodiumLib } = await import('@utils/crypto');
-                const s = await getSodiumLib();
-                const e = s.to_base64(privateKeysCache!.encryption, s.base64_variants.URLSAFE_NO_PADDING);
-                const p = privateKeysCache!.pqEncryption ? s.to_base64(privateKeysCache!.pqEncryption!, s.base64_variants.URLSAFE_NO_PADDING) : 'NONE';
-                console.log(`[DIAG:rACK] CACHED HIT enc=${e.slice(0,16)} pqEnc=${p.slice(0,16)}`);
-            } catch(_){}
-        })();
         return privateKeysCache;
     }
     if (keysRetrievalPromise) {
-        console.log(`[DIAG:rACK] awaiting keysRetrievalPromise`);
         return keysRetrievalPromise;
     }
 
@@ -214,15 +205,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
             const result = await retrievePrivateKeys(encryptedKeys, autoUnlockKey);
             if (result.success) {
               privateKeysCache = result.keys;
-              (async () => {
-                try {
-                    const { getSodiumLib } = await import('@utils/crypto');
-                    const s = await getSodiumLib();
-                    const e = s.to_base64(result.keys.encryption, s.base64_variants.URLSAFE_NO_PADDING);
-                    const p = result.keys.pqEncryption ? s.to_base64(result.keys.pqEncryption!, s.base64_variants.URLSAFE_NO_PADDING) : 'NONE';
-                    console.log(`[DIAG:rACK] FRESH INDEXEDDB enc=${e.slice(0,16)} pqEnc=${p.slice(0,16)}`);
-                } catch(_){}
-              })();
               return result.keys;
             }
           } catch (e) {}
@@ -366,6 +348,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         set({ isBootstrapping: false });
         return;
       }
+      Sentry.addBreadcrumb({ category: 'lifecycle', message: 'Bootstrap start', level: 'info' });
 
       set({ isBootstrapping: true });
       try {
@@ -397,6 +380,9 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     login: async (usernameHash, password, restoredNotSynced = false) => {
+      Sentry.setTag('auth_method', restoredNotSynced ? 'restore_login' : 'password_login');
+      Sentry.addBreadcrumb({ category: 'auth', message: 'Login attempt', level: 'info' });
+
       privateKeysCache = null;
       set({ isInitializingCrypto: true });
 
@@ -617,6 +603,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     logout: async () => {
+      Sentry.addBreadcrumb({ category: 'auth', message: 'Logout', level: 'info' });
+      Sentry.setUser(null);
       try {
         if ('serviceWorker' in navigator && 'PushManager' in window) {
            const registration = await navigator.serviceWorker.ready;
@@ -733,8 +721,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
       const { getSodiumLib } = await import('@utils/crypto');
       const sodium = await getSodiumLib();
       const publicKey = sodium.crypto_scalarmult_base(keys.encryption);
-      const encB64 = sodium.to_base64(keys.encryption, sodium.base64_variants.URLSAFE_NO_PADDING);
-      console.log(`[DIAG:getEncryptionKeyPair] priv=${encB64.slice(0,16)}...`);
       return { publicKey, privateKey: keys.encryption };
     },
     async getPqEncryptionKeyPair() {
@@ -743,9 +729,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
       const sodium = await getSodiumLib();
       if (!keys.pqEncryption) throw new Error("PQ Encryption key missing");
       const kp = sodium.crypto_kem_xwing_seed_keypair(keys.pqEncryption);
-      const pqB64 = sodium.to_base64(keys.pqEncryption, sodium.base64_variants.URLSAFE_NO_PADDING);
-      const pkB64 = sodium.to_base64(kp.privateKey, sodium.base64_variants.URLSAFE_NO_PADDING);
-      console.log(`[DIAG:getPqEncryptionKeyPair] seed=${pqB64.slice(0,16)}... priv=${pkB64.slice(0,16)}...`);
       return kp;
     },
     async getSignedPreKeyPair() {

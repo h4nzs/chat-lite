@@ -42,6 +42,7 @@ import { MaintenancePage } from './pages/MaintenancePage';
 
 // Stores & Hooks
 import { useAuthStore } from './store/auth';
+import * as Sentry from '@sentry/react';
 import { useThemeStore } from './store/theme';
 import { useCommandPaletteStore } from './store/commandPalette';
 import { useConversationStore } from './store/conversation';
@@ -191,6 +192,19 @@ const AppContent = () => {
     addCommands(commands);
     return () => removeCommands(commands.map(c => c.id));
   }, [addCommands, removeCommands, settingsAction, logoutAction]);
+
+  // --- Sentry User Context ---
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({
+        id: user.id,
+        username: user.name || user.id.slice(0, 8),
+        role: user.role,
+      });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
 
   // --- Lifecycle & Effects ---
 
