@@ -30,110 +30,15 @@ self.addEventListener('push', (event: PushEvent) => {
       let body = data.body || 'You have a new message';
       let conversationId = data.data?.conversationId;
 
-      // ATTEMPT E2EE DECRYPTION FOR SEALED BOXES
-      if (data.type === 'ENCRYPTED_MESSAGE' && data.data?.encryptedPushPayload) {
-        try {
-           // Helper to read from NyxUnifiedDB directly without heavy deps
-           const getKvValue = (key: string): Promise<unknown> => {
-             return new Promise((resolve) => {
-               const req = indexedDB.open('NyxUnifiedDB');
-               req.onsuccess = () => {
-                 const db = req.result;
-                 if (!db.objectStoreNames.contains('kvStore')) {
-                   resolve(undefined);
-                   return;
-                 }
-                 const tx = db.transaction('kvStore', 'readonly');
-                 const store = tx.objectStore('kvStore');
-                 const getReq = store.get(key);
-                 getReq.onsuccess = () => resolve(getReq.result?.value);
-                 getReq.onerror = () => resolve(undefined);
-               };
-               req.onerror = () => resolve(undefined);
-             });
-           };
-
-           const encryptedKeys = (await getKvValue('nyx_encrypted_keys')) as string | undefined;
-           const autoUnlockKey = (await getKvValue('nyx_device_auto_unlock_key')) as string | undefined;
-
-           if (encryptedKeys && autoUnlockKey) {
-             const sodiumModule = await import('libsodium-wrappers');
-             await sodiumModule.default.ready;
-             const sodium = sodiumModule.default;
-
-             const { argon2id } = await import('hash-wasm');
-
-             // Deobfuscate autoUnlockKey from DB
-             const OBFUSCATION_MASK = "NX_AUTH_MASK_2026";
-             const getRealKey = (b64: string): string => {
-                try {
-                  return atob(b64).split('').map((c, i) => 
-                    String.fromCharCode(c.charCodeAt(0) ^ OBFUSCATION_MASK.charCodeAt(i % OBFUSCATION_MASK.length))
-                  ).join('');
-                } catch {
-                  return b64; // Fallback jika itu kunci legacy (tidak di-obfuscate)
-                }
-             };
-             const realPassword = getRealKey(autoUnlockKey);
-
-             // 1. Parse the Vault Format: "saltB64.JSON_String"
-             const parts = encryptedKeys.split('.');
-             if (parts.length === 2) {
-               const salt = sodium.from_base64(parts[0], sodium.base64_variants.URLSAFE_NO_PADDING);
-               const encryptedString = parts[1];
-
-               // 2. Derive Key matching crypto.worker.ts EXACTLY
-               const kek = await argon2id({
-                   password: realPassword,
-                   salt,
-                   parallelism: 1,
-                   iterations: 4, // Sinkron dengan ARGON_VAULT_CONFIG
-                   memorySize: 131072, // Sinkron dengan 128MB di crypto.worker.ts
-                   hashLength: 32,
-                   outputType: 'binary'
-               });
-
-               // 3. Decrypt the Private Keys using Libsodium xchacha20poly1305_ietf
-               const parsedData = JSON.parse(encryptedString);
-               const iv = new Uint8Array(parsedData.iv);
-               const ciphertext = new Uint8Array(parsedData.data);
-               const keyBytes = new Uint8Array(kek as unknown as ArrayBuffer);
-
-               const decryptedContent = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
-                   null,
-                   ciphertext,
-                   null,
-                   iv,
-                   keyBytes
-               );
-
-               const decryptedString = new TextDecoder().decode(decryptedContent);
-               const parsedOnce = JSON.parse(decryptedString);
-               // Handle the double-stringified payload dari crypto.worker.ts
-               const keys = typeof parsedOnce === 'string' ? JSON.parse(parsedOnce) : parsedOnce;
-
-               // 4. Extract the Encryption Private Key & Compute Public Key
-               const privateKey = sodium.from_base64(keys.encryption, sodium.base64_variants.URLSAFE_NO_PADDING);
-               const publicKey = sodium.crypto_scalarmult_base(privateKey);
-
-               // 5. Open the Push Notification Sealed Box
-               const sealedPayloadBytes = sodium.from_base64(data.data.encryptedPushPayload, sodium.base64_variants.URLSAFE_NO_PADDING);
-               const decryptedPushBytes = sodium.crypto_box_seal_open(sealedPayloadBytes, publicKey, privateKey);
-               
-               const decryptedPayload = JSON.parse(sodium.to_string(decryptedPushBytes));
-               
-               title = decryptedPayload.title || title;
-               body = decryptedPayload.body || body;
-               conversationId = decryptedPayload.conversationId || conversationId;
-
-               // Cleanup memory
-               sodium.memzero(kek);
-               sodium.memzero(privateKey);
-             }
-           }
-        } catch (cryptoError) {
-           console.error("[SW] Push decryption failed ERROR:", cryptoError);
-        }
+      // NOTE: E2EE push decryption is handled in the main app when user opens it.
+      // Service Worker avoids heavy crypto libraries (libsodium, hash-wasm) to
+      // stay within browser SW size limits (~1 MB). Push notifications show
+      // generic content; app-side decryption provides the real message.
+      if (data.type === 'ENCRYPTED_MESSAGE') {
+        // For encrypted pushes, use generic fallback title
+        title = data.title || 'New secure message';
+        body = data.body || 'You have a new end-to-end encrypted message';
+        conversationId = data.data?.conversationId || conversationId;
       }
 
       // --- VISIBILITY CHECK ---
