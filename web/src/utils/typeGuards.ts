@@ -13,8 +13,8 @@ export interface ReactionPayload {
 }
 
 export function isReactionPayload(data: unknown): data is ReactionPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return (
     d.type === 'reaction' &&
     typeof d.targetMessageId === 'string' &&
@@ -30,8 +30,8 @@ export interface EditPayload {
 }
 
 export function isEditPayload(data: unknown): data is EditPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return (
     d.type === 'edit' &&
     typeof d.targetMessageId === 'string' &&
@@ -65,8 +65,8 @@ const SILENT_TYPES: ReadonlySet<string> = new Set<SilentType>([
 ]);
 
 export function isSilentPayload(data: unknown): data is SilentPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   if (typeof d.type !== 'string' || !SILENT_TYPES.has(d.type)) return false;
   return true;
 }
@@ -83,9 +83,16 @@ export interface FileMetadata {
 }
 
 export function isFileMetadata(data: unknown): data is FileMetadata {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   if (d.type !== 'file') return false;
+  // Validate optional field types if present
+  if (d.url !== undefined && typeof d.url !== 'string') return false;
+  if (d.key !== undefined && typeof d.key !== 'string') return false;
+  if (d.name !== undefined && typeof d.name !== 'string') return false;
+  if (d.size !== undefined && typeof d.size !== 'number') return false;
+  if (d.mimeType !== undefined && typeof d.mimeType !== 'string') return false;
+  if (d.isBlindAttachment !== undefined && typeof d.isBlindAttachment !== 'boolean') return false;
   return true;
 }
 
@@ -100,9 +107,15 @@ export interface StoryReplyPayload {
 }
 
 export function isStoryReplyPayload(data: unknown): data is StoryReplyPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   if (d.type !== 'story_reply') return false;
+  // Validate optional field types if present
+  if (d.text !== undefined && typeof d.text !== 'string') return false;
+  if (d.storyAuthorId !== undefined && typeof d.storyAuthorId !== 'string') return false;
+  if (d.isReply !== undefined && typeof d.isReply !== 'boolean') return false;
+  if (d.storyText !== undefined && typeof d.storyText !== 'string') return false;
+  if (d.hasMedia !== undefined && typeof d.hasMedia !== 'boolean') return false;
   return true;
 }
 
@@ -117,8 +130,8 @@ export interface X3dhHeader {
 }
 
 export function isX3dhHeader(data: unknown): data is X3dhHeader {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   if (d.x3dh !== undefined) {
     if (!d.x3dh || typeof d.x3dh !== 'object') return false;
     const x = d.x3dh as Record<string, unknown>;
@@ -131,15 +144,15 @@ export function isX3dhHeader(data: unknown): data is X3dhHeader {
 
 // ─── System Message Payload ──────────────────────────────────────
 export function isSystemMessagePayload(data: unknown): data is SystemMessagePayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return typeof d.type === 'string';
 }
 
 // ─── Generic Object with participants ────────────────────────────
 export function hasParticipantsArray(data: unknown): data is { participants: string[] } {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return Array.isArray(d.participants) && d.participants.every(p => typeof p === 'string');
 }
 
@@ -149,8 +162,8 @@ export interface CiphertextWrapper {
 }
 
 export function isCiphertextWrapper(data: unknown): data is CiphertextWrapper {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return d.ciphertext === undefined || typeof d.ciphertext === 'string';
 }
 
@@ -164,8 +177,18 @@ export interface DecryptedGroupMetadata {
 }
 
 export function isDecryptedGroupMetadata(data: unknown): data is DecryptedGroupMetadata {
-  if (!data || typeof data !== 'object') return false;
-  return true; // Minimal guard — all fields are optional
+  if (!isPlainObject(data)) return false;
+  // All fields are optional, but validate types if present
+  const d = data;
+  if (d.title !== undefined && typeof d.title !== 'string') return false;
+  if (d.description !== undefined && typeof d.description !== 'string') return false;
+  if (d.avatarUrl !== undefined && typeof d.avatarUrl !== 'string') return false;
+  if (d.authSecret !== undefined && typeof d.authSecret !== 'string') return false;
+  if (d.participants !== undefined) {
+    if (!Array.isArray(d.participants)) return false;
+    if (!d.participants.every(p => typeof p === 'string')) return false;
+  }
+  return true;
 }
 
 // ─── Story Key Payload ────────────────────────────────────────────
@@ -176,8 +199,8 @@ export interface StoryKeyPayload {
 }
 
 export function isStoryKeyPayload(data: unknown): data is StoryKeyPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return d.type === 'STORY_KEY';
 }
 
@@ -187,8 +210,8 @@ export interface GhostSyncPayload {
 }
 
 export function isGhostSyncPayload(data: unknown): data is GhostSyncPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return d.type === 'GHOST_SYNC';
 }
 
@@ -200,8 +223,8 @@ export interface ProtocolResetPayload {
 }
 
 export function isProtocolResetPayload(data: unknown): data is ProtocolResetPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return d.type === 'PROTOCOL_RESET';
 }
 
@@ -220,7 +243,7 @@ export interface LinkPreviewPayload {
 }
 
 export function isLinkPreviewPayload(data: unknown): data is LinkPreviewPayload {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!isPlainObject(data)) return false;
+  const d = data;
   return typeof d.url === 'string' || typeof d.title === 'string';
 }

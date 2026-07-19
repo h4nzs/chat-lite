@@ -53,8 +53,6 @@ const UserProfile = memo(function UserProfile() {
   }, [logout, confirmLogout, t]);
 
   const handleLockVault = useCallback(() => {
-    // Clear decoy state and force reload to trigger the lock screen
-    sessionStorage.removeItem('nyx_decoy_mode');
     window.location.reload();
   }, []);
 

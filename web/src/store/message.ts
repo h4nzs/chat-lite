@@ -1389,20 +1389,6 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         toast.error("Failed to send burner message");
         get().updateMessage(conversationId, `temp_${actualTempId}`, { error: true });
       }
-      return;
-    }
-
-    // FAKE SEND FOR DECOY
-    if (sessionStorage.getItem('nyx_decoy_mode') === 'true') {
-        const actualTempId = tempId !== undefined ? tempId : Date.now();
-        const msg = {
-            id: `temp_${actualTempId}`, tempId: actualTempId, optimistic: true,
-            content: data.content, senderId: user.id, sender: user,
-            createdAt: new Date().toISOString(), conversationId, status: 'SENT'
-        } as Message;
-        if (!isSilent) {
-            get().addOptimisticMessage(conversationId, msg);
-        }
         return;
     }
 
@@ -2227,15 +2213,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
     // Set lock synchronously sebelum await apapun!
     set(state => ({ isFetchingMore: { ...state.isFetchingMore, [id]: true } }));
 
-    if (sessionStorage.getItem('nyx_decoy_mode') === 'true') {
-       set(state => ({
-          messages: { ...state.messages, [id]: [{ id: 'msg-1', content: 'Welcome to NYX. No active chats found.', senderId: 'bot-1', createdAt: new Date().toISOString(), conversationId: id, type: 'SYSTEM' } as Message] },
-          hasMore: { ...state.hasMore, [id]: false },
-          hasLoadedHistory: { ...state.hasLoadedHistory, [id]: true },
-          isFetchingMore: { ...state.isFetchingMore, [id]: false }
-       }));
-       return;
-    }
+
 
     // 1. TAMPILKAN DARI LOCAL VAULT (INDEXEDDB) DULU (Instan 0ms!)
     let localWasEmpty = true;

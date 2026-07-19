@@ -314,7 +314,6 @@ export default function Register() {
           <AuthForm
             onSubmit={handleRegister}
             button={!TURNSTILE_SITE_KEY ? 'Configuration Error' : (!turnstileToken ? t('auth:status.verifying_security', 'Checking Security...') : t('auth:buttons.register'))}
-            hideEmail={true} 
             isRegister={true}
             disabled={!TURNSTILE_SITE_KEY || !turnstileToken}
           />
