@@ -924,7 +924,6 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
               if (payload.storyId && payload.key) {
                   const { saveStoryKey } = await import('@lib/shadowVaultDb');
                   await saveStoryKey(payload.storyId, payload.key);
-                  console.log(`[Stories] Received and securely stored key for story ${payload.storyId}`);
               }
           } catch (e) {
               console.error('[Stories] Failed to parse incoming story key message', e);
@@ -950,12 +949,10 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
                       const rateLimitKey = `sys_key_req_reply_${conversationId}_${requestorId}` as keyof Window;
                       const lastReq = window[rateLimitKey] as number | undefined || 0;
                       if (Date.now() - lastReq < 10000) {
-                          console.log(`[Shield] Mengabaikan duplikat permintaan kunci dari ${requestorId} (Rate limited)`);
-                          return true;
+                              return true;
                       }
                       window[rateLimitKey] = Date.now() as never;
 
-                      console.log(`[Offline Sync] Received persistent key request from ${requestorId}`);
                       import('@lib/transportClient').then(async ({ emitGroupKeyDistribution }) => {
                            try {
                                const { getMyEncryptionKeyPair, getSodiumLib, getWorkerProxy, fetchPreKeyBundles } = await import('@utils/crypto');
@@ -1024,7 +1021,6 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
                                      conversationId,
                                      distributionKeys as { userId: string; key: string }[]
                                    );
-                                   console.log(`[System Key Request] Successfully distributed keys to ${requesterId}`);
                                }
                            } catch (err) {
                                console.error("[System Key Request] Error distributing key", err);
@@ -1123,8 +1119,7 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
 
                       // Abaikan paket distribusi jika secara eksplisit ditujukan untuk perangkat lain
                       if (data.targetDeviceKey && data.targetDeviceKey !== myIdentityKeyB64) {
-                          console.log(`[Shield] Mengabaikan Kunci Distribusi untuk perangkat lain.`);
-                          return true;
+                              return true;
                       }
 
                       const authStore = (await import('@store/auth')).useAuthStore.getState();
@@ -1167,14 +1162,12 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
                       }
 
                       if (success) {
-                          console.log(`[Group Ratchet] Berhasil mengekstrak & menyimpan real-time group key untuk ${conversationId}`);
-                          useMessageStore.getState().reDecryptPendingMessages(data.conversationId || conversationId);
+                                  useMessageStore.getState().reDecryptPendingMessages(data.conversationId || conversationId);
                       } else {
                           const requestorId = decrypted.senderId || data.senderId;
                           if (requestorId) {
                               const reqPayload = JSON.stringify({ type: 'SYSTEM_KEY_REQUEST', targetUserId: requestorId });
-                              console.log(`[Offline Sync] Sending persistent key request to ${requestorId} due to failed processing`);
-                              useMessageStore.getState().sendMessage(conversationId, { content: reqPayload, type: 'SYSTEM' }, undefined, true);
+                                          useMessageStore.getState().sendMessage(conversationId, { content: reqPayload, type: 'SYSTEM' }, undefined, true);
                           }
                       }
                   } catch (e) {
@@ -1414,13 +1407,11 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             const reconstructedParticipants = cachedUserIds.map(id => ({
                 id, name: id === currentUser?.id ? currentUser.name || '' : '', role: 'MEMBER' as const
             })) as Participant[];
-            console.log(`[OpaqueMailbox] Reconstructed participants from cache for conv=${conversationId} count=${cachedUserIds.length}`);
             // Update the store so both ensureGroupSession and targetRecipients use the correct list
             await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
             conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
         } else {
             // Fallback: try to fetch encryptedMetadata from server and decrypt to get participants
-            console.log(`[OpaqueMailbox] No cached participants for conv=${conversationId}, trying server fetch...`);
             try {
                 const { authFetch } = await import('@lib/api');
                 const serverConv: any = await authFetch(`/api/conversations/${conversationId}`);
@@ -2316,7 +2307,6 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                             const finalConvId = message.conversationId || payload.conversationId || "";
                             const finalSenderId = message.senderId || payload.senderId || "";
                             const finalEncKey = (payload.encryptedKey || payload.key || "");
-                            console.log(`[Offline Sync KEY] conv=${finalConvId} senderId=${finalSenderId} senderDeviceKey=${payload.senderDeviceKey} keyLen=${finalEncKey.length} hasDrHeader=${!!payload.drHeader}`);
                             const { storeReceivedSessionKey } = await import('@utils/crypto');
                             await storeReceivedSessionKey({
                                 ...payload,

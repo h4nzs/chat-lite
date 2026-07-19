@@ -270,7 +270,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                  console.warn("Failed to decrypt metadata for group", e);
              }
         } else {
-            if (c.isGroup && !decryptedMetadata) console.log("cannot decrypt metadata for group");
+            if (c.isGroup && !decryptedMetadata) console.warn("[Metadata] Cannot decrypt metadata for group", c.id);
         }
 
         return {

@@ -1783,7 +1783,6 @@ export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promi
         const authStore = useAuthStore.getState();
         const myId = authStore.user?.id;
         if (senderId && myId !== senderId) {
-            console.log(`[Crypto] Requesting fresh group key from ${senderId}`);
             import('@lib/transportClient').then(({ emitGroupKeyRequest }) => {
                 emitGroupKeyRequest(conversationId, senderId, senderDeviceKey).catch(() => {});
             });

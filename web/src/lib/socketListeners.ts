@@ -26,14 +26,11 @@ async function doSyncMessages() {
 
     syncCompleted = true;
     const messageStore = useMessageStore.getState();
-    let syncedCount = 0;
     for (const conv of conversations) {
       if (conv.id.startsWith('burner_')) continue;
       if (conv.isGroup && !conv.decryptedMetadata) continue;
       await messageStore.loadMessagesForConversation(conv.id);
-      syncedCount++;
     }
-    console.log(`[Offline Sync] Fetched pending messages for ${syncedCount} conversations`);
   } catch (e) {
     console.error('[Offline Sync] Failed to sync messages on connect:', e);
   }
@@ -42,8 +39,6 @@ async function doSyncMessages() {
 export function initSocketListeners() {
   if (isInitialized) return;
   isInitialized = true;
-
-  console.log('[Socket] Initializing listeners...');
 
   // Register Zustand subscription ONCE (no leak on reconnect)
   unsubConversation = useConversationStore.subscribe((state, prevState) => {
@@ -54,7 +49,6 @@ export function initSocketListeners() {
 
   transportClient.on('connect', () => {
     Sentry.addBreadcrumb({ category: 'socket', message: 'Connected', level: 'info' });
-    console.log('[Socket] Connected');
     useConnectionStore.getState().setStatus('connected');
     
     // User is active by default on connect
@@ -85,7 +79,6 @@ export function initSocketListeners() {
 
   transportClient.on('disconnect', (reason) => {
     Sentry.addBreadcrumb({ category: 'socket', message: `Disconnected: ${reason}`, level: 'warning' });
-    console.log('[Socket] Disconnected:', reason);
     useConnectionStore.getState().setStatus('disconnected');
 
     if (reason === 'Logged in on another device') {

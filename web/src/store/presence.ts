@@ -46,10 +46,8 @@ export const usePresenceStore = create<State>((set) => ({
             import('./conversation').then(({ useConversationStore }) => {
                 const conv = useConversationStore.getState().conversations.find(c => c.id === cid);
                 if (conv?.isGroup && !conv.decryptedMetadata) {
-                    console.log(`[Offline Sync] Skipping reDecrypt for group ${cid} — metadata not yet decrypted`);
                     return;
                 }
-                console.log(`[Offline Sync] User ${userId} came online. Retrying decryptions for ${cid}...`);
                 messageStore.reDecryptPendingMessages(cid);
                 
                 // Also try to fetch fresh messages from server for this conversation
