@@ -111,9 +111,9 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
       if (entry.isIntersecting) {
         onVisibilityChange?.(message.id, true);
         const alreadyRead = message.statuses?.some((s: MessageStatus) => s.userId === meId && s.status === 'READ');
-        if (!alreadyRead) {
-          transportClient.sendEvent('message:mark_as_read', { messageId: message.id, conversationId: message.conversationId });
-        }
+  if (!alreadyRead) {
+    transportClient.sendEvent('message:mark_as_read', { messageId: message.id, conversationId: message.conversationId, targetRecipient: message.senderId });
+  }
         observer.disconnect();
       }
     }, { threshold: 0.8 });
@@ -181,10 +181,11 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
           });
 
           // 3. Beritahu Server untuk memusnahkannya (jika pesan masih nyangkut/belum dibaca) — hanya jika connected
-          const socket = transportClient;
-          if (socket?.connected) {
-              transportClient.sendEvent("message:unsend", { messageId: message.id, conversationId: message.conversationId });
-          }
+const socket = transportClient;
+if (socket?.connected) {
+    const targetRecipients = participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
+    transportClient.sendEvent("message:unsend", { messageId: message.id, conversationId: message.conversationId, targetRecipients });
+}
       }
 
       // 4. Bersihkan file dari Cloudflare R2 (Storage) jika ini adalah file gambar/media

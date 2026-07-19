@@ -98,9 +98,11 @@ const AddParticipantModal = ({ conversationId, onClose }: {
 
     setIsLoading(true);
     try {
+      // Notify existing members about new participants
+      const addRecipients = conversation?.participants?.filter(p => p.id !== me?.id)?.map(p => p.id) || [];
       await api(`/api/conversations/${conversationId}/participants`, {
         method: 'POST',
-        body: JSON.stringify({ userIds: selectedUserIds }),
+        body: JSON.stringify({ userIds: selectedUserIds, targetRecipients: addRecipients }),
       });
       toast.success(t('modals:add_participant.success'));
       onClose();

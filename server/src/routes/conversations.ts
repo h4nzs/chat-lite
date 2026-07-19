@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth.js'
 import { ApiError } from '../utils/errors.js'
 import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
-import { emitEventToUsers, emitEventToConversation, emitEventToUser } from '../network/redisBridge.js'
+import { emitEventToUsers, emitEventToUser } from '../network/redisBridge.js'
 import { redisClient } from '../lib/redis.js'
 import { hoistConvoKeys, toConversation, asConversationId, asUserId, userSelectWithKeys, type RawConversationData } from '../utils/mappers.js'
 import type { Conversation } from '@nyx/shared'
@@ -204,7 +204,11 @@ router.put('/:id/details', async (req, res, next) => {
     }
 
     const updatedConversation = await prisma.conversation.update({ where: { id }, data: { encryptedMetadata } })
-    await emitEventToConversation(id, 'conversation:updated', { id: asConversationId(id), encryptedMetadata: updatedConversation.encryptedMetadata ?? undefined });
+    // Opaque Mailbox: notify explicit targetRecipients passed from client
+    const targetRecipients = req.body.targetRecipients as string[] | undefined;
+    if (Array.isArray(targetRecipients) && targetRecipients.length > 0) {
+      await emitEventToUsers(targetRecipients, 'conversation:updated', { id: asConversationId(id), encryptedMetadata: updatedConversation.encryptedMetadata ?? undefined });
+    }
     res.json(updatedConversation)
   } catch (error) {
     next(error)
@@ -230,7 +234,11 @@ router.post('/:id/participants', async (req, res, next) => {
       await emitEventToUser(uid, 'conversation:new', safeConv);
   }
   
-  await emitEventToConversation(conversationId, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  // Opaque Mailbox: notify explicit targetRecipients passed from client
+  const addRecipients = req.body.targetRecipients as string[] | undefined;
+  if (Array.isArray(addRecipients) && addRecipients.length > 0) {
+    await emitEventToUsers(addRecipients, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  }
   res.status(201).json([]);
 });
 
@@ -244,8 +252,12 @@ router.delete('/:id/participants/:userId', async (req, res, next) => {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
   }
 
-  await emitEventToConversation(conversationId, 'conversation:participant_removed', { conversationId: asConversationId(conversationId), userId: asUserId(userId) });
-  await emitEventToConversation(conversationId, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  // Opaque Mailbox: notify explicit targetRecipients passed from client
+  const removeRecipients = req.body.targetRecipients as string[] | undefined;
+  if (Array.isArray(removeRecipients) && removeRecipients.length > 0) {
+    await emitEventToUsers(removeRecipients, 'conversation:participant_removed', { conversationId: asConversationId(conversationId), userId: asUserId(userId) });
+    await emitEventToUsers(removeRecipients, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  }
   await emitEventToUser(userId, 'conversation:deleted', { id: asConversationId(conversationId) });
   res.status(204).end();
 });
@@ -261,8 +273,12 @@ router.delete('/:id/leave', async (req, res, next) => {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
   }
 
-  await emitEventToConversation(conversationId, 'conversation:participant_removed', { conversationId: asConversationId(conversationId), userId: asUserId(userId) });
-  await emitEventToConversation(conversationId, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  // Opaque Mailbox: notify explicit targetRecipients passed from client
+  const leaveRecipients = req.body.targetRecipients as string[] | undefined;
+  if (Array.isArray(leaveRecipients) && leaveRecipients.length > 0) {
+    await emitEventToUsers(leaveRecipients, 'conversation:participant_removed', { conversationId: asConversationId(conversationId), userId: asUserId(userId) });
+    await emitEventToUsers(leaveRecipients, 'group:participants_changed', { conversationId: asConversationId(conversationId) });
+  }
   res.status(204).end();
 });
 

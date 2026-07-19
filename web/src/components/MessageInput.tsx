@@ -299,7 +299,9 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
         throttledTypingSignal();
       } else {
         // Jika teks dihapus sampai kosong, hentikan indikator mengetik segera
-        transportClient.sendEvent("typing:stop", { conversationId: conversation.id });
+        const meId = useAuthStore.getState().user?.id;
+        const targetRecipients = conversation.participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
+        transportClient.sendEvent("typing:stop", { conversationId: conversation.id, targetRecipients });
       }
       debouncedFetchPreview(newText);
     }

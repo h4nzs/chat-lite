@@ -4,7 +4,7 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
-import { sendJsonToUser, broadcastToConversation } from '../network/redisBridge.js';
+import { sendJsonToUser } from '../network/redisBridge.js';
 import { TransportOpCode } from '@nyx/shared';
 import { asConversationId, asMessageId } from '@nyx/shared'
 import { toRawServerMessage } from '../utils/mappers.js'
@@ -180,8 +180,22 @@ router.post('/', zodValidate({
 
     res.status(201).json(safeMessage)
 
-    // EMIT & PUSH NOTIFICATION
-    await broadcastToConversation(conversationId, TransportOpCode.CHAT_MESSAGE, safeMessage);
+    // EMIT & PUSH NOTIFICATION (Opaque Mailbox: explicit targetRecipients from client)
+    const targetRecipients = req.body.targetRecipients as string[] | undefined;
+    if (Array.isArray(targetRecipients) && targetRecipients.length > 0) {
+        for (const targetId of targetRecipients) {
+            if (typeof targetId === 'string' && targetId !== senderId) {
+                await sendJsonToUser(targetId, TransportOpCode.CHAT_MESSAGE, safeMessage);
+
+                // Register for offline discovery
+                prisma.userHiddenConversation.upsert({
+                    where: { userId_conversationId: { userId: targetId, conversationId } },
+                    create: { userId: targetId, conversationId },
+                    update: {}
+                }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
+            }
+        }
+    }
 
     // PUSH NOTIFICATIONS DEFERRED FOR OPAQUE MAILBOX
     // Push payloads are now handled completely separately by the client directly calling a new push endpoint,

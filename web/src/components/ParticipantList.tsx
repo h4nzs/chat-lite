@@ -47,8 +47,12 @@ const ParticipantActions = ({ conversationId, participant, profile, amIAdmin }: 
       t('modals:participants.remove_desc', { name: profile.name }),
       async () => {
         try {
+          const { useConversationStore } = await import('@store/conversation');
+          const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+          const removeRecipients = conv?.participants?.filter(p => p.id !== participant.id)?.map(p => p.id) || [];
           await api(`/api/conversations/${conversationId}/participants/${participant.id}`, {
             method: 'DELETE',
+            body: JSON.stringify({ targetRecipients: removeRecipients }),
           });
           toast.success(t('modals:participants.toasts.removed', { name: profile.name }));
         } catch (error: unknown) {

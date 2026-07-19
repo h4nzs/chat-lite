@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { prisma } from '../lib/prisma.js';
-import { emitEventToConversation } from '../network/redisBridge.js';
+import { emitEventToUsers } from '../network/redisBridge.js';
 import { TransportOpCode } from '@nyx/shared';
 
 // Job: MESSAGE SWEEPER (Setiap menit)
@@ -36,9 +36,16 @@ export const startMessageSweeper = () => {
             deletedByConversation.set(m.conversationId, arr);
         }
 
-        // 2. Beritahu klien via Redis Bridge
+        // 2. Beritahu klien via Redis Bridge (Opaque Mailbox: cari user via UserHiddenConversation)
         for (const [conversationId, msgIds] of deletedByConversation.entries()) {
-            await emitEventToConversation(conversationId, 'message:deleted_batch', { messageIds: msgIds, conversationId });
+            const userConvs = await prisma.userHiddenConversation.findMany({
+                where: { conversationId },
+                select: { userId: true }
+            });
+            const recipientIds = userConvs.map(uc => uc.userId);
+            if (recipientIds.length > 0) {
+                await emitEventToUsers(recipientIds, 'message:deleted_batch', { messageIds: msgIds, conversationId });
+            }
         }
 
         // 3. ✅ PERBAIKAN: Hapus fisik segera agar tidak ter-query lagi di menit berikutnya

@@ -2447,7 +2447,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         if (socket?.connected && user) {
           for (const msg of processedMessages) {
             if (msg.senderId !== user.id) {
-              transportClient.sendEvent('message:mark_as_read', { messageId: msg.id, conversationId: id });
+              transportClient.sendEvent('message:mark_as_read', { messageId: msg.id, conversationId: id, targetRecipient: msg.senderId });
             }
           }
         }
@@ -2923,7 +2923,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               if (socket?.connected && currentUser && finalDecrypted.senderId !== currentUser.id && !finalDecrypted.isSilent) {
                   transportClient.sendEvent('message:mark_as_read', {
                       messageId: finalDecrypted.id,
-                      conversationId: conversationId
+                      conversationId: conversationId,
+                      targetRecipient: finalDecrypted.senderId
                   });
               }
 

@@ -46,11 +46,14 @@ export default function EditGroupInfoModal({ conversationId, currentTitle, curre
       
       const encryptedMetadata = await encryptGroupMetadata(newMetadata, conversationId);
       const authSecret = currentMetadata.authSecret;
+      const { useAuthStore } = await import('@store/auth');
+      const meId = useAuthStore.getState().user?.id;
+      const editRecipients = conversation.participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
 
       await api(`/api/conversations/${conversationId}/details`, {
         method: 'PUT',
         headers: authSecret ? { 'X-Group-Token': authSecret } : undefined,
-        body: JSON.stringify({ encryptedMetadata }),
+        body: JSON.stringify({ encryptedMetadata, targetRecipients: editRecipients }),
       });
       toast.success(t('modals:edit_group.success'));
       onClose();

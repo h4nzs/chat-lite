@@ -341,18 +341,28 @@ async function handlePresence(userId: string, payload: { event: string, conversa
 
   if (payload.conversationId && (payload.event === 'typing:start' || payload.event === 'typing:stop' || payload.event === 'typing')) {
      const conversationId = payload.conversationId;
-     const { getParticipantIds } = await import('../utils/participantCache.js');
-     const participantIds = await getParticipantIds(conversationId);
-
-     if (participantIds.length > 0) {
-       const isTyping = payload.event === 'typing:start' || payload.event === 'typing';
-       const typingData = { type: 'typing', userId, conversationId, isTyping };
-       
-       for (const pId of participantIds) {
-         if (pId !== userId) {
-           await sendJsonToUser(pId, TransportOpCode.PRESENCE, typingData);
+     const isTyping = payload.event === 'typing:start' || payload.event === 'typing';
+     const typingData = { type: 'typing', userId, conversationId, isTyping };
+     
+     // Opaque Mailbox: sender explicitly provides targetRecipients
+     const targetRecipients = (payload as { targetRecipients?: string[] }).targetRecipients;
+     if (Array.isArray(targetRecipients) && targetRecipients.length > 0) {
+         for (const pId of targetRecipients) {
+             if (typeof pId === 'string' && pId !== userId) {
+               await sendJsonToUser(pId, TransportOpCode.PRESENCE, typingData);
+             }
          }
-       }
+     } else {
+         // Fallback: legacy mode via participant cache
+         const { getParticipantIds } = await import('../utils/participantCache.js');
+         const participantIds = await getParticipantIds(conversationId);
+         if (participantIds.length > 0) {
+           for (const pId of participantIds) {
+             if (pId !== userId) {
+               await sendJsonToUser(pId, TransportOpCode.PRESENCE, typingData);
+             }
+           }
+         }
      }
   }
 }
@@ -534,23 +544,36 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        }
 
        case 'message:unsend': {
-         const { messageId, conversationId } = data as { messageId: string, conversationId: string };
+         const { messageId, conversationId, targetRecipients } = data as { messageId: string, conversationId: string, targetRecipients?: string[] };
          if (!messageId || !conversationId) return;
-         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
+         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true, senderId: true } });
          if (!msg || msg.conversationId !== conversationId) return;
          await prisma.message.delete({ where: { id: messageId } });
-         await emitEventToConversation(conversationId, 'message:deleted_remotely', { messageId, conversationId, deletedBy: userId }, userId);
+         
+         // Notify recipients about the unsend (Opaque Mailbox: explicit targetRecipients from client)
+         const recipients = Array.isArray(targetRecipients) && targetRecipients.length > 0 
+           ? targetRecipients 
+           : (msg.senderId ? [msg.senderId] : []);
+         for (const targetId of recipients) {
+           if (typeof targetId === 'string' && targetId !== userId) {
+             await emitEventToUser(targetId, 'message:deleted_remotely', { messageId, conversationId, deletedBy: userId });
+           }
+         }
          break;
        }
 
        case 'message:view_once_opened': {
-         const { messageId, conversationId } = data as { messageId: string, conversationId: string };
+         const { messageId, conversationId, targetRecipient } = data as { messageId: string, conversationId: string, targetRecipient?: string };
          if (!messageId || !conversationId) return;
-         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true } });
+         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true, senderId: true } });
          if (!msg || msg.conversationId !== conversationId) return;
 
-         // Emit viewed event then OBLITERATE from server
-         await emitEventToConversation(conversationId, 'message:viewed', { messageId, conversationId }, userId);
+         // Emit viewed event to sender then OBLITERATE from server
+         // Opaque Mailbox: use explicit targetRecipient from client if available, fallback to msg.senderId
+         const notifyTarget = targetRecipient || msg.senderId;
+         if (notifyTarget && notifyTarget !== userId) {
+           await emitEventToUser(notifyTarget, 'message:viewed', { messageId, conversationId });
+         }
          await prisma.message.delete({ where: { id: messageId } }).catch(() => {});
          break;
        }
@@ -653,14 +676,14 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
 
        case 'message:mark_read':
        case 'message:mark_as_read': {
-         const { conversationId, messageId } = data as { conversationId: string, messageId: string };
-         await handleMessageStatusUpdate(userId, conversationId, messageId, 'READ');
+         const { conversationId, messageId, targetRecipient } = data as { conversationId: string, messageId: string, targetRecipient?: string };
+         await handleMessageStatusUpdate(userId, conversationId, messageId, 'READ', targetRecipient);
          break;
        }
 
        case 'message:ack_delivered': {
-         const { conversationId, messageId } = data as { conversationId: string, messageId: string };
-         await handleMessageStatusUpdate(userId, conversationId, messageId, 'DELIVERED');
+         const { conversationId, messageId, targetRecipient } = data as { conversationId: string, messageId: string, targetRecipient?: string };
+         await handleMessageStatusUpdate(userId, conversationId, messageId, 'DELIVERED', targetRecipient);
          break;
        }
 
@@ -680,14 +703,23 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
        }
 
        case 'message:deleted': {
-         const { conversationId, id: messageId } = data as { conversationId: string, id: string };
+         const { conversationId, id: messageId, targetRecipients } = data as { conversationId: string, id: string, targetRecipients?: string[] };
          if (!conversationId || !messageId) return;
 
          const message = await prisma.message.findUnique({ where: { id: messageId } });
          if (!message || message.senderId !== userId) return;
 
          await prisma.message.delete({ where: { id: messageId } });
-         await emitEventToConversation(conversationId, 'message:deleted', { conversationId, id: messageId }, userId);
+         
+         // Notify recipients about the deletion (Opaque Mailbox: explicit targetRecipients from client)
+         const recipients = Array.isArray(targetRecipients) && targetRecipients.length > 0 
+           ? targetRecipients 
+           : (message.senderId ? [message.senderId] : []);
+         for (const targetId of recipients) {
+           if (typeof targetId === 'string' && targetId !== userId) {
+             await emitEventToUser(targetId, 'message:deleted', { conversationId, id: messageId });
+           }
+         }
          break;
        }
        
@@ -703,7 +735,7 @@ async function sendAck(userId: string, deviceId: string, msgId: string, data: Re
   await sendJsonToUser(userId, TransportOpCode.ACK, { msgId, data }, false, deviceId);
 }
 
-async function handleMessageStatusUpdate(userId: string, conversationId: string, messageId: string, status: 'READ' | 'DELIVERED') {
+async function handleMessageStatusUpdate(userId: string, conversationId: string, messageId: string, status: 'READ' | 'DELIVERED', targetRecipient?: string) {
   if (!conversationId || !messageId) return;
 
   try {
@@ -723,12 +755,17 @@ async function handleMessageStatusUpdate(userId: string, conversationId: string,
       create: { messageId, userId, status }
     });
 
-    await emitEventToConversation(conversationId, 'message:status_updated', {
-      conversationId,
-      messageId,
-      userId,
-      status
-    }, userId);
+    // Notify the original message sender about the status update
+    // Opaque Mailbox: use explicit targetRecipient from client if available, fallback to msg.senderId
+    const notifyTarget = targetRecipient || msg.senderId;
+    if (notifyTarget && notifyTarget !== userId) {
+      await emitEventToUser(notifyTarget, 'message:status_updated', {
+        conversationId,
+        messageId,
+        userId,
+        status
+      });
+    }
 
     // 2. LOGIKA PENGHAPUSAN OTOMATIS (Store-and-Forward Ephemerality)
     if (status === 'READ') {

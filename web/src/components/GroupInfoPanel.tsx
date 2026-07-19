@@ -107,9 +107,10 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: Conversat
       const newMetadata = { ...currentMetadata, avatarUrl: fileUrl };
       const encryptedMetadata = await encryptGroupMetadata(newMetadata, conversation.id);
 
+      const avatarRecipients = conversation.participants?.filter(p => p.id !== user?.id)?.map(p => p.id) || [];
       await api(`/api/conversations/${conversation.id}/details`, {
         method: 'PUT',
-        body: JSON.stringify({ encryptedMetadata }),
+        body: JSON.stringify({ encryptedMetadata, targetRecipients: avatarRecipients }),
       });
 
       toast.success(t('modals:group_info.toasts.avatar_updated'), { id: toastId });
@@ -146,7 +147,8 @@ const GroupInfoPanel = ({ conversationId, onClose }: { conversationId: Conversat
   const handleLeaveGroup = async () => {
     const toastId = toast.loading(t('modals:group_info.toasts.leaving'));
     try {
-      await api(`/api/conversations/${conversation.id}/leave`, { method: 'DELETE' });
+      const leaveRecipients = conversation.participants?.filter(p => p.id !== user?.id)?.map(p => p.id) || [];
+      await api(`/api/conversations/${conversation.id}/leave`, { method: 'DELETE', body: JSON.stringify({ targetRecipients: leaveRecipients }) });
       toast.success(t('modals:group_info.toasts.left_success'), { id: toastId });
       handleClose(); 
     } catch (error: unknown) {

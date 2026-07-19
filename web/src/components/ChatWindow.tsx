@@ -328,7 +328,8 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
          msgsToAck.forEach(msg => {
              transportClient.sendEvent('message:mark_as_read', {
                  messageId: msg.id,
-                 conversationId: id
+                 conversationId: id,
+                 targetRecipient: msg.senderId
              });
          });
     };
@@ -401,17 +402,21 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTyping = useCallback(() => {
-    transportClient.sendEvent("typing:start", { conversationId: id });
+    const conv = useConversationStore.getState().conversations.find(c => c.id === id);
+    const targetRecipients = conv?.participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
+    transportClient.sendEvent("typing:start", { conversationId: id, targetRecipients });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      transportClient.sendEvent("typing:stop", { conversationId: id });
+      transportClient.sendEvent("typing:stop", { conversationId: id, targetRecipients });
     }, 3500); // 3.5s untuk memberi ruang bagi throttle 2s
-  }, [id]);
+  }, [id, meId]);
 
   const handleSendMessage = (data: { content: string }) => {
     actions.sendMessage(data);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    transportClient.sendEvent("typing:stop", { conversationId: id });
+    const conv = useConversationStore.getState().conversations.find(c => c.id === id);
+    const targetRecipients = conv?.participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
+    transportClient.sendEvent("typing:stop", { conversationId: id, targetRecipients });
     setTimeout(scrollToBottom, 100);
   };
 

@@ -35,7 +35,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
           const socket = transportClient;
           const emitViewedAck = () => {
               if (isMountedRef.current) {
-                  transportClient.sendEvent('message:view_once_opened', { messageId: message.id, conversationId: message.conversationId });
+                  transportClient.sendEvent('message:view_once_opened', { messageId: message.id, conversationId: message.conversationId, targetRecipient: message.senderId });
               }
           };
           if (socket?.connected) {
