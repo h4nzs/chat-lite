@@ -12,6 +12,7 @@ import type { ConversationId, UserId, MessageId, MessageStatus, RawServerMessage
 import { asUserId } from '@nyx/shared';
 // Removed all crypto imports
 import toast from 'react-hot-toast';
+import { captureAndLog } from '@utils/feedback';
 
 import { encryptGroupMetadata, decryptGroupMetadata, forceRotateGroupSenderKey, ensureGroupSession } from "@utils/crypto";
 import i18n from '../i18n';
@@ -60,7 +61,7 @@ const withPreview = (msg: Message): Message => {
          if (payload.type === 'CALL_INIT' || payload.type === 'GHOST_SYNC') {
             return { ...msg, preview: '', isSilent: true };
          }
-       } catch {}
+       } catch { /* not a JSON payload */ }
     }
     return { ...msg, preview: msg.content };
   }
@@ -648,7 +649,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
 
         if (hasCryptoChanged) {
           affectedConvoIds.push(c.id);
-          import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(c.id).catch(console.error));
+          import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(c.id).catch(captureAndLog));
         }
       });
 
@@ -677,7 +678,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   },
 
   addParticipants: (conversationId, newParticipants) => {
-    import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(conversationId).catch(console.error));
+    import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(conversationId).catch(captureAndLog));
     set(state => ({
       conversations: state.conversations.map(c => {
         if (c.id === conversationId) {
@@ -697,7 +698,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   },
 
   removeParticipant: (conversationId, userId) => {
-    import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(conversationId).catch(console.error));
+    import('@utils/crypto').then(m => m.forceRotateGroupSenderKey(conversationId).catch(captureAndLog));
     set(state => ({
       conversations: state.conversations.map(c => {
         if (c.id === conversationId) {

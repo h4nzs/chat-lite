@@ -7,6 +7,7 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { v4 as uuidv4 } from 'uuid';
 import { api, authFetch } from "@lib/api"; 
 import { transportClient, emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/transportClient';
+import { captureAndLog } from '@utils/feedback';
 import { 
   encryptMessage, 
   decryptMessage, 
@@ -1269,9 +1270,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         } else {
             tombstones.push({ id, conversationId, isDeletedLocal: true, createdAt: new Date().toISOString(), senderId: 'unknown' } as Message);
         }
-        import('@utils/crypto').then(m => m.deleteMessageKeySecurely(id)).catch(console.error);
+        import('@utils/crypto').then(m => m.deleteMessageKeySecurely(id)).catch(captureAndLog);
     }
-    shadowVault.upsertMessages(tombstones).catch(console.error);
+    shadowVault.upsertMessages(tombstones).catch(captureAndLog);
 
     // 3. Remove from active state
     set(state => {
@@ -1782,7 +1783,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                     await storeMessageKeySecurely(msgId, mk);
                     await deleteMessageKeySecurely(`temp_${actualTempId}`);
                 }
-            }).catch(console.error);
+            }).catch(captureAndLog);
 
             // 2. Tangani Reaksi (Tanpa Gelembung Chat)
             if (isReactionPayload) {
@@ -1854,7 +1855,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                      } catch (e) {
                          console.error("Async self-decrypt failed in callback:", e);
                      }
-                 }).catch(console.error);
+                 }).catch(captureAndLog);
             }            const updatedMsg: Partial<Message> = {
                 ...res.msg,
                 id: asMessageId(res.msg.id),
@@ -1981,7 +1982,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                     await storeMessageKeySecurely(msgId, mk);
                     await deleteMessageKeySecurely(`temp_${tempId}`);
                 }
-            }).catch(console.error);
+            }).catch(captureAndLog);
 
             // Tentukan status silent berdasarkan payload asli
             const silentPayload = parseSilent(payloadData.content);
@@ -2058,7 +2059,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                      } catch (e) {
                          console.error("Async self-decrypt failed in offline queue callback:", e);
                      }
-                 }).catch(console.error);
+                 }).catch(captureAndLog);
             }            const updatedMsg: Partial<Message> = {
                 ...res.msg,
                 id: asMessageId(res.msg.id),
@@ -2838,7 +2839,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       if (m.id === silentPayload.targetMessageId) {
                           const newReactions = m.reactions?.filter(r => r.userId !== decrypted.senderId || r.emoji !== silentPayload.emoji) || [];
                           const updatedMsg = { ...m, reactions: newReactions };
-                          shadowVault.upsertMessages([updatedMsg]).catch(console.error);
+                          shadowVault.upsertMessages([updatedMsg]).catch(captureAndLog);
                           return updatedMsg;
                       }
                       return m;
@@ -2878,7 +2879,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       const updatedReactions = [...existingReactions.filter(r => r.userId !== reaction.userId), reaction];
                       shadowVault.upsertMessages([{ ...targetMsg, reactions: updatedReactions }]);
                   }
-              }).catch(console.error);
+              }).catch(captureAndLog);
           });
       } else if (editPayload) {
           cleanUpOptimisticBubble(); // ✅ Bersihkan Bubble Hantu Edit Pesan
@@ -2896,7 +2897,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                       if (conv?.lastMessage?.id === editPayload.targetMessageId) {
                           m.useConversationStore.getState().updateConversationLastMessage(conversationId, editedMsg);
                       }
-                  }).catch(console.error);
+                  }).catch(captureAndLog);
               }
               
               return { messages: { ...state.messages, [conversationId]: updatedMessages } };
@@ -2951,14 +2952,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                           message: snippet,
                           link: `/chat/${finalDecrypted.conversationId}`
                       } as Parameters<ReturnType<typeof useDynamicIslandStore.getState>['addActivity']>[0], 4000);                  
-                  }).catch(console.error);
+                  }).catch(captureAndLog);
               }
 
               // --- Logika Update Preview Chat List ---
               if (!finalDecrypted.isSilent) {
                   import('@store/conversation').then(m => {
                       m.useConversationStore.getState().updateConversationLastMessage(conversationId, finalDecrypted);
-                  }).catch(console.error);
+                  }).catch(captureAndLog);
               }
           }
       }
@@ -3077,12 +3078,12 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           if (messageToRemove.fileUrl?.startsWith('blob:')) {
             URL.revokeObjectURL(messageToRemove.fileUrl);
           }
-          shadowVault.upsertMessages([{ ...messageToRemove, content: null, fileUrl: undefined, isDeletedLocal: true }]).catch(console.error);
+          shadowVault.upsertMessages([{ ...messageToRemove, content: null, fileUrl: undefined, isDeletedLocal: true }]).catch(captureAndLog);
       } else {
-          shadowVault.upsertMessages([{ id: messageId, conversationId, isDeletedLocal: true, createdAt: new Date().toISOString(), senderId: 'unknown' } as Message]).catch(console.error);
+          shadowVault.upsertMessages([{ id: messageId, conversationId, isDeletedLocal: true, createdAt: new Date().toISOString(), senderId: 'unknown' } as Message]).catch(captureAndLog);
       }
 
-      import('@utils/crypto').then(m => m.deleteMessageKeySecurely(messageId)).catch(console.error);
+      import('@utils/crypto').then(m => m.deleteMessageKeySecurely(messageId)).catch(captureAndLog);
 
       const updatedMessages = messages.map(m => {
           if (m.id === messageId) {
@@ -3114,9 +3115,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       if (updatedMsg) {
         let messageForPreview = updatedMsg;
         if (updatedMsg.isViewOnce && updatedMsg.isViewed) {
-            import('@utils/crypto').then(m => m.deleteMessageKeySecurely(messageId)).catch(console.error);
+            import('@utils/crypto').then(m => m.deleteMessageKeySecurely(messageId)).catch(captureAndLog);
             const tombstone = { ...updatedMsg, content: null, fileUrl: undefined, isDeletedLocal: true };
-            shadowVault.upsertMessages([tombstone]).catch(console.error);
+            shadowVault.upsertMessages([tombstone]).catch(captureAndLog);
             updatedMessages = updatedMessages.map(m => m.id === messageId ? tombstone : m);
             messageForPreview = tombstone;
         } else {
@@ -3128,7 +3129,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             if (conv?.lastMessage?.id === messageId) {
                 m.useConversationStore.getState().updateConversationLastMessage(conversationId, messageForPreview);
             }
-        }).catch(console.error);
+        }).catch(captureAndLog);
       }
       return { messages: { ...state.messages, [conversationId]: updatedMessages } };
     })
@@ -3237,8 +3238,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           },
 
             clearMessagesForConversation: (conversationId) => {
-            shadowVault.deleteConversationMessages(conversationId).catch(console.error);
-            import('@utils/crypto').then(m => m.deleteConversationKeychain(conversationId)).catch(console.error);
+            shadowVault.deleteConversationMessages(conversationId).catch(captureAndLog);
+            import('@utils/crypto').then(m => m.deleteConversationKeychain(conversationId)).catch(captureAndLog);
 
             set(state => {
             const newMessages = { ...state.messages };

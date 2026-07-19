@@ -37,6 +37,30 @@ if (typeof window !== 'undefined') {
   }, 1000);
 }
 
+// === GLOBAL ERROR HANDLING ===
+import * as Sentry from '@sentry/react';
+
+window.onerror = function (message, source, lineno, colno, error) {
+  if (import.meta.env.PROD) {
+    Sentry.captureException(error || new Error(String(message)), {
+      tags: { source: 'window.onerror' },
+      extra: { source, lineno, colno }
+    });
+  }
+  console.error('[Global] Uncaught error:', message, 'at', source, lineno + ':' + colno);
+};
+
+window.addEventListener('unhandledrejection', function (event) {
+  if (import.meta.env.PROD) {
+    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+    Sentry.captureException(reason, {
+      tags: { source: 'unhandledrejection' },
+      extra: { promise: String(event.reason) }
+    });
+  }
+  console.error('[Global] Unhandled Promise rejection:', event.reason);
+});
+
 // --- Dependency Injection for Auth Failure ---
 // This injects the logout function into the api layer, breaking the circular dependency.
 // Now, if authFetch encounters a final token refresh failure, it can trigger a full logout.

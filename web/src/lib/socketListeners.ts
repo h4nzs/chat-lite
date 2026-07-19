@@ -6,6 +6,7 @@ import { transportClient, emitSessionKeyRequest } from './transportClient';
 import { useMessageStore } from '../store/message';
 import { useConversationStore } from '../store/conversation';
 import { useAuthStore } from '../store/auth';
+import { captureAndLog } from '@utils/feedback';
 import { useConnectionStore } from '../store/connection';
 import { usePresenceStore } from '../store/presence';
 import { RawServerMessageSchema, type RawServerMessage, type Message, type Participant, type User, type BinaryPayload, type Conversation, asMessageId, asConversationId, asUserId } from '@nyx/shared';
@@ -232,15 +233,15 @@ export function initSocketListeners() {
         // when metadata is decrypted. Don't call it here unconditionally — it would
         // advance the sender key ratchet (CK N=0→N=1) before group metadata decrypts.
       })
-      .catch(console.error);
+      .catch(captureAndLog);
   });
   
   transportClient.on('session:fulfill_request', (data: { conversationId: string; sessionId: string; requesterId: string; requesterPublicKey: string; requesterPqPublicKey: string }) => {
-    import('../utils/crypto').then(m => m.fulfillKeyRequest(data).catch(console.error));
+    import('../utils/crypto').then(m => m.fulfillKeyRequest(data).catch(captureAndLog));
   });
 
   transportClient.on('group:fulfill_key_request', (data: { conversationId: string; requesterId: string; requesterPublicKey: string; requesterPqPublicKey: string; requesterDeviceId?: string }) => {
-    import('../utils/crypto').then(m => m.fulfillGroupKeyRequest(data).catch(console.error));
+    import('../utils/crypto').then(m => m.fulfillGroupKeyRequest(data).catch(captureAndLog));
   });
 
   transportClient.on('group:key_request_failed', (data: { conversationId: string; reason: string }) => {

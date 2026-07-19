@@ -568,7 +568,7 @@ router.post('/recover', authLimiter, zodValidate({
                 isValid = true;
                 break;
             }
-        } catch(e) {}
+        } catch(e) { console.warn("[Auth] Recovery signature verification error:", e); }
     }
 
     if (!isValid) throw new ApiError(401, "Cryptographic signature verification failed.");

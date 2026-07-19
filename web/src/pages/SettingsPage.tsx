@@ -47,8 +47,8 @@ const parseApiError = (error: unknown, fallback: string): string => {
       if (typeof details === 'object' && details !== null && 'error' in details) {
         return (details as { error: string }).error;
       }
-    } catch {
-      // fallback
+    } catch (e) {
+      console.warn('[Settings] Failed to parse response:', e);
     }
   }
   return fallback;

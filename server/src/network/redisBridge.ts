@@ -295,7 +295,7 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
                     sendPushNotification(targetId, {
                         type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
                         data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
-                    }).catch(console.error);
+                    }).catch((e: unknown) => { console.error("[RedisBridge] Failed to upsert UserHiddenConversation:", e); });
 
                     // Register this conversation for the target recipient so they can discover it later
                     // (Critical for new users who have never synced this conversation before)

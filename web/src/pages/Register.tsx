@@ -8,6 +8,7 @@ import RecoveryPhraseModal from "@components/RecoveryPhraseModal";
 import { Turnstile } from '@marsidev/react-turnstile';
 import toast from "react-hot-toast";
 import { api } from "@lib/api";
+import { captureAndLog } from '@utils/feedback';
 import { FiShield, FiSkipForward, FiCpu, FiZap } from "react-icons/fi";
 import { IoFingerPrint } from "react-icons/io5";
 import SEO from '../components/SEO';
@@ -41,7 +42,7 @@ export default function Register() {
       .then(({ platformAuthenticatorIsAvailable }) => {
         platformAuthenticatorIsAvailable().then(setIsBiometricsSupported);
       })
-      .catch(console.error);
+      .catch(captureAndLog);
   }, []);
 
   useEffect(() => {

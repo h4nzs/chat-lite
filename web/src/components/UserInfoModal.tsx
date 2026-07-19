@@ -14,6 +14,7 @@ import { useVerificationStore } from '@store/verification';
 import { useAuthStore } from '@store/auth';
 import { usePresenceStore } from '@store/presence';
 import { useShallow } from 'zustand/react/shallow';
+import { captureAndLog } from '@utils/feedback';
 import ModalBase from './ui/ModalBase';
 import MediaGallery from './MediaGallery';
 import { AnimatedTabs } from './ui/AnimatedTabs';
@@ -256,7 +257,7 @@ export default function UserInfoModal() {
                       {blockedUserIds.includes(user.id) ? (
                         <button
                           onClick={() => {
-                            useAuthStore.getState().unblockUser(user.id).catch(console.error);
+                            useAuthStore.getState().unblockUser(user.id).catch(captureAndLog);
                           }}
                           className="
                             w-full py-3 rounded-xl font-bold uppercase tracking-wider text-xs
@@ -271,7 +272,7 @@ export default function UserInfoModal() {
                       ) : (
                         <button
                           onClick={() => {
-                            useAuthStore.getState().blockUser(user.id).catch(console.error);
+                            useAuthStore.getState().blockUser(user.id).catch(captureAndLog);
                           }}
                           className="
                             w-full py-3 rounded-xl font-bold uppercase tracking-wider text-xs

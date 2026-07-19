@@ -53,9 +53,9 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
         
         const selectedIds = selectedUsers.map(u => u.id);
         setUserList(optimisticResults.filter(u => u.id !== me?.id && !selectedIds.includes(u.id)));
-      } catch {
-        // Silent fail
-      }
+    } catch (e) {
+      console.warn('[CreateGroup] Failed to load participants:', e);
+    }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, me?.id, selectedUsers]);

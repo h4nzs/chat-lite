@@ -26,6 +26,7 @@ const EmbedChatPage = lazy(() => import('./pages/EmbedChatPage'));
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import ConfirmModal from '@components/ConfirmModal';
 import UserInfoModal from '@components/UserInfoModal';
 import PasswordPromptModal from '@components/PasswordPromptModal';
@@ -365,6 +366,7 @@ const AppContent = () => {
       <PrivacyCloak />
 
       {/* Global Modals & UI Elements */}
+      <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
         <CommandPalette />
         <ConfirmModal />
@@ -429,6 +431,7 @@ const AppContent = () => {
           </div>
         </div>
       </Suspense>
+      </ErrorBoundary>
     </>
   );
 };

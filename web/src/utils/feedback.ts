@@ -40,3 +40,19 @@ export const triggerReceiveFeedback = () => {
   playHaptic([30, 50, 30]); // Pola getar pendek-panjang-pendek
   playSound('receive');
 };
+
+/**
+ * Log error to console AND attempt Sentry capture (fire-and-forget).
+ * Use this instead of .catch(console.error) for better production visibility.
+ */
+export function captureAndLog(error: unknown, context?: string): void {
+  if (context) {
+    console.error(`[${context}]`, error);
+  } else {
+    console.error(error);
+  }
+  // Fire-and-forget Sentry capture — avoids circular deps with Sentry init
+  try {
+    import('@sentry/react').then(S => S.captureException(error)).catch(() => {});
+  } catch {}
+}

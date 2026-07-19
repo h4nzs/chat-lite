@@ -1209,7 +1209,7 @@ async function doDecryptMessage(
 
   // ✅ FASE 3: Deteksi Otomatis apakah ini pesan Sender Key Fan-Out atau Double Ratchet Klasik
   let payloadObj;
-  try { payloadObj = JSON.parse(cipher); } catch {}
+  try { payloadObj = JSON.parse(cipher); } catch { /* not a JSON payload */ }
   const isSenderKeyProtocol = payloadObj && payloadObj.signature !== undefined && payloadObj.header !== undefined;
 
   if (isSenderKeyProtocol || isGroup) {

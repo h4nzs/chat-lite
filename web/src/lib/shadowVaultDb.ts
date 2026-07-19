@@ -310,7 +310,7 @@ class NyxShadowVaultProxy {
         if (r.repliedTo) {
             const rawRepliedTo = await decryptVaultText(r.repliedTo);
             if (rawRepliedTo) { 
-                try { decryptedRepliedTo = JSON.parse(rawRepliedTo); } catch {} 
+                try { decryptedRepliedTo = JSON.parse(rawRepliedTo); } catch { /* not JSON */ } 
             }
         }
         if (r.senderName) decryptedSenderName = await decryptVaultText(r.senderName) || undefined;
@@ -320,7 +320,7 @@ class NyxShadowVaultProxy {
         if (r.fileMeta) {
             const rawMeta = await decryptVaultText(r.fileMeta);
             if (rawMeta) { 
-                try { decryptedFileMeta = JSON.parse(rawMeta); } catch {} 
+                try { decryptedFileMeta = JSON.parse(rawMeta); } catch { /* not JSON */ } 
             }
         }
 
