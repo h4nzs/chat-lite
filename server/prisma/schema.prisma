@@ -130,18 +130,22 @@ model PreKeyBundle {
 model RefreshToken {
   id           String    @id @default(cuid())
   jti          String    @unique
+  familyId     String    @default("legacy") // Groups tokens from the same original session (rotation chain). Default for legacy tokens pre-migration.
   deviceId     String // Sesi login diikat ke Perangkat
   device       Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   userAgent    String?
   ipAddress    String?
   revokedAt    DateTime?
-  replacedById String?
+  replacedById String? @unique // Points to the previous token in this family chain
+  replacedBy   RefreshToken? @relation("TokenReplacement", fields: [replacedById], references: [id])
+  replacedToken RefreshToken? @relation("TokenReplacement")
   createdAt    DateTime  @default(now())
   lastUsedAt   DateTime  @updatedAt
   expiresAt    DateTime
 
   @@index([deviceId])
   @@index([expiresAt])
+  @@index([familyId])
   @@index([jti])
   @@index([revokedAt])
 }
@@ -215,7 +219,7 @@ model Message {
   id             String       @id @default(cuid())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
-  sender         User?        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
   senderId       String?
   content        String?      @db.Text
   type           MessageType  @default(USER)

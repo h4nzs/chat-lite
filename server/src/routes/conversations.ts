@@ -19,17 +19,54 @@ const router: Router = Router()
 router.use(requireAuth)
 
 // GET conversations by IDs (Inbox sync for Opaque Mailbox)
+// For new users with no local IDs, discovers conversations from UserHiddenConversation
 router.get('/sync', async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
     
     const ids = req.query.ids as string;
-    if (!ids) return res.json([]);
-    const conversationIds = ids.split(',');
+    let conversationIds: string[] = ids ? ids.split(',') : [];
+
+    // Discover conversations from UserHiddenConversation records
+    // (created when conversations are created or messages are sent)
+    const userConvs = await prisma.userHiddenConversation.findMany({
+      where: { userId: req.user.id },
+      select: { conversationId: true }
+    });
+    const hiddenIds = userConvs.map(uc => uc.conversationId);
+    
+    // Backfill for legacy conversations (pre-dating UserHiddenConversation tracking):
+    // If no discovery records and no client-provided IDs, try SessionKey table
+    // (covers conversations where E2EE session was established)
+    let backfillIds: string[] = [];
+    if (hiddenIds.length === 0 && conversationIds.length === 0) {
+      try {
+        const userDevices = await prisma.device.findMany({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        const deviceIds = userDevices.map(d => d.id);
+        if (deviceIds.length > 0) {
+          const sessionKeys = await prisma.sessionKey.findMany({
+            where: { deviceId: { in: deviceIds } },
+            select: { conversationId: true },
+            distinct: ['conversationId']
+          });
+          backfillIds = sessionKeys.map(sk => sk.conversationId);
+        }
+      } catch (e) {
+        console.warn('[Sync] SessionKey backfill failed:', e);
+      }
+    }
+    
+    // Merge known IDs with discovered IDs + backfill, deduplicate
+    const allIds = [...new Set([...conversationIds, ...hiddenIds, ...backfillIds])];
+    
+    if (allIds.length === 0) return res.json([]);
 
     const conversations = await prisma.conversation.findMany({
       where: {
-        id: { in: conversationIds }
+        id: { in: allIds }
       },
       orderBy: { lastMessageAt: 'desc' }
     })
@@ -119,6 +156,16 @@ router.post('/', zodValidate({
 
     // PUSH creation event to userIds passed in the body
     await emitEventToUsers(allUserIds.filter(uid => uid !== creatorId), 'conversation:new', safeConversation);
+    
+    // Register discovery records for offline recipients
+    for (const uid of allUserIds.filter(uid => uid !== creatorId)) {
+        prisma.userHiddenConversation.upsert({
+            where: { userId_conversationId: { userId: uid, conversationId: newConversation.id } },
+            create: { userId: uid, conversationId: newConversation.id },
+            update: {}
+        }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
+    }
+    
     res.status(201).json({ ...safeConversation, unreadCount: 0 })
   } catch (error) {
     next(error)
@@ -226,13 +273,6 @@ router.delete('/:id', async (req, res, next) => {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
     const { id } = req.params
     const userId = req.user.id
-    
-    // We just hide it for this user on the server (if they use the hidden sync feature)
-    await prisma.userHiddenConversation.upsert({
-        where: { userId_conversationId: { userId, conversationId: id } },
-        create: { userId, conversationId: id },
-        update: {}
-    });
     
     await emitEventToUser(userId, 'conversation:deleted', { id: asConversationId(id) });
     res.status(204).send()

@@ -85,6 +85,39 @@ function enrichMessagesWithSenderProfile(conversationId: string, messages: Messa
 }
 
 /**
+ * Reconstruct 1-1 conversation participants from message sender info.
+ * Used in Opaque Mailbox when the server doesn't store participant lists.
+ * Safe to call even if participants already exist (guarded by length check).
+ */
+function reconstructDirectParticipants(conversationId: string, messages: Message[]): void {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || messages.length === 0) return;
+
+    const firstMsgWithSender = messages.find(m => m.senderId && m.senderId !== currentUser.id);
+    if (!firstMsgWithSender) return;
+
+    const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
+    if (!conv || conv.isGroup || conv.participants.length > 0) return;
+
+    const cachedProfiles = useProfileStore.getState().profiles;
+    const profileKey = Object.keys(cachedProfiles).find(k => k.startsWith(firstMsgWithSender.senderId));
+    const peerProfile = profileKey ? cachedProfiles[profileKey] : null;
+    const peerEncryptedProfile = (firstMsgWithSender.sender as any)?.encryptedProfile;
+
+    useConversationStore.getState().addOrUpdateConversation({
+    ...conv,
+    participants: [
+      { id: currentUser.id },
+      {
+        id: firstMsgWithSender.senderId,
+        name: peerProfile?.name || '',
+        encryptedProfile: peerEncryptedProfile
+      }
+    ] as any
+  });
+}
+
+/**
  * Logika Dekripsi Terpusat (Single Source of Truth)
  * Menangani dekripsi teks biasa DAN kunci file.
  */
@@ -2389,6 +2422,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         const uniqueMessages = Array.from(uniqueMessagesMap.values());
 
         const allMessages = processMessagesAndReactions(uniqueMessages, []);
+
+        // Opaque Mailbox: reconstruct 1-1 participants from first valid message's senderId
+        reconstructDirectParticipants(id, allMessages);
+
         const enrichedMessages = enrichMessagesWithSenderProfile(id, allMessages);
 
         // ✅ 3. AWAIT PENYIMPANAN LOKAL DULU (PENTING!)
@@ -2463,7 +2500,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       // PAGINATION LOKAL: Server sudah tidak punya pesan lama kita (karena dihapus saat dibaca), 
       // jadi kita gulir ke atas murni mengambil dari Shadow Vault (IndexedDB).
       const localMessages = await shadowVault.getMessagesByConversation(conversationId, 50, oldestMessage.createdAt);
-      
+
+      // Opaque Mailbox: reconstruct 1-1 participants from first valid message's senderId
+      reconstructDirectParticipants(conversationId, localMessages);
+
       set(state => {
         const existingMessages = state.messages[conversationId] || [];
         
@@ -2511,6 +2551,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
       // untuk mengambil pesan berdasarkan rentang waktu targetMessage.createdAt)
       // Untuk amannya, kita muat porsi yang mencukupi dari memori lokal:
       const localMessages = await shadowVault.getMessagesByConversation(convoId, 100);
+
+      // Opaque Mailbox: reconstruct 1-1 participants from first valid message's senderId
+      reconstructDirectParticipants(convoId, localMessages);
 
       // 3. Proses dan tampilkan ke UI secara instan
       set(state => {
@@ -2593,26 +2636,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
 
       // Opaque Mailbox: reconstruct conversation participants if empty,
       // so the peer's name is resolvable and outbound messages have valid targetRecipients
-      if (currentUser && decryptedMsg.senderId && decryptedMsg.senderId !== currentUser.id) {
-          const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
-          if (conv && !conv.isGroup && conv.participants.length === 0) {
-              const cachedProfiles = useProfileStore.getState().profiles;
-              const profileKey = Object.keys(cachedProfiles).find(k => k.startsWith(decryptedMsg.senderId));
-              const peerProfile = profileKey ? cachedProfiles[profileKey] : null;
-              const peerEncryptedProfile = (decryptedMsg.sender as any)?.encryptedProfile;
-              useConversationStore.getState().addOrUpdateConversation({
-                  ...conv,
-                  participants: [
-                      { id: currentUser.id },
-                      {
-                          id: decryptedMsg.senderId,
-                          name: peerProfile?.name || '',
-                          encryptedProfile: peerEncryptedProfile
-                      }
-                  ] as any
-              });
-          }
-      }
+      reconstructDirectParticipants(conversationId, [decryptedMsg]);
 
       // Opaque Mailbox: reconstruct group participants from encrypted metadata if empty
       if (currentUser) {

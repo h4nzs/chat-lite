@@ -51,6 +51,11 @@ export const usePresenceStore = create<State>((set) => ({
                 }
                 console.log(`[Offline Sync] User ${userId} came online. Retrying decryptions for ${cid}...`);
                 messageStore.reDecryptPendingMessages(cid);
+                
+                // Also try to fetch fresh messages from server for this conversation
+                messageStore.loadMessagesForConversation(cid).catch(e => 
+                    console.warn(`[Offline Sync] Failed to fetch messages for ${cid}`, e)
+                );
             });
         });
     });

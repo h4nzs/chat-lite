@@ -261,7 +261,7 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
     const [newMessageRaw] = await prisma.$transaction([
       prisma.message.create({
         data: {
-            conversationId, senderId: null, content, sessionId: sessionId || null,
+            conversationId, senderId: conversation.isGroup ? userId : null, content, sessionId: sessionId || null,
             repliedToId: repliedToId || null, expiresAt: expiresAt ? new Date(expiresAt) : null, 
             isViewOnce: isViewOnce === true,
             deleteSecret
@@ -281,7 +281,6 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
     if (msgId) await sendAck(userId, deviceId, msgId, { ok: true, msg: safeMessage });
 
     // Relay to target recipients explicitly passed by the sender (Opaque Mailbox routing)
-    const targetRecipients = (validatedPayload as any).targetRecipients || [];
     if (Array.isArray(targetRecipients)) {
         if (targetRecipients.length > 500) {
             console.warn('[Security] User', sanitizeForLog(userId), 'attempted to send message to', targetRecipients.length, 'recipients (max 500)');
@@ -297,6 +296,14 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
                         type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
                         data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
                     }).catch(console.error);
+
+                    // Register this conversation for the target recipient so they can discover it later
+                    // (Critical for new users who have never synced this conversation before)
+                    prisma.userHiddenConversation.upsert({
+                        where: { userId_conversationId: { userId: targetId, conversationId } },
+                        create: { userId: targetId, conversationId },
+                        update: {} // No-op if already exists
+                    }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
                 }
             }
         }
@@ -432,7 +439,7 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
                  data: {
                      id: `msg_sys_key_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                      conversationId,
-                     senderId: null,
+                     senderId: userId, // Store actual sender for group key routing
                      type: 'SYSTEM',
                      content: JSON.stringify(emitPayload),
                      isViewOnce: false,

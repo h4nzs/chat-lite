@@ -183,12 +183,22 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       const localConversations = await shadowVault.getAllConversations();
       const localIds = localConversations.map(c => c.id);
 
-      // 2. Sync with server by local IDs
+      // 2. Sync with server by local IDs (or discover new conversations for fresh users)
       let rawConversations: Conversation[] = [];
       if (localIds.length > 0) {
         rawConversations = await api<Conversation[]>(`/api/conversations/sync?ids=${localIds.join(',')}`);
+      } else {
+        // New user with no local conversations — discover from UserHiddenConversation
+        rawConversations = await api<Conversation[]>('/api/conversations/sync');
       }
       if (!Array.isArray(rawConversations)) throw new Error('Invalid data from server.');
+
+      // If server returned discovered conversations, persist them locally
+      if (localIds.length === 0 && rawConversations.length > 0) {
+        for (const conv of rawConversations) {
+          await shadowVault.saveConversation({ ...conv, participants: [] } as any);
+        }
+      }
 
       // 3. Merge: server metadata + local participants
       const serverMap = new Map(rawConversations.map(c => [c.id, c]));

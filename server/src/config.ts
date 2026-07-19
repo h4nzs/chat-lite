@@ -17,6 +17,11 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
   throw new Error('JWT_SECRET must be set to a secure value in production environment');
 }
 
+// Warn if CSRF_SECRET is not explicitly set (recommended for defense in depth)
+if (!process.env.CSRF_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️  CSRF_SECRET not set. Falling back to JWT_SECRET for CSRF protection. For better security isolation, set CSRF_SECRET to an independent random value.');
+}
+
 export const env = {
   port: parseInt(process.env.PORT || '4000', 10),
   corsOrigin: (process.env.CORS_ORIGIN || 'https://app.nyx-app.my.id')
@@ -32,6 +37,12 @@ export const env = {
       throw new Error('JWT_SECRET is required in production environment')
     }
     return 'dev-secret'
+  })(),
+  csrfSecret: process.env.CSRF_SECRET || process.env.JWT_SECRET || (() => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CSRF_SECRET is required in production environment')
+    }
+    return 'dev-csrf-secret'
   })(),
   uploadDir: process.env.UPLOAD_DIR || 'uploads',
   nodeEnv: process.env.NODE_ENV || 'development',

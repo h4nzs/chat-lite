@@ -96,20 +96,22 @@ router.delete('/:jti', requireAuth, async (req, res, next) => {
       throw new ApiError(404, 'Session not found or unauthorized')
     }
 
-    // Mark as revoked in DB
-    await prisma.refreshToken.update({
-      where: { id: token.id },
+    // Revoke ALL tokens in this family (prevents reuse of rotated tokens)
+    await prisma.refreshToken.updateMany({
+      where: { familyId: token.familyId, revokedAt: null },
       data: { revokedAt: new Date() }
-    })
+    });
 
-    // Add to Redis blacklist (jti based)
-    const expiresIn = Math.floor((new Date(token.expiresAt).getTime() - Date.now()) / 1000)
-    try {
+    // Add all JTIs in this family to Redis blacklist
+    const familyTokens = await prisma.refreshToken.findMany({
+      where: { familyId: token.familyId },
+      select: { jti: true, expiresAt: true }
+    });
+    for (const ft of familyTokens) {
+      const expiresIn = Math.floor((new Date(ft.expiresAt).getTime() - Date.now()) / 1000);
       if (expiresIn > 0) {
-        await redisClient.setEx(`revoked_jti:${String(jti)}`, expiresIn, '1')
+        await redisClient.setEx(`revoked_jti:${ft.jti}`, expiresIn, '1').catch(() => {});
       }
-    } catch (err) {
-      console.error("[Session] Failed to set revoked flag in Redis:", err)
     }
 
     try {

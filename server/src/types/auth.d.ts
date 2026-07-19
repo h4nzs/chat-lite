@@ -4,6 +4,7 @@ export interface AuthPayload {
   id: string;
   role?: string;
   deviceId?: string;
+  jti?: string; // JWT ID — used for Redis blacklist checks
 }
 
 export type AuthJwtPayload = AuthPayload;

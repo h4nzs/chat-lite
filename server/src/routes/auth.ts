@@ -67,10 +67,11 @@ function setAuthCookies (res: Response, { access, refresh }: { access: string; r
   res.cookie('rt', refresh, { ...cookieOptions, maxAge: 1000 * 60 * 60 * 24 * 30 })
 }
 
-async function issueTokens (user: { id: string, role?: string }, deviceId: string, req: Request) {
-  const access = signAccessToken({ id: user.id, role: user.role, deviceId })
-  const jti = newJti()
-  const refresh = signAccessToken({ sub: user.id, jti, deviceId }, { expiresIn: '30d' })
+async function issueTokens (user: { id: string, role?: string }, deviceId: string, req: Request, familyId?: string) {
+  const accessJti = newJti()
+  const access = signAccessToken({ id: user.id, role: user.role, deviceId, jti: accessJti })
+  const refreshJti = newJti()
+  const refresh = signAccessToken({ sub: user.id, jti: refreshJti, deviceId }, { expiresIn: '30d' })
 
   const rawIp = req.ip || '';
   const sodium = await getSodium();
@@ -94,8 +95,11 @@ async function issueTokens (user: { id: string, role?: string }, deviceId: strin
         console.log(`[Migration] Bypassing session revocation for user ${user.id} due to active migration flag.`);
     }
 
+    // Generate familyId for token rotation tracking (reuse detection)
+    const tokenFamilyId = familyId || crypto.randomUUID();
+
     await prisma.refreshToken.create({
-      data: { jti, deviceId, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
+      data: { jti: refreshJti, deviceId, familyId: tokenFamilyId, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
     })
 
     // Store active device in Redis for instant WebTransport validation (Lapis 1 Security)
@@ -106,7 +110,7 @@ async function issueTokens (user: { id: string, role?: string }, deviceId: strin
     }
   }
   
-  return { access, refresh }
+  return { access, refresh, familyId: familyId || crypto.randomUUID() }
 }
 
 async function verifyTurnstileToken (token: string): Promise<boolean> {
@@ -410,22 +414,99 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } })
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    if (!stored) {
+      // Token doesn't exist in DB at all — either never existed or was fully deleted.
+      // Clear cookies and require re-login.
       const isProd = env.nodeEnv === 'production'
       res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
       res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-      throw new ApiError(401, 'Refresh token expired/revoked')
+      throw new ApiError(401, 'Refresh token not found. Please login again.');
+    }
+
+    // --- REUSE DETECTION ---
+    // If token is already revoked, replaced, or expired → this is a REUSE ATTACK!
+    if (stored.revokedAt || stored.replacedById || stored.expiresAt < new Date()) {
+      console.warn(`[Security] Refresh token reuse detected! JTI: ${payload.jti}, Family: ${stored.familyId}, User: ${payload.sub}`);
+      
+      // Revoke ALL tokens in this family (compromise containment)
+      await prisma.refreshToken.updateMany({
+        where: { familyId: stored.familyId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      });
+
+      // Add all JTIs in this family to Redis blacklist
+      const familyTokens = await prisma.refreshToken.findMany({
+        where: { familyId: stored.familyId },
+        select: { jti: true, expiresAt: true }
+      });
+      for (const ft of familyTokens) {
+        const expiresIn = Math.floor((new Date(ft.expiresAt).getTime() - Date.now()) / 1000);
+        if (expiresIn > 0) {
+          await redisClient.setEx(`revoked_jti:${ft.jti}`, expiresIn, '1').catch(() => {});
+        }
+      }
+
+      // Clear cookies
+      const isProd = env.nodeEnv === 'production'
+      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+
+      // Alert the user via their active WebSocket connection
+      try {
+        const { emitEventToUser } = await import('../network/redisBridge.js');
+        await emitEventToUser(payload.sub, 'force_logout', { reason: 'session_hijacked', message: 'Your session was compromised. Please login again.' });
+      } catch (_e) {}
+
+      throw new ApiError(401, 'Refresh token reuse detected. All sessions in this family have been revoked for security.');
+    }
+
+    if (stored.expiresAt < new Date()) {
+      const isProd = env.nodeEnv === 'production'
+      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      throw new ApiError(401, 'Refresh token expired')
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.sub } })
     if (!user) throw new ApiError(401, 'User not found')
     if (user.bannedAt) throw new ApiError(403, `ACCESS DENIED: ${user.banReason || 'Account suspended'}`)
 
-    await prisma.refreshToken.deleteMany({ where: { jti: payload.jti } });
+    // --- PROPER ROTATION WITH FAMILY CHAIN ---
+    // 1. Mark old token as replaced (don't delete — keep for reuse detection)
+    const newJtiValue = newJti();
+    await prisma.refreshToken.update({
+      where: { jti: payload.jti },
+      data: { revokedAt: new Date() }
+    });
 
-    const tokens = await issueTokens(user, stored.deviceId, req)
-    setAuthCookies(res, tokens)
-    res.json({ ok: true, accessToken: tokens.access })
+    const rawIp = req.ip || '';
+    const sodium = await getSodium();
+    const ipAddress = sodium.to_hex(sodium.crypto_generichash(32, Buffer.from(rawIp), null)).substring(0, 16);
+    const userAgent = req.headers['user-agent'];
+
+    // 2. Create new token linked to the old one via replacedById chain
+    const access = signAccessToken({ id: user.id, role: user.role, deviceId: stored.deviceId, jti: newJti() });
+    const refresh = signAccessToken({ sub: user.id, jti: newJtiValue, deviceId: stored.deviceId }, { expiresIn: '30d' });
+
+    await prisma.refreshToken.create({
+      data: {
+        jti: newJtiValue,
+        familyId: stored.familyId,
+        deviceId: stored.deviceId,
+        expiresAt: refreshExpiryDate(),
+        ipAddress,
+        userAgent,
+        replacedById: stored.id // Link to the previous token in the chain
+      }
+    });
+
+    // Update Redis active device
+    try {
+      await redisClient.setEx(`active_device:${user.id}`, 86400 * 30, stored.deviceId);
+    } catch (_e) {}
+
+    setAuthCookies(res, { access, refresh });
+    res.json({ ok: true, accessToken: access });
   } catch (e) {
     next(e)
   }
@@ -528,7 +609,25 @@ router.post('/logout-all', requireAuth, async (req, res, next) => {
     const userDevices = await prisma.device.findMany({ where: { userId: req.user.id }, select: { id: true } });
     const deviceIds = userDevices.map(d => d.id);
     
-    await prisma.refreshToken.deleteMany({ where: { deviceId: { in: deviceIds } } });
+    // Fetch active tokens BEFORE updating them (for Redis blacklist)
+    const tokensToRevoke = await prisma.refreshToken.findMany({
+      where: { deviceId: { in: deviceIds }, revokedAt: null },
+      select: { jti: true, expiresAt: true }
+    });
+    
+    // Use updateMany to set revokedAt instead of deleteMany to preserve audit trail
+    const updated = await prisma.refreshToken.updateMany({
+      where: { deviceId: { in: deviceIds }, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+
+    // Blacklist all revoked tokens in Redis
+    for (const t of tokensToRevoke) {
+      const expiresIn = Math.floor((new Date(t.expiresAt).getTime() - Date.now()) / 1000);
+      if (expiresIn > 0) {
+        await redisClient.setEx(`revoked_jti:${t.jti}`, expiresIn, '1').catch(() => {});
+      }
+    }
     
     const isProd = env.nodeEnv === 'production'
     res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
@@ -539,7 +638,7 @@ router.post('/logout-all', requireAuth, async (req, res, next) => {
       await redisClient.del(`active_device:${req.user.id}`);
     } catch (_re) {}
 
-    res.json({ message: "All sessions terminated." });
+    res.json({ message: `All ${updated.count} sessions terminated.` });
   } catch (e) { next(e); }
 });
 
@@ -551,7 +650,31 @@ router.post('/logout', async (req, res) => {
   try {
     const payload = verifyJwt(String(req.cookies?.rt || '')) as { jti?: string; sub?: string };
     if (payload && typeof payload === 'object' && 'jti' in payload && typeof payload.jti === 'string') {
-      await prisma.refreshToken.updateMany({ where: { jti: payload.jti }, data: { revokedAt: new Date() } })
+      // Find the token to get its familyId
+      const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
+      
+      if (stored) {
+        // Revoke ALL tokens in this family (logout all sessions from this device chain)
+        await prisma.refreshToken.updateMany({
+          where: { familyId: stored.familyId, revokedAt: null },
+          data: { revokedAt: new Date() }
+        });
+
+        // Blacklist all JTIs in Redis
+        const familyTokens = await prisma.refreshToken.findMany({
+          where: { familyId: stored.familyId },
+          select: { jti: true, expiresAt: true }
+        });
+        for (const ft of familyTokens) {
+          const expiresIn = Math.floor((new Date(ft.expiresAt).getTime() - Date.now()) / 1000);
+          if (expiresIn > 0) {
+            await redisClient.setEx(`revoked_jti:${ft.jti}`, expiresIn, '1').catch(() => {});
+          }
+        }
+      } else {
+        // Fallback: revoke just this JTI
+        await prisma.refreshToken.updateMany({ where: { jti: payload.jti }, data: { revokedAt: new Date() } });
+      }
       
       // Clear active device cache if we have the user ID
       if (payload.sub) {

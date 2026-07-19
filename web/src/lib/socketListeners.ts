@@ -12,11 +12,44 @@ import { RawServerMessageSchema, type RawServerMessage, type Message, type Parti
 
 let isInitialized = false;
 
+// Module-level state for offline sync (lives across reconnects)
+let syncCompleted = false;
+let unsubConversation: (() => void) | null = null;
+
+// Shared sync function — accessible from both connect handler and subscription
+async function doSyncMessages() {
+  if (syncCompleted) return;
+  try {
+    const conversations = useConversationStore.getState().conversations;
+    if (conversations.length === 0) return;
+
+    syncCompleted = true;
+    const messageStore = useMessageStore.getState();
+    let syncedCount = 0;
+    for (const conv of conversations) {
+      if (conv.id.startsWith('burner_')) continue;
+      if (conv.isGroup && !conv.decryptedMetadata) continue;
+      await messageStore.loadMessagesForConversation(conv.id);
+      syncedCount++;
+    }
+    console.log(`[Offline Sync] Fetched pending messages for ${syncedCount} conversations`);
+  } catch (e) {
+    console.error('[Offline Sync] Failed to sync messages on connect:', e);
+  }
+}
+
 export function initSocketListeners() {
   if (isInitialized) return;
   isInitialized = true;
 
   console.log('[Socket] Initializing listeners...');
+
+  // Register Zustand subscription ONCE (no leak on reconnect)
+  unsubConversation = useConversationStore.subscribe((state, prevState) => {
+    if (!syncCompleted && state.conversations.length > 0 && prevState.conversations.length === 0) {
+      doSyncMessages();
+    }
+  });
 
   transportClient.on('connect', () => {
     Sentry.addBreadcrumb({ category: 'socket', message: 'Connected', level: 'info' });
@@ -25,6 +58,28 @@ export function initSocketListeners() {
     
     // User is active by default on connect
     transportClient.sendEvent('user:active');
+
+    // Offline Sync: fetch pending messages for all active conversations
+    // Reset sync flag on each connect so new messages are fetched
+    syncCompleted = false;
+
+    // Uses polling + Zustand subscription for reliable init regardless of load order
+    let syncAttempts = 0;
+    const maxSyncAttempts = 8;
+    const pollSyncMessages = async () => {
+      if (syncCompleted) return;
+      const conversations = useConversationStore.getState().conversations;
+      if (conversations.length === 0) {
+        if (syncAttempts < maxSyncAttempts) {
+          syncAttempts++;
+          setTimeout(pollSyncMessages, 500);
+        }
+        return;
+      }
+      await doSyncMessages();
+    };
+    // Polling fallback: start after a short delay
+    setTimeout(pollSyncMessages, 300);
   });
 
   transportClient.on('disconnect', (reason) => {

@@ -19,6 +19,7 @@ web/dist
 **/.env.local
 **/*/.env
 .env.local
+ca.pem
 
 /generated/prisma
 server/uploads/

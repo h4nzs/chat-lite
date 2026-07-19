@@ -4,6 +4,7 @@ import { requireTenantAuth } from '../middleware/tenantAuth.js';
 import { hashPassword } from '../utils/password.js';
 import { signAccessToken, newJti, refreshExpiryDate } from '../utils/jwt.js';
 import crypto from 'crypto';
+import { randomUUID } from 'crypto';
 import { env } from '../config.js';
 import { getSodium } from '../lib/sodium.js';
 import { Buffer } from 'buffer';
@@ -34,8 +35,9 @@ async function issueIframeTokens(user: { id: string; role?: string }, req: Reque
     });
   }
 
-  const access = signAccessToken({ id: user.id, role: user.role, deviceId: device.id });
-  const jti = newJti();
+  const accessJti = newJti();
+  const access = signAccessToken({ id: user.id, role: user.role, deviceId: device.id, jti: accessJti });
+  const refreshJti = newJti();
   
   const rawIp = req.ip || '';
   const sodium = await getSodium();
@@ -43,7 +45,7 @@ async function issueIframeTokens(user: { id: string; role?: string }, req: Reque
   const userAgent = req.headers['user-agent'] || 'B2B Iframe';
 
   await prisma.refreshToken.create({
-    data: { jti, deviceId: device.id, expiresAt: refreshExpiryDate(), ipAddress, userAgent }
+    data: { jti: refreshJti, deviceId: device.id, familyId: randomUUID(), expiresAt: refreshExpiryDate(), ipAddress, userAgent }
   });
 
   return access;
