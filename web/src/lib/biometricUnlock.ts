@@ -1,3 +1,4 @@
+import { isPlainObject } from '@utils/typeGuards';
 import { 
   startAuthentication, 
   startRegistration, 
@@ -156,7 +157,7 @@ export async function unlockWithBiometric(
 
   if (vaultStr) {
       try {
-          const vault = JSON.parse(vaultStr) as { ciphertext: string, iv: string };
+          const _parsed = JSON.parse(vaultStr); if (!isPlainObject(_parsed) || typeof _parsed.ciphertext !== 'string' || typeof _parsed.iv !== 'string') throw new Error('Invalid vault data'); const vault = { ciphertext: _parsed.ciphertext, iv: _parsed.iv };
           const extensionResults = asseResp.clientExtensionResults as PRFClientExtensionResults;
           const keyBuffer = extensionResults.prf?.results?.first;
           

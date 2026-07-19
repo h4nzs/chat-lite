@@ -45,20 +45,20 @@ export const useMessageSearchStore = createWithEqualityFn<State>((set, get) => (
         .sortBy('createdAt');
         
       // 2. In-memory lightning decryption & filtering
-      const decryptedResults = [];
+      const decryptedResults: Message[] = [];
       for (const msg of rawResults) {
         if (msg.isViewOnce || msg.isDeletedLocal || !msg.content) continue; // Skip phantom media and tombstones
         
         const plainText = await decryptVaultText(msg.content);
         if (plainText && plainText.toLowerCase().includes(normalizedQuery)) {
           // Reconstruct the message object with the decrypted text for the UI
-          decryptedResults.push({ ...msg, content: plainText });
+          decryptedResults.push({ ...msg, content: plainText } as Message);
         }
       }
         
       // ONLY update if the query hasn't changed while we were decrypting
       if (get().currentSearchToken === token) {
-        set({ searchResults: decryptedResults as unknown as Message[], isSearching: false });
+        set({ searchResults: decryptedResults, isSearching: false });
       }
     } catch (error) {
       console.error("Iron Vault Search failed:", error);

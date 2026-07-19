@@ -19,7 +19,7 @@ export async function encryptBlob(blob: Blob): Promise<{ encryptedBlob: Blob; sy
   const symmetricKey = sodium.to_base64(symmetricKeyBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
   const nonce = sodium.to_base64(nonceBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
 
-  const encryptedBlob = new Blob([ciphertext as unknown as BlobPart], { type: 'application/octet-stream' });
+  const encryptedBlob = new Blob([ciphertext as BlobPart], { type: 'application/octet-stream' });
 
   // Clean up key from memory
   sodium.memzero(symmetricKeyBytes);
@@ -47,7 +47,7 @@ export async function decryptBlob(encryptedBlob: Blob, symmetricKey: string, non
     symmetricKeyBytes
   );
 
-  const decryptedBlob = new Blob([plaintext as unknown as BlobPart]);
+  const decryptedBlob = new Blob([plaintext as BlobPart]);
 
   // Clean up key from memory
   sodium.memzero(symmetricKeyBytes);

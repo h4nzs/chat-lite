@@ -5,8 +5,8 @@ import { Spinner } from './Spinner';
 import { useTranslation } from 'react-i18next';
 
 const QRCode = (
-  (QRCodeRaw as unknown as { default?: { default?: typeof QRCodeRaw } }).default?.default ||
-  (QRCodeRaw as unknown as { default?: typeof QRCodeRaw }).default ||
+  (QRCodeRaw as { default?: { default?: typeof QRCodeRaw } }).default?.default ||
+  (QRCodeRaw as { default?: typeof QRCodeRaw }).default ||
   QRCodeRaw
 ) as typeof QRCodeRaw;
 

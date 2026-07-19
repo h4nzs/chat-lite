@@ -285,7 +285,7 @@ const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   },
   size: 64,
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
-  getCsrfTokenFromRequest: (req) => req.headers["csrf-token"] as string,
+  getCsrfTokenFromRequest: (req) => String(req.headers['csrf-token'] ?? ''),
 });
 
 app.use((req, res, next) => {
@@ -328,7 +328,7 @@ app.use("/api", (req, _res, next) => {
   Sentry.setTag('route', req.path);
   Sentry.setTag('method', req.method);
   // Tag with user ID if authenticated
-  const userId = (req as any).user?.id;
+  const userId = req.user?.id;
   if (userId) {
     Sentry.setUser({ id: userId });
   }

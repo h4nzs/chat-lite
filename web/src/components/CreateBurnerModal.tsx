@@ -58,6 +58,8 @@ export default function CreateBurnerModal({ onClose }: Props) {
              unreadCount: 0,
              createdAt: new Date().toISOString(),
              updatedAt: new Date().toISOString(),
+             lastMessage: null,
+             encryptionMode: 'SENDER_KEY' as const,
              encryptedMetadata: "BURNER_CHAT"
            } as unknown as import('@nyx/shared').ConversationUi);
         }

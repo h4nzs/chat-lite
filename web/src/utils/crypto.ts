@@ -136,7 +136,7 @@ export async function decryptGroupMetadata(
     
     if (result.status === 'success') {
       try {
-        let text = result.value as string;
+        let text = String(result.value);
         // Unwrap Sealed Sender wrapper if present
         if (text.startsWith('{') && text.includes('"senderId"')) {
            try {
@@ -1750,7 +1750,7 @@ export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promi
                         const serverConv: any = await authFetch(`/api/conversations/${conversationId}`);
                         if (serverConv?.encryptedMetadata) {
                             await useConversationStore.getState().updateConversation(conversationId, {
-                                encryptedMetadata: serverConv.encryptedMetadata as string
+                                encryptedMetadata: serverConv.encryptedMetadata
                             });
                             metadataDecrypted = useConversationStore.getState().conversations.find(c => c.id === conversationId)?.decryptedMetadata ? true : false;
                         }

@@ -8,6 +8,7 @@ import { zodValidate } from '../utils/validate.js'
 import { emitEventToUsers, emitEventToConversation, emitEventToUser } from '../network/redisBridge.js'
 import { redisClient } from '../lib/redis.js'
 import { hoistConvoKeys, toConversation, asConversationId, asUserId, userSelectWithKeys, type RawConversationData } from '../utils/mappers.js'
+import type { Conversation } from '@nyx/shared'
 
 const ConversationSchema = z.object({
   id: z.string().optional(),
@@ -24,7 +25,7 @@ router.get('/sync', async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
     
-    const ids = req.query.ids as string;
+    const ids = String(req.query.ids ?? '');
     let conversationIds: string[] = ids ? ids.split(',') : [];
 
     // Discover conversations from UserHiddenConversation records
@@ -72,7 +73,7 @@ router.get('/sync', async (req, res, next) => {
     })
 
     const safeConversations = conversations.map(c => {
-       const conv = toConversation(hoistConvoKeys(c as unknown as RawConversationData));
+       const conv = toConversation(hoistConvoKeys(c as RawConversationData));
        conv.participants = []; // Participants are stored locally in Opaque Mailbox
        return conv;
     });
@@ -150,7 +151,7 @@ router.post('/', zodValidate({
       throw dbError;
     }
 
-    const safeConversation = toConversation(hoistConvoKeys(newConversation as unknown as RawConversationData)) as any;
+    const safeConversation = toConversation(hoistConvoKeys(newConversation as RawConversationData)) as Conversation;
     safeConversation.participants = []; 
     safeConversation.authSecret = authSecret; // Sharing with creator so they can put it in encryptedMetadata
 
@@ -181,7 +182,7 @@ router.get('/:id', async (req, res, next) => {
     })
 
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' })
-    const safeConversation = toConversation(hoistConvoKeys(conversation as unknown as RawConversationData));
+    const safeConversation = toConversation(hoistConvoKeys(conversation as RawConversationData));
     safeConversation.participants = [];
     res.json(safeConversation)
   } catch (error) {
@@ -197,7 +198,7 @@ router.put('/:id/details', async (req, res, next) => {
     const { encryptedMetadata } = req.body
     const groupToken = req.headers['x-group-token']
 
-    const conversation = await (prisma.conversation as any).findUnique({ where: { id }, select: { authSecret: true } }) as { authSecret: string | null } | null;
+    const conversation = await prisma.conversation.findUnique({ where: { id }, select: { authSecret: true } }) as { authSecret: string | null } | null;
     if (!conversation || conversation.authSecret !== groupToken) {
         return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
     }
@@ -218,13 +219,11 @@ router.post('/:id/participants', async (req, res, next) => {
   const { userIds } = req.body;
   const groupToken = req.headers['x-group-token'];
 
-  const conversation = await (prisma.conversation as any).findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
   if (!groupToken || conversation.authSecret !== groupToken) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
-  }
-
-  const safeConv = toConversation(hoistConvoKeys(conversation as unknown as RawConversationData));
+  }    const safeConv = toConversation(hoistConvoKeys(conversation as unknown as RawConversationData));
   safeConv.participants = [];
   
   for (const uid of userIds) {
@@ -239,7 +238,7 @@ router.delete('/:id/participants/:userId', async (req, res, next) => {
   const { id: conversationId, userId } = req.params;
   const groupToken = req.headers['x-group-token'];
 
-  const conversation = await (prisma.conversation as any).findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
   if (!groupToken || conversation.authSecret !== groupToken) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
@@ -256,7 +255,7 @@ router.delete('/:id/leave', async (req, res, next) => {
   const userId = req.user!.id;
   const groupToken = req.headers['x-group-token'];
 
-  const conversation = await (prisma.conversation as any).findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
   if (!groupToken || conversation.authSecret !== groupToken) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
@@ -297,7 +296,7 @@ router.post('/:id/key-rotation', async (req, res, next) => {
       data: { updatedAt: new Date() }
     })
 
-    const safeConv = toConversation(hoistConvoKeys(updatedConversation as unknown as RawConversationData));
+    const safeConv = toConversation(hoistConvoKeys(updatedConversation as RawConversationData));
     safeConv.participants = [];
     res.json({ 
         success: true, 

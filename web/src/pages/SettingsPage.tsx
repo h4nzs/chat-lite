@@ -189,7 +189,7 @@ export default function SettingsPage() {
         
         Object.values(messagesMap).flat().forEach((msg: Record<string, unknown>) => {
             if (msg.senderId === user?.id && msg.fileKey) {
-                fileKeys.push(msg.fileKey as string);
+                fileKeys.push(String(msg.fileKey));
             }
         });
 
@@ -409,7 +409,7 @@ export default function SettingsPage() {
 
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const json = event.target?.result as string;
+      const json = String(event.target?.result);
       try {
          const parsed = JSON.parse(json);
          if (parsed.encrypted) {

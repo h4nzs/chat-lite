@@ -7,7 +7,9 @@ import { useMessageStore, decryptMessageObject } from "./message";
 import { transportClient, emitSessionKeyRequest, fireGhostSync, emitGroupKeyDistribution, emitMetadataUpdated } from '@lib/transportClient';
 import { useVerificationStore } from './verification';
 import { useAuthStore, User } from './auth';
+import { asConversationId, asMessageId } from '@nyx/shared';
 import type { ConversationId, UserId, MessageId, MessageStatus, RawServerMessage, Message, Participant, ConversationUi as Conversation } from '@nyx/shared';
+import { asUserId } from '@nyx/shared';
 // Removed all crypto imports
 import toast from 'react-hot-toast';
 
@@ -159,12 +161,12 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   loadConversations: async () => {
     if (sessionStorage.getItem('nyx_decoy_mode') === 'true') {
       const dummyConvo = {
-         id: 'decoy-1', isGroup: false, unreadCount: 0,
-         participants: [{ id: 'bot-1', username: 'system_bot', name: 'NYX Service' }],
+         id: asConversationId('decoy-1'), isGroup: false, unreadCount: 0,
+         participants: [{ id: asUserId('bot-1'), username: 'system_bot', name: 'NYX Service', role: 'MEMBER' as const }],          encryptionMode: 'SENDER_KEY' as const,
          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-         lastMessage: { id: 'msg-1', content: 'Welcome to NYX. No active chats found.', senderId: 'bot-1', createdAt: new Date().toISOString(), conversationId: 'decoy-1', type: 'SYSTEM' }
+         lastMessage: { id: asMessageId('msg-1'), content: 'Welcome to NYX. No active chats found.', senderId: asUserId('bot-1'), createdAt: new Date().toISOString(), conversationId: asConversationId('decoy-1'), type: 'SYSTEM' as const }
       };
-      set({ conversations: [dummyConvo as unknown as Conversation], loading: false, initialLoadCompleted: true });
+      set({ conversations: [dummyConvo as Conversation], loading: false, initialLoadCompleted: true });
       return;
     }
 
@@ -196,7 +198,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       // If server returned discovered conversations, persist them locally
       if (localIds.length === 0 && rawConversations.length > 0) {
         for (const conv of rawConversations) {
-          await shadowVault.saveConversation({ ...conv, participants: [] } as any);
+          await shadowVault.saveConversation({ ...conv, participants: [], encryptionMode: 'SENDER_KEY' as const } as Conversation);
         }
       }
 
@@ -269,7 +271,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                      // addOrUpdateConversation is called (which also caches). This handles the
                      // initial load path where metadata is decrypted but addOrUpdateConversation
                      // is not invoked.
-                     const metaParticipants = (decrypted as any).participants;
+                     const metaParticipants = (decrypted as { participants?: string[] }).participants;
                      if (Array.isArray(metaParticipants) && metaParticipants.length > 0) {
                          import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(c.id, metaParticipants));
                      }
@@ -395,8 +397,8 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
       
       // Opaque Mailbox: server returns empty participants, reconstruct locally
       conv.participants = [
-        { id: user.id as any, name: '', username: '' } as any,
-        { id: peerId as any, name: optimisticProfile?.name || '', username: optimisticProfile?.username || '' } as any
+        { id: asUserId(user.id), name: '', username: '', role: 'MEMBER' as const },
+        { id: asUserId(peerId), name: optimisticProfile?.name || '', username: optimisticProfile?.username || '', role: 'MEMBER' as const }
       ];
 
       get().addOrUpdateConversation({ ...conv, encryptionMode: 'SPQR' });
@@ -427,7 +429,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         const authSecret = createRes.authSecret;
 
         // Opaque Mailbox: server returns empty participants, reconstruct from userIds
-        const constructedParticipants = userIds.map(id => ({ id, name: '' })) as unknown as Participant[];
+        const constructedParticipants = userIds.map(id => ({ id, name: '', role: 'MEMBER' as const })) as Participant[];
         const distributionKeys = await ensureGroupSession(conv.id, constructedParticipants, true);
         if (distributionKeys && distributionKeys.length > 0) {
             await emitGroupKeyDistribution(conv.id, distributionKeys as { userId: string; key: string }[]);
@@ -439,7 +441,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         // for Opaque Mailbox, which meant targetRecipients was empty and ensureGroupSessionIfNeeded
         // couldn't distribute the member's sender key to the creator.
         const allParticipantIds = Array.from(new Set([user.id, ...userIds]));
-        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl, participants: allParticipantIds, authSecret } as any, conv.id);
+        const encryptedMetadata = await encryptGroupMetadata({ title: name, avatarUrl, participants: allParticipantIds, authSecret } as { title: string; avatarUrl?: string; participants: string[]; authSecret: string }, conv.id);
         
         await authFetch(`/api/conversations/${conv.id}/details`, {
             method: 'PUT',
@@ -458,7 +460,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         
         const updatedConv: Conversation = {
             ...conv,
-            participants: constructedParticipants as any,
+            participants: constructedParticipants as Participant[],
             decryptedMetadata: { title: name, avatarUrl, authSecret },
             encryptedMetadata
         };
@@ -494,27 +496,27 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
             decryptedMetadata = existing.decryptedMetadata;
             // Also forward participants from cached metadata to prevent overwrite with empty
             // (caller may pass conversation with empty participants in Opaque Mailbox)
-            const metaParticipants = (decryptedMetadata as any).participants;
+            const metaParticipants = (decryptedMetadata as { participants?: string[] }).participants;
             if (Array.isArray(metaParticipants) && metaParticipants.length > 0 &&
                 (!conversation.participants || conversation.participants.length === 0)) {
                 const currentUser = useAuthStore.getState().user;
                 conversation.participants = metaParticipants.map((pid: string) => ({
-                    id: pid, name: pid === currentUser?.id ? currentUser.name || '' : ''
-                })) as any;
+                    id: pid, name: pid === currentUser?.id ? currentUser.name || '' : '', role: 'MEMBER' as const
+                })) as Participant[];
             }
         } else {
             try {
-                const dec = await decryptGroupMetadata(conversation.encryptedMetadata as string, conversation.id);
+                const dec = await decryptGroupMetadata(String(conversation.encryptedMetadata), conversation.id);
                 if (dec) {
                     decryptedMetadata = dec;
                     // Opaque Mailbox: extract participants from encrypted metadata
-                    const metaParticipants = (dec as any).participants;
+                    const metaParticipants = (dec as { participants?: string[] }).participants;
                     if (Array.isArray(metaParticipants) && metaParticipants.length > 0 &&
                         (!conversation.participants || conversation.participants.length === 0)) {
                         const currentUser = useAuthStore.getState().user;
                         conversation.participants = metaParticipants.map((id: string) => ({
-                            id, name: id === currentUser?.id ? currentUser.name || '' : ''
-                        })) as any;
+                            id, name: id === currentUser?.id ? currentUser.name || '' : '', role: 'MEMBER' as const
+                        })) as Participant[];
                         // Persist to IndexedDB so non-creator members can send messages even before metadata is re-decrypted
                         import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(conversation.id, metaParticipants));
                     }
@@ -585,10 +587,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
          const existing = get().conversations.find(c => c.id === id);
          if (existing?.decryptedMetadata && existing.encryptedMetadata === data.encryptedMetadata) {
              decryptedMetadata = existing.decryptedMetadata;
-             if (Array.isArray((decryptedMetadata as any).participants) && (decryptedMetadata as any).participants.length > 0) {
-                 data.participants = (decryptedMetadata as any).participants.map((pid: string) => ({
-                     id: pid, name: pid === useAuthStore.getState().user?.id ? useAuthStore.getState().user?.name || '' : ''
-                 })) as any;
+             if (Array.isArray((decryptedMetadata as { participants?: string[] }).participants) && (decryptedMetadata as { participants?: string[] }).participants!.length > 0) {
+                 data.participants = (decryptedMetadata as { participants?: string[] }).participants!.map((pid: string) => ({
+                     id: asUserId(pid), name: pid === useAuthStore.getState().user?.id ? useAuthStore.getState().user?.name || '' : '', role: 'MEMBER' as const
+                 }));
              }
          } else {
          try {
@@ -596,12 +598,12 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
              if (dec) {
                  decryptedMetadata = dec;
                  // Opaque Mailbox: extract participants from decrypted metadata
-                 const metaParticipants = (dec as any).participants;
+                 const metaParticipants = (dec as { participants?: string[] }).participants;
                  if (Array.isArray(metaParticipants) && metaParticipants.length > 0) {
                      const currentUser = useAuthStore.getState().user;
                      data.participants = metaParticipants.map((pid: string) => ({
-                         id: pid, name: pid === currentUser?.id ? currentUser.name || '' : ''
-                     })) as any;
+                         id: asUserId(pid), name: pid === currentUser?.id ? currentUser.name || '' : '', role: 'MEMBER' as const
+                     }));
                      // Persist to IndexedDB cache for offline/early message sending
                      import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(id, metaParticipants));
                  }

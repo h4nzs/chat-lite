@@ -57,7 +57,7 @@ export default function Login() {
 
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const json = event.target?.result as string;
+      const json = String(event.target?.result);
       try {
           const parsed = JSON.parse(json);
           const performImport = async (password?: string) => {

@@ -155,7 +155,7 @@ export default function SessionManagerPage() {
              <div className="hidden md:block fixed right-4 top-0 bottom-0 w-2 bg-[repeating-linear-gradient(0deg,transparent,transparent_20px,rgba(0,0,0,0.1)_20px,rgba(0,0,0,0.1)_21px)]"></div>
 
             {sessions.map(session => {
-              const sessionProps = session as unknown as { userAgent: string, ipAddress: string, lastUsedAt: string | number | Date, jti: string, isCurrent?: boolean };
+              const sessionProps = session as { userAgent: string, ipAddress: string, lastUsedAt: string | number | Date, jti: string, isCurrent?: boolean };
               return (
               <SessionBlade
                 key={sessionProps.jti}

@@ -78,7 +78,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const cloakClass = privacyCloak ? "blur-[6px] opacity-70 group-hover:blur-none group-hover:opacity-100 group-active:blur-none group-active:opacity-100 transition-all duration-300 select-none" : "";
 
   const peerUser = !conversation.isGroup ? conversation.participants?.find((p) => p.id !== meId) : null;
-  const peerProfile = useUserProfile(peerUser as unknown as { id: string; encryptedProfile?: string | null });
+  const peerProfile = useUserProfile(peerUser as { id: string; encryptedProfile?: string | null });
   const title = conversation.isGroup 
     ? (conversation.decryptedMetadata?.title || t('common:defaults.group_unknown', 'Unknown Group'))
     : peerProfile.name;
@@ -106,14 +106,14 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
   const handleVoiceCall = async () => {
     if (peerUser) {
       const { startCall } = await import('@lib/webrtc');
-      startCall(peerUser.id, false, (user as unknown as MinimalProfile) || { id: user?.id || 'unknown' });
+      startCall(peerUser.id, false, (user as MinimalProfile) || { id: user?.id || 'unknown' });
     }
   };
 
   const handleVideoCall = async () => {
     if (peerUser) {
       const { startCall } = await import('@lib/webrtc');
-      startCall(peerUser.id, true, (user as unknown as MinimalProfile) || { id: user?.id || 'unknown' });
+      startCall(peerUser.id, true, (user as MinimalProfile) || { id: user?.id || 'unknown' });
     }
   };
 
@@ -249,7 +249,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const { t } = useTranslation(['chat', 'common']);
   const meId = useAuthStore((s) => s.user?.id);
   const { conversation, messages: rawMessages, isLoading, error, actions, isFetchingMore } = useConversation(id);
-  const messages = useMemo(() => rawMessages.filter(m => m.type !== 'SYSTEM' && (m.type as string) !== 'SYSTEM_KEY_REQUEST'), [rawMessages]);
+  const messages = useMemo(() => rawMessages.filter(m => m.type !== 'SYSTEM' && String(m.type) !== 'SYSTEM_KEY_REQUEST'), [rawMessages]);
   const { loadMessagesForConversation, selectedMessageIds, clearMessageSelection, removeMessages } = useMessageStore(useShallow(s => ({
       loadMessagesForConversation: s.loadMessagesForConversation,
       selectedMessageIds: s.selectedMessageIds,

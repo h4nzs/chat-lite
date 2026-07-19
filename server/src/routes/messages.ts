@@ -199,11 +199,11 @@ router.delete('/:id', async (req, res, next) => {
     if (!req.user) throw new ApiError(401, 'Authentication required.')
     const userId = req.user.id
     const messageId = req.params.id
-    const r2Key = req.query.r2Key as string | undefined
+    const r2Key = req.query.r2Key ? String(req.query.r2Key) : undefined
     const deleteToken = req.headers['x-delete-token']
 
     // OPAQUE MAILBOX: Blind authorization check
-    const message = await (prisma.message as any).findUnique({
+    const message = await prisma.message.findUnique({
         where: { id: messageId },
         select: { deleteSecret: true }
     }) as { deleteSecret: string | null } | null;

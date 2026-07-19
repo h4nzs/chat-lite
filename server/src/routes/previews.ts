@@ -25,7 +25,7 @@ router.post('/', requireAuth, async (req, res, _next) => {
 })
 
 router.get('/image', requireAuth, async (req, res, _next) => {
-  const targetUrl = req.query.url as string;
+  const targetUrl = String(req.query.url ?? '');
   if (!targetUrl) return res.status(400).json({ error: 'URL is required' });
 
   try {

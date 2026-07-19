@@ -895,7 +895,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         const theirIdentityKeyBytes = sodium.crypto_sign_ed25519_pk_to_curve25519(theirSigningKeyBytes);
 
         // Parse Binary Handshake
-        const { ephemeralPublicKey, ctId, ctSpk, ctOtpk } = deserializeHandshake(new Uint8Array(initiatorCiphertexts as unknown as ArrayBufferLike));
+        const { ephemeralPublicKey, ctId, ctSpk, ctOtpk } = deserializeHandshake(new Uint8Array(initiatorCiphertexts));
 
         let sharedSecret: Uint8Array | null = null;
 
@@ -1529,7 +1529,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         const theirIdentityKeyBytes = sodium.crypto_sign_ed25519_pk_to_curve25519(theirSigningKeyBytes);
 
         // Parse Binary Handshake
-        const { ephemeralPublicKey, ctId, ctSpk, ctOtpk } = deserializeHandshake(new Uint8Array(initiatorCiphertexts as unknown as ArrayBufferLike));
+        const { ephemeralPublicKey, ctId, ctSpk, ctOtpk } = deserializeHandshake(new Uint8Array(initiatorCiphertexts));
 
         let sharedSecret: Uint8Array | null = null;
 

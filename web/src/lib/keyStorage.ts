@@ -1,3 +1,4 @@
+import { isPlainObject } from '@utils/typeGuards';
 // web/src/lib/keyStorage.ts
 import { db } from './db';
 import { sha256, argon2id } from 'hash-wasm';
@@ -81,13 +82,11 @@ export const setPanicPassword = async (password: string) => {
     memorySize: 19456,
     parallelism: 1,
     hashLength: 32
-  };
-  
-  const hashHex = (await argon2id({
+  };    const hashHex = await argon2id({
     password,
     salt: saltBytes,
     ...params
-  })) as unknown as string;
+  });
   
   const hashBytes = hexToUint8Array(hashHex);
   const hash = arrayBufferToBase64(hashBytes);
@@ -112,15 +111,15 @@ export const checkPanicPassword = async (password: string): Promise<boolean> => 
       return hash === storedRecordStr;
     }
     
-    const record = JSON.parse(storedRecordStr);
+    const _parsedRec = JSON.parse(storedRecordStr); if (!isPlainObject(_parsedRec)) return false; const record = _parsedRec as { alg: string; salt: string; params: { iterations: number; memorySize: number; parallelism: number; hashLength: number }; hash: string };
     if (record.alg !== "NYX_PANIC_VERIFY_V1") return false;
     
     const saltBytes = base64ToArrayBuffer(record.salt);
-    const derivedHashHex = (await argon2id({
+    const derivedHashHex = await argon2id({
       password,
       salt: saltBytes,
       ...record.params
-    })) as string;
+    });
     
     const derivedHashBytes = hexToUint8Array(derivedHashHex);
     const derivedHash = arrayBufferToBase64(derivedHashBytes);

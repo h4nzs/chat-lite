@@ -1,3 +1,4 @@
+import { isPlainObject } from '@utils/typeGuards';
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
@@ -55,11 +56,12 @@ export async function getGroupSenderState(conversationId: string): Promise<Group
     // Jika di runtime dia berupa Uint8Array (dari legacy code), kita konversi.
     let ckString = '';
     if (record) {
-        if (typeof record.state.CK === 'string') {
-            ckString = record.state.CK;
-        } else if ((record.state.CK as unknown) instanceof Uint8Array) {
+        const rawCk: unknown = record.state.CK;
+        if (typeof rawCk === 'string') {
+            ckString = rawCk;
+        } else if (rawCk instanceof Uint8Array) {
             const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
-            ckString = sodium.to_base64(record.state.CK as unknown as Uint8Array, sodium.base64_variants.URLSAFE_NO_PADDING);
+            ckString = sodium.to_base64(rawCk, sodium.base64_variants.URLSAFE_NO_PADDING);
         }
     }
     
@@ -98,11 +100,12 @@ export async function getGroupReceiverState(conversationId: string, senderId: st
     
     let ckString = '';
     if (record) {
-        if (typeof record.state.CK === 'string') {
-            ckString = record.state.CK;
-        } else if ((record.state.CK as unknown) instanceof Uint8Array) {
+        const rawCk: unknown = record.state.CK;
+        if (typeof rawCk === 'string') {
+            ckString = rawCk;
+        } else if (rawCk instanceof Uint8Array) {
             const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
-            ckString = sodium.to_base64(record.state.CK as unknown as Uint8Array, sodium.base64_variants.URLSAFE_NO_PADDING);
+            ckString = sodium.to_base64(rawCk, sodium.base64_variants.URLSAFE_NO_PADDING);
         }
     }
 
@@ -535,11 +538,11 @@ export async function importDatabaseFromJson(jsonString: string, password?: stri
               
               const salt = sodium.from_base64(parsedInit.salt, sodium.base64_variants.URLSAFE_NO_PADDING);
               const key = await deriveKeyFromPassword(password, salt);
-              finalJsonStr = await decryptWithKey(key, parsedInit.data) as string;
+              finalJsonStr = String(await decryptWithKey(key, parsedInit.data));
           }
 
           const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
-          importData = JSON.parse(finalJsonStr, (key, value) => {
+          const _parsedImport = JSON.parse(finalJsonStr, (key, value) => {
             if (value && typeof value === 'object' && value.__type === 'Uint8Array') {
               if (typeof value.data === 'string') {
                   return sodium.from_base64(value.data, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -547,7 +550,8 @@ export async function importDatabaseFromJson(jsonString: string, password?: stri
               return new Uint8Array(value.data);
             }
             return value;
-          }) as Record<string, unknown[]>;
+          });
+          importData = isPlainObject(_parsedImport) ? _parsedImport as Record<string, unknown[]> : {};
       } catch (_e) {
           throw new Error("Invalid vault file format or incorrect password.");
       }
@@ -594,10 +598,11 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
 
     for (const record of records) {
         let ckString = '';
-        if (typeof record.state.CK === 'string') {
-            ckString = record.state.CK;
-        } else if ((record.state.CK as unknown) instanceof Uint8Array) {
-            ckString = sodium.to_base64(record.state.CK as unknown as Uint8Array, sodium.base64_variants.URLSAFE_NO_PADDING);
+        const rawCk: unknown = record.state.CK;
+        if (typeof rawCk === 'string') {
+            ckString = rawCk;
+        } else if (rawCk instanceof Uint8Array) {
+            ckString = sodium.to_base64(rawCk, sodium.base64_variants.URLSAFE_NO_PADDING);
         }
 
         if (ckString.substring(0, 8) === keyId) {

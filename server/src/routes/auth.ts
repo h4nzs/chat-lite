@@ -182,9 +182,11 @@ async (req, res, next) => {
 
     const passwordHash = await hashPassword(password)
     
-    const fingerprint = req.headers['x-nyx-fingerprint'] as string | undefined;
-    const installationId = req.headers['x-nyx-installation-id'] as string | undefined;
-    
+    const _fp = req.headers['x-nyx-fingerprint'];
+    const fingerprint = typeof _fp === 'string' ? _fp : undefined;
+    const _iid = req.headers['x-nyx-installation-id'];
+    const installationId = typeof _iid === 'string' ? _iid : undefined;
+
     const user = await prisma.user.create({
       data: {
         usernameHash,
@@ -243,9 +245,11 @@ router.post('/login', authLimiter, zodValidate({
   try {
     const { usernameHash, password, publicKey, pqPublicKey, signingKey, encryptedPrivateKey, deviceName } = req.body
     const explicitDeviceId = req.body.deviceId;
-    const fingerprint = req.headers['x-nyx-fingerprint'] as string | undefined;
-    const installationId = req.headers['x-nyx-installation-id'] as string | undefined;
-    
+    const _fp = req.headers['x-nyx-fingerprint'];
+    const fingerprint = typeof _fp === 'string' ? _fp : undefined;
+    const _iid = req.headers['x-nyx-installation-id'];
+    const installationId = typeof _iid === 'string' ? _iid : undefined;
+
     const user = await prisma.user.findUnique({
       where: { usernameHash },
       include: {
@@ -575,8 +579,10 @@ router.post('/recover', authLimiter, zodValidate({
 
     const passwordHash = await hashPassword(newPassword);
 
-    const fingerprint = req.headers['x-nyx-fingerprint'] as string | undefined;
-    const installationId = req.headers['x-nyx-installation-id'] as string | undefined;
+    const _fp = req.headers['x-nyx-fingerprint'];
+    const fingerprint = typeof _fp === 'string' ? _fp : undefined;
+    const _iid = req.headers['x-nyx-installation-id'];
+    const installationId = typeof _iid === 'string' ? _iid : undefined;
 
     const [updatedUser, _, __, newDevice] = await prisma.$transaction([
         prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
@@ -746,7 +752,7 @@ router.post('/pow/verify',
         throw new ApiError(400, 'Challenge expired or invalid. Please request a new one.');
       }
 
-      const { salt, difficulty } = JSON.parse(challengeData as string) as { salt: string, difficulty: number };
+      const { salt, difficulty } = JSON.parse(String(challengeData)) as { salt: string, difficulty: number };
 
       // ADJUSTED DIFFICULTY MATCHING FRONTEND:
       const targetPrefix = '0'.repeat(Math.max(1, Math.floor(difficulty / 2)));
@@ -919,7 +925,7 @@ router.post('/webauthn/login/verify', async (req, res, next) => {
         transports: userAuthenticator.transports ? (userAuthenticator.transports.split(',') as NonNullable<VerifyOpts['credential']>['transports']) : undefined
       },
       requireUserVerification: false
-    } as unknown as VerifyOpts)
+    } as VerifyOpts)
 
     if (verification.verified) {
       const { authenticationInfo } = verification
@@ -947,8 +953,10 @@ router.post('/webauthn/login/verify', async (req, res, next) => {
       if (!safeUser) throw new ApiError(404, 'User not found')
       if (safeUser.bannedAt) return res.status(403).json({ error: 'ACCESS DENIED: Your account has been suspended.', reason: safeUser.banReason })
 
-      const fingerprint = req.headers['x-nyx-fingerprint'] as string | undefined;
-      const installationId = req.headers['x-nyx-installation-id'] as string | undefined;
+      const _fp = req.headers['x-nyx-fingerprint'];
+      const fingerprint = typeof _fp === 'string' ? _fp : undefined;
+      const _iid = req.headers['x-nyx-installation-id'];
+      const installationId = typeof _iid === 'string' ? _iid : undefined;
 
       const latestDevice = safeUser.devices[0];
       let activeDeviceId = latestDevice?.id;

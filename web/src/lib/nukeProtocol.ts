@@ -1,3 +1,4 @@
+import { isPlainObject } from '@utils/typeGuards';
 import { closeDatabaseConnection } from './keychainDb';
 
 /**
@@ -19,7 +20,7 @@ export const executeLocalWipe = async (redirectUrl: string = '/') => {
     try {
         const savedUser = localStorage.getItem("user");
         if (savedUser) {
-            const user = JSON.parse(savedUser);
+            const _parsedUser = JSON.parse(savedUser); const user = isPlainObject(_parsedUser) ? _parsedUser : null;
             if (user?.id) {
                 databases.push(`keychain-db-${user.id}`);
             }

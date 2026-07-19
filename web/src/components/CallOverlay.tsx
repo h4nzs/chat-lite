@@ -25,8 +25,8 @@ const RemoteStream = ({ userId, stream, isVideo, profile }: { userId: UserId, st
     }
   }, [stream, isVideo]);
 
-  const name = (profile?.name as string) || t('defaults.user', 'User');
-  const avatarUrl = profile?.avatarUrl as string | undefined;
+  const name = String(profile?.name ?? '') || t('defaults.user', 'User');
+  const avatarUrl = String(profile?.avatarUrl ?? '') || undefined;
 
   return (
     <div className="relative w-full h-full bg-gray-900 rounded-2xl overflow-hidden shadow-xl border border-white/10 group flex items-center justify-center">

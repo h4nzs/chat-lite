@@ -1,7 +1,7 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import type { UserId, ConversationId, MessageId } from '@nyx/shared';
+import type { Participant, UserId, ConversationId, MessageId } from '@nyx/shared';
 import { asUserId, asConversationId, asMessageId } from '@nyx/shared';
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, handleApiError } from "@lib/api";
@@ -68,8 +68,9 @@ const ensureGroupSessionIfNeeded = async (conversationId: string): Promise<boole
     if (cachedUserIds && cachedUserIds.length > 0) {
       const currentUser = useAuthStore.getState().user;
       const reconstructedParticipants = cachedUserIds.map(id => ({
-        id, name: id === currentUser?.id ? currentUser.name || '' : ''
-      })) as any;
+        id: asUserId(id), name: id === currentUser?.id ? currentUser.name || '' : '',
+        role: 'MEMBER' as const
+      })) as Participant[];
       await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
     }
   }

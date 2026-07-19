@@ -540,9 +540,7 @@ router.get('/turn', requireAuth, async (req, res): Promise<unknown> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ ttl: 86400 })
-    });
-
-    const data = await response.json() as unknown as TurnResponse;
+    });      const data = await response.json() as TurnResponse;
 
     if (data.iceServers) {
       return res.json({ iceServers: data.iceServers });

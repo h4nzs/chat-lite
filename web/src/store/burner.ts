@@ -284,7 +284,7 @@ export const useBurnerStore = createWithEqualityFn<BurnerState & BurnerActions>(
             const myPqKeys = await authStore.getPqEncryptionKeyPair(); // Host PQ
 
             const guestPkBytes = sodium.from_base64(guestClassicalPk, sodium.base64_variants.URLSAFE_NO_PADDING);
-            const ctStr = (header as Record<string, unknown>).ct as string;
+            const ctStr = String((header as Record<string, unknown>).ct);
             if (!ctStr) {
                 throw new Error('KEM Ciphertext missing');
             }
@@ -378,10 +378,17 @@ export const useBurnerStore = createWithEqualityFn<BurnerState & BurnerActions>(
              isViewed: false,
              ...fileData
           };
-          useMessageStore.getState().addOptimisticMessage(roomId, mainMsg as unknown as import('@nyx/shared').Message);
+          const { asMessageId, asConversationId, asUserId } = await import('@nyx/shared');
+          const mainMsgTyped: import('@nyx/shared').Message = {
+            ...mainMsg,
+            id: asMessageId(mainMsg.id),
+            conversationId: asConversationId(mainMsg.conversationId),
+            senderId: asUserId(mainMsg.senderId),
+          };
+          useMessageStore.getState().addOptimisticMessage(roomId, mainMsgTyped);
           
           const { useConversationStore } = await import('./conversation');
-          useConversationStore.getState().updateConversationLastMessage(roomId, mainMsg as unknown as import('@nyx/shared').Message);
+          useConversationStore.getState().updateConversationLastMessage(roomId, mainMsgTyped);
         }
 
         set(s => ({ messages: [...s.messages, msg] }));

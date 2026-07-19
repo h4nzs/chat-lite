@@ -374,7 +374,7 @@ export const initWebRTCListeners = () => {
             }
         }
 
-        let pc = peerConnections.get(data.from as string);
+        let pc = peerConnections.get(data.from);
 
         switch (data.type) {
             case 'request':
@@ -384,7 +384,7 @@ export const initWebRTCListeners = () => {
                     if (state.ephemeralCallKey === callKey) {
                          useCallStore.getState().addRemoteUser((decryptedPayload as { callerProfile?: MinimalProfile }).callerProfile || { id: data.from });
                     } else {
-                         sendSecureSignal(data.from as string, 'reject', { reason: 'busy' });
+                         sendSecureSignal(data.from, 'reject', { reason: 'busy' });
                     }
                 }
                 break;
@@ -394,13 +394,13 @@ export const initWebRTCListeners = () => {
 
                 if (!pc) {
                     const iceServers = await getDynamicIceServers();
-                    pc = createPeerConnection(data.from as string, iceServers);
+                    pc = createPeerConnection(data.from, iceServers);
                 }
 
                 try {
                   const offer = await pc.createOffer();
                   await pc.setLocalDescription(offer);
-                  sendSecureSignal(data.from as string, 'offer', { offer });
+                  sendSecureSignal(data.from, 'offer', { offer });
                 } catch (e) {
                   console.error('Failed to create offer', e);
                 }
@@ -409,7 +409,7 @@ export const initWebRTCListeners = () => {
             case 'end':
                 if (pc) {
                     pc.close();
-                    peerConnections.delete(data.from as string);
+                    peerConnections.delete(data.from);
                 }
                 const store = useCallStore.getState();
                 store.removeRemoteStream(data.from);
@@ -422,13 +422,13 @@ export const initWebRTCListeners = () => {
             case 'offer':
                 if (!pc) {
                     const iceServers = await getDynamicIceServers();
-                    pc = createPeerConnection(data.from as string, iceServers);
+                    pc = createPeerConnection(data.from, iceServers);
                 }
                 try {
                   await pc.setRemoteDescription(new RTCSessionDescription((decryptedPayload as { offer: RTCSessionDescriptionInit }).offer));
                   const answer = await pc.createAnswer();
                   await pc.setLocalDescription(answer);
-                  sendSecureSignal(data.from as string, 'answer', { answer });
+                  sendSecureSignal(data.from, 'answer', { answer });
                 } catch (e) {
                   console.error('Failed to handle offer', e);
                 }
@@ -438,12 +438,12 @@ export const initWebRTCListeners = () => {
                 try {
                   await pc.setRemoteDescription(new RTCSessionDescription((decryptedPayload as { answer: RTCSessionDescriptionInit }).answer));
                   
-                  const queue = candidateQueues.get(data.from as string);
+                  const queue = candidateQueues.get(data.from);
                   if (queue) {
                       for (const c of queue) {
                           await pc.addIceCandidate(new RTCIceCandidate(c)).catch(e => console.error('Failed to add queued ice candidate', e));
                       }
-                      candidateQueues.delete(data.from as string);
+                      candidateQueues.delete(data.from);
                   }
                 } catch (e) {
                   console.error('Failed to handle answer', e);
@@ -462,7 +462,7 @@ export const initWebRTCListeners = () => {
         console.error(`Failed to decrypt and process secure signal ${data.type}`, e);
         if (e instanceof DOMException || (e as Error).name === 'OperationError') {
             console.warn(`[WebRTC] Invalid call key detected for peer ${data.from}. Removing peer from call.`);
-            const peerIdStr = data.from as string;
+            const peerIdStr = data.from;
             const pc = peerConnections.get(peerIdStr);
             if (pc) {
                 pc.close();

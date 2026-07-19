@@ -8,8 +8,8 @@ export function zodValidate (schema: { body?: ZodSchema; query?: ZodSchema; para
   return (req: Request, _res: Response, next: NextFunction) => {
     try {
       if (schema.body) req.body = schema.body.parse(req.body)
-      if (schema.query) req.query = schema.query.parse(req.query) as unknown as ParsedQs
-      if (schema.params) req.params = schema.params.parse(req.params) as unknown as ParamsDictionary
+      if (schema.query) req.query = schema.query.parse(req.query) as ParsedQs
+      if (schema.params) req.params = schema.params.parse(req.params) as ParamsDictionary
       next()
     } catch (e: unknown) {
       if (e instanceof ZodError) {

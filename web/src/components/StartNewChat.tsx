@@ -59,7 +59,7 @@ export default function StartNewChat({ query, onStarted }: { query: string; onSt
       try {
         const r = await searchUsers(query);
         if (currentId === searchIdRef.current) {
-          setList(r.map((u: Record<string, unknown>) => ({ ...u, id: asUserId(u.id as string) })));
+          setList(r.map((u: Record<string, unknown>) => ({ ...u, id: asUserId(String(u.id)) })));
         }
       } catch {
         toast.error(t('search.failed'));

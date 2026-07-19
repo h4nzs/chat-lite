@@ -43,7 +43,7 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
     return { id: userId };
   });
 
-  const profile = useUserProfile(targetUser as unknown as { id: string });
+  const profile = useUserProfile(targetUser as { id: string });
   const [mediaBlobUrl, setMediaBlobUrl] = useState<string | null>(null);
   const mediaBlobUrlRef = useRef<string | null>(null);
   const [replyText, setReplyText] = useState('');

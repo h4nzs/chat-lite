@@ -29,7 +29,7 @@ export const useProfileStore = createWithEqualityFn<ProfileState>((set, get) => 
     if (get().profiles[cacheKey]) return get().profiles[cacheKey];
 
     // 2. Check IndexedDB
-    const idbCache = await db.profileCache.get(userId as string);
+    const idbCache = await db.profileCache.get(userId);
     if (idbCache && idbCache.encryptedHash === encryptedProfile) {
       const parsed: DecryptedProfile = {
         name: idbCache.name,
@@ -55,7 +55,7 @@ export const useProfileStore = createWithEqualityFn<ProfileState>((set, get) => 
     if (!encryptedProfile) return fallback;
 
     // 4. Try Persistent Cache (IndexedDB)
-    const idbCache = await db.profileCache.get(userId as string);
+    const idbCache = await db.profileCache.get(userId);
     if (idbCache && idbCache.encryptedHash === encryptedProfile) {
       const parsed: DecryptedProfile = {
         name: idbCache.name,
@@ -68,7 +68,7 @@ export const useProfileStore = createWithEqualityFn<ProfileState>((set, get) => 
 
     try {
       // 5. Cari ProfileKey di IndexedDB
-      const profileKey = await getProfileKey(userId as string);
+      const profileKey = await getProfileKey(userId);
       if (!profileKey) return fallback;
 
       // 6. Decrypt via Worker

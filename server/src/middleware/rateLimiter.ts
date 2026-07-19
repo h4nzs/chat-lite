@@ -7,7 +7,7 @@ import { Request } from 'express';
 // Secure IP Extractor: Pakai helper bawaan untuk cegah bypass IPv6
 const secureKeyGenerator = (req: Request): string => {
   // 1. Ambil teks IP-nya dulu (dari Cloudflare atau bawaan Express)
-  const clientIp = (req.headers['cf-connecting-ip'] as string) || req.ip || 'unknown';
+  const clientIp = typeof req.headers['cf-connecting-ip'] === 'string' ? req.headers['cf-connecting-ip'] : req.ip || 'unknown';
   
   // 2. Lempar teks IP (string) tersebut ke polisi library biar di-format dengan aman
   return ipKeyGenerator(clientIp);

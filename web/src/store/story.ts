@@ -73,7 +73,7 @@ export const useStoryStore = createWithEqualityFn<StoryState>((set, get) => ({
           const base64Key = await getStoryKey(story.id);
           if (base64Key) {
             const decryptedData = await decryptStoryPayload(story.encryptedPayload, base64Key);
-            return { ...story, decryptedData: decryptedData as unknown as Record<string, unknown> };
+            return { ...story, decryptedData: decryptedData as Record<string, unknown> };
           }
         } catch (err) {
           console.error(`Failed to decrypt story ${story.id}`, err);
@@ -158,7 +158,7 @@ export const useStoryStore = createWithEqualityFn<StoryState>((set, get) => ({
           if (otherParticipant) {
             const actualUserId = (otherParticipant as Record<string, unknown>).userId || ((otherParticipant as Record<string, unknown>).user as Record<string, unknown>)?.id || (otherParticipant as Record<string, unknown>).id;
             if (actualUserId) {
-              userToConvMap.set(asUserId(actualUserId as string), c.id);
+              userToConvMap.set(asUserId(String(actualUserId)), c.id);
             }
           }
         }

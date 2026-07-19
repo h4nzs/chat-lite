@@ -163,7 +163,7 @@ router.post(
       if (!fileUrl) throw new ApiError(400, 'Missing fileUrl.')
 
       const oldGroup = await prisma.conversation.findUnique({
-        where: { id: groupId as string }
+        where: { id: String(groupId) }
       })
       if (!oldGroup) throw new ApiError(404, 'Group not found')
 

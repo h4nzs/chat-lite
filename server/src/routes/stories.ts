@@ -34,7 +34,7 @@ router.post('/', requireAuth, async (req, res) => {
 // Get all active stories for a specific user
 router.get('/user/:userId', requireAuth, async (req, res) => {
   try {
-    const userId = req.params.userId as string;
+    const userId = String(req.params.userId);
     const stories = await prisma.story.findMany({
       where: {
         senderId: userId,
@@ -53,7 +53,7 @@ router.get('/user/:userId', requireAuth, async (req, res) => {
 // Get a specific story by ID (only if not expired)
 router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = String(req.params.id);
     const story = await prisma.story.findUnique({ where: { id } });
 
     if (!story) {
@@ -74,7 +74,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 // Delete a story early
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = String(req.params.id);
     const userId = req.user!.id;
 
     const story = await prisma.story.findUnique({ where: { id } });

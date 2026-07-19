@@ -162,7 +162,7 @@ router.post('/tenants', requireAuth, requireAdmin, async (req, res) => {
 
 // 6. Toggle Tenant Status
 router.patch('/tenants/:id/toggle', requireAuth, requireAdmin, async (req, res) => {
-  const id = req.params.id as string;
+  const id = String(req.params.id);
   try {
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {

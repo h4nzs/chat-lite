@@ -12,7 +12,7 @@ export class ApiError extends Error {
 
 export function errorHandler (err: unknown, _req: Request, res: Response, _next: NextFunction) {
   const status = typeof err === 'object' && err !== null && 'status' in err ? (err as Record<string, unknown>).status as number : 500
-  const message = typeof err === 'object' && err !== null && 'message' in err ? (err as Record<string, unknown>).message as string : 'Internal Server Error'
+  const message = typeof err === 'object' && err !== null && 'message' in err ? String((err as Record<string, unknown>).message) : 'Internal Server Error'
 
   // Report 5xx errors to Sentry
   if (status >= 500) {

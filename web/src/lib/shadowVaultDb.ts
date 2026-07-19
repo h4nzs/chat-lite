@@ -197,7 +197,7 @@ class NyxShadowVaultProxy {
         const hasValidName = mSender?.name && mSender.name !== 'Unknown' && mSender.name !== 'Encrypted User';
         
         if (hasValidName) {
-            encryptedSenderName = (await encryptVaultText(mSender.name as string)) || undefined;
+            encryptedSenderName = (await encryptVaultText(String(mSender.name))) || undefined;
             if (mSender.username) {
                 encryptedSenderUsername = await encryptVaultText(mSender.username);
             }
@@ -331,7 +331,7 @@ class NyxShadowVaultProxy {
           content: plainText,
           repliedToId: r.repliedToId ? asMessageId(r.repliedToId) : undefined,
           repliedTo: decryptedRepliedTo,
-          createdAt: r.createdAt as string,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
           senderId: asUserId(r.senderId),
           sender: {
               id: asUserId(r.senderId),
@@ -348,7 +348,7 @@ class NyxShadowVaultProxy {
           })(),
           isViewOnce: r.isViewOnce,
           isDeletedLocal: r.isDeletedLocal,
-          expiresAt: r.expiresAt as string | undefined,
+          expiresAt: r.expiresAt ?? undefined,
           // Merge file properties cleanly
           fileUrl: decryptedFileMeta?.fileUrl,
           fileKey: decryptedFileMeta?.fileKey,
@@ -418,7 +418,7 @@ class NyxShadowVaultProxy {
         isGroup: conv.isGroup,
         encryptedMetadata: conv.encryptedMetadata || null,
         decryptedMetadata: encryptedDecryptedMetadata,
-        lastMessageAt: (conv.lastMessageAt as string | Date | null) || null,
+        lastMessageAt: (conv as { lastMessageAt?: string | Date | null }).lastMessageAt ?? null,
         participants: encryptedParticipants
       });
     } catch (e) {
@@ -449,8 +449,9 @@ class NyxShadowVaultProxy {
           lastMessageAt: r.lastMessageAt ? new Date(r.lastMessageAt).toISOString() : null,
           participants,
           unreadCount: 0,
-          encryptionMode: 'SENDER_KEY'
-        } as unknown as Conversation;
+          encryptionMode: 'SENDER_KEY' as const,
+          lastMessage: null,
+        } as Conversation;
       }));
       return conversations;
     } catch (e) {

@@ -8,7 +8,7 @@ import { useConversationStore } from '../store/conversation';
 import { useAuthStore } from '../store/auth';
 import { useConnectionStore } from '../store/connection';
 import { usePresenceStore } from '../store/presence';
-import { RawServerMessageSchema, type RawServerMessage, type Message, type Participant, type User, type BinaryPayload, type Conversation } from '@nyx/shared';
+import { RawServerMessageSchema, type RawServerMessage, type Message, type Participant, type User, type BinaryPayload, type Conversation, asMessageId, asConversationId, asUserId } from '@nyx/shared';
 
 let isInitialized = false;
 
@@ -118,7 +118,19 @@ export function initSocketListeners() {
     });
 
     try {
-      const msg = await useMessageStore.getState().addIncomingMessage(rawMsg.conversationId, rawMsg as unknown as Message);
+      // Convert RawServerMessage to Message by applying branded types
+      const msgForStore = {
+        ...rawMsg,
+        id: asMessageId(rawMsg.id),
+        conversationId: asConversationId(rawMsg.conversationId),
+        senderId: asUserId(rawMsg.senderId),
+        createdAt: rawMsg.createdAt,
+        reactions: [] as Message['reactions'],
+        sender: rawMsg.sender ? { ...rawMsg.sender, id: asUserId(rawMsg.sender.id) } : undefined,
+        repliedToId: rawMsg.repliedToId ? asMessageId(rawMsg.repliedToId) : undefined,
+      } as Message;
+      
+      const msg = await useMessageStore.getState().addIncomingMessage(rawMsg.conversationId, msgForStore);
       if (msg) {
         useConversationStore.getState().updateConversationLastMessage(rawMsg.conversationId, msg);
       }
@@ -128,7 +140,7 @@ export function initSocketListeners() {
   });
 
   transportClient.on('message:updated', (data: Partial<RawServerMessage> & { id: string, conversationId: string }) => {
-    useMessageStore.getState().updateMessage(data.conversationId, data.id, data as unknown as Partial<Message>);
+    useMessageStore.getState().updateMessage(data.conversationId, data.id, data as Partial<Message>);
   });
 
   transportClient.on('message:deleted', (data: { conversationId: string; id: string }) => {
@@ -176,7 +188,7 @@ export function initSocketListeners() {
       const parsed = JSON.parse(new TextDecoder().decode(payload)) as unknown;
       const data = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
       if (data.type === 'bulk' && Array.isArray(data.userIds)) {
-        usePresenceStore.getState().setOnlineUsers(data.userIds as string[]);
+        usePresenceStore.getState().setOnlineUsers(Array.from(data.userIds as unknown[], id => String(id)));
       } else if (data.type === 'join' && typeof data.userId === 'string') {
         usePresenceStore.getState().userJoined(data.userId);
       } else if (data.type === 'leave' && typeof data.userId === 'string') {

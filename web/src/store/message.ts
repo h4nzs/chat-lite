@@ -22,7 +22,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuthStore } from "./auth";
 import type { RawServerMessage } from "./conversation";
-import type { User, Message } from '@nyx/shared';
+import type { User, Message, Participant } from '@nyx/shared';
 import useDynamicIslandStore, { UploadActivity } from './dynamicIsland';
 import { useConversationStore } from "./conversation";
 import { addToQueue, getQueueItems, removeFromQueue, updateQueueAttempt } from "@lib/offlineQueueDb";
@@ -32,7 +32,9 @@ import { getSodium } from "@lib/sodiumInitializer";
 import { shadowVault, saveStoryKey } from "../lib/shadowVaultDb";
 
 import { useProfileStore } from './profile';
-import i18n from '../i18n';
+
+import { isReactionPayload, isEditPayload, isSilentPayload, isStoryReplyPayload, isSystemMessagePayload, isFileMetadata, isPlainObject } from '@utils/typeGuards';
+import type { SilentPayload } from '@utils/typeGuards';import i18n from '../i18n';
 
 const incomingMessageLocks = new Map<string, Promise<void>>();
 
@@ -40,7 +42,7 @@ function enrichMessagesWithSenderProfile(conversationId: string, messages: Messa
     const conv = useConversationStore.getState().conversations.find(c => c.id === conversationId);
     if (!conv) return messages;
     
-    const participantsMap = new Map(conv.participants.map(p => [('userId' in p ? (p as unknown as {userId: string}).userId : p.id) || p.id, p]));
+    const participantsMap = new Map(conv.participants.map(p => [('userId' in p ? (p.userId || p.id) : p.id), p]));
     const cachedProfiles = useProfileStore.getState().profiles;
     
     return messages.map(m => {
@@ -102,19 +104,41 @@ function reconstructDirectParticipants(conversationId: string, messages: Message
     const cachedProfiles = useProfileStore.getState().profiles;
     const profileKey = Object.keys(cachedProfiles).find(k => k.startsWith(firstMsgWithSender.senderId));
     const peerProfile = profileKey ? cachedProfiles[profileKey] : null;
-    const peerEncryptedProfile = (firstMsgWithSender.sender as any)?.encryptedProfile;
+    const peerEncryptedProfile = firstMsgWithSender.sender?.encryptedProfile;
 
     useConversationStore.getState().addOrUpdateConversation({
     ...conv,
     participants: [
-      { id: currentUser.id },
+      { id: currentUser.id, role: 'MEMBER' as const },
       {
         id: firstMsgWithSender.senderId,
         name: peerProfile?.name || '',
-        encryptedProfile: peerEncryptedProfile
+        encryptedProfile: peerEncryptedProfile,
+        role: 'MEMBER' as const
       }
-    ] as any
+    ]
   });
+}
+
+/**
+ * Create a minimal Message object for story_reply repliedTo field.
+ * Uses branded types so `as Message` works instead of `as unknown as Message`.
+ */
+function createRepliedToForStoryReply(
+  conversationId: string,
+  storyAuthorId: string,
+  storyText: string | null | undefined,
+  hasMedia: boolean | undefined
+): Message {
+  return {
+    id: asMessageId('story_mock'),
+    conversationId: asConversationId(conversationId),
+    senderId: asUserId(storyAuthorId),
+    sender: { id: asUserId(storyAuthorId) },
+    content: storyText || (hasMedia ? '📷 Story' : 'Story'),
+    createdAt: new Date().toISOString(),
+    reactions: [],
+  } as Message;
 }
 
 /**
@@ -187,13 +211,14 @@ export async function decryptMessageObject(
             const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
             const sodium = await getSodium();
             
-            let cipherTextToUse: string | null | undefined = ('ciphertext' in rawMsg ? rawMsg.ciphertext : rawMsg.content) as string | null | undefined;
-            
+            const rawCipher: unknown = 'ciphertext' in rawMsg ? rawMsg.ciphertext : rawMsg.content;
+            let cipherTextToUse: string | null | undefined = rawCipher === null ? null : rawCipher === undefined ? undefined : String(rawCipher);
+
             const unwrap = (str: string): string => {
                  if (str && typeof str === 'string' && str.trim().startsWith('{')) {
                      try {
                          const p = JSON.parse(str) as { ciphertext?: string };
-                         if (p.ciphertext) return unwrap(p.ciphertext as string);
+                         if (p.ciphertext) return unwrap(String(p.ciphertext));
                      } catch (_e) {}
                      }
                      return str;
@@ -211,15 +236,16 @@ export async function decryptMessageObject(
                     
                     if (plainText && plainText.trim().startsWith('{')) {
                         try {
-                            const parsed = JSON.parse(plainText) as Record<string, unknown>;
+                            const parsed = JSON.parse(plainText);
+                            if (!isPlainObject(parsed)) return finalMessage;
                             if (parsed.senderId) {
-                                finalMessage.senderId = asUserId(parsed.senderId as string);
-                                if (!finalMessage.sender) finalMessage.sender = { id: asUserId(parsed.senderId as string) } as any;
-                                else finalMessage.sender.id = asUserId(parsed.senderId as string);
+                                finalMessage.senderId = asUserId(String(parsed.senderId));
+                                if (!finalMessage.sender) finalMessage.sender = { id: asUserId(String(parsed.senderId)) };
+                                else finalMessage.sender.id = asUserId(String(parsed.senderId));
                             }
                             if (parsed.profileKey) {
                                 const { saveProfileKey } = await import('@lib/keychainDb');
-                                const profileKeyToSave = parsed.profileKey as string;
+                                const profileKeyToSave = String(parsed.profileKey);
                                 await saveProfileKey(finalMessage.senderId || '', profileKeyToSave).catch(() => {});
                                 delete parsed.profileKey;
                             }
@@ -230,10 +256,10 @@ export async function decryptMessageObject(
                                 plainText = innerValue;
                                 // Recursively strip profileKey from inner value
                                 try {
-                                    const innerParsed = JSON.parse(plainText) as Record<string, unknown>;
-                                    if (innerParsed && typeof innerParsed === 'object' && innerParsed.profileKey) {
+                                    const innerParsed = JSON.parse(plainText);
+                                    if (isPlainObject(innerParsed) && innerParsed.profileKey) {
                                         const { saveProfileKey } = await import('@lib/keychainDb');
-                                        await saveProfileKey(finalMessage.senderId || '', innerParsed.profileKey as string).catch(() => {});
+                                        await saveProfileKey(finalMessage.senderId || '', String(innerParsed.profileKey)).catch(() => {});
                                         delete innerParsed.profileKey;
                                         if (innerParsed.text !== undefined && Object.keys(innerParsed).length === 1) {
                                             plainText = String(innerParsed.text);
@@ -254,8 +280,9 @@ export async function decryptMessageObject(
                     
                     if (finalMessage.content && finalMessage.content.startsWith('{') && finalMessage.content.includes('"type":"file"')) {
                         try {
-                            const metadata = JSON.parse(finalMessage.content) as { type?: string, url?: string, key?: string, name?: string, size?: number, mimeType?: string, text?: string, storyAuthorId?: string, isReply?: boolean, storyText?: string, hasMedia?: boolean };
-                            if (metadata.type === 'file') {
+                            const parsed = JSON.parse(finalMessage.content);
+                            if (isFileMetadata(parsed)) {
+                                const metadata = parsed;
                                 finalMessage = {
                                     ...finalMessage,
                                     fileUrl: metadata.url,
@@ -270,20 +297,17 @@ export async function decryptMessageObject(
                         } catch (_e) {}
                     } else if (finalMessage.content && finalMessage.content.startsWith('{') && finalMessage.content.includes('"type":"story_reply"')) {
                         try {
-                            const metadata = JSON.parse(finalMessage.content) as { type?: string, text?: string, storyAuthorId?: string, isReply?: boolean, storyText?: string, hasMedia?: boolean };
-                            if (metadata.type === 'story_reply') {
+                            const parsed = JSON.parse(finalMessage.content);
+                            if (isStoryReplyPayload(parsed)) {
+                                const metadata = parsed;
                                 finalMessage = {
-                                    ...finalMessage,
-                                    content: metadata.text,
-                                    repliedTo: {
-                                        id: 'story_mock',
-                                        conversationId: rawMsg.conversationId,
-                                        senderId: metadata.storyAuthorId,
-                                        sender: { id: metadata.storyAuthorId },
-                                        content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story'),
-                                        createdAt: new Date().toISOString(),
-                                        reactions: [],
-                                    } as unknown as Message
+                                    ...finalMessage,                content: metadata.text,
+                repliedTo: createRepliedToForStoryReply(
+                    rawMsg.conversationId,
+                    metadata.storyAuthorId || '',
+                    metadata.storyText,
+                    metadata.hasMedia
+                ),
                                 };
                             }
                         } catch (_e) {}
@@ -313,10 +337,11 @@ export async function decryptMessageObject(
         }
     }
 
-    let contentToDecrypt: string | undefined = ('ciphertext' in rawMsg ? rawMsg.ciphertext : undefined) as string | undefined;
+    const rawContent: unknown = 'ciphertext' in rawMsg ? rawMsg.ciphertext : undefined;
+    let contentToDecrypt: string | undefined = rawContent === undefined ? undefined : String(rawContent);
 
     if (!contentToDecrypt) {
-        contentToDecrypt = (('fileKey' in rawMsg ? rawMsg.fileKey : undefined) || rawMsg.content) as string | undefined;
+        contentToDecrypt = (('fileKey' in rawMsg ? rawMsg.fileKey : undefined) || rawMsg.content) ?? undefined;
     }
 
     if (!contentToDecrypt || contentToDecrypt === 'waiting_for_key' || contentToDecrypt === '[Requesting key to decrypt...]') {
@@ -453,27 +478,28 @@ export async function decryptMessageObject(
     }
 
     if (result?.status === 'success') {
-        let plainText = result.value as string;
+        let plainText = String(result.value);
 
         const stripProfileKey = async (text: string): Promise<string> => {
             if (!text || !text.trim().startsWith('{')) return text;
             try {
-                const parsed = JSON.parse(text) as Record<string, unknown>;
+                const parsed = JSON.parse(text);
+            if (!isPlainObject(parsed)) return text;
 
                 if (parsed.senderId) {
-                    finalMessage.senderId = asUserId(parsed.senderId as string);
-                    if (!finalMessage.sender) finalMessage.sender = { id: asUserId(parsed.senderId as string) } as any;
-                    else finalMessage.sender.id = asUserId(parsed.senderId as string);
+                    finalMessage.senderId = asUserId(String(parsed.senderId));
+                    if (!finalMessage.sender) finalMessage.sender = { id: asUserId(String(parsed.senderId)) };
+                    else finalMessage.sender.id = asUserId(String(parsed.senderId));
                 }
 
                 if (parsed.profileKey) {
                     const { saveProfileKey } = await import('@lib/keychainDb');
                     const { useProfileStore } = await import('@store/profile');
-                    await saveProfileKey(finalMessage.senderId, parsed.profileKey as string);
-                    const ep = (parsed.encryptedProfile as string) || rawMsg.sender?.encryptedProfile || null;
+                    await saveProfileKey(finalMessage.senderId, String(parsed.profileKey));
+                    const ep = typeof parsed.encryptedProfile === 'string' ? parsed.encryptedProfile : rawMsg.sender?.encryptedProfile || null;
                     useProfileStore.getState().decryptAndCache(finalMessage.senderId, ep);
                     if (ep && finalMessage.sender) {
-                        (finalMessage.sender as any).encryptedProfile = ep;
+                        finalMessage.sender.encryptedProfile = ep;
                     }
                     delete parsed.profileKey;
                     delete parsed.encryptedProfile;
@@ -504,8 +530,9 @@ export async function decryptMessageObject(
 
       if (plainText.startsWith('{') && plainText.includes('"type":"file"')) {
         try {
-          const metadata = JSON.parse(plainText) as { type?: string, url?: string, key?: string, name?: string, size?: number, mimeType?: string, text?: string, storyAuthorId?: string, isReply?: boolean, storyText?: string, hasMedia?: boolean };
-          if (metadata.type === 'file') {
+          const parsed = JSON.parse(plainText);
+          if (isFileMetadata(parsed)) {
+            const metadata = parsed;
             finalMessage = {
                 ...finalMessage,
                 fileUrl: metadata.url,
@@ -522,20 +549,17 @@ export async function decryptMessageObject(
 
       if (plainText.startsWith('{') && plainText.includes('"type":"story_reply"')) {
         try {
-          const metadata = JSON.parse(plainText) as { type?: string, url?: string, key?: string, name?: string, size?: number, mimeType?: string, text?: string, storyAuthorId?: string, isReply?: boolean, storyText?: string, hasMedia?: boolean };
-          if (metadata.type === 'story_reply') {
+          const parsed = JSON.parse(plainText);
+          if (isStoryReplyPayload(parsed)) {
+            const metadata = parsed;
             finalMessage = {
                 ...finalMessage,
-                content: metadata.text,
-                repliedTo: {
-                    id: 'story_mock',
-                    conversationId: rawMsg.conversationId,
-                    senderId: metadata.storyAuthorId,
-                    sender: { id: metadata.storyAuthorId },
-                    content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story'),
-                    createdAt: new Date().toISOString(),
-                    reactions: [],
-                } as unknown as Message
+                content: metadata.text,                    repliedTo: createRepliedToForStoryReply(
+                        rawMsg.conversationId,
+                        metadata.storyAuthorId || '',
+                    metadata.storyText,
+                    metadata.hasMedia
+                ),
             };
           }
         } catch (_e) { }
@@ -549,19 +573,19 @@ export async function decryptMessageObject(
             finalMessage.content = 'waiting_for_key';
         } else if (errMsg.includes('Ratchet Advanced!') || errMsg.includes('ciphertext cannot be decrypted')) {
             if (rawMsg.type !== 'USER') {
-                return null as unknown as Message; // Drop system messages that fail decryption
+                return null; // Drop system messages that fail decryption
             }
             finalMessage.content = '🔒 Pesan gagal didekripsi (Kunci kedaluwarsa)';
             finalMessage.error = true;
         } else if (errMsg.includes('older than current state')) {
             if (rawMsg.type !== 'USER') {
-                return null as unknown as Message; // Drop system messages that are too old
+                return null; // Drop system messages that are too old
             }
             finalMessage.content = '[Message too old to decrypt]';
             finalMessage.error = true;
         } else {
             if (rawMsg.type !== 'USER') {
-                return null as unknown as Message; // Drop system messages that fail decryption
+                return null; // Drop system messages that fail decryption
             }
             finalMessage.content = '[Decryption Failed: Key out of sync]';
             finalMessage.error = true;
@@ -592,9 +616,9 @@ function parseReaction(content: string | null | undefined): { targetMessageId: s
     const trimmed = content.trim();
     if (!trimmed.startsWith('{') || !trimmed.includes('"type":"reaction"')) return null;
     
-    const payload = JSON.parse(trimmed) as { type: string, targetMessageId: string, emoji: string, text: string, key?: string, url?: string };
-    if (payload.type === 'reaction' && payload.targetMessageId && payload.emoji) {
-      return payload;
+    const parsed = JSON.parse(trimmed);
+    if (isReactionPayload(parsed)) {
+      return { targetMessageId: parsed.targetMessageId, emoji: parsed.emoji };
     }
   } catch (_e) {}
   return null;
@@ -605,15 +629,15 @@ function parseEdit(content: string | null | undefined): { targetMessageId: strin
   try {
     const trimmed = content.trim();
     if (!trimmed.startsWith('{') || !trimmed.includes('"type":"edit"')) return null;
-    const payload = JSON.parse(trimmed) as { type: string, targetMessageId: string, emoji: string, text: string, key?: string, url?: string };
-    if (payload.type === 'edit' && payload.targetMessageId && payload.text) {
-      return payload;
+    const parsed = JSON.parse(trimmed);
+    if (isEditPayload(parsed)) {
+      return { targetMessageId: parsed.targetMessageId, text: parsed.text };
     }
   } catch (_e) {}
   return null;
 }
 
-function parseSilent(content: string | null | undefined): { text?: string, type?: string, key?: string, storyId?: string, targetMessageId?: string, emoji?: string, url?: string } | null {
+function parseSilent(content: string | null | undefined): SilentPayload | null {
   if (!content) return null;
   try {
     let trimmed = content.trim();
@@ -621,29 +645,13 @@ function parseSilent(content: string | null | undefined): { text?: string, type?
         trimmed = trimmed.replace('STORY_KEY:', '');
     }
     if (!trimmed.startsWith('{')) return null;
-    const payload = JSON.parse(trimmed) as { type: string, targetMessageId: string, emoji: string, text: string, key?: string, url?: string };
+    const parsed = JSON.parse(trimmed);
     
-    if (payload.type === 'story_reply') {
+    if (isStoryReplyPayload(parsed)) {
       return null;
     }
-    if (payload.type === 'silent') {
-      return payload;
-    }
-    if (payload.type === 'CALL_INIT' && typeof payload.key === 'string') {
-      return payload;
-    }
-    if (payload.type === 'GHOST_SYNC') {
-      return payload;
-    }
-    if (payload.type === 'STORY_KEY') {
-      return payload;
-    }
-    // Tambahan untuk E2EE Unsend & Cabut Reaksi
-    if (payload.type === 'UNSEND' || payload.type === 'reaction_remove') {
-      return payload;
-    }
-    if (payload.type === 'SYSTEM_KEY_REQUEST') {
-      return payload;
+    if (isSilentPayload(parsed)) {
+      return parsed;
     }
   } catch (_e) {}
   return null;
@@ -925,7 +933,9 @@ const evaluateControlMessage = async (decrypted: Message, conversationId: string
 
       if (decrypted.content && decrypted.content.startsWith('{')) {
           try {
-              const data = JSON.parse(decrypted.content) as SystemMessagePayload;
+              const parsed = JSON.parse(decrypted.content);
+        if (!isSystemMessagePayload(parsed)) return true;
+        const data = parsed;
               
               if (data.type === 'SYSTEM_KEY_REQUEST' && data.targetUserId) {
                   // [BUGFIX: PERSISTENT OFFLINE KEY REQUEST]
@@ -1338,17 +1348,17 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
          }
       } catch {}
 
-      const msg = {
-          id: `temp_${actualTempId}`, tempId: actualTempId, optimistic: true,
-          content: data.content, senderId: user.id, sender: user,
-          createdAt: new Date().toISOString(), conversationId: conversationId, status: 'SENDING',
-          isSilent: isSilent
-      } as unknown as Message;
+      const msg: Message = {
+          id: asMessageId(`temp_${actualTempId}`), tempId: actualTempId, optimistic: true,
+          content: data.content, senderId: asUserId(user.id), sender: user,
+          createdAt: new Date().toISOString(), conversationId: asConversationId(conversationId), status: 'SENDING' as const,
+          isSilent: isSilent, reactions: [],
+      };
 
       if (!isSilent) {
         get().addOptimisticMessage(conversationId, msg);
         const { useConversationStore } = await import('./conversation');
-        useConversationStore.getState().updateConversationLastMessage(conversationId, { ...msg, content: lastMsgPreview, fileType: data.fileType, fileName: data.fileName } as unknown as Message);
+        useConversationStore.getState().updateConversationLastMessage(conversationId, { ...msg, content: lastMsgPreview, fileType: data.fileType, fileName: data.fileName });
       }
       
       try {
@@ -1415,8 +1425,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         if (cachedUserIds && cachedUserIds.length > 0) {
             const currentUser = useAuthStore.getState().user;
             const reconstructedParticipants = cachedUserIds.map(id => ({
-                id, name: id === currentUser?.id ? currentUser.name || '' : ''
-            })) as any;
+                id, name: id === currentUser?.id ? currentUser.name || '' : '', role: 'MEMBER' as const
+            })) as Participant[];
             console.log(`[OpaqueMailbox] Reconstructed participants from cache for conv=${conversationId} count=${cachedUserIds.length}`);
             // Update the store so both ensureGroupSession and targetRecipients use the correct list
             await useConversationStore.getState().updateConversation(conversationId, { participants: reconstructedParticipants });
@@ -1429,7 +1439,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 const serverConv: any = await authFetch(`/api/conversations/${conversationId}`);
                 if (serverConv?.encryptedMetadata) {
                     await useConversationStore.getState().updateConversation(conversationId, {
-                        encryptedMetadata: serverConv.encryptedMetadata as string
+                        encryptedMetadata: serverConv.encryptedMetadata
                     });
                     conversation = useConversationStore.getState().conversations.find(c => c.id === conversationId);
                 }
@@ -1518,12 +1528,12 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 const metadata = JSON.parse(optimisticContent) as { type?: string, text?: string, storyAuthorId?: string, storyText?: string, hasMedia?: boolean };
                 if (metadata.type === 'story_reply') {
                     optimisticMessage.content = metadata.text || 'Story reply';
-                    optimisticMessage.repliedTo = {
-                        id: 'story_mock',
-                        senderId: metadata.storyAuthorId,
-                        sender: { id: metadata.storyAuthorId },
-                        content: metadata.storyText || (metadata.hasMedia ? '📷 Story' : 'Story')
-                    } as unknown as Message;
+                    optimisticMessage.repliedTo = createRepliedToForStoryReply(
+                        conversationId,
+                        metadata.storyAuthorId || '',
+                        metadata.storyText,
+                        metadata.hasMedia
+                    );
                 }
             } catch (e) {
                 console.error('Failed to parse story_reply metadata:', e);
@@ -1563,7 +1573,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             if (profileKey) {
                 let parsedObj: Record<string, unknown> | null = null;
                 if (contentToEncrypt.trim().startsWith('{')) {
-                    try { parsedObj = JSON.parse(contentToEncrypt) as Record<string, unknown>; } catch (e) {}
+                    try { const _parsedObj = JSON.parse(contentToEncrypt); parsedObj = isPlainObject(_parsedObj) ? _parsedObj : null; } catch (e) {}
                 }
                 
                 const myUser = useAuthStore.getState().user;
@@ -1677,7 +1687,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 devices?: {id: string, publicKey: PublicKeyInput}[], 
                 publicKey?: PublicKeyInput 
             };
-            for (const p of conversation.participants as unknown as ParticipantData[]) {
+            for (const p of conversation.participants as ParticipantData[]) {
                const targetUserId = p.userId || p.id;
                const userObj = p.user || p;
 
@@ -1844,7 +1854,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                              const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
                              const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
                              
-                             const parsed = JSON.parse(res.msg!.content as string) as { ciphertext?: string };
+                             const parsed = JSON.parse(String(res.msg!.content)) as { ciphertext?: string };
                              const ciphertext = parsed.ciphertext;
                              if (ciphertext) {
                                  const combined = sodium.from_base64(ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -1859,10 +1869,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                          console.error("Async self-decrypt failed in callback:", e);
                      }
                  }).catch(console.error);
-            }
-
-            const updatedMsg = { 
-                ...res.msg, 
+            }            const updatedMsg: Partial<Message> = {
+                ...res.msg,
+                id: asMessageId(res.msg.id),
+                conversationId: asConversationId(res.msg.conversationId),
+                senderId: asUserId(res.msg.senderId),
+                sender: res.msg.sender ? { ...res.msg.sender, id: asUserId(res.msg.sender.id) } : undefined,
+                repliedToId: res.msg.repliedToId ? asMessageId(res.msg.repliedToId) : undefined,
+                tempId: typeof res.msg.tempId === 'number' ? res.msg.tempId : undefined,
                 content: finalContent,
                 repliedTo: existingMsg?.repliedTo,
                 isBlindAttachment: existingMsg?.isBlindAttachment,
@@ -1873,7 +1887,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 fileSize: existingMsg?.fileSize,
                 duration: existingMsg?.duration,
                 status: 'SENT' as const
-            } as unknown as Partial<Message>;
+            };
             
             // Ubah bubble optimistik menjadi bubble permanen
             get().replaceOptimisticMessage(conversationId, actualTempId, updatedMsg);
@@ -2044,7 +2058,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                              const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
                              const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
                              
-                             const parsed = JSON.parse(res.msg!.content as string) as { ciphertext?: string };
+                             const parsed = JSON.parse(String(res.msg!.content)) as { ciphertext?: string };
                              const ciphertext = parsed.ciphertext;
                              if (ciphertext) {
                                  const combined = sodium.from_base64(ciphertext, sodium.base64_variants.URLSAFE_NO_PADDING);
@@ -2059,10 +2073,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                          console.error("Async self-decrypt failed in offline queue callback:", e);
                      }
                  }).catch(console.error);
-            }
-
-            const updatedMsg = { 
-                ...res.msg, 
+            }            const updatedMsg: Partial<Message> = {
+                ...res.msg,
+                id: asMessageId(res.msg.id),
+                conversationId: asConversationId(res.msg.conversationId),
+                senderId: asUserId(res.msg.senderId),
+                sender: res.msg.sender ? { ...res.msg.sender, id: asUserId(res.msg.sender.id) } : undefined,
+                repliedToId: res.msg.repliedToId ? asMessageId(res.msg.repliedToId) : undefined,
+                tempId: typeof res.msg.tempId === 'number' ? res.msg.tempId : undefined,
                 content: finalContent,
                 repliedTo: existingMsg?.repliedTo,
                 isBlindAttachment: existingMsg?.isBlindAttachment,
@@ -2073,7 +2091,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 fileSize: existingMsg?.fileSize,
                 duration: existingMsg?.duration,
                 status: 'SENT' as const
-            } as unknown as Partial<Message>;
+            };
             
             get().replaceOptimisticMessage(conversationId, tempId, updatedMsg);
 
@@ -2395,7 +2413,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               ...message,
               content: '<Decryption Failed>',
               error: true
-            } as unknown as Message);
+            } as Message);
           }
         }
 
@@ -2431,9 +2449,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         // ✅ 3. AWAIT PENYIMPANAN LOKAL DULU (PENTING!)
         await shadowVault.upsertMessages(enrichedMessages);
 
-        const hasFailedDecryption = processedMessages.some(m => 
-            m.type !== 'SYSTEM' && 
-            (m.type as string) !== 'SYSTEM_KEY_REQUEST' && 
+        const hasFailedDecryption = processedMessages.some(m =>      m.type !== 'SYSTEM' && String(m.type) !== 'SYSTEM_KEY_REQUEST' && 
             (m.error || m.content === 'waiting_for_key' || m.content?.startsWith('['))
         );
         if (hasFailedDecryption) {
@@ -2459,7 +2475,9 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         }
 
         // 5. UPDATE UI
-        const visibleMessages = enrichedMessages.filter(m => m.type !== 'SYSTEM' && (m.type as string) !== 'SYSTEM_KEY_REQUEST');
+      const visibleMessages = enrichedMessages.filter(
+        m => m.type !== 'SYSTEM' && String(m.type) !== 'SYSTEM_KEY_REQUEST'
+      );
         set(state => {
           return {
             messages: { ...state.messages, [id]: visibleMessages },
@@ -2712,7 +2730,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
 
       if (
           decrypted.type !== 'SYSTEM' && 
-          (decrypted.type as string) !== 'SYSTEM_KEY_REQUEST' && 
+          String(decrypted.type) !== 'SYSTEM_KEY_REQUEST' && 
           (decrypted.error || decrypted.content === 'waiting_for_key' || decrypted.content?.startsWith('['))
       ) {
           const existing = await shadowVault.getMessage(decrypted.id);
@@ -2942,8 +2960,8 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               const isViewingChat = window.location.pathname.includes(`/chat/${finalDecrypted.conversationId}`);
               if (!isViewingChat && !finalDecrypted.isSilent && finalDecrypted.senderId !== currentUser?.id) {
                   import('@store/dynamicIsland').then(({ default: useDynamicIslandStore }) => {
-                      const sender = finalDecrypted.sender as unknown as { encryptedProfile?: string };
-                      const senderName = (sender as unknown as { name?: string, decryptedProfile?: { name?: string } })?.name || (sender as unknown as { decryptedProfile?: { name?: string } })?.decryptedProfile?.name || 'Someone'; 
+            const sender = finalDecrypted.sender;
+            const senderName = sender?.name || (sender as typeof sender & { decryptedProfile?: { name?: string } }).decryptedProfile?.name || 'Someone'; 
                       let snippet = finalDecrypted.content || 'New secure message';
                       if (finalDecrypted.fileUrl || finalDecrypted.isBlindAttachment) snippet = 'Sent an attachment 📎';
                       if (finalDecrypted.content && finalDecrypted.content.startsWith('🔒')) snippet = 'System message';
@@ -3060,7 +3078,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
 
       const newMessages = [...filteredMessages, finalMessage]
           .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-          .filter(m => m.type !== 'SYSTEM' && (m.type as string) !== 'SYSTEM_KEY_REQUEST');
+          .filter(m => m.type !== 'SYSTEM' && String(m.type) !== 'SYSTEM_KEY_REQUEST');
 
       return {
         messages: {
