@@ -103,12 +103,42 @@ router.get("/openid-configuration", (_req: Request, res: Response) => {
 });
 
 // =========================================================
+// OAuth 2.0 Authorization Server Metadata (RFC 8414)
+// Alternative path for pure OAuth 2.0 (vs OpenID Connect)
+// Includes agent_auth block for Auth.md registration flow
+// =========================================================
+router.get("/oauth-authorization-server", (_req: Request, res: Response) => {
+  res.json({
+    issuer: "https://api.nyx-app.my.id",
+    authorization_endpoint: "https://api.nyx-app.my.id/api/auth/login",
+    token_endpoint: "https://api.nyx-app.my.id/api/auth/refresh",
+    registration_endpoint: "https://api.nyx-app.my.id/api/auth/register",
+    scopes_supported: ["openid", "profile"],
+    response_types_supported: ["token"],
+    grant_types_supported: ["password", "refresh_token"],
+    token_endpoint_auth_methods_supported: ["client_secret_post"],
+    subject_types_supported: ["public"],
+    service_documentation: "https://nyx-app.my.id/api-docs",
+    agent_auth: {
+      skill: "https://isitagentready.com/.well-known/agent-skills/auth-md/SKILL.md",
+      register_uri: "https://app.nyx-app.my.id/register",
+      identity_types_supported: ["identity_assertion"],
+      identity_assertion: {
+        assertion_types_supported: ["verified_email"],
+        credential_types_supported: ["urn:ietf:params:oauth:token-type:access_token"],
+        claim_uri: "https://api.nyx-app.my.id/api/users/me"
+      }
+    }
+  });
+});
+
+// =========================================================
 // OAuth Protected Resource Metadata (RFC 9728)
 // Describes how agents can obtain tokens for this resource
 // =========================================================
 router.get("/oauth-protected-resource", (_req: Request, res: Response) => {
   res.json({
-    resource: "https://api.nyx-app.my.id",
+    resource: "https://nyx-app.my.id",
     authorization_servers: [
       "https://api.nyx-app.my.id"
     ],
