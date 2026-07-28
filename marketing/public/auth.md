@@ -1,4 +1,4 @@
-# NYX Chat — Agent Authentication
+# NYX Chat auth.md — Agent Authentication
 
 ## Overview
 
