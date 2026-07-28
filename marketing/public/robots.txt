@@ -1,3 +1,7 @@
+# === AI Content Signals ===
+# Declare content usage preferences for AI agents
+Content-Signal: ai-train=no, search=yes, ai-input=no
+
 User-agent: *
 Allow: /
 # Blokir akses crawler ke area privat dan API backend

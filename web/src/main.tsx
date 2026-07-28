@@ -14,6 +14,86 @@ import { registerServiceWorker } from '@lib/serviceWorkerRegistration';
 import { setAuthFailureHandler } from '@lib/api';
 import { useAuthStore } from '@store/auth';
 
+// === WebMCP: Expose site tools to AI agents via the browser ===
+// See: https://webmachinelearning.github.io/webmcp/
+function initWebMCP(): void {
+  if (typeof navigator === 'undefined' || !('modelContext' in navigator)) return;
+  
+  try {
+    const mc = (navigator as unknown as { modelContext: { provideContext: (ctx: unknown) => void } }).modelContext;
+    
+    mc.provideContext({
+      tools: [
+        {
+          name: 'search_users',
+          description: 'Search for users by username hash to start a conversation',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Username hash to search for' }
+            },
+            required: ['query']
+          },
+          execute: async (args: { query: string }) => {
+            const response = await fetch('/api/users/search?q=' + encodeURIComponent(args.query), { credentials: 'include' });
+            return response.json();
+          }
+        },
+        {
+          name: 'list_conversations',
+          description: 'List all conversations for the authenticated user',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          },
+          execute: async () => {
+            const response = await fetch('/api/conversations/sync', { credentials: 'include' });
+            return response.json();
+          }
+        },
+        {
+          name: 'get_messages',
+          description: 'Get messages from a specific conversation',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              conversationId: { type: 'string', description: 'Conversation ID to fetch messages from' },
+              limit: { type: 'integer', description: 'Max messages to return', default: 50 }
+            },
+            required: ['conversationId']
+          },
+          execute: async (args: { conversationId: string; limit?: number }) => {
+            const response = await fetch('/api/messages/' + encodeURIComponent(args.conversationId), { credentials: 'include' });
+            return response.json();
+          }
+        },
+        {
+          name: 'get_system_status',
+          description: 'Check the current system status and any active banners',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          },
+          execute: async () => {
+            const response = await fetch('/api/system/status', { credentials: 'include' });
+            return response.json();
+          }
+        }
+      ]
+    });
+    
+    console.log('[WebMCP] Tools registered with navigator.modelContext');
+  } catch (e) {
+    // WebMCP API not available or registration failed — non-critical
+    console.debug('[WebMCP] Not available:', e);
+  }
+}
+
+// Initialize WebMCP after a short delay to ensure app is loaded
+if (typeof window !== 'undefined') {
+  setTimeout(initWebMCP, 2000);
+}
+
 // === TACTICAL GHOST SIGNATURE ===
 // Mencetak watermark rahasia di Developer Console
 if (typeof window !== 'undefined') {
