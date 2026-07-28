@@ -5,6 +5,14 @@
 NYX Chat is a zero-knowledge, end-to-end encrypted messaging platform.
 AI agents can authenticate with the API to send/receive messages programmatically.
 
+## Agent Registration
+
+To register as an agent:
+
+1. **Create a user account** at https://app.nyx-app.my.id/register
+2. **Authenticate** via POST /api/auth/login with your credentials
+3. **Use the access token** in API requests as `Authorization: Bearer <token>`
+
 ## Authentication Methods
 
 ### Bearer Token (Recommended for Agents)
@@ -17,6 +25,11 @@ AI agents can authenticate with the API to send/receive messages programmaticall
 
 Standard session authentication via cookie is supported for browser-based agents.
 
+## Credential Types
+
+- `urn:ietf:params:oauth:token-type:access_token` — Bearer JWT access token (15min TTL)
+- Refresh token — Long-lived token for obtaining new access tokens
+
 ## Scopes
 
 - `messages:read` — Read messages from your conversations
@@ -26,6 +39,13 @@ Standard session authentication via cookie is supported for browser-based agents
 - `profile:read` — Read your profile
 - `profile:write` — Update your profile
 
+## OAuth Discovery
+
+Machine-readable OAuth metadata is available at:
+- `/.well-known/oauth-authorization-server` — OAuth 2.0 Authorization Server metadata
+- `/.well-known/oauth-protected-resource` — Protected Resource metadata (RFC 9728)
+- `/.well-known/openid-configuration` — OpenID Connect Discovery (RFC 8414)
+
 ## Agent Requirements
 
 - All messages are end-to-end encrypted
@@ -33,7 +53,7 @@ Standard session authentication via cookie is supported for browser-based agents
 - Rate limits apply: 100 requests/minute per user
 - WebSocket connections require authentication via token
 
-## Endpoints
+## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
