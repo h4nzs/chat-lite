@@ -427,15 +427,21 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
   const participants = useMemo(() => conversation?.participants || [], [conversation?.participants]);
   const isGroup = conversation?.isGroup || false;
 
-  // ✅ 3. FIX RE-RENDER MASSAL: Hapus `messages` dari dependency array
+  // ✅ 3. FIX RE-RENDER MASSAL: itemContent STABIL — tidak lagi bergantung pada `messages`.
+  // Daftar pesan dibaca dari ref "latest value" sehingga callback tidak pernah berubah
+  // identitasnya saat pesan baru masuk. Baris Virtuoso hanya re-render bila data itemnya
+  // berubah (computeItemKey + memo(MessageItem)).
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages; // Latest-value ref (synchronous — mencegah bubble-shape flicker 1 frame)
+
   const itemContent = useCallback((index: number, message: Message) => {
       // Cek pesan sebelum dan sesudahnya untuk menentukan bentuk gelembung chat
-      const prevMessage = messages[index - 1];
-      const nextMessage = messages[index + 1];
+      const currentMessages = messagesRef.current;
+      const prevMessage = currentMessages[index - 1];
+      const nextMessage = currentMessages[index + 1];
       
       const isFirstInSequence = !prevMessage || prevMessage.senderId !== message.senderId;
       const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
-      const stableKey = message.tempId ? `t-${message.tempId}` : message.id;
   
       return (
         <div className="px-1 md:px-4 py-0.5" key={message.id}>
@@ -451,7 +457,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
           />
         </div>
       );
-    }, [messages, isGroup, participants, highlightedMessageId, handleImageClick, trackMessageVisibility]); // 👈 'messages' dikembalikan
+    }, [isGroup, participants, highlightedMessageId, handleImageClick, trackMessageVisibility]);
 
   return (
     <AnimatePresence mode="wait">

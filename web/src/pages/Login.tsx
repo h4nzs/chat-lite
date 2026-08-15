@@ -37,12 +37,21 @@ export default function Login() {
     hasRestoredKeys: s.hasRestoredKeys
   })));
 
+  // Jangan buka ulang modal recovery untuk user yang sama setelah user menutupnya
+  // (sebelumnya modal re-appear setiap ada update store karena hasRestoredKeys tak berubah).
+  const dismissedRecoveryForUserId = useRef<string | null>(null);
+
   useEffect(() => {
     // If we are logged in but missing keys, auto-show recovery modal
-    if (accessToken && user && !hasRestoredKeys) {
+    if (accessToken && user && !hasRestoredKeys && dismissedRecoveryForUserId.current !== user.id) {
         setShowRecoveryOptions(true);
     }
   }, [accessToken, user, hasRestoredKeys]);
+
+  const dismissRecoveryOptions = () => {
+    if (user) dismissedRecoveryForUserId.current = user.id;
+    setShowRecoveryOptions(false);
+  };
 
   useEffect(() => {
     // Cek ketersediaan hardware biometric
@@ -324,7 +333,7 @@ export default function Login() {
       {/* Identity Recovery Modal */}
       <ModalBase
         isOpen={showRecoveryOptions}
-        onClose={() => setShowRecoveryOptions(false)}
+        onClose={dismissRecoveryOptions}
         title={t('auth:messages.new_device_title')}
       >
         <div className="p-6">
@@ -386,7 +395,7 @@ export default function Login() {
           </div>
 
           <button
-            onClick={() => setShowRecoveryOptions(false)}
+            onClick={dismissRecoveryOptions}
             className="w-full mt-8 py-3 text-xs font-mono text-text-secondary hover:text-red-500 uppercase tracking-widest transition-colors"
           >
             {t('common:actions.cancel_bracket')}

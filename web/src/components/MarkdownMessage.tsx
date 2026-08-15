@@ -76,4 +76,4 @@ const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, isOwn = fals
   );
 };
 
-export default MarkdownMessage;
+export default React.memo(MarkdownMessage);

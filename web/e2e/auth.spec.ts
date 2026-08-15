@@ -76,10 +76,20 @@ test.describe('Authentication & Onboarding', () => {
     // 1. Register User
     await registerAndBypass(page, 'Test Login User', username);
     
-    // 2. Clear Session
+    // 2. Clear Session — logout via app API dulu (cookie HttpOnly tidak bisa dihapus
+    //    langsung dari document.cookie), lalu bersihkan storage lokal.
     await page.evaluate(async () => {
+      try {
+        // @ts-ignore — path absolut Vite dev server (runtime-only)
+        const { useAuthStore } = await import('/src/store/auth.ts');
+        await useAuthStore.getState().logout().catch(() => {});
+      } catch (e) {}
       localStorage.clear();
       sessionStorage.clear();
+      document.cookie.split(';').forEach(c => {
+        const name = c.split('=')[0]?.trim();
+        if (name) document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+      });
       const dbs = await indexedDB.databases();
       for (const db of dbs) { 
         if (db.name) indexedDB.deleteDatabase(db.name); 
@@ -96,16 +106,16 @@ test.describe('Authentication & Onboarding', () => {
     await page.getByRole('textbox', { name: /Password/i }).fill('StrongPass123!');
     await page.getByRole('button', { name: /Login/i }).click();
 
-    // 5. Bypass Modals after Login (New Device Detected / System Init / Quick Tour)
+    // 5. Asersi Login berhasil: modal "New Device Detected" muncul (bukti sesi aktif
+    //    tapi kunci lokal terhapus — recovery flow), modal bisa ditutup dan TIDAK reopen.
+    await expect(page.getByRole('heading', { name: /New Device Detected/i })).toBeVisible({ timeout: 30000 });
     const closeNewDeviceBtn = page.getByRole('button', { name: /Close modal/i });
-    try {
-      await closeNewDeviceBtn.waitFor({ state: 'visible', timeout: 30000 });
-      await closeNewDeviceBtn.click();
-    } catch (e) {
-      const cancelBtn = page.getByRole('button', { name: /\[ CANCEL \]|Cancel/i }).first();
-      try { await cancelBtn.waitFor({ state: 'visible', timeout: 10000 }); await cancelBtn.click(); } catch (e2) {}
-    }
+    await closeNewDeviceBtn.click();
+    await expect(page.getByRole('heading', { name: /New Device Detected/i })).toBeHidden({ timeout: 10000 });
+    // Tidak boleh ada error server di form
+    await expect(page.getByText('Internal server error')).toBeHidden();
 
+    // Bypass modals lainnya (System Init / Quick Tour)
     const skipSystemInitBtn = page.getByRole('button', { name: /Skip for now/i });
     try {
       await skipSystemInitBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -117,9 +127,6 @@ test.describe('Authentication & Onboarding', () => {
       await closeTourBtn.waitFor({ state: 'visible', timeout: 5000 });
       await closeTourBtn.click();
     } catch (e) {}
-
-    // ✅ Asersi Login berhasil
-    await expect(page.getByRole('heading', { name: /System Ready/i })).toBeVisible({ timeout: 15000 });
   });
 
   test('Fail login with incorrect password', async ({ page }) => {

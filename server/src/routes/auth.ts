@@ -80,7 +80,9 @@ async function issueTokens (user: { id: string, role?: string }, deviceId: strin
 
   // GUEST users (Burner Chat) are ephemeral and don't exist in the User/Device tables.
   // We skip DB persistence for their refresh tokens to avoid FK constraint violations.
-  if (user.role !== 'GUEST') {
+  // Sama untuk deviceId kosong (recovery flow: login tanpa kunci lokal) — refresh token
+  // tidak dipersist karena tidak ada device yang valid (FK RefreshToken_deviceId_fkey).
+  if (user.role !== 'GUEST' && deviceId) {
     // Check if user is in Migration Mode
     const isMigrating = await redisClient.exists(`is_migrating:${user.id}`);
 

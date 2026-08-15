@@ -3,8 +3,9 @@
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
 import { api, authFetch } from "@lib/api";
-import { useMessageStore, decryptMessageObject } from "./message";
 import { transportClient, emitSessionKeyRequest, fireGhostSync, emitGroupKeyDistribution, emitMetadataUpdated } from '@lib/transportClient';
+// NOTE: useMessageStore & decryptMessageObject di-import DINAMIS di dalam aksi
+// untuk memutus circular dependency (message.ts ⇄ conversation.ts).
 import { useVerificationStore } from './verification';
 import { useAuthStore, User } from './auth';
 import { asConversationId, asMessageId } from '@nyx/shared';
@@ -221,6 +222,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         if (lastMessage) {
             const originalLastMsg = lastMessage;
             try {
+              const { decryptMessageObject } = await import('./message');
               const decryptedLastMsg = await decryptMessageObject(lastMessage);
               lastMessage = decryptedLastMsg || c.lastMessage || null;
             } catch (_e) {
@@ -552,7 +554,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
   },
 
   removeConversation: (conversationId) => {
-    useMessageStore.getState().clearMessagesForConversation(conversationId);
+    (async () => {
+      const { useMessageStore } = await import('./message');
+      useMessageStore.getState().clearMessagesForConversation(conversationId);
+    })();
 
     set(state => {
       const wasActive = state.activeId === conversationId;

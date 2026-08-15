@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { Message, MessageStatus } from "@store/conversation";
 import { useAuthStore } from "@store/auth";
 import { FiClock, FiEyeOff, FiCamera, FiVideo, FiMic, FiEye, FiVolumeX } from "react-icons/fi";
@@ -44,7 +44,7 @@ interface Props {
 }
 
 // ✅ OPTIMASI: Hapus 'participants' dari props jika tidak digunakan
-export default function MessageBubble({ message, isOwn, onImageClick, isLastInSequence = true }: Props) {
+function MessageBubble({ message, isOwn, onImageClick, isLastInSequence = true }: Props) {
   const { t } = useTranslation('chat');
   // Ambil ID saja secara statis untuk menghindari re-render berlebih
   const myId = useAuthStore.getState().user?.id; 
@@ -243,3 +243,4 @@ export default function MessageBubble({ message, isOwn, onImageClick, isLastInSe
   );
 }
 
+export default memo(MessageBubble);
