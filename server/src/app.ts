@@ -275,7 +275,14 @@ app.post("/api/admin/cleanup", async (req, res) => {
 // === CSRF Protection ===
 const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   getSecret: () => env.csrfSecret,
-  getSessionIdentifier: (req) => "api",
+  // PERBAIKAN: identifier per-KLIEN (bukan "api" global) — sebelumnya semua
+  // klien berbagi satu state CSRF sehingga dua tab/klien bisa saling menimpa
+  // token (menyebabkan 403 acak saat multi-tab / paralel).
+  getSessionIdentifier: (req) => {
+    const iid = req.headers['x-nyx-installation-id'];
+    if (typeof iid === 'string' && iid.length > 0) return `iid:${iid}`;
+    return `ip:${req.ip || 'unknown'}`;
+  },
   cookieName: "x-csrf-token",
   cookieOptions: {
     httpOnly: true,

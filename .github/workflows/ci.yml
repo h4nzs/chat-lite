@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build (shared + web + server + marketing)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Prisma generate
+        working-directory: server
+        run: pnpm exec prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL || 'postgresql://ci:ci@localhost:5432/ci_db' }}
+      - name: Build
+        run: pnpm run build
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL || 'postgresql://ci:ci@localhost:5432/ci_db' }}
+          JWT_SECRET: ci-jwt-secret-not-for-prod
+          CSRF_SECRET: ci-csrf-secret
+          VITE_TURNSTILE_SITE_KEY: '1x00000000000000000000AA'
+
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Run unit tests
+        run: pnpm run test
+        env:
+          JWT_SECRET: ci-jwt-secret-not-for-prod
+
+  lint:
+    name: Lint (non-blocking — typescript-eslint belum support TS 7)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Lint
+        run: pnpm run lint
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Audit production dependencies
+        run: pnpm audit --prod
+
+  e2e:
+    name: E2E (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci_db
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-jwt-secret-not-for-prod
+      CSRF_SECRET: ci-csrf-secret
+      CHAT_SECRET: ci-chat-secret
+      TURNSTILE_SECRET_KEY: ''
+      CORS_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Prisma generate + db push (DB CI)
+        working-directory: server
+        env:
+          PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: 'consent for CI ephemeral database schema push'
+        run: |
+          pnpm exec prisma generate
+          pnpm exec prisma db push
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E (spec transport auto-skip bila WebTransport tidak tersedia)
+        working-directory: web
+        run: pnpm exec playwright test

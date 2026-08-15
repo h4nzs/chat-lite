@@ -15,7 +15,8 @@
     "postbuild": "node scripts/ping-indexnow.js",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.6.0",

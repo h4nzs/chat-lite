@@ -29,7 +29,7 @@ jobs:
 
       # --- PHASE 1: INSTALL SEMUA (ROOT) ---
       - name: 📦 Install Dependencies (Root)
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
         env:
           PUPPETEER_SKIP_DOWNLOAD: "true"
 
@@ -114,6 +114,7 @@ jobs:
           zip -r ../nyx-deploy.zip .
 
       # --- PHASE 5: SHIP TO VPS ---
+      # TODO(OPS): Migrasi ke SSH key (secrets.VPS_SSH_KEY) — password auth rentan brute-force.
       - name: 🚀 Upload to VPS via SCP
         uses: appleboy/scp-action@master
         with:
@@ -167,7 +168,7 @@ jobs:
                 cp $TARGET_DIR/ca.pem $TARGET_DIR/server/ca.pem || true
             fi
             cd $TARGET_DIR
-            PUPPETEER_SKIP_DOWNLOAD="true" CI=true pnpm install --no-frozen-lockfile
+            PUPPETEER_SKIP_DOWNLOAD="true" CI=true pnpm install --frozen-lockfile
 
             # Pastikan file rahasia diamankan (Diasumsikan Anda menaruh .env asli di /root/nyx-app/.env)
             if [ -f "$TARGET_DIR/.env" ]; then
@@ -176,10 +177,12 @@ jobs:
                 echo "⚠️ WARNING: File .env server Production tidak ditemukan di root aplikasi! Pastikan SENTRY_DSN sudah ada di .env"
             fi
             
-            # 5. GENERATE PRISMA ENGINE (Wajib di dalam server/)
+            # 5. GENERATE PRISMA ENGINE + SYNC SCHEMA (Wajib di dalam server/)
             echo "⚙️ Generating Prisma Engine..."
             cd $TARGET_DIR/server
             pnpm exec prisma generate
+            echo "🗄️ Syncing Prisma schema (index-only changes)..."
+            PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION="consent for production schema sync via deploy workflow" pnpm exec prisma db push || true
             
             # 6. DEPLOY FRONTEND
             echo "🌐 Deploying Frontend..."

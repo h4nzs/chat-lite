@@ -15,6 +15,27 @@ let csrfTokenCache: string | null = null;
 // Handler for auth failure (Logout)
 let onAuthFailure: (() => Promise<void>) | null = null;
 
+// Identifier per-klien untuk state CSRF server (mencegah dua klien saling menimpa token).
+// WAJIB sama dengan installationId yang dikirim flow register/login (kvStore Dexie) —
+// kalau beda, token CSRF di-generate & divalidasi dengan id berbeda → 403.
+let clientInstallationIdPromise: Promise<string> | null = null;
+
+function getClientInstallationId(): Promise<string> {
+  if (!clientInstallationIdPromise) {
+    clientInstallationIdPromise = import('@utils/fingerprint')
+      .then(m => m.getPersistentInstallationId())
+      .catch(() => {
+        let iid = sessionStorage.getItem('nyx_installation_id');
+        if (!iid) {
+          iid = crypto.randomUUID();
+          sessionStorage.setItem('nyx_installation_id', iid);
+        }
+        return iid;
+      });
+  }
+  return clientInstallationIdPromise;
+}
+
 export function setAuthFailureHandler(handler: () => Promise<void>) {
   onAuthFailure = handler;
 }
@@ -39,7 +60,10 @@ export async function getCsrfToken(): Promise<string> {
   if (csrfTokenCache) return csrfTokenCache;
   
   try {
-    const res = await fetch(`${API_URL}/api/csrf-token`, { credentials: "include" });
+    const res = await fetch(`${API_URL}/api/csrf-token`, {
+      credentials: "include",
+      headers: { 'x-nyx-installation-id': await getClientInstallationId() }
+    });
     if (!res.ok) throw new Error(`Failed to fetch CSRF token: ${res.status}`);
     
     const data = await res.json();
@@ -56,8 +80,11 @@ export async function api<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const userHeaders = (options.headers as Record<string, string> | undefined) || {};
+  const hasInstallationId = Object.keys(userHeaders).some(k => k.toLowerCase() === 'x-nyx-installation-id');
   const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string> || {}),
+    ...(hasInstallationId ? {} : { 'x-nyx-installation-id': await getClientInstallationId() }),
+    ...userHeaders,
   };
 
   // Attach CSRF Token hanya untuk method non-GET (mutasi)
@@ -220,12 +247,14 @@ export async function apiUpload<T = unknown>({
 }): Promise<T> {
   try {
     const csrfToken = await getCsrfToken().catch(() => "");
+    const installationId = await getClientInstallationId();
 
     const data = await new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', API_URL + path);
       xhr.withCredentials = true; // Kirim Cookie
       xhr.setRequestHeader('CSRF-Token', csrfToken);
+      xhr.setRequestHeader('x-nyx-installation-id', installationId);
       xhr.upload.onprogress = (e) => {
         const progress = Math.round((e.loaded * 100) / (e.total || 1));
         onUploadProgress(progress);

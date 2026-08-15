@@ -90,6 +90,11 @@ test.describe('Chat Functionality', () => {
   test.setTimeout(240000); 
 
   test('Start a new conversation and send a message', async ({ page, browser }) => {
+    // Membutuhkan WebTransport untuk penerimaan real-time — skip bila tak tersedia
+    // (mis. chromium headless-shell di beberapa Linux build / CI tanpa QUIC).
+    const supported = await page.evaluate(() => typeof WebTransport !== 'undefined');
+    test.skip(!supported, 'WebTransport tidak tersedia di environment ini');
+
     // 1. Register User A (Alice)
     const usernameA = `alice_${Date.now()}`;
     await registerUser(page, 'Alice', usernameA);

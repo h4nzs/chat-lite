@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm -r run build",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r --if-present run test",
     "lint": "pnpm -r run lint",
     "bump:patch": "pnpm -r version patch",
     "bump:minor": "pnpm -r version minor",

@@ -91,8 +91,14 @@ test.describe('Profile & Identity Settings', () => {
     await expect(nameField).toHaveValue('Updated Ghost Identity', { timeout: 10000 });
     
     // Verifikasi inisial Avatar berubah menjadi UG (Updated Ghost)
-    // Timeout lebih longgar — update participant/sidebar lewat REST bisa lambat
-    // saat suite berjalan paralel (server lokal).
-    await expect(page.getByText('UG', { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    // expect.poll: event `user:updated`/REST update bisa lambat saat suite paralel
+    // (server lokal). Polling 45 detik jauh lebih stabil daripada expect tunggal.
+    await expect.poll(
+      async () => {
+        const initials = await page.getByText('UG', { exact: true }).first().isVisible().catch(() => false);
+        return initials;
+      },
+      { timeout: 45000, message: 'Avatar initials "UG" harus muncul setelah update profil' }
+    ).toBe(true);
   });
 });
