@@ -7,43 +7,42 @@ import { asMessageId, asConversationId, asUserId } from '@nyx/shared';
 import type { StoryId } from '@nyx/shared';
 
 // --- CRYPTO ENGINE FOR IRON VAULT ---
+// Kunci vault (deterministik dari identity private key) di-cache per sesi —
+// sebelumnya di-derive ulang (crypto_generichash) di SETIAP encrypt/decrypt pesan.
+let vaultKeyCache: { key: Uint8Array; privateKeyRef: Uint8Array } | null = null;
+
 const getVaultKey = async () => {
-  const sodium = await getSodium();
   const { privateKey } = await getMyEncryptionKeyPair();
-  if (!privateKey) throw new Error("Vault locked: Identity key not found in memory.");
+  if (!privateKey) {
+    vaultKeyCache = null;
+    throw new Error("Vault locked: Identity key not found in memory.");
+  }
+  if (vaultKeyCache && vaultKeyCache.privateKeyRef === privateKey) {
+    return vaultKeyCache.key;
+  }
+  const sodium = await getSodium();
   // Derive a deterministic 32-byte symmetric key from the user's private key
-  return sodium.crypto_generichash(32, privateKey, null);
+  const key = sodium.crypto_generichash(32, privateKey, null);
+  vaultKeyCache = { key, privateKeyRef: privateKey };
+  return key;
 };
 
 export const encryptVaultText = async (text: string): Promise<string> => {
-  const sodium = await getSodium();
+  // Canonical XChaCha envelope — AEAD dijalankan di crypto worker
   const key = await getVaultKey();
-  const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  
-  const cipherText = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-    text, null, null, nonce, key
-  );
-  
-  const combined = new Uint8Array(nonce.length + cipherText.length);
-  combined.set(nonce);
-  combined.set(cipherText, nonce.length);
-  return sodium.to_base64(combined, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const sodium = await getSodium();
+  const keyB64 = sodium.to_base64(key, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const { workerXChaChaSeal } = await import('@lib/crypto-worker-proxy');
+  return workerXChaChaSeal(keyB64, text);
 };
 
 export const decryptVaultText = async (encryptedBase64: string): Promise<string | null> => {
   try {
-    const sodium = await getSodium();
     const key = await getVaultKey();
-    const combined = sodium.from_base64(encryptedBase64, sodium.base64_variants.URLSAFE_NO_PADDING);
-    const nonceBytes = sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-    
-    const nonce = combined.slice(0, nonceBytes);
-    const cipherText = combined.slice(nonceBytes);
-
-    const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
-      null, cipherText, null, nonce, key
-    );
-    return new TextDecoder().decode(decrypted);
+    const sodium = await getSodium();
+    const keyB64 = sodium.to_base64(key, sodium.base64_variants.URLSAFE_NO_PADDING);
+    const { workerXChaChaOpen } = await import('@lib/crypto-worker-proxy');
+    return await workerXChaChaOpen(keyB64, encryptedBase64);
   } catch (_e) {
     return null; // Silent fail for corrupted/old data
   }

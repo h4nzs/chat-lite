@@ -1665,6 +1665,11 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                 devices?: {id: string, publicKey: PublicKeyInput}[], 
                 publicKey?: PublicKeyInput 
             };
+
+            // Kumpulkan semua (deviceId → publicKey bytes) dulu, lalu seal
+            // PARALEL via Promise.all — sebelumnya sequential per device.
+            const sealTargets: { deviceId: string; pubBytes: Uint8Array }[] = [];
+
             for (const p of conversation.participants as ParticipantData[]) {
                const targetUserId = p.userId || p.id;
                const userObj = p.user || p;
@@ -1702,15 +1707,23 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                                    }
                                }
 
-                               const sealed = await worker_crypto_box_seal(pushDataBytes, recipientPubBytes);
-                               pushPayloads[device.id] = sodium.to_base64(sealed, sodium.base64_variants.URLSAFE_NO_PADDING);
+                               sealTargets.push({ deviceId: device.id, pubBytes: recipientPubBytes });
                            } catch (e) {
-                               console.error(`Failed to seal push for device ${device.id}`, e);
+                               console.error(`Failed to parse public key for device ${device.id}`, e);
                            }
                        }
                    }
                }
             }
+
+            await Promise.all(sealTargets.map(async ({ deviceId, pubBytes }) => {
+                try {
+                    const sealed = await worker_crypto_box_seal(pushDataBytes, pubBytes);
+                    pushPayloads[deviceId] = sodium.to_base64(sealed, sodium.base64_variants.URLSAFE_NO_PADDING);
+                } catch (e) {
+                    console.error(`Failed to seal push for device ${deviceId}`, e);
+                }
+            }));
         }
       } catch (e) {
         console.error("Failed to generate push payloads", e);

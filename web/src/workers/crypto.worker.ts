@@ -212,6 +212,38 @@ async function _stretchSeed(seed: Uint8Array): Promise<Uint8Array> {
   });
 }
 
+// ============================================================
+// CANONICAL XChaCha20-Poly1305 ENVELOPE (single implementation)
+// Format: base64url( nonce(24) || ciphertext ) — kompatibel dengan
+// semua data terenkripsi yang sudah tersimpan (story, call signal,
+// profile, shadow vault). Setiap pemanggil WAJIB memakai helper ini,
+// bukan mengimplementasikan ulang AEAD.
+// ============================================================
+const XCHACHA_NPUBBYTES = 24;
+
+function xchachaSealBytes(keyBytes: Uint8Array, plaintext: string): Uint8Array {
+  const message = new TextEncoder().encode(plaintext);
+  const nonce = sodium.randombytes_buf(XCHACHA_NPUBBYTES);
+  const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+    message, null, null, nonce, keyBytes
+  );
+  const combined = new Uint8Array(nonce.length + ciphertext.length);
+  combined.set(nonce);
+  combined.set(ciphertext, nonce.length);
+  return combined;
+}
+
+function xchachaOpenBytes(keyBytes: Uint8Array, combined: Uint8Array): Uint8Array {
+  if (combined.length < XCHACHA_NPUBBYTES) {
+    throw new Error('Sealed payload is too short to contain a valid nonce.');
+  }
+  const nonce = combined.slice(0, XCHACHA_NPUBBYTES);
+  const ciphertext = combined.slice(XCHACHA_NPUBBYTES);
+  return sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+    null, ciphertext, null, nonce, keyBytes
+  );
+}
+
 async function _encryptData(keyBytes: Uint8Array, data: unknown): Promise<string> {
   try {
     const iv = sodium.randombytes_buf(24);
@@ -560,7 +592,10 @@ export type WorkerMessage =
   | { type: 'burner_dr_init_guest'; payload: { hostClassicalPk: CryptoBuffer; hostPqPk: CryptoBuffer }; id: string }
   | { type: 'burner_dr_init_host'; payload: { guestClassicalPk: CryptoBuffer; hostClassicalSk: CryptoBuffer; savedCt: CryptoBuffer; hostPqSk: CryptoBuffer }; id: string }
   | { type: 'burner_dr_encrypt'; payload: { state: BurnerDoubleRatchetState; plaintext: string | CryptoBuffer }; id: string }
-  | { type: 'burner_dr_decrypt'; payload: { state: BurnerDoubleRatchetState; header: BurnerDoubleRatchetHeader; ciphertext: CryptoBuffer }; id: string };
+  | { type: 'burner_dr_decrypt'; payload: { state: BurnerDoubleRatchetState; header: BurnerDoubleRatchetHeader; ciphertext: CryptoBuffer }; id: string }
+  | { type: 'xchacha_seal'; payload: { keyB64: string; plaintext: string }; id: string }
+  | { type: 'xchacha_open'; payload: { keyB64: string; sealedB64: string }; id: string }
+  | { type: 'panic_hash'; payload: { password: string; saltB64: string; iterations: number; memorySize: number; parallelism: number }; id: string };
 
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const { type, payload, id } = event.data;
@@ -684,6 +719,28 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             if (ciphertextBytes) sodium.memzero(ciphertextBytes);
             if (nonceBytes) sodium.memzero(nonceBytes);
             if (keyBytes) sodium.memzero(keyBytes);
+        }
+        break;
+      }
+      case 'xchacha_seal': {
+        // Canonical envelope: base64url(nonce||ciphertext). Dipakai story/call/vault/profile.
+        const { keyB64, plaintext } = payload as { keyB64: string; plaintext: string };
+        const keyBytes = sodium.from_base64(keyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+        try {
+          result = sodium.to_base64(xchachaSealBytes(keyBytes, plaintext), sodium.base64_variants.URLSAFE_NO_PADDING);
+        } finally {
+          sodium.memzero(keyBytes);
+        }
+        break;
+      }
+      case 'xchacha_open': {
+        const { keyB64, sealedB64 } = payload as { keyB64: string; sealedB64: string };
+        const keyBytes = sodium.from_base64(keyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+        try {
+          const combined = sodium.from_base64(sealedB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+          result = new TextDecoder().decode(xchachaOpenBytes(keyBytes, combined));
+        } finally {
+          sodium.memzero(keyBytes);
         }
         break;
       }
@@ -1231,33 +1288,44 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         result = sodium.to_base64(hashBytes, sodium.base64_variants.URLSAFE_NO_PADDING);
         break;
       }
+      case 'panic_hash': {
+        // Panic password hashing (Argon2id ringan) — dipindah dari main thread
+        const { password, saltB64, iterations, memorySize, parallelism } = payload as {
+          password: string; saltB64: string; iterations: number; memorySize: number; parallelism: number;
+        };
+        const saltBytes = sodium.from_base64(saltB64, sodium.base64_variants.ORIGINAL);
+        try {
+          // hash-wasm mengembalikan HEX string — konversi ke bytes agar format
+          // base64(32 bytes) tetap kompatibel dengan record lama di kvStore.
+          const hashHex = await argon2id({
+            password,
+            salt: saltBytes,
+            iterations,
+            memorySize,
+            parallelism,
+            hashLength: 32
+          });
+          const hashBytes = new Uint8Array(hashHex.length / 2);
+          for (let i = 0; i < hashBytes.length; i++) {
+            hashBytes[i] = parseInt(hashHex.substr(i * 2, 2), 16);
+          }
+          result = sodium.to_base64(hashBytes, sodium.base64_variants.ORIGINAL);
+        } finally {
+          sodium.memzero(saltBytes);
+        }
+        break;
+      }
       case 'encryptProfile': {
         const { profileJsonString, profileKeyB64 } = payload;
         let key: Uint8Array | null = null;
-        let message: Uint8Array | null = null;
-        let nonce: Uint8Array | null = null;
-        let ciphertext: Uint8Array | null = null;
         let combined: Uint8Array | null = null;
 
         try {
             key = sodium.from_base64(profileKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-            message = new TextEncoder().encode(profileJsonString);
-            nonce = sodium.randombytes_buf(24);
-            
-            ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-                message, null, null, nonce, key
-            );
-            
-            combined = new Uint8Array(nonce!.length + ciphertext!.length);
-            combined.set(nonce!);
-            combined.set(ciphertext!, nonce!.length);
-            
+            combined = xchachaSealBytes(key!, profileJsonString);
             result = sodium.to_base64(combined, sodium.base64_variants.URLSAFE_NO_PADDING);
         } finally {
             if (key) sodium.memzero(key);
-            if (message) sodium.memzero(message);
-            if (nonce) sodium.memzero(nonce);
-            if (ciphertext) sodium.memzero(ciphertext);
             if (combined) sodium.memzero(combined);
         }
         break;
@@ -1271,15 +1339,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         try {
             key = sodium.from_base64(profileKeyB64, sodium.base64_variants.URLSAFE_NO_PADDING);
             combined = sodium.from_base64(encryptedProfileB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-            
-            const nonceBytes = 24;
-            const nonce = combined!.slice(0, nonceBytes);
-            const ciphertext = combined!.slice(nonceBytes);
-            
-            decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
-                null, ciphertext, null, nonce, key!
-            );
-            
+            decrypted = xchachaOpenBytes(key!, combined!);
             result = new TextDecoder().decode(decrypted!);
         } finally {
             if (key) sodium.memzero(key);

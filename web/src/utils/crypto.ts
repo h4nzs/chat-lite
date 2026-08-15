@@ -446,47 +446,14 @@ export async function generateCallKey(): Promise<string> {
 }
 
 export async function encryptCallSignal(payload: object, base64Key: string): Promise<string> {
-  const { getSodium } = await import('@lib/sodiumInitializer');
-  const sodium = await getSodium();
-  const keyBytes = sodium.from_base64(base64Key, sodium.base64_variants.URLSAFE_NO_PADDING);
-  
-  const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  const encodedPayload = new TextEncoder().encode(JSON.stringify(payload));
-  
-  const encryptedBytes = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-    encodedPayload,
-    null,
-    null,
-    nonce,
-    keyBytes
-  );
-
-  const combined = new Uint8Array(nonce.length + encryptedBytes.length);
-  combined.set(nonce, 0);
-  combined.set(encryptedBytes, nonce.length);
-
-  return sodium.to_base64(combined, sodium.base64_variants.URLSAFE_NO_PADDING);
+  // Canonical XChaCha envelope — AEAD dijalankan di crypto worker
+  const { workerXChaChaSeal } = await import('@lib/crypto-worker-proxy');
+  return workerXChaChaSeal(base64Key, JSON.stringify(payload));
 }
 
 export async function decryptCallSignal(encryptedStr: string, base64Key: string): Promise<unknown> {
-  const { getSodium } = await import('@lib/sodiumInitializer');
-  const sodium = await getSodium();
-  const keyBytes = sodium.from_base64(base64Key, sodium.base64_variants.URLSAFE_NO_PADDING);
-  const combined = sodium.from_base64(encryptedStr, sodium.base64_variants.URLSAFE_NO_PADDING);
-
-  const nonceLength = sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-  const nonce = combined.slice(0, nonceLength);
-  const encryptedBytes = combined.slice(nonceLength);
-
-  const decryptedBuf = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
-    null,
-    encryptedBytes,
-    null,
-    nonce,
-    keyBytes
-  );
-
-  const jsonStr = new TextDecoder().decode(decryptedBuf);
+  const { workerXChaChaOpen } = await import('@lib/crypto-worker-proxy');
+  const jsonStr = await workerXChaChaOpen(base64Key, encryptedStr);
   return JSON.parse(jsonStr);
 }
 

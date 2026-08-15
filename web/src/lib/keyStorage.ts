@@ -1,7 +1,7 @@
 import { isPlainObject } from '@utils/typeGuards';
 // web/src/lib/keyStorage.ts
 import { db } from './db';
-import { sha256, argon2id } from 'hash-wasm';
+import { sha256 } from 'hash-wasm';
 import { getSodium } from './sodiumInitializer';
 
 const STORAGE_KEYS = {
@@ -34,40 +34,8 @@ const arrayBufferToBase64 = (buffer: Uint8Array) => {
   return window.btoa(binary);
 };
 
-const base64ToArrayBuffer = (base64: string) => {
-  const binary_string = window.atob(base64);
-  const len = binary_string.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary_string.charCodeAt(i);
-  }
-  return bytes;
-};
-
-const hexToUint8Array = (hex: string): Uint8Array => {
-  if (hex.length % 2 !== 0) {
-    throw new Error("Invalid Argon2id hex format: Length must be even");
-  }
-  if (/[^0-9a-fA-F]/.test(hex)) {
-    throw new Error("Invalid Argon2id hex format: Contains non-hex characters");
-  }
-  const matches = hex.match(/.{1,2}/g);
-  if (!matches) {
-    throw new Error("Invalid Argon2id hex format: No hex pairs found");
-  }
-  
-  const bytes = matches.map((byte, index) => {
-    const parsed = parseInt(byte, 16);
-    if (isNaN(parsed)) {
-      throw new Error(`Invalid Argon2id hex format: Non-hex character at pair ${index} (${byte})`);
-    }
-    return parsed;
-  });
-  
-  return new Uint8Array(bytes);
-};
-
-// FIX 2: Pindahkan Panic Hash ke IndexedDB (kvStore) agar tersentralisasi
+// FIX 2: Pindahkan Panic Hash ke IndexedDB (kvStore) agar tersentralisasi.
+// Argon2id dijalankan di crypto worker — bukan main thread (jangan blocking UI).
 export const setPanicPassword = async (password: string) => {
   if (!password) {
     await del(STORAGE_KEYS.PANIC_HASH);
@@ -82,14 +50,10 @@ export const setPanicPassword = async (password: string) => {
     memorySize: 19456,
     parallelism: 1,
     hashLength: 32
-  };    const hashHex = await argon2id({
-    password,
-    salt: saltBytes,
-    ...params
-  });
-  
-  const hashBytes = hexToUint8Array(hashHex);
-  const hash = arrayBufferToBase64(hashBytes);
+  };
+
+  const { workerPanicHash } = await import('./crypto-worker-proxy');
+  const hash = await workerPanicHash(password, salt, params.iterations, params.memorySize, params.parallelism);
 
   const record = {
     alg: "NYX_PANIC_VERIFY_V1",
@@ -114,15 +78,8 @@ export const checkPanicPassword = async (password: string): Promise<boolean> => 
     const _parsedRec = JSON.parse(storedRecordStr); if (!isPlainObject(_parsedRec)) return false; const record = _parsedRec as { alg: string; salt: string; params: { iterations: number; memorySize: number; parallelism: number; hashLength: number }; hash: string };
     if (record.alg !== "NYX_PANIC_VERIFY_V1") return false;
     
-    const saltBytes = base64ToArrayBuffer(record.salt);
-    const derivedHashHex = await argon2id({
-      password,
-      salt: saltBytes,
-      ...record.params
-    });
-    
-    const derivedHashBytes = hexToUint8Array(derivedHashHex);
-    const derivedHash = arrayBufferToBase64(derivedHashBytes);
+    const { workerPanicHash } = await import('./crypto-worker-proxy');
+    const derivedHash = await workerPanicHash(password, record.salt, record.params.iterations, record.params.memorySize, record.params.parallelism);
     
     return derivedHash === record.hash;
   } catch (e) {

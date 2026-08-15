@@ -350,6 +350,31 @@ export function worker_encrypt_session_key(sessionKey: Uint8Array, masterSeed: C
     });
 }
 
+// --- CANONICAL XChaCha20-Poly1305 ENVELOPE (dedup 5 implementasi) ---
+
+/**
+ * Enkripsi string dengan XChaCha20-Poly1305.
+ * Output: base64url(nonce(24) || ciphertext) — format kanonik NYX.
+ */
+export function workerXChaChaSeal(keyB64: string, plaintext: string): Promise<string> {
+    return sendToWorker<string>('xchacha_seal', { keyB64, plaintext });
+}
+
+/**
+ * Dekripsi payload dari workerXChaChaSeal. Melempar error bila format/autentikasi gagal.
+ */
+export function workerXChaChaOpen(keyB64: string, sealedB64: string): Promise<string> {
+    return sendToWorker<string>('xchacha_open', { keyB64, sealedB64 });
+}
+
+/**
+ * Panic password hash (Argon2id) — dijalankan di worker, bukan main thread.
+ * Output: base64 (ORIGINAL variant) dari 32 byte hash — kompatibel dengan format lama.
+ */
+export function workerPanicHash(password: string, saltB64: string, iterations: number, memorySize: number, parallelism: number): Promise<string> {
+    return sendToWorker<string>('panic_hash', { password, saltB64, iterations, memorySize, parallelism }, undefined, 120000);
+}
+
 export function worker_decrypt_session_key(encryptedKey: Uint8Array, masterSeed: CryptoBuffer): Promise<Uint8Array> {
     return sendToWorker('decrypt_session_key', { 
         encryptedKey: asBuffer(encryptedKey), 

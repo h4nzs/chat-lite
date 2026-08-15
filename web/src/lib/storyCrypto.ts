@@ -2,7 +2,7 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { getSodiumLib } from '@utils/crypto';
-import { worker_generate_random_key } from './crypto-worker-proxy';
+import { worker_generate_random_key, workerXChaChaSeal, workerXChaChaOpen } from './crypto-worker-proxy';
 
 /**
  * Generate a new random symmetric key for a Story (using libsodium)
@@ -16,57 +16,19 @@ export async function generateStoryKey(): Promise<string> {
 }
 
 /**
- * Encrypt a Story payload using the provided key (XChaCha20-Poly1305)
+ * Encrypt a Story payload using the provided key.
+ * AEAD dijalankan di crypto worker (canonical XChaCha envelope).
  * Output: Base64 URL Safe string (nonce + ciphertext)
  */
 export async function encryptStoryPayload(payload: unknown, base64Key: string): Promise<string> {
-  const sodium = await getSodiumLib();
-  const keyBytes = sodium.from_base64(base64Key, sodium.base64_variants.URLSAFE_NO_PADDING);
-  
-  const encodedPayload = new TextEncoder().encode(JSON.stringify(payload));
-  const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  
-  const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-    encodedPayload,
-    null,
-    null,
-    nonce,
-    keyBytes
-  );
-  
-  const combined = new Uint8Array(nonce.length + ciphertext.length);
-  combined.set(nonce);
-  combined.set(ciphertext, nonce.length);
-  
-  return sodium.to_base64(combined, sodium.base64_variants.URLSAFE_NO_PADDING);
+  return workerXChaChaSeal(base64Key, JSON.stringify(payload));
 }
 
 /**
- * Decrypt a Story payload using the provided key (XChaCha20-Poly1305)
+ * Decrypt a Story payload using the provided key.
  * Output: Parsed JSON Object
  */
 export async function decryptStoryPayload(encryptedDataB64: string, base64Key: string): Promise<unknown> {
-  const sodium = await getSodiumLib();
-  const keyBytes = sodium.from_base64(base64Key, sodium.base64_variants.URLSAFE_NO_PADDING);
-  
-  const combined = sodium.from_base64(encryptedDataB64, sodium.base64_variants.URLSAFE_NO_PADDING);
-  const nonceBytes = sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-  
-  if (combined.length < nonceBytes) {
-      throw new Error("Story payload is too short to contain a valid nonce.");
-  }
-  
-  const nonce = combined.slice(0, nonceBytes);
-  const ciphertext = combined.slice(nonceBytes);
-  
-  const decrypted = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
-    null,
-    ciphertext,
-    null,
-    nonce,
-    keyBytes
-  );
-  
-  const decoded = new TextDecoder().decode(decrypted);
-  return JSON.parse(decoded);
+  const plaintext = await workerXChaChaOpen(base64Key, encryptedDataB64);
+  return JSON.parse(plaintext);
 }
