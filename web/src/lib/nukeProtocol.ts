@@ -10,6 +10,24 @@ export const executeLocalWipe = async (redirectUrl: string = '/') => {
   try {
     console.warn("INITIATING NUCLEAR LOCAL WIPE...");
 
+    // 0.0 Matikan sesi di SERVER dulu (best-effort). Cookie `at`/`rt` HttpOnly
+    // tidak bisa dihapus dari document.cookie — tanpa ini access token tetap valid
+    // ~15 menit setelah wipe, sehingga "obliterate" tidak benar-benar total.
+    try {
+      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
+      const csrfData = await csrfRes.json().catch(() => null) as { csrfToken?: string } | null;
+      await fetch('/api/auth/logout-all', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'CSRF-Token': csrfData?.csrfToken ?? '',
+          'x-nyx-installation-id': localStorage.getItem('nyx_installation_id') ?? ''
+        }
+      });
+    } catch (_e) {
+      // Session kill gagal (mungkin sudah logout / offline) — lanjutkan wipe lokal
+    }
+
     // 0. Close active connections to release the file lock
     await closeDatabaseConnection().catch(() => {});
 

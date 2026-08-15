@@ -1046,56 +1046,54 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         const header = res.header;
 
         const chunkSize = 1024 * 1024 * 1; // 1MB chunk for streaming stability
-        const chunks: Uint8Array[] = [];
-        chunks.push(header);
+        const ABYTES = sodium.crypto_secretstream_xchacha20poly1305_ABYTES;
+
+        const sourceLength = isBlob
+          ? (fileBuffer as Blob).size
+          : new Uint8Array(fileBuffer as ArrayBuffer).length;
+
+        // STREAMING: alokasi output SEKALI (header + ciphertext + per-chunk MAC).
+        // Format byte-identik dengan implementasi lama (header + pushed chunks) —
+        // hanya tidak lagi mengakumulasi seluruh chunk di memori (2× ukuran file).
+        const numChunks = sourceLength === 0 ? 1 : Math.ceil(sourceLength / chunkSize);
+        const totalLength = header.length + sourceLength + numChunks * ABYTES;
+        const combinedData = new Uint8Array(totalLength);
+        combinedData.set(header, 0);
+        let offset = header.length;
+
+        const pushChunk = (chunkBytes: Uint8Array, isFinal: boolean) => {
+          const tag = isFinal
+            ? sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
+            : sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE;
+          const encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, chunkBytes, null, tag);
+          combinedData.set(encryptedChunk, offset);
+          offset += encryptedChunk.length;
+        };
 
         if (isBlob) {
             const blob = fileBuffer as Blob;
             if (blob.size === 0) {
-               const encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(
-                 state, new Uint8Array(0), null, sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
-               );
-               chunks.push(encryptedChunk);
+               pushChunk(new Uint8Array(0), true);
             } else {
                for (let i = 0; i < blob.size; i += chunkSize) {
                  const slice = blob.slice(i, i + chunkSize);
                  const chunkBuf = await slice.arrayBuffer();
                  const chunkBytes = new Uint8Array(chunkBuf);
                  const isFinal = (i + chunkSize) >= blob.size;
-                 const tag = isFinal
-                   ? sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
-                   : sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE;
-                 const encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, chunkBytes, null, tag);
-                 chunks.push(encryptedChunk);
+                 pushChunk(chunkBytes, isFinal);
                }
             }
         } else {
             const fileBytes = new Uint8Array(fileBuffer as ArrayBuffer);
             if (fileBytes.length === 0) {
-              const encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(
-                state, new Uint8Array(0), null, sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
-              );
-              chunks.push(encryptedChunk);
+              pushChunk(new Uint8Array(0), true);
             } else {
               for (let i = 0; i < fileBytes.length; i += chunkSize) {
                 const chunk = fileBytes.slice(i, i + chunkSize);
                 const isFinal = (i + chunkSize) >= fileBytes.length;
-                const tag = isFinal
-                  ? sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL
-                  : sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE;
-
-                const encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(state, chunk, null, tag);
-                chunks.push(encryptedChunk);
+                pushChunk(chunk, isFinal);
               }
             }
-        }
-
-        const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
-        const combinedData = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const c of chunks) {
-          combinedData.set(c, offset);
-          offset += c.length;
         }
 
         result = { combinedData: combinedData.buffer, key };

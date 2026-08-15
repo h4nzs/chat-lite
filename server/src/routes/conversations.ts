@@ -103,8 +103,14 @@ router.post('/', zodValidate({
     const { userIds, isGroup, encryptedMetadata, initialSession } = req.body
 
     const today = new Date().toISOString().split('T')[0];
-    const sandboxCount = await redisClient.incr(`sandbox:newchat:${creatorId}:${today}`);
-    if (sandboxCount === 1) await redisClient.expire(`sandbox:newchat:${creatorId}:${today}`, 86400);
+    // INCR+EXPIRE atomik (Lua) — mencegah key hidup selamanya bila proses mati di antaranya
+    const sandboxCount = Number(await redisClient.eval(`
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`, { keys: [`sandbox:newchat:${creatorId}:${today}`], arguments: ['86400'] }));
 
     const creator = await prisma.user.findUnique({ where: { id: creatorId }, select: { isVerified: true } });
     if (!creator?.isVerified && sandboxCount > 3) {

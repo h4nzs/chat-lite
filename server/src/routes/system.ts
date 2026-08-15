@@ -1,12 +1,7 @@
 import { Router } from 'express';
 import { redisClient } from '../lib/redis.js';
-import openapiSpec from '../openapi.js';
 
 const router = Router();
-
-router.get('/openapi.json', (_req, res) => {
-  res.json(openapiSpec);
-});
 
 router.get('/status', async (req, res) => {
   try {

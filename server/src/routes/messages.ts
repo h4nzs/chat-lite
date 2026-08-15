@@ -118,7 +118,9 @@ router.post('/', zodValidate({
     sessionId: z.string().optional().nullable(),
     tempId: z.union([z.string(), z.number()]).optional(),
     expiresIn: z.number().optional().nullable(),
-    isViewOnce: z.boolean().optional()
+    isViewOnce: z.boolean().optional(),
+    // Cap sama dengan jalur WebTransport: mencegah amplifikasi relay via REST
+    targetRecipients: z.array(z.string()).max(500).optional()
     // repliedToId dihapus validasinya karena relasi DB sudah diputus
   }).refine(data => data.content, { message: "Message must contain content" })
 }), async (req, res, next) => {

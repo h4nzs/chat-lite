@@ -14,9 +14,6 @@ router.get("/api-catalog", (_req: Request, res: Response) => {
     linkset: [
       {
         anchor: "https://api.nyx-app.my.id",
-        "service-desc": [
-          { href: "/api/system/openapi.json" }
-        ],
         "service-doc": [
           { href: "https://nyx-app.my.id/api-docs" }
         ],
@@ -26,9 +23,6 @@ router.get("/api-catalog", (_req: Request, res: Response) => {
       },
       {
         anchor: "https://api.nyx-app.my.id/api/auth",
-        "service-desc": [
-          { href: "/api/system/openapi.json" }
-        ],
         "service-doc": [
           { href: "https://nyx-app.my.id/api-docs" }
         ],
@@ -38,9 +32,6 @@ router.get("/api-catalog", (_req: Request, res: Response) => {
       },
       {
         anchor: "https://api.nyx-app.my.id/api/users",
-        "service-desc": [
-          { href: "/api/system/openapi.json" }
-        ],
         "service-doc": [
           { href: "https://nyx-app.my.id/api-docs" }
         ],
@@ -50,9 +41,6 @@ router.get("/api-catalog", (_req: Request, res: Response) => {
       },
       {
         anchor: "https://api.nyx-app.my.id/api/conversations",
-        "service-desc": [
-          { href: "/api/system/openapi.json" }
-        ],
         "service-doc": [
           { href: "https://nyx-app.my.id/api-docs" }
         ],
@@ -62,9 +50,6 @@ router.get("/api-catalog", (_req: Request, res: Response) => {
       },
       {
         anchor: "https://api.nyx-app.my.id/api/messages",
-        "service-desc": [
-          { href: "/api/system/openapi.json" }
-        ],
         "service-doc": [
           { href: "https://nyx-app.my.id/api-docs" }
         ],

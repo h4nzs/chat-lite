@@ -17,6 +17,12 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      // Chrome penuh (channel apt) — satu-satunya varian yang mendukung
+      // WebTransport/QUIC di CI. Dipakai oleh job `e2e-chrome`.
+      name: 'chrome',
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    },
   ],
   webServer: [
     {

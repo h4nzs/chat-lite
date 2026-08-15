@@ -24,28 +24,33 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const BurnerChat = lazy(() => import('./pages/BurnerChat'));
 const EmbedChatPage = lazy(() => import('./pages/EmbedChatPage'));
 
-// Components
+// Components — modal global di-LAZY (hanya diunduh & dimount saat dibutuhkan).
+// Sebelumnya eager import membengkakkan main bundle (CallOverlay, CommandPalette, dll).
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
-import ConfirmModal from '@components/ConfirmModal';
-import UserInfoModal from '@components/UserInfoModal';
-import PasswordPromptModal from '@components/PasswordPromptModal';
-import ChatInfoModal from '@components/ChatInfoModal';
-import DynamicIsland from '@components/DynamicIsland';
-import CommandPalette from '@components/CommandPalette';
-import ContextMenu from '@components/ContextMenu';
-import CallOverlay from '@components/CallOverlay';
-import SystemInitModal from '@components/SystemInitModal';
 import PrivacyCloak from './components/PrivacyCloak';
 import { Spinner } from './components/Spinner';
 import { SystemBanner } from './components/SystemBanner';
 import { MaintenancePage } from './pages/MaintenancePage';
+
+const ConfirmModal = lazy(() => import('@components/ConfirmModal'));
+const UserInfoModal = lazy(() => import('@components/UserInfoModal'));
+const PasswordPromptModal = lazy(() => import('@components/PasswordPromptModal'));
+const ChatInfoModal = lazy(() => import('@components/ChatInfoModal'));
+const DynamicIsland = lazy(() => import('@components/DynamicIsland'));
+const CommandPalette = lazy(() => import('@components/CommandPalette'));
+const ContextMenu = lazy(() => import('@components/ContextMenu'));
+const CallOverlay = lazy(() => import('@components/CallOverlay'));
+const SystemInitModal = lazy(() => import('@components/SystemInitModal'));
 
 // Stores & Hooks
 import { useAuthStore } from './store/auth';
 import * as Sentry from '@sentry/react';
 import { useThemeStore } from './store/theme';
 import { useCommandPaletteStore } from './store/commandPalette';
+import { useModalStore } from './store/modal';
+import { useContextMenuStore } from './store/contextMenu';
+import { useCallStore } from './store/callStore';
 import { useConversationStore } from './store/conversation';
 import { useSystemStore } from './store/systemStore';
 import { useGlobalShortcut } from './hooks/useGlobalShortcut';
@@ -114,6 +119,16 @@ const AppContent = () => {
   })));
   const navigate = useNavigate();
   const location = useLocation();
+
+  // --- Kondisi render modal global (on-demand chunk loading) ---
+  const { isConfirmOpen, isProfileModalOpen, isPasswordPromptOpen, isChatInfoModalOpen } = useModalStore(useShallow(s => ({
+    isConfirmOpen: s.isConfirmOpen,
+    isProfileModalOpen: s.isProfileModalOpen,
+    isPasswordPromptOpen: s.isPasswordPromptOpen,
+    isChatInfoModalOpen: s.isChatInfoModalOpen
+  })));
+  const isContextMenuOpen = useContextMenuStore(s => s.isOpen);
+  const isCallActive = useCallStore(s => s.callState !== 'idle');
 
   // --- System Status (Banner & Maintenance) ---
   const { maintenance, checkStatus } = useSystemStore(useShallow(s => ({
@@ -365,17 +380,20 @@ const AppContent = () => {
 
       <PrivacyCloak />
 
-      {/* Global Modals & UI Elements */}
+      {/* Global Modals & UI Elements — render on-demand agar chunk modal
+          hanya diunduh saat benar-benar dibutuhkan */}
       <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
+        {/* CommandPalette wajib selalu ter-mount: dia mendaftarkan command
+            navigasi global di dalam dirinya */}
         <CommandPalette />
-        <ConfirmModal />
-        <UserInfoModal />
-        <PasswordPromptModal />
-        <ChatInfoModal />
+        {isConfirmOpen && <ConfirmModal />}
+        {isProfileModalOpen && <UserInfoModal />}
+        {isPasswordPromptOpen && <PasswordPromptModal />}
+        {isChatInfoModalOpen && <ChatInfoModal />}
         <DynamicIsland />
-        <ContextMenu />
-        <CallOverlay />
+        {isContextMenuOpen && <ContextMenu />}
+        {isCallActive && <CallOverlay />}
         <SystemInitModal />
 
         <div className="w-full h-dvh max-w-[1920px] mx-auto relative shadow-2xl overflow-hidden bg-bg-main flex flex-col">

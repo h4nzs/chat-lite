@@ -136,4 +136,78 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Run E2E (spec transport auto-skip bila WebTransport tidak tersedia)
         working-directory: web
-        run: pnpm exec playwright test
+        run: pnpm exec playwright test --project=chromium
+
+  e2e-chrome:
+    name: E2E (Chrome penuh — WebTransport/QUIC aktif)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci_db
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-jwt-secret-not-for-prod
+      CSRF_SECRET: ci-csrf-secret
+      CHAT_SECRET: ci-chat-secret
+      CORS_ORIGIN: http://localhost:5173
+      TRANSPORT_PORT: 33333
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install dependencies (lockfile enforced)
+        run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Prisma generate + db push (DB CI)
+        working-directory: server
+        env:
+          PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: 'consent for CI ephemeral database schema push'
+        run: |
+          pnpm exec prisma generate
+          pnpm exec prisma db push
+      - name: Install Google Chrome (channel 'chrome')
+        working-directory: web
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      - name: Build Rust WebTransport sidecar
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build sidecar
+        working-directory: server/transport-sidecar
+        run: cargo build --release
+      - name: Start sidecar & ambil cert hash untuk pinning
+        working-directory: server
+        run: |
+          ./transport-sidecar/target/release/transport-sidecar > /tmp/sidecar.log 2>&1 &
+          for i in $(seq 1 20); do
+            grep -q "SHA-256 Hash" /tmp/sidecar.log && break
+            sleep 1
+          done
+          CERT_HASH=$(grep -oE "Hash: ([0-9a-f]{2}:){31}[0-9a-f]{2}" /tmp/sidecar.log | head -1 | cut -d' ' -f2)
+          echo "VITE_TRANSPORT_CERT_HASH=$CERT_HASH" >> "$GITHUB_ENV"
+          echo "VITE_TRANSPORT_URL=http://localhost:33333" >> "$GITHUB_ENV"
+          cat /tmp/sidecar.log
+      - name: Run E2E full (chat + transport specs aktif)
+        working-directory: web
+        run: pnpm exec playwright test --project=chrome

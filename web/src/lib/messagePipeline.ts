@@ -112,7 +112,7 @@ export async function decryptMessageObject(
             const { worker_crypto_secretbox_xchacha20poly1305_open_easy } = await import('@lib/crypto-worker-proxy');
             const sodium = await getSodium();
             
-            const rawCipher: unknown = 'ciphertext' in rawMsg ? rawMsg.ciphertext : rawMsg.content;
+            const rawCipher: unknown = rawMsg.content;
             let cipherTextToUse: string | null | undefined = rawCipher === null ? null : rawCipher === undefined ? undefined : String(rawCipher);
 
             const unwrap = (str: string): string => {
@@ -238,7 +238,7 @@ export async function decryptMessageObject(
         }
     }
 
-    const rawContent: unknown = 'ciphertext' in rawMsg ? rawMsg.ciphertext : undefined;
+    const rawContent: unknown = rawMsg.content;
     let contentToDecrypt: string | undefined = rawContent === undefined ? undefined : String(rawContent);
 
     if (!contentToDecrypt) {

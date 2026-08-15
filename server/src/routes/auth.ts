@@ -125,7 +125,11 @@ async function verifyTurnstileToken (token: string): Promise<boolean> {
     formData.append('secret', secret)
     formData.append('response', token)
     try {
-      const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: formData })
+      const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        body: formData,
+        signal: AbortSignal.timeout(5000)
+      })
       const outcome = await result.json() as { success: boolean }
       return outcome.success
     } catch (e) {
@@ -679,10 +683,15 @@ router.get('/pow/challenge', requireAuth, async (req, res, next) => {
     const prefix = instId ? 'pow:inst' : (fingerprint ? 'pow:fp' : (ip ? 'pow:ip' : 'pow:user'));
     const rateKey = `${prefix}:${stableHash}`;
 
-    let count = await redisClient.incr(rateKey);
-    if (count === 1) {
-        await redisClient.expire(rateKey, 86400);
-    } else if (Number.isNaN(count) || count < 0) {
+    // INCR+EXPIRE atomik (Lua)
+    let count = Number(await redisClient.eval(`
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`, { keys: [rateKey], arguments: ['86400'] }));
+    if (Number.isNaN(count) || count < 0) {
         count = 0;
     }
 

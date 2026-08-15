@@ -143,7 +143,6 @@ const RawServerMessageBaseSchema = z.object({
     username: z.string().optional(),
     avatarUrl: z.string().nullable().optional(),
   }).optional(),
-  ciphertext: PayloadStringSchema.optional(), // Legacy duplikat content — server tidak lagi mengirimnya
   content: PayloadStringSchema.optional().nullable(),
   fileUrl: z.string().nullable().optional(),
   fileKey: Base64StringSchema.nullable().optional(),

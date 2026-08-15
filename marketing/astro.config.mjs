@@ -1,11 +1,7 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import packageJson from './package.json';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://astro.build/config
 export default defineConfig({
@@ -32,15 +28,5 @@ export default defineConfig({
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
     },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '../web/src'),
-        '@lib': path.resolve(__dirname, '../web/src/lib'),
-        '@utils': path.resolve(__dirname, '../web/src/utils'),
-        '@hooks': path.resolve(__dirname, '../web/src/hooks'),
-        '@store': path.resolve(__dirname, '../web/src/store'),
-        '@components': path.resolve(__dirname, '../web/src/components'),
-      }
-    }
   }
 });

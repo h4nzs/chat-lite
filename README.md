@@ -88,6 +88,8 @@ NYX is designed for high-security, zero-trust deployments.
 
 **Zero-Inbound Policy:** Our production reference architecture completely disables inbound firewall ports (except SSH). All traffic is securely routed through **Cloudflare Tunnels** directly to localhost ports (3000 for PWA, 4000 for API/Socket).
 
+> **📦 Ops note — R2 lifecycle:** Expiring messages are swept server-side, but their encrypted blobs are blind (the server cannot read `r2Key`). Configure a Cloudflare R2 **lifecycle rule** (e.g. delete objects older than 30 days) so orphaned encrypted blobs don't accumulate indefinitely.
+
 ### Local Development Quick Start
 
 *Prerequisites: Node.js 22+, `pnpm`, PostgreSQL, Redis.*

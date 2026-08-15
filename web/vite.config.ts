@@ -141,12 +141,6 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
-      '/socket.io': {
-        target: 'http://localhost:4000',
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-      }
     }
   },
   // FIX: Konfigurasi untuk npm run build && npm run preview (Port 4173)
@@ -165,12 +159,6 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
-      '/socket.io': {
-        target: 'http://localhost:4000',
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-      }
     }
   },
   build: {

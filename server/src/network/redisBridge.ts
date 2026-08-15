@@ -79,8 +79,27 @@ export async function broadcastToUsers(userIds: string[], opCode: TransportOpCod
   await Promise.all(userIds.map(userId => sendJsonToUser(userId, opCode, data)));
 }
 
-async function handleUpstreamMessage(userId: string, deviceId: string, opCode: number, base64Payload: string, _msgIdFromWrapper?: string) {
-  const buffer = Buffer.from(base64Payload, 'base64');
+// 🔒 Single active device check (per-opcode) dengan cache lokal 60 detik.
+// Migration mode membolehkan device lama & baru bersamaan (sama seperti AUTH).
+const activeDeviceCache = new Map<string, { deviceId: string; expiresAt: number }>();
+
+async function isActiveDeviceAllowed(userId: string, deviceId: string): Promise<boolean> {
+  const now = Date.now();
+  const cached = activeDeviceCache.get(userId);
+  if (cached && cached.expiresAt > now) {
+    return cached.deviceId === '' || cached.deviceId === deviceId;
+  }
+  const isMigrating = await redisClient.exists(`is_migrating:${userId}`).catch(() => 0);
+  if (isMigrating) {
+    activeDeviceCache.set(userId, { deviceId: '', expiresAt: now + 30000 });
+    return true;
+  }
+  const active = await redisClient.get(`active_device:${userId}`).catch(() => null);
+  activeDeviceCache.set(userId, { deviceId: active ?? '', expiresAt: now + 60000 });
+  return !active || active === deviceId;
+}
+
+async function handleUpstreamMessage(userId: string, deviceId: string, opCode: number, base64Payload: string, _msgIdFromWrapper?: string) {  const buffer = Buffer.from(base64Payload, 'base64');
   const payloadStr = buffer.toString('utf-8');
   let payload: Record<string, unknown>;
   
@@ -91,6 +110,17 @@ async function handleUpstreamMessage(userId: string, deviceId: string, opCode: n
   }
   
   const msgId = typeof payload?.msgId === 'string' ? payload.msgId : undefined;
+
+  // 🔒 SINGLE ACTIVE DEVICE — dicek untuk SETIAP opcode data (bukan hanya auth).
+  // Device yang di-kick (login di perangkat lain) tidak boleh terus mengirim pesan
+  // sampai melakukan re-auth. Cache lokal 60 detik untuk hindari Redis GET beruntun.
+  if (opCode !== 0x00 && opCode !== 99) {
+    const allowed = await isActiveDeviceAllowed(userId, deviceId);
+    if (!allowed) {
+      console.warn(`[Security] Blocked opcode ${opCode} from non-active device ${sanitizeForLog(deviceId)} (user ${sanitizeForLog(userId)})`);
+      return;
+    }
+  }
 
   switch (opCode) {
     case TransportOpCode.CHAT_MESSAGE:
@@ -336,13 +366,23 @@ async function handlePresence(userId: string, payload: { event: string, conversa
   }
 }
 
+// Lua atomic: INCR + EXPIRE dalam satu perintah — mencegah key hidup selamanya
+// bila proses mati di antara dua perintah (race condition rate limit permanen).
+const RATE_LIMIT_LUA = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`;
+
 export async function checkRateLimit(userId: string, event: string, limit: number, windowSeconds: number) {
     const key = `rate_limit:socket:${event}:${userId}`;
-    const current = await redisClient.incr(key);
-    if (current === 1) {
-        await redisClient.expire(key, windowSeconds);
-    }
-    return current <= limit;
+    const current = await redisClient.eval(RATE_LIMIT_LUA, {
+      keys: [key],
+      arguments: [String(windowSeconds)]
+    });
+    return Number(current) <= limit;
 }
 
 async function handleKeySync(userId: string, deviceId: string, payload: { event: string, msgId: string, data: unknown }, msgIdFromRust?: string) {

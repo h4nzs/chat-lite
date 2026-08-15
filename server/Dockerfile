@@ -48,5 +48,13 @@ COPY --from=builder /app/prisma ./prisma
 ENV PORT=4000
 EXPOSE 4000
 
+# Jalankan sebagai non-root (keamanan container)
+RUN addgroup -S nyx && adduser -S nyx -G nyx
+USER nyx
+
+# Healthcheck: endpoint /health mengembalikan 200 saat siap
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:4000/health >/dev/null 2>&1 || exit 1
+
 # Command Start
 CMD ["node", "dist/index.js"]

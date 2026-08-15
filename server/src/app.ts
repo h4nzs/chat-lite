@@ -162,8 +162,6 @@ const isAllowedOrigin = (origin: string): boolean => {
 
   const allowedOrigins = [
     ...baseOrigins, // 👈 PERBAIKAN: Gunakan spread operator (...)
-    "http://localhost:5173",
-    "http://localhost:4173",
     // IZINKAN HTTP & HTTPS UNTUK CLOUDFLARE TUNNEL
     "https://nyx-app.my.id",
     "https://www.nyx-app.my.id",
@@ -171,12 +169,18 @@ const isAllowedOrigin = (origin: string): boolean => {
     "https://app.nyx-app.my.id",
     "https://rt.nyx-app.my.id",
     "https://storage.nyx-app.my.id",
-    "http://nyx-app.my.id",
-    "http://www.nyx-app.my.id",
-    "http://app.nyx-app.my.id",
-    "http://api.nyx-app.my.id",
-    "http://rt.nyx-app.my.id",
-    "http://storage.nyx-app.my.id",
+    // Varian HTTP & localhost HANYA untuk development (mencegah mixed-content
+    // origin diterima di production)
+    ...(!isProd ? [
+      "http://localhost:5173",
+      "http://localhost:4173",
+      "http://nyx-app.my.id",
+      "http://www.nyx-app.my.id",
+      "http://app.nyx-app.my.id",
+      "http://api.nyx-app.my.id",
+      "http://rt.nyx-app.my.id",
+      "http://storage.nyx-app.my.id",
+    ] : []),
   ];
 
   return allowedOrigins.some(allowedOrigin => {
@@ -231,7 +235,11 @@ if (isProd) {
 }
 
 // === MIDDLEWARE ===
-app.use(logger("dev"));
+// Morgan hanya di development — di prod `dev` mencatat URL penuh termasuk query
+// param sensitif (mis. identifier pada recover challenge).
+if (!isProd) {
+  app.use(logger("dev"));
+}
 app.use(cookieParser());
 
 // Body Parser Split: Uploads butuh limit besar, lainnya kecil (Security)

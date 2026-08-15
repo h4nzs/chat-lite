@@ -335,8 +335,11 @@ export function worker_x3dh_recipient_regenerate(payload: {
 
 // --- LARGE FILE STREAMING PROXY FUNCTIONS ---
 
-export function worker_file_encrypt(fileBuffer: ArrayBuffer | Blob): Promise<{ combinedData: ArrayBuffer, key: Uint8Array }> {
-    return sendToWorker('file_encrypt', { fileBuffer }, undefined, 600000);
+export async function worker_file_encrypt(fileBuffer: ArrayBuffer | Blob): Promise<{ combinedData: ArrayBuffer, key: Uint8Array }> {
+    // Blob → ArrayBuffer lalu TRANSFER (zero-copy) ke worker — menghemat 1 salinan
+    // penuh ukuran file. Blob caller tetap utuh (Blob immutable).
+    const buffer = fileBuffer instanceof Blob ? await fileBuffer.arrayBuffer() : fileBuffer;
+    return sendToWorker('file_encrypt', { fileBuffer: buffer }, [buffer], 600000);
 }
 
 export function worker_file_decrypt(combinedData: ArrayBuffer | Blob, keyBytes: Uint8Array): Promise<ArrayBuffer> {
