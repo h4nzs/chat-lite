@@ -1,6 +1,20 @@
 import { z } from 'zod';
 import { asUserId, asConversationId, asMessageId, asStoryId } from './brands.js';
 
+// CSP-KETAT: Zod 4 default memakai JIT (Function()/eval) untuk kompilasi schema.
+// Prod memakai CSP script-src TANPA 'unsafe-eval' — mode jitless wajib diaktifkan
+// DI SINI (di modul tempat schema dibuat) agar tidak bergantung pada urutan
+// evaluasi chunk/import.
+//
+// NOTE: TIDAK memakai zod.config() — package zod berlabel `sideEffects: false`
+// sehingga panggilan itu DI-TREE-SHAKE di build production (terbukti di prod).
+// Mutasi langsung ke globalThis tidak bisa dihilangkan bundler.
+// Mutasi (bukan replace) — zod memegang referensi objek yang sama.
+type ZodGlobalConfig = { jitless?: boolean };
+const zodGlobal = globalThis as unknown as { __zod_globalConfig?: ZodGlobalConfig };
+if (!zodGlobal.__zod_globalConfig) zodGlobal.__zod_globalConfig = {};
+zodGlobal.__zod_globalConfig.jitless = true;
+
 // --- Validasi Kriptografi Khusus ---
 // Memastikan string hanya berisi karakter Base64 atau URL-Safe Base64 yang valid (dan max len wajar)
 export const Base64StringSchema = z.string().regex(/^[A-Za-z0-9+/_-]+={0,2}$/, 'Invalid base64/base64url format').max(1000000, 'Payload too large');
