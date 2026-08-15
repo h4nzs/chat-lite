@@ -27,9 +27,8 @@
     "p1": "Cara tercepat untuk menyematkan NYX adalah melalui Iframe yang terisolasi. Pertama, buat URL ruang yang aman dengan memanggil API S2S kami: <code class=\"bg-[#1e293b] px-2 py-1 rounded text-sm\">POST /api/engine/rooms</code>. Kemudian, sematkan URL respons tersebut di frontend Anda."
   },
   "sdk": {
-    "title": "3. Metode B: SDK Native",
-    "p1": "Untuk kontrol UI kustom yang mendalam, instal SDK lokal. Ini memberi Anda akses mentah ke bus pesan dan worker kriptografi lokal tanpa menggunakan UI kami.",
-    "example_title": "Contoh Implementasi"
+    "title": "3. Metode B: SDK Native (Dihentikan)",
+    "p1": "SDK NYX Engine mandiri telah dihentikan dan tidak lagi didistribusikan. Untuk integrasi, gunakan metode Iframe di atas atau REST API yang didokumentasikan di bawah. Kode sumber SDK tetap tersedia di riwayat git proyek."
   },
   "troubleshooting": {
     "title": "4. Panduan Troubleshooting",

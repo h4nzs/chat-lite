@@ -1,7 +1,6 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import axios from 'axios';
 import toast from 'react-hot-toast'; // Pastikan sudah diinstall
 
 // PERBAIKAN: Baca dari Environment Variable
@@ -209,7 +208,7 @@ export async function getPreKeyBundle(userId: string): Promise<PreKeyBundle> {
   return userBundles[0];
 }
 
-// Upload menggunakan Axios (untuk Progress Bar)
+// Upload menggunakan XMLHttpRequest native (untuk Progress Bar)
 export async function apiUpload<T = unknown>({
   path,
   formData,
@@ -222,38 +221,43 @@ export async function apiUpload<T = unknown>({
   try {
     const csrfToken = await getCsrfToken().catch(() => "");
 
-    const response = await axios.post<T>(
-      API_URL + path, // Gunakan konstanta API_URL yang sama
-      formData,
-      {
-        withCredentials: true, // Kirim Cookie
-        headers: {
-          'CSRF-Token': csrfToken,
-        },
-        onUploadProgress: (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-          );
-          onUploadProgress(progress);
-        },
-      }
-    );
-    return response.data;
+    const data = await new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', API_URL + path);
+      xhr.withCredentials = true; // Kirim Cookie
+      xhr.setRequestHeader('CSRF-Token', csrfToken);
+      xhr.upload.onprogress = (e) => {
+        const progress = Math.round((e.loaded * 100) / (e.total || 1));
+        onUploadProgress(progress);
+      };
+      xhr.onload = () => {
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(xhr.responseText || 'null');
+        } catch (_e) {
+          parsed = null;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(parsed as T);
+        } else {
+          const body = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<string, unknown>;
+          const message = (typeof body.error === 'string' ? body.error : undefined)
+            ?? (typeof body.message === 'string' ? body.message : undefined)
+            ?? xhr.statusText;
+          reject(new ApiError(xhr.status, message || 'Upload failed', body));
+        }
+      };
+      xhr.onerror = () => reject(new ApiError(0, 'Network error during upload'));
+      xhr.send(formData);
+    });
+    return data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      // Mapping Error Axios ke ApiError kita biar konsisten
-      const message = error.response.data?.error || error.response.data?.message || error.message;
-      
+    if (error instanceof ApiError) {
       // Handle 429 di upload juga
-      if (error.response.status === 429) {
-         toast.error(message, { icon: '⏳', style: { background: '#fee2e2', color: '#b91c1c' } });
+      if (error.status === 429) {
+        toast.error(error.message, { icon: '⏳', style: { background: '#fee2e2', color: '#b91c1c' } });
       }
-
-      throw new ApiError(
-        error.response.status,
-        message,
-        error.response.data
-      );
+      throw error;
     }
     throw error;
   }

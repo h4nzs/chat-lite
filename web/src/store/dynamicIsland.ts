@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 import type { User } from './auth';
 
 // --- Activity Types ---

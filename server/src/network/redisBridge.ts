@@ -58,15 +58,6 @@ export async function emitEventToUser(userId: string, event: string, data: unkno
 }
 
 /**
- * Emits a named event to all participants of a conversation.
- */
-export async function emitEventToConversation(conversationId: string, event: string, data: unknown, excludeUserId?: string) {
-  // In Opaque Mailbox, we can't query participants from the DB.
-  // Real-time delivery must be handled via explicit subscriptions or client-side routing.
-  console.log(`[Opaque Mailbox] Dropped emitEventToConversation for ${conversationId}`);
-}
-
-/**
  * Emits a named event to multiple users.
  */
 export async function emitEventToUsers(userIds: string[], event: string, data: unknown) {
@@ -81,14 +72,6 @@ export async function emitEventToUsers(userIds: string[], event: string, data: u
 export async function sendJsonToUser(targetUserId: string, opCode: TransportOpCode, data: unknown, isDatagram = false, deviceId?: string) {
   const base64 = Buffer.from(JSON.stringify(data)).toString('base64');
   await sendToUser(targetUserId, opCode, base64, isDatagram, deviceId);
-}
-
-/**
- * Broadcasts a message to all participants of a conversation.
- */
-export async function broadcastToConversation(conversationId: string, opCode: TransportOpCode, data: unknown, excludeUserId?: string) {
-  // In Opaque Mailbox, we can't query participants from the DB.
-  console.log(`[Opaque Mailbox] Dropped broadcastToConversation for ${conversationId}`);
 }
 
 /**
@@ -352,17 +335,6 @@ async function handlePresence(userId: string, payload: { event: string, conversa
              if (typeof pId === 'string' && pId !== userId) {
                await sendJsonToUser(pId, TransportOpCode.PRESENCE, typingData);
              }
-         }
-     } else {
-         // Fallback: legacy mode via participant cache
-         const { getParticipantIds } = await import('../utils/participantCache.js');
-         const participantIds = await getParticipantIds(conversationId);
-         if (participantIds.length > 0) {
-           for (const pId of participantIds) {
-             if (pId !== userId) {
-               await sendJsonToUser(pId, TransportOpCode.PRESENCE, typingData);
-             }
-           }
          }
      }
   }

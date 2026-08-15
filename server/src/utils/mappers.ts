@@ -70,20 +70,6 @@ export interface PrismaConversationInput {
 export type RawConversationData = PrismaConversationInput;
 export type UserWithDevices = PrismaUserProfileInput;
 
-export const userSelectWithKeys = {
-  id: true,
-  usernameHash: true,
-  encryptedProfile: true,
-  devices: {
-    select: {
-      id: true,
-      publicKey: true,
-      pqPublicKey: true,
-      signingKey: true
-    }
-  }
-};
-
 export interface HoistedDevice {
   id: string;
   publicKey: string;

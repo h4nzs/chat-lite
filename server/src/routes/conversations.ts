@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { zodValidate, safeEqualStrings } from '../utils/validate.js'
 import { emitEventToUsers, emitEventToUser } from '../network/redisBridge.js'
 import { redisClient } from '../lib/redis.js'
-import { hoistConvoKeys, toConversation, asConversationId, asUserId, userSelectWithKeys, type RawConversationData } from '../utils/mappers.js'
+import { hoistConvoKeys, toConversation, asConversationId, asUserId, type RawConversationData } from '../utils/mappers.js'
 import type { Conversation } from '@nyx/shared'
 
 const ConversationSchema = z.object({

@@ -14,7 +14,7 @@ import { transportClient, connectSocket } from '@lib/transportClient';
 import { getSodium } from '@lib/sodiumInitializer';
 import { worker_file_decrypt } from '@lib/crypto-worker-proxy';
 import { importDatabaseFromJson } from '@lib/keychainDb';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 

@@ -27,9 +27,8 @@
     "p1": "La forma más rápida de integrar NYX adalah mediante un Iframe aislado. Primero, cree una URL de sala segura llamando a nuestra API S2S: <code class=\"bg-[#1e293b] px-2 py-1 rounded text-sm\">POST /api/engine/rooms</code>. Luego, inserte la URL de respuesta en su frontend."
   },
   "sdk": {
-    "title": "3. Método B: SDK Nativo",
-    "p1": "Para un control profundo de la interfaz de usuario personalizada, instale el SDK local. Esto le otorga acceso directo al bus de mensajería y al worker de criptografía local sin usar nuestra interfaz.",
-    "example_title": "Ejemplo de Implementación"
+    "title": "3. Método B: SDK Nativo (Descontinuado)",
+    "p1": "El SDK independiente NYX Engine ha sido descontinuado y ya no se distribuye. Para integraciones, utilice el método Iframe anterior o la API REST documentada a continuación. El código fuente del SDK sigue disponible en el historial de git del proyecto."
   },
   "troubleshooting": {
     "title": "4. Guía de Resolución de Problemas",

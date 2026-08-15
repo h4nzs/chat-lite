@@ -5,10 +5,18 @@ import { usePresenceStore } from '@store/presence';
 import { useAuthStore, type User } from '@store/auth';
 import { useShallow } from 'zustand/react/shallow';
 import { authFetch } from '@lib/api';
-import { debounce } from 'lodash-es';
 import { hashUsername } from '@lib/crypto-worker-proxy';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
+
+// Debounce minimal (pengganti lodash-es): panggilan terakhir yang menang
+function debounce<A extends unknown[]>(fn: (...args: A) => void, wait: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return (...args: A): void => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = undefined; fn(...args); }, wait);
+  };
+}
 
 export function useChatList() {
   const { t } = useTranslation(['common']);

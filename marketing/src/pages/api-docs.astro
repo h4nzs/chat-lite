@@ -96,31 +96,6 @@ const description = t('api-docs:meta.description');
           </div>
           <div class="card-neumorphic space-y-4">
             <p class="text-text-secondary leading-relaxed">{t('api-docs:sdk.p1')}</p>
-            <div class="bg-[#070a13] rounded-lg overflow-hidden border border-[#1e293b]">
-              <pre class="p-4 overflow-x-auto text-sm font-mono text-gray-300">
-<code>npm install nyx-engine-sdk-0.1.0.tgz</code></pre>
-            </div>
-            
-            <h4 class="text-lg font-semibold mt-6 mb-2">{t('api-docs:sdk.example_title')}</h4>
-            <div class="bg-[#070a13] rounded-lg overflow-hidden border border-[#1e293b]">
-              <pre class="p-4 overflow-x-auto text-sm font-mono text-gray-300">
-<code>import NyxClient from 'nyx-engine-sdk';
-
-// 1. Initialize Web Worker and Cryptography
-const nyx = new NyxClient(&lcub; apiKey: process.env.NYX_ENGINE_KEY &rcub;);
-await nyx.initialize();
-
-// 2. Connect user via token
-await nyx.connectUser(userToken);
-
-// 3. Listen for natively decrypted messages
-nyx.on('message.decrypted', (message) =&gt; &lcub;
-  console.log("New Secure Message:", message);
-&rcub;);
-
-// 4. Send encrypted message
-await nyx.sendMessage(roomId, "Hello from the custom integration!");</code></pre>
-            </div>
           </div>
         </section>
 

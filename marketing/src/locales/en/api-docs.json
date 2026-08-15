@@ -27,9 +27,8 @@
     "p1": "The fastest way to embed NYX is via an isolated Iframe. First, create a secure room URL by hitting our S2S API: <code class=\"bg-[#1e293b] px-2 py-1 rounded text-sm\">POST /api/engine/rooms</code>. Then, embed the response URL in your frontend."
   },
   "sdk": {
-    "title": "3. Method B: Native SDK",
-    "p1": "For deep custom UI control, install the local SDK. This grants you raw access to the messaging bus and local cryptography worker without using our UI.",
-    "example_title": "Implementation Example"
+    "title": "3. Method B: Native SDK (Discontinued)",
+    "p1": "The standalone NYX Engine SDK has been discontinued and is no longer distributed. For integrations, use the Iframe method above or the REST API documented below. The SDK source remains available in the project's git history."
   },
   "troubleshooting": {
     "title": "4. Troubleshooting Guide",

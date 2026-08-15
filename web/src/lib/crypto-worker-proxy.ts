@@ -11,7 +11,7 @@ import type {
   GroupRatchetHeader,
   DoubleRatchetHeader
 } from '../types/crypto-common';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 const worker = new CryptoWorker();
 

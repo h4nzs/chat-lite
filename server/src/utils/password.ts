@@ -1,7 +1,7 @@
-import argon2 from 'argon2'
+import argon2, { HashOptions } from 'argon2'
 
 // Konfigurasi "Sweet Spot" buat VPS 1GB RAM / 1 vCPU
-const ARGON_CONFIG = {
+const ARGON_CONFIG: HashOptions = {
   type: argon2.argon2id,
   memoryCost: 2 ** 15, // 32 MB (32 * 1024 kb)
   timeCost: 3, // Jumlah putaran hashing (3x cukup aman & cepat)

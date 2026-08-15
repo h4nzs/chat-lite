@@ -109,17 +109,7 @@ router.get('/:conversationId', async (req, res, next) => {
 })
 
 // ==========================================
-// 2. GET CONTEXT (OBSOLETE IN E2EE)
-// ==========================================
-router.get('/context/:id', requireAuth, async (req, res) => {
-  // Dalam arsitektur Zero-Knowledge Store-and-Forward, 
-  // server tidak punya histori pesan. Frontend harus mencarinya di IndexedDB lokal.
-  // Kita kembalikan array kosong agar aplikasi tidak crash.
-  res.json({ items: [], conversationId: null });
-});
-
-// ==========================================
-// 3. SEND MESSAGE (Store & Forward Courier)
+// 2. POST MESSAGE (Opaque Mailbox Store-and-Forward)
 // ==========================================
 router.post('/', zodValidate({
   body: z.object({
@@ -270,15 +260,5 @@ router.delete('/:id', async (req, res, next) => {
     next(error)
   }
 })
-
-// ==========================================
-// 5. VIEW ONCE MESSAGE (OBSOLETE)
-// ==========================================
-router.put('/:id/viewed', async (req, res) => {
-  // Dalam E2EE, pesan isViewOnce langsung dihancurkan saat dibaca.
-  // Sinyal "Viewed" dikirim melalui payload E2EE silent message.
-  // Rute HTTP ini bisa dibiarkan kosong dengan respon sukses palsu.
-  res.json({ success: true, message: "E2EE Tombstone Processed" });
-});
 
 export default router

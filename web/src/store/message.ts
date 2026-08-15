@@ -4,7 +4,7 @@
 import type { UserId, ConversationId, MessageId, MessageSendPayload, SystemMessagePayload, GroupKeyDistributionPayload, SystemKeyRequestPayload } from '@nyx/shared';
 import { asUserId, asConversationId, asMessageId } from '@nyx/shared';
 import { createWithEqualityFn } from "zustand/traditional";
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 import { api, authFetch } from "@lib/api"; 
 import { transportClient, emitSessionKeyRequest, emitGroupKeyDistribution } from '@lib/transportClient';
 import { captureAndLog } from '@utils/feedback';

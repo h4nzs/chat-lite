@@ -1,5 +1,5 @@
 import { db } from '../lib/db';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 /**
  * Generates a consistent browser fingerprint based on hardware and browser signals.

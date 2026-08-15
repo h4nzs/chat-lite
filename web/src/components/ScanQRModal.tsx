@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FiX, FiCamera } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Html5Qrcode } from 'html5-qrcode';
 import { useTranslation } from 'react-i18next';
+// Type-only import: tidak ikut ke bundle (html5-qrcode di-load lazy di runtime)
+import type { Html5Qrcode } from 'html5-qrcode';
 
 interface Props {
   onClose: () => void;
@@ -15,9 +16,17 @@ export default function ScanQRModal({ onClose, onScanSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scannerRef.current = new Html5Qrcode('nyx-qr-reader');
-      scannerRef.current.start(
+    let cancelled = false;
+    let localScanner: Html5Qrcode | null = null;
+
+    const timer = setTimeout(async () => {
+      // Lazy import: html5-qrcode hanya diunduh saat user benar-benar membuka scanner
+      const { Html5Qrcode } = await import('html5-qrcode');
+      if (cancelled) return;
+
+      localScanner = new Html5Qrcode('nyx-qr-reader');
+      scannerRef.current = localScanner;
+      localScanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
@@ -40,15 +49,18 @@ export default function ScanQRModal({ onClose, onScanSuccess }: Props) {
         },
         () => {} // Ignore scan failures (frame missed)
       ).catch(err => {
+          if (cancelled) return;
           console.error("Camera start failed", err);
           setError(t('scan.camera_error'));
       });
     }, 200);
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      if (scannerRef.current?.isScanning) {
-        scannerRef.current.stop().catch(() => {});
+      if (localScanner?.isScanning) {
+        localScanner.stop().catch(() => {});
+        localScanner.clear();
       }
     };
   }, [onScanSuccess, t]);
