@@ -1,3 +1,6 @@
+// Zod jitless — WAJIB paling awal agar tidak ada schema yang terkompilasi
+// dengan eval/Function() (CSP prod tanpa 'unsafe-eval').
+import './zodSetup';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 

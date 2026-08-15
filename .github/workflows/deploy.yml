@@ -15,7 +15,7 @@ jobs:
 
       # --- SETUP PNPM ---
       - name: Install pnpm manually (Bypass GitHub Outage)
-        run: npm install -g pnpm
+        run: npm install -g pnpm@11.4.0
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
@@ -139,7 +139,7 @@ jobs:
             
             # 1. Pastikan PNPM terinstall di VPS
             if ! command -v pnpm &> /dev/null; then
-                npm install -g pnpm
+                npm install -g pnpm@11.4.0
             fi
             
             pm2 stop nyx-api nyx-sidecar || true

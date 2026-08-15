@@ -59,5 +59,6 @@
     "unrs-resolver",
     "@sentry/cli",
     "@sentry/node-cpu-profiler"
-  ]
+  ],
+  "packageManager": "pnpm@11.4.0"
 }
