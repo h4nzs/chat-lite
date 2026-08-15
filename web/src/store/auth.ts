@@ -110,6 +110,10 @@ type State = {
   isInitializingCrypto: boolean;
   sendReadReceipts: boolean;
   hasRestoredKeys: boolean;
+  // True selama proses login/dekripsi kunci berlangsung (state `hasRestoredKeys`
+  // belum settle). Dipakai agar modal "New Device Detected" tidak flash terbuka
+  // beberapa detik di device yang sama (jendela antara baseline false → true).
+  isUnlocking: boolean;
   blockedUserIds: string[];
 };
 
@@ -288,6 +292,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     isInitializingCrypto: false,
     sendReadReceipts: savedReadReceipts ? JSON.parse(savedReadReceipts) : true,
     hasRestoredKeys: false,
+    isUnlocking: false,
     blockedUserIds: [],
 
     setHasRestoredKeys: async (_hasKeys) => set({ hasRestoredKeys: await hasStoredKeys() }),
@@ -466,72 +471,80 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         });
 
         // ✅ SET SESSION IMMEDIATELY (Allows navigation to migration pages)
+        // isUnlocking: true menahan modal "New Device Detected" selama dekripsi
+        // kunci berjalan — mencegah modal flash ~2-4 detik di device yang sama.
         set({ 
           accessToken: res.accessToken, 
           user: res.user, 
           hasRestoredKeys: false, // Baseline as false, will be checked below
+          isUnlocking: true,
           blockedUserIds: [] 
         });
         localStorage.setItem("user", JSON.stringify(res.user));
 
-        // [FIX] Identity Persistence
-        // 1. Always save deviceId if server provides it (recovery fallback)
-        if (res.deviceId) {
-           localStorage.setItem('deviceId', res.deviceId);
-        }
-
-        // 2. Only adopt server keys if we don't have local keys
-        // This prevents overwriting existing IDB data on same device
-        if (res.encryptedPrivateKey && !alreadyHasKeys) {
-          await saveEncryptedKeys(res.encryptedPrivateKey);
-          await saveDeviceAutoUnlockKey(password);
-          await setDeviceAutoUnlockReady(true);
-        }
-
-        const hasKeysNow = await hasStoredKeys();
-
-        // CHECK: If we still don't have local keys, this is a "Blind Login" on a new device.
-        if (!hasKeysNow) {
-            get().loadBlockedUsers();
-            connectSocket();
-            throw new Error("IDENTITY_RECOVERY_REQUIRED");
-        }
-
-        // FIX 2: Buka kunci MENGGUNAKAN data yang baru saja disave
-        if (hasKeysNow) {
-          try {
-            const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
-            const storedEncryptedKeys = await getEncryptedKeys();
-            if (storedEncryptedKeys) {
-                const result = await retrievePrivateKeys(storedEncryptedKeys, password);
-
-                if (result.success) {
-                  privateKeysCache = result.keys;
-                  // Persist for auto-unlock
-                  await saveDeviceAutoUnlockKey(password);
-                  await setDeviceAutoUnlockReady(true);
-                } else {
-                  throw new Error(`Login successful, but failed to decrypt keys: ${result.reason}`);
-                }
-            }
-          } catch (e) {
-            console.error("Failed to decrypt keys on login:", e);
-            toast.error(i18n.t('errors:could_not_decrypt_your_stored_keys_pleas', 'Could not decrypt your stored keys. Please restore your account if the password has changed.'));
+        try {
+          // [FIX] Identity Persistence
+          // 1. Always save deviceId if server provides it (recovery fallback)
+          if (res.deviceId) {
+             localStorage.setItem('deviceId', res.deviceId);
           }
-        }
 
-        // NOW set hasRestoredKeys, so App.tsx connects socket only after crypto is ready
-        set({ user: res.user, accessToken: res.accessToken, hasRestoredKeys: hasKeysNow, blockedUserIds: [] });
-        localStorage.setItem("user", JSON.stringify(res.user));
+          // 2. Only adopt server keys if we don't have local keys
+          // This prevents overwriting existing IDB data on same device
+          if (res.encryptedPrivateKey && !alreadyHasKeys) {
+            await saveEncryptedKeys(res.encryptedPrivateKey);
+            await saveDeviceAutoUnlockKey(password);
+            await setDeviceAutoUnlockReady(true);
+          }
 
-        get().loadBlockedUsers();
+          const hasKeysNow = await hasStoredKeys();
 
-        if (restoredNotSynced) {
-          try { await setupAndUploadPreKeyBundle(); } catch(e) { console.error("Failed to sync restored keys:", e); }
-        } else if (get().hasRestoredKeys) {
-          setupAndUploadPreKeyBundle().catch(e => console.error("Failed to upload pre-key bundle on login:", e));
-        } else {
-          toast("To enable secure messaging, restore your account from your recovery phrase in Settings.", { duration: 7000 });
+          // CHECK: If we still don't have local keys, this is a "Blind Login" on a new device.
+          if (!hasKeysNow) {
+              get().loadBlockedUsers();
+              connectSocket();
+              throw new Error("IDENTITY_RECOVERY_REQUIRED");
+          }
+
+          // FIX 2: Buka kunci MENGGUNAKAN data yang baru saja disave
+          if (hasKeysNow) {
+            try {
+              const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
+              const storedEncryptedKeys = await getEncryptedKeys();
+              if (storedEncryptedKeys) {
+                  const result = await retrievePrivateKeys(storedEncryptedKeys, password);
+
+                  if (result.success) {
+                    privateKeysCache = result.keys;
+                    // Persist for auto-unlock
+                    await saveDeviceAutoUnlockKey(password);
+                    await setDeviceAutoUnlockReady(true);
+                  } else {
+                    throw new Error(`Login successful, but failed to decrypt keys: ${result.reason}`);
+                  }
+              }
+            } catch (e) {
+              console.error("Failed to decrypt keys on login:", e);
+              toast.error(i18n.t('errors:could_not_decrypt_your_stored_keys_pleas', 'Could not decrypt your stored keys. Please restore your account if the password has changed.'));
+            }
+          }
+
+          // NOW set hasRestoredKeys, so App.tsx connects socket only after crypto is ready
+          set({ user: res.user, accessToken: res.accessToken, hasRestoredKeys: hasKeysNow, blockedUserIds: [] });
+          localStorage.setItem("user", JSON.stringify(res.user));
+
+          get().loadBlockedUsers();
+
+          if (restoredNotSynced) {
+            try { await setupAndUploadPreKeyBundle(); } catch(e) { console.error("Failed to sync restored keys:", e); }
+          } else if (get().hasRestoredKeys) {
+            setupAndUploadPreKeyBundle().catch(e => console.error("Failed to upload pre-key bundle on login:", e));
+          } else {
+            toast("To enable secure messaging, restore your account from your recovery phrase in Settings.", { duration: 7000 });
+          }
+        } finally {
+          // State settle — modal recovery (Login.tsx) baru boleh memutuskan muncul
+          set({ isUnlocking: false });
         }
 
         try { await resetOneTimePreKeys(); } catch (e) { console.error("Reset OTPK failed:", e); }

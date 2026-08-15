@@ -30,11 +30,12 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { login, user, accessToken, hasRestoredKeys } = useAuthStore(useShallow(s => ({
+  const { login, user, accessToken, hasRestoredKeys, isUnlocking } = useAuthStore(useShallow(s => ({
     login: s.login,
     user: s.user,
     accessToken: s.accessToken,
-    hasRestoredKeys: s.hasRestoredKeys
+    hasRestoredKeys: s.hasRestoredKeys,
+    isUnlocking: s.isUnlocking
   })));
 
   // Jangan buka ulang modal recovery untuk user yang sama setelah user menutupnya
@@ -42,11 +43,21 @@ export default function Login() {
   const dismissedRecoveryForUserId = useRef<string | null>(null);
 
   useEffect(() => {
+    // JANGAN tampilkan modal selama proses login/dekripsi kunci belum settle
+    // (isUnlocking) — mencegah flash "New Device Detected" beberapa detik di
+    // device yang sama sebelum hasRestoredKeys menjadi true.
+    if (isUnlocking) return;
+
     // If we are logged in but missing keys, auto-show recovery modal
     if (accessToken && user && !hasRestoredKeys && dismissedRecoveryForUserId.current !== user.id) {
         setShowRecoveryOptions(true);
     }
-  }, [accessToken, user, hasRestoredKeys]);
+
+    // Kunci berhasil dipulihkan (mis. selesai restore) → tutup modal recovery
+    if (accessToken && user && hasRestoredKeys) {
+        setShowRecoveryOptions(false);
+    }
+  }, [accessToken, user, hasRestoredKeys, isUnlocking]);
 
   const dismissRecoveryOptions = () => {
     if (user) dismissedRecoveryForUserId.current = user.id;
