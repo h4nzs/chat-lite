@@ -140,6 +140,28 @@ Please check the `CONTRIBUTING.md` and use the provided PR templates.
 
 ---
 
+## 📚 Documentation
+
+Full technical documentation lives in [`docs/`](docs/README.md):
+
+| Document | Topic |
+|---|---|
+| [Architecture](docs/01-architecture.md) | System overview, monorepo layout, data flows |
+| [Getting Started](docs/02-getting-started.md) | Dev setup, commands, toolchain quirks |
+| [Security Model](docs/03-security-model.md) | Threat model, session/device binding, trade-offs |
+| [Crypto Protocol](docs/04-crypto-protocol.md) | **Frozen** formats, ratchets, worker op catalog |
+| [Message Pipeline](docs/05-message-pipeline.md) | Send/receive flow, transport framing, Redis bridge |
+| [Frontend](docs/06-frontend.md) | Stores, rendering, i18n, PWA |
+| [Backend](docs/07-backend.md) | Routes, middleware, jobs, Redis inventory |
+| [WebTransport Sidecar](docs/08-webtransport-sidecar.md) | Rust sidecar protocol & deployment |
+| [Database](docs/09-database.md) | Schema, indexes, backup, migrations |
+| [Deployment & Ops](docs/10-deployment-ops.md) | CI/CD, VPS runbook, env vars |
+| [Testing](docs/11-testing.md) | Unit + E2E guides and quirks |
+| [API Reference](docs/12-api-reference.md) | Complete REST endpoint catalog |
+| [Troubleshooting](docs/13-troubleshooting.md) | Known errors and fixes |
+
+---
+
 ## 👨‍💻 Author
 
 **Han**
