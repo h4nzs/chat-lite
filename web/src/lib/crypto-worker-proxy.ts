@@ -21,22 +21,28 @@ function toArray(buffer: CryptoBuffer): number[] {
 }
 
 // Map untuk nyimpen Promise yang nunggu balasan worker
-const pendingRequests = new Map<string, { resolve: (val: unknown) => void; reject: (err: unknown) => void }>();
+const pendingRequests = new Map<string, { resolve: (val: unknown) => void; reject: (err: unknown) => void; startedAt: number; type: string }>();
 
 worker.onmessage = (e) => {
   const { id, success, result, error } = e.data;
-  if (pendingRequests.has(id)) {
-    const { resolve, reject } = pendingRequests.get(id)!;
-    if (success) resolve(result);
-    else reject(new Error(error));
-    pendingRequests.delete(id);
+  const pending = pendingRequests.get(id);
+  if (!pending) return;
+  const { resolve, reject, startedAt, type } = pending;
+  if (import.meta.env.DEV) {
+    const duration = performance.now() - startedAt;
+    if (duration > 50) {
+      console.debug(`[perf:crypto] ${type} roundtrip ${duration.toFixed(1)}ms`);
+    }
   }
+  if (success) resolve(result);
+  else reject(new Error(error));
+  pendingRequests.delete(id);
 };
 
 function sendToWorker<T>(type: string, payload: unknown, transfer?: Transferable[]): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = uuidv4();
-    pendingRequests.set(id, { resolve: resolve as (val: unknown) => void, reject });
+    pendingRequests.set(id, { resolve: resolve as (val: unknown) => void, reject, startedAt: performance.now(), type });
     worker.postMessage({ id, type, payload }, transfer || []);
   });
 }

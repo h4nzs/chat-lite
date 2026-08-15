@@ -12,7 +12,7 @@ import { ApiError } from '../utils/errors.js'
 import { sendPushNotification } from '../utils/sendPushNotification.js'
 import { deleteR2File } from '../utils/r2.js'
 import { z } from 'zod'
-import { zodValidate } from '../utils/validate.js'
+import { zodValidate, safeEqualStrings } from '../utils/validate.js'
 import { sanitizeForLog } from '../utils/logger.js'
 
 const router: Router = Router()
@@ -228,7 +228,7 @@ router.delete('/:id', async (req, res, next) => {
     if (!message.deleteSecret) {
         return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Message cannot be deleted (no delete secret)' });
     }
-    if (message.deleteSecret !== deleteToken) {
+    if (!safeEqualStrings(message.deleteSecret, typeof deleteToken === 'string' ? deleteToken : '')) {
         return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid X-Delete-Token' });
     }
 

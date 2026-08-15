@@ -68,7 +68,7 @@ type TransportEvents = {
 export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
   private worker: Worker;
   public connected: boolean = false;
-  private pendingAcks = new Map<string, { resolve: (val: unknown) => void, reject: (err: unknown) => void, timeoutId: ReturnType<typeof setTimeout> }>();
+  private pendingAcks = new Map<string, { resolve: (val: unknown) => void, reject: (err: unknown) => void, startedAt: number, timeoutId: ReturnType<typeof setTimeout> }>();
 
   private offlineQueue: MainToTransportWorker[] = [];
 
@@ -209,6 +209,10 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
        if (json && json.msgId && typeof json.msgId === 'string' && this.pendingAcks.has(json.msgId)) {
           const p = this.pendingAcks.get(json.msgId)!;
           clearTimeout(p.timeoutId);
+          if (import.meta.env.DEV) {
+            const duration = performance.now() - p.startedAt;
+            console.debug(`[perf:transport] ack ${json.msgId}: ${duration.toFixed(1)}ms`);
+          }
           p.resolve(json.data);
           this.pendingAcks.delete(json.msgId);
        }
@@ -271,6 +275,7 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
        this.pendingAcks.set(msgId, {
           resolve: (val) => callback(null, val),
           reject: (err) => callback(err, null),
+          startedAt: performance.now(),
           timeoutId: setTimeout(() => {
              this.pendingAcks.delete(msgId);
              callback(new Error('timeout'), null);
@@ -288,6 +293,7 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
         this.pendingAcks.set(msgId, {
           resolve: (val) => callback(null, val),
           reject: (err) => callback(new Error('timeout'), null),
+          startedAt: performance.now(),
           timeoutId: setTimeout(() => {
              this.pendingAcks.delete(msgId);
              callback(new Error('timeout'), null);

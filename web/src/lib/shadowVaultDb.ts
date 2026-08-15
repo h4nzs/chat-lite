@@ -464,10 +464,13 @@ class NyxShadowVaultProxy {
 export const shadowVault = new NyxShadowVaultProxy();
 
 export async function saveStoryKey(storyId: string, base64Key: string): Promise<void> {
-  await db.storyKeys.put({ storyId: storyId as StoryId, key: base64Key });
+  const { encryptValueAtRest } = await import('./keychainDb');
+  await db.storyKeys.put({ storyId: storyId as StoryId, key: await encryptValueAtRest(base64Key) });
 }
 
 export async function getStoryKey(storyId: string): Promise<string | null> {
+  const { decryptValueAtRest } = await import('./keychainDb');
   const record = await db.storyKeys.get(storyId);
-  return record ? record.key : null;
+  if (!record) return null;
+  return decryptValueAtRest(record.key);
 }

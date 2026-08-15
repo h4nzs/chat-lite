@@ -6,6 +6,77 @@ import { db, VaultEntry } from './db';
 import { asConversationId, asUserId } from '@nyx/shared';
 import type { ConversationId, UserId, MessageId } from '@nyx/shared';
 
+// ============================================================
+// AT-REST ENCRYPTION (masterSeed-bound)
+// Group chain keys (CK), skipped message keys, dan story keys
+// dienkripsi dengan masterSeed sebelum disimpan ke IndexedDB.
+// Skema sama dengan ratchet state (worker_encrypt_session_key).
+// Nilai legacy (plaintext, tanpa prefix) tetap terbaca transparan
+// dan dienkripsi ulang lewat migrateKeychainAtRestEncryption().
+// ============================================================
+export const AT_REST_PREFIX = 'ENC1:';
+
+async function getMasterSeedOrUndefined(): Promise<Uint8Array | undefined> {
+  const { useAuthStore } = await import('@store/auth');
+  return useAuthStore.getState().getMasterSeed();
+}
+
+export async function encryptValueAtRest(value: string): Promise<string> {
+  if (value.startsWith(AT_REST_PREFIX)) return value;
+  try {
+    const masterSeed = await getMasterSeedOrUndefined();
+    if (!masterSeed) {
+      console.warn('[KeychainDB] Master seed unavailable — storing value without at-rest encryption');
+      return value;
+    }
+    const { worker_encrypt_session_key } = await import('@lib/crypto-worker-proxy');
+    const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
+    const bytes = await worker_encrypt_session_key(new TextEncoder().encode(value), masterSeed);
+    return AT_REST_PREFIX + sodium.to_base64(bytes, sodium.base64_variants.URLSAFE_NO_PADDING);
+  } catch (e) {
+    console.warn('[KeychainDB] At-rest encryption failed — falling back to plaintext:', e);
+    return value;
+  }
+}
+
+export async function decryptValueAtRest(value: string): Promise<string | null> {
+  if (!value.startsWith(AT_REST_PREFIX)) return value; // legacy plaintext
+  try {
+    const masterSeed = await getMasterSeedOrUndefined();
+    if (!masterSeed) return null;
+    const { worker_decrypt_session_key } = await import('@lib/crypto-worker-proxy');
+    const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
+    const bytes = await worker_decrypt_session_key(
+      sodium.from_base64(value.slice(AT_REST_PREFIX.length), sodium.base64_variants.URLSAFE_NO_PADDING),
+      masterSeed
+    );
+    return new TextDecoder().decode(bytes);
+  } catch (e) {
+    console.warn('[KeychainDB] At-rest decryption failed:', e);
+    return null;
+  }
+}
+
+async function encryptSkippedKeysAtRest(skippedKeys: Record<string, string> | undefined): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  if (!skippedKeys) return out;
+  for (const [k, v] of Object.entries(skippedKeys)) {
+    out[k] = await encryptValueAtRest(v);
+  }
+  return out;
+}
+
+async function decryptSkippedKeysAtRest(skippedKeys: Record<string, string> | undefined): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  if (!skippedKeys) return out;
+  for (const [k, v] of Object.entries(skippedKeys)) {
+    const plain = await decryptValueAtRest(v);
+    if (plain === null) continue; // unreadable entry — skip (forward secrecy preserved)
+    out[k] = plain;
+  }
+  return out;
+}
+
 // --- Types ---
 export interface GroupSenderState {
   conversationId: ConversationId;
@@ -64,10 +135,13 @@ export async function getGroupSenderState(conversationId: string): Promise<Group
             ckString = sodium.to_base64(rawCk, sodium.base64_variants.URLSAFE_NO_PADDING);
         }
     }
+
+    const ckPlain = await decryptValueAtRest(ckString);
+    if (ckPlain === null) return null; // encrypted but unreadable (locked/corrupt)
     
     return record ? {
         conversationId: asConversationId(record.conversationId),
-        CK: ckString,
+        CK: ckPlain,
         N: record.state.N,
         createdAt: record.state.createdAt,
         messageCount: record.state.messageCount,
@@ -80,10 +154,11 @@ export async function getGroupSenderState(conversationId: string): Promise<Group
 export async function saveGroupSenderState(state: GroupSenderState): Promise<void> {
   return enqueueWrite(async () => {
       // Sama seperti di atas, kita simpan sesuai schema yang baru (string)
+      // CK dienkripsi at-rest dengan masterSeed (prefix ENC1:)
       await db.groupSenderStates.put({
           conversationId: state.conversationId,
           state: {
-            CK: state.CK,
+            CK: await encryptValueAtRest(state.CK),
             N: state.N,
             createdAt: state.createdAt,
             messageCount: state.messageCount,
@@ -109,13 +184,16 @@ export async function getGroupReceiverState(conversationId: string, senderId: st
         }
     }
 
+    const ckPlain = await decryptValueAtRest(ckString);
+    if (ckPlain === null) return null;
+
     return record ? {
         id: record.id,
         conversationId: asConversationId(conversationId),
         senderId: asUserId(senderId),
-        CK: ckString,
+        CK: ckPlain,
         N: record.state.N,
-        skippedKeys: record.state.skippedKeys || {}
+        skippedKeys: await decryptSkippedKeysAtRest(record.state.skippedKeys)
     } : null;
   });
 }
@@ -124,7 +202,11 @@ export async function saveGroupReceiverState(state: GroupReceiverState): Promise
   return enqueueWrite(async () => {
       await db.groupReceiverStates.put({
           id: state.id,
-          state: { CK: state.CK, N: state.N, skippedKeys: state.skippedKeys }
+          state: {
+            CK: await encryptValueAtRest(state.CK),
+            N: state.N,
+            skippedKeys: await encryptSkippedKeysAtRest(state.skippedKeys)
+          }
       });
   });
 }
@@ -135,7 +217,7 @@ export async function saveGroupReceiverState(state: GroupReceiverState): Promise
 export async function storeGroupSkippedKey(conversationId: string, senderId: string, senderDeviceKey: string, n: number, mk: string, keyId?: string): Promise<void> {
     return enqueueWrite(async () => {
         const key = keyId ? `${conversationId}_${senderId}_${senderDeviceKey}_${keyId}_${n}` : `${conversationId}_${senderId}_${senderDeviceKey}_${n}`;
-        await db.groupSkippedKeys.put({ key, mk });
+        await db.groupSkippedKeys.put({ key, mk: await encryptValueAtRest(mk) });
     });
 }
 
@@ -147,13 +229,13 @@ export async function getGroupSkippedKey(conversationId: string, senderId: strin
         if (senderDeviceKey && senderDeviceKey !== 'undefined') {
             const key = keyId ? `${conversationId}_${senderId}_${senderDeviceKey}_${keyId}_${n}` : `${conversationId}_${senderId}_${senderDeviceKey}_${n}`;
             const record = await db.groupSkippedKeys.get(key);
-            if (record) return record.mk;
+            if (record) return decryptValueAtRest(record.mk);
             
             if (keyId) {
                 // Fallback to legacy format without keyId
                 const fallbackKey = `${conversationId}_${senderId}_${senderDeviceKey}_${n}`;
                 const fallbackRecord = await db.groupSkippedKeys.get(fallbackKey);
-                if (fallbackRecord) return fallbackRecord.mk;
+                if (fallbackRecord) return decryptValueAtRest(fallbackRecord.mk);
             }
         }
         
@@ -162,7 +244,7 @@ export async function getGroupSkippedKey(conversationId: string, senderId: strin
         const suffix = `_${n}`;
         const records = await db.groupSkippedKeys.toArray();
         const found = records.find(r => r.key.startsWith(prefix) && r.key.endsWith(suffix));
-        return found ? found.mk : null;
+        return found ? decryptValueAtRest(found.mk) : null;
     });
 }
 
@@ -444,6 +526,65 @@ export async function clearAllKeys(): Promise<void> {
 
 export type { VaultEntry };
 
+// ============================================================
+// MIGRASI AT-REST: enkripsi ulang nilai plaintext legacy (tanpa
+// prefix ENC1:) yang tersimpan sebelum versi ini. Dijalankan
+// sekali setelah sesi ter-unlock. Idempotent & aman dijalankan
+// berulang. Semua tulis lewat queue agar tidak race.
+// ============================================================
+export async function migrateKeychainAtRestEncryption(): Promise<void> {
+  return enqueueWrite(async () => {
+    const masterSeed = await getMasterSeedOrUndefined();
+    if (!masterSeed) return; // session belum ter-unlock — tunda sampai unlock berikutnya
+
+    // 1. Group sender states (CK)
+    const senderRecords = await db.groupSenderStates.toArray();
+    for (const r of senderRecords) {
+      const rawCk: unknown = r.state.CK;
+      if (typeof rawCk === 'string' && !rawCk.startsWith(AT_REST_PREFIX)) {
+        await db.groupSenderStates.put({ conversationId: r.conversationId, state: { ...r.state, CK: await encryptValueAtRest(rawCk) } });
+      }
+    }
+
+    // 2. Group receiver states (CK + skippedKeys)
+    const receiverRecords = await db.groupReceiverStates.toArray();
+    for (const r of receiverRecords) {
+      const rawCk: unknown = r.state.CK;
+      const needsCk = typeof rawCk === 'string' && !rawCk.startsWith(AT_REST_PREFIX);
+      let needsSkipped = false;
+      for (const v of Object.values(r.state.skippedKeys || {})) {
+        if (!v.startsWith(AT_REST_PREFIX)) { needsSkipped = true; break; }
+      }
+      if (needsCk || needsSkipped) {
+        await db.groupReceiverStates.put({
+          id: r.id,
+          state: {
+            ...r.state,
+            CK: needsCk ? await encryptValueAtRest(rawCk as string) : r.state.CK,
+            skippedKeys: needsSkipped ? await encryptSkippedKeysAtRest(r.state.skippedKeys) : r.state.skippedKeys
+          }
+        });
+      }
+    }
+
+    // 3. Group skipped keys (mk)
+    const groupSkippedRecords = await db.groupSkippedKeys.toArray();
+    for (const r of groupSkippedRecords) {
+      if (!r.mk.startsWith(AT_REST_PREFIX)) {
+        await db.groupSkippedKeys.put({ key: r.key, mk: await encryptValueAtRest(r.mk) });
+      }
+    }
+
+    // 4. Story keys (di store storyKeys — shared dengan ShadowVault)
+    const storyRecords = await db.storyKeys.toArray();
+    for (const r of storyRecords) {
+      if (!r.key.startsWith(AT_REST_PREFIX)) {
+        await db.storyKeys.put({ storyId: r.storyId, key: await encryptValueAtRest(r.key) });
+      }
+    }
+  });
+}
+
 // --- Opaque Mailbox: Cached Group Participants ---
 
 /**
@@ -605,7 +746,10 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
             ckString = sodium.to_base64(rawCk, sodium.base64_variants.URLSAFE_NO_PADDING);
         }
 
-        if (ckString.substring(0, 8) === keyId) {
+        const ckPlain = await decryptValueAtRest(ckString);
+        if (ckPlain === null) continue;
+
+        if (ckPlain.substring(0, 8) === keyId) {
             const parts = record.id.split('_');
             const senderId = parts[1];
             
@@ -613,9 +757,9 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
                 id: record.id,
                 conversationId: asConversationId(conversationId),
                 senderId: asUserId(senderId),
-                CK: ckString,
+                CK: ckPlain,
                 N: record.state.N,
-                skippedKeys: record.state.skippedKeys || {}
+                skippedKeys: await decryptSkippedKeysAtRest(record.state.skippedKeys)
             };
         }
     }

@@ -3,6 +3,21 @@ import { ApiError } from './errors.js'
 import { Request, Response, NextFunction } from 'express'
 import type { ParsedQs } from 'qs'
 import type { ParamsDictionary } from 'express-serve-static-core'
+import crypto from 'crypto'
+
+/**
+ * Perbandingan string yang aman dari timing attack (constant-time).
+ * Wajib dipakai untuk secret/token/HMAC. Panjang berbeda langsung false
+ * (length check tidak bisa constant-time karena panjang adalah side channel
+ * yang tidak bisa dihindari tanpa padding — sudah praktik standar).
+ */
+export function safeEqualStrings (a: string | undefined | null, b: string | undefined | null): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
 
 export function zodValidate (schema: { body?: ZodSchema; query?: ZodSchema; params?: ZodSchema }) {
   return (req: Request, _res: Response, next: NextFunction) => {

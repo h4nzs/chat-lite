@@ -5,6 +5,7 @@ import { getSodium } from '../lib/sodium.js';
 import { toRawServerMessage } from '../utils/mappers.js';
 import { sendPushNotification } from '../utils/sendPushNotification.js';
 import { sanitizeForLog } from '../utils/logger.js';
+import { safeEqualStrings } from '../utils/validate.js';
 import { TransportOpCode, MessageSendPayloadSchema } from '@nyx/shared';
 import type { MessageSendPayload, ServerToClientEvents, ClientToServerEvents, RawServerMessage, KeyRequestPayload, KeyFulfillmentPayload, GroupKeyRequestPayload, DistributeKeysPayload, PushSubscribePayload } from '@nyx/shared';
 
@@ -543,12 +544,22 @@ async function handleKeySync(userId: string, deviceId: string, payload: { event:
          break;
        }
 
-       case 'message:unsend': {
-         const { messageId, conversationId, targetRecipients } = data as { messageId: string, conversationId: string, targetRecipients?: string[] };
-         if (!messageId || !conversationId) return;
-         const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true, senderId: true } });
-         if (!msg || msg.conversationId !== conversationId) return;
-         await prisma.message.delete({ where: { id: messageId } });
+        case 'message:unsend': {
+          const { messageId, conversationId, targetRecipients, deleteSecret } = data as { messageId: string, conversationId: string, targetRecipients?: string[], deleteSecret?: string };
+          if (!messageId || !conversationId) return;
+          const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { conversationId: true, senderId: true, deleteSecret: true } });
+          if (!msg || msg.conversationId !== conversationId) return;
+
+          // Authorization: pengirim pesan ATAU pemegang deleteSecret (blind auth) yang boleh unsend.
+          // Pesan 1:1 disimpan dengan senderId null (Opaque Mailbox), jadi proof via deleteSecret.
+          const isSender = msg.senderId !== null && msg.senderId === userId;
+          const hasValidSecret = typeof deleteSecret === 'string' && !!msg.deleteSecret && safeEqualStrings(deleteSecret, msg.deleteSecret);
+          if (!isSender && !hasValidSecret) {
+            console.warn('[Security] Unauthorized unsend attempt by', sanitizeForLog(userId), 'for message', sanitizeForLog(messageId));
+            return;
+          }
+
+          await prisma.message.delete({ where: { id: messageId } });
          
          // Notify recipients about the unsend (Opaque Mailbox: explicit targetRecipients from client)
          const recipients = Array.isArray(targetRecipients) && targetRecipients.length > 0 

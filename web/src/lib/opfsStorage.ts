@@ -52,6 +52,24 @@ export async function getEncryptedFromOPFS(fileId: string): Promise<Blob | null>
 }
 
 /**
+ * Wipes the entire NYX OPFS directory (all encrypted attachment blobs).
+ * Used by the nuclear local wipe (nukeProtocol).
+ */
+export async function wipeOPFS(): Promise<void> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    try {
+      await root.removeEntry(OPFS_DIR_NAME, { recursive: true });
+      console.log('[OPFS] Wiped attachment cache directory.');
+    } catch (_e) {
+      // Directory tidak ada — tidak perlu diapa-apakan
+    }
+  } catch (err) {
+    console.warn('[OPFS] Wipe failed:', err);
+  }
+}
+
+/**
  * Basic LRU-style cleanup to keep OPFS cache under MAX_CACHE_SIZE_BYTES.
  */
 export async function clearOldOPFS(): Promise<void> {

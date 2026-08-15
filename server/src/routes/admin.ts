@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { s3Client } from '../utils/r2.js';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { env } from '../config.js';
+import { redisClient } from '../lib/redis.js';
 import { emitEventToUser, sendJsonToUser } from '../network/redisBridge.js';
 import { TransportOpCode } from '@nyx/shared';
 
@@ -86,6 +87,9 @@ router.post('/ban', requireAuth, requireAdmin, async (req, res) => {
         data: { bannedAt: new Date(), banReason: reason || 'Violation of TOS' }
     });
 
+    // Invalidate ban cache agar middleware requireAuth segera melihat ban baru
+    await redisClient.del(`ban_status:${userId}`).catch((e: unknown) => console.warn('[Admin] Failed to invalidate ban cache:', e));
+
     // KICK USER DARI WEBTRANSPORT
     try {
       await emitEventToUser(userId, 'auth:banned', { reason });
@@ -110,6 +114,8 @@ router.post('/unban', requireAuth, requireAdmin, async (req, res) => {
         where: { id: userId },
         data: { bannedAt: null, banReason: null }
     });
+    // Invalidate ban cache agar middleware requireAuth segera melihat unban
+    await redisClient.del(`ban_status:${userId}`).catch((e: unknown) => console.warn('[Admin] Failed to invalidate ban cache:', e));
     res.json({ message: 'User unbanned successfully' });
   } catch (_e) {
     res.status(500).json({ error: 'Failed to unban user' });

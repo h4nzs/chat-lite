@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { sendJsonToUser, emitEventToUser } from '../network/redisBridge.js';
 import { TransportOpCode } from '@nyx/shared';
 import { SubscriptionTier } from '@nyx/shared';
+import { safeEqualStrings } from '../utils/validate.js';
 
 const router: Router = Router();
 
@@ -92,7 +93,7 @@ router.post('/webhook', async (req: Request, res: Response, next: NextFunction) 
       .update(JSON.stringify(req.body))
       .digest('hex');
 
-    if (signature !== expectedHash) {
+    if (!safeEqualStrings(typeof signature === 'string' ? signature : '', expectedHash)) {
       console.error("[Tripay] Invalid signature key");
       return res.status(400).json({ error: 'Invalid signature' });
     }
@@ -215,7 +216,7 @@ router.post('/nowpayments-webhook', async (req: Request, res: Response, next: Ne
     hmac.update(stringifiedPayload);
     const expectedSignature = hmac.digest('hex');
 
-    if (signature !== expectedSignature) {
+    if (!safeEqualStrings(signature, expectedSignature)) {
       console.error("[NOWPayments] Invalid signature key");
       return res.status(403).json({ error: 'Invalid signature' });
     }

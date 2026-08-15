@@ -13,6 +13,18 @@ export const executeLocalWipe = async (redirectUrl: string = '/') => {
     // 0. Close active connections to release the file lock
     await closeDatabaseConnection().catch(() => {});
 
+    // 0.5 Revoke all in-memory blob: URLs (decrypted media cache)
+    try {
+      const { clearBlobCache } = await import('@utils/blobCache');
+      clearBlobCache();
+    } catch (_e) {}
+
+    // 0.6 Wipe OPFS (encrypted attachment cache)
+    try {
+      const { wipeOPFS } = await import('./opfsStorage');
+      await wipeOPFS();
+    } catch (_e) {}
+
     // 1. Obliterate all known IndexedDB Vaults
     const databases = ['nyx_offline_queue', 'nyx_shadow_vault', 'NyxUnifiedDB', 'nyx_keychain', 'NyxDB'];
     
@@ -52,6 +64,17 @@ export const executeLocalWipe = async (redirectUrl: string = '/') => {
     // 3. Wipe Local & Session Storage completely
     localStorage.clear();
     sessionStorage.clear();
+
+    // 3.5 Wipe cookies (access/refresh token & CSRF) — semua domain & path yang relevan
+    try {
+      const cookieNames = document.cookie.split(';').map(c => c.split('=')[0]?.trim()).filter(Boolean);
+      for (const name of cookieNames) {
+        for (const domain of ['', 'nyx-app.my.id', '.nyx-app.my.id']) {
+          const domainPart = domain ? `; domain=${domain}` : '';
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domainPart}`;
+        }
+      }
+    } catch (_e) {}
 
     // 4. Unregister all Service Workers (removes PWA traces and caches)
     if ('serviceWorker' in navigator) {

@@ -9,7 +9,7 @@ let datagramWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 const CHAFF_INTERVAL_MS = 3000;
 const CHAFF_JITTER_MS = 500;
 const PADDING_BLOCK_SIZE = 8192;
-let outgoingQueue: { opCode: number, payload: Uint8Array, useStream: boolean }[] = [];
+let outgoingQueue: { opCode: number, payload: Uint8Array, useStream: boolean, queuedAt?: number }[] = [];
 let isChaffingActive = false;
 
 async function chaffingLoop() {
@@ -23,7 +23,13 @@ async function chaffingLoop() {
         }
 
         let item = outgoingQueue.shift();
-        if (!item) {
+        if (item) {
+            // DEV instrumentation: waktu menunggu di antrean (drain rate chaffing)
+            if (import.meta.env.DEV && item.queuedAt !== undefined) {
+                const waitMs = performance.now() - item.queuedAt;
+                console.debug(`[perf:transport] queue wait ${waitMs.toFixed(0)}ms (depth ${outgoingQueue.length + 1})`);
+            }
+        } else {
             // Generate encrypted-looking dummy data
             const dummyPayload = new Uint8Array(PADDING_BLOCK_SIZE);
             self.crypto.getRandomValues(dummyPayload);
@@ -276,12 +282,15 @@ self.onmessage = async (event: MessageEvent<MainToTransportWorker>) => {
       break;
     case 'SEND_STREAM':
       if (transport) {
-        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: true });
+        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: true, queuedAt: import.meta.env.DEV ? performance.now() : undefined });
+        if (import.meta.env.DEV && outgoingQueue.length > 10) {
+          console.debug(`[perf:transport] outgoingQueue depth ${outgoingQueue.length}`);
+        }
       }
       break;
     case 'SEND_DATAGRAM':
       if (transport) {
-        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: false });
+        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: false, queuedAt: import.meta.env.DEV ? performance.now() : undefined });
       }
       break;
     case 'START_HANDSHAKE':

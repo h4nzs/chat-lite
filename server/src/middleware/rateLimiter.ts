@@ -4,12 +4,16 @@ import { RedisStore } from 'rate-limit-redis'
 import { redisClient } from '../lib/redis.js'
 import { Request } from 'express';
 
-// Secure IP Extractor: Pakai helper bawaan untuk cegah bypass IPv6
+// Secure IP Extractor: prioritas pada req.ip (dari socket/X-Forwarded-For yang sudah
+// diproses Express dengan `trust proxy: true`). Header `cf-connecting-ip` hanya dipakai
+// sebagai fallback bila req.ip tidak tersedia. Ini mencegah bypass rate limit dengan
+// men-spoof header cf-connecting-ip langsung ke origin.
 const secureKeyGenerator = (req: Request): string => {
-  // 1. Ambil teks IP-nya dulu (dari Cloudflare atau bawaan Express)
-  const clientIp = typeof req.headers['cf-connecting-ip'] === 'string' ? req.headers['cf-connecting-ip'] : req.ip || 'unknown';
-  
-  // 2. Lempar teks IP (string) tersebut ke polisi library biar di-format dengan aman
+  const socketIp = req.ip && req.ip !== 'unknown' ? req.ip : undefined;
+  const cfIp = typeof req.headers['cf-connecting-ip'] === 'string' ? req.headers['cf-connecting-ip'] : undefined;
+  const clientIp = socketIp || cfIp || 'unknown';
+
+  // Lempar teks IP (string) tersebut ke polisi library biar di-format dengan aman
   return ipKeyGenerator(clientIp);
 };
 

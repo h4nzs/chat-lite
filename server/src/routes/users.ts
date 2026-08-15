@@ -1,4 +1,5 @@
 import { sendJsonToUser, broadcastToUsers, emitEventToUser, emitEventToUsers } from '../network/redisBridge.js';
+import { redisClient } from '../lib/redis.js';
 import { TransportOpCode } from '@nyx/shared';
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
@@ -260,6 +261,12 @@ router.put('/me/keys',
             installationId: installationId || undefined
         }
       })
+
+      // Invalidate cached identity/prekey bundles agar recipient tidak menerima key lama (stale up to 1h)
+      await Promise.all([
+        redisClient.del(`cache:keys:bundle:${userId}`),
+        redisClient.del(`cache:keys:public:${userId}`)
+      ]).catch((e: unknown) => console.warn('[Keys] Failed to invalidate key cache:', e))
 
       res.status(200).json({ message: 'Keys updated successfully.' })
     } catch (error) { next(error) }

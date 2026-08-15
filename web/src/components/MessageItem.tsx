@@ -184,7 +184,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
 const socket = transportClient;
 if (socket?.connected) {
     const targetRecipients = participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
-    transportClient.sendEvent("message:unsend", { messageId: message.id, conversationId: message.conversationId, targetRecipients });
+    transportClient.sendEvent("message:unsend", { messageId: message.id, conversationId: message.conversationId, targetRecipients, deleteSecret: message.deleteSecret });
 }
       }
 

@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ApiError } from '../utils/errors.js'
 import { z } from 'zod'
-import { zodValidate } from '../utils/validate.js'
+import { zodValidate, safeEqualStrings } from '../utils/validate.js'
 import { emitEventToUsers, emitEventToUser } from '../network/redisBridge.js'
 import { redisClient } from '../lib/redis.js'
 import { hoistConvoKeys, toConversation, asConversationId, asUserId, userSelectWithKeys, type RawConversationData } from '../utils/mappers.js'
@@ -199,7 +199,7 @@ router.put('/:id/details', async (req, res, next) => {
     const groupToken = req.headers['x-group-token']
 
     const conversation = await prisma.conversation.findUnique({ where: { id }, select: { authSecret: true } }) as { authSecret: string | null } | null;
-    if (!conversation || conversation.authSecret !== groupToken) {
+    if (!conversation || !safeEqualStrings(conversation.authSecret, typeof groupToken === 'string' ? groupToken : '')) {
         return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
     }
 
@@ -225,7 +225,7 @@ router.post('/:id/participants', async (req, res, next) => {
 
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
-  if (!groupToken || conversation.authSecret !== groupToken) {
+  if (!safeEqualStrings(conversation.authSecret, typeof groupToken === 'string' ? groupToken : '')) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
   }    const safeConv = toConversation(hoistConvoKeys(conversation as unknown as RawConversationData));
   safeConv.participants = [];
@@ -248,7 +248,7 @@ router.delete('/:id/participants/:userId', async (req, res, next) => {
 
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
-  if (!groupToken || conversation.authSecret !== groupToken) {
+  if (!safeEqualStrings(conversation.authSecret, typeof groupToken === 'string' ? groupToken : '')) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
   }
 
@@ -269,7 +269,7 @@ router.delete('/:id/leave', async (req, res, next) => {
 
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { authSecret: true } }) as { authSecret: string | null } | null;
   if (!conversation) return res.status(404).json({ error: 'Not found' });
-  if (!groupToken || conversation.authSecret !== groupToken) {
+  if (!safeEqualStrings(conversation.authSecret, typeof groupToken === 'string' ? groupToken : '')) {
       return res.status(403).json({ error: 'BLIND_AUTH_REQUIRED: Invalid or missing X-Group-Token' });
   }
 
