@@ -37,12 +37,22 @@ export const startMessageSweeper = () => {
         }
 
         // 2. Beritahu klien via Redis Bridge (Opaque Mailbox: cari user via UserHiddenConversation)
+        // N+1 FIX: satu query untuk SEMUA conversation yang terpengaruh (bukan per-conversation)
+        const affectedConversationIds = Array.from(deletedByConversation.keys());
+        const userConvs = await prisma.userHiddenConversation.findMany({
+            where: { conversationId: { in: affectedConversationIds } },
+            select: { userId: true, conversationId: true }
+        });
+
+        const recipientsByConversation = new Map<string, string[]>();
+        for (const uc of userConvs) {
+            const arr = recipientsByConversation.get(uc.conversationId) || [];
+            arr.push(uc.userId);
+            recipientsByConversation.set(uc.conversationId, arr);
+        }
+
         for (const [conversationId, msgIds] of deletedByConversation.entries()) {
-            const userConvs = await prisma.userHiddenConversation.findMany({
-                where: { conversationId },
-                select: { userId: true }
-            });
-            const recipientIds = userConvs.map(uc => uc.userId);
+            const recipientIds = recipientsByConversation.get(conversationId) || [];
             if (recipientIds.length > 0) {
                 await emitEventToUsers(recipientIds, 'message:deleted_batch', { messageIds: msgIds, conversationId });
             }

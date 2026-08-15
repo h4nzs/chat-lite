@@ -91,6 +91,8 @@ test.describe('Profile & Identity Settings', () => {
     await expect(nameField).toHaveValue('Updated Ghost Identity', { timeout: 10000 });
     
     // Verifikasi inisial Avatar berubah menjadi UG (Updated Ghost)
-    await expect(page.getByText('UG', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    // Timeout lebih longgar — update participant/sidebar lewat REST bisa lambat
+    // saat suite berjalan paralel (server lokal).
+    await expect(page.getByText('UG', { exact: true }).first()).toBeVisible({ timeout: 30000 });
   });
 });

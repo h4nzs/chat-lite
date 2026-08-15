@@ -8,6 +8,7 @@ import { ApiError } from '../utils/errors.js'
 import { newJti, refreshExpiryDate, signAccessToken, verifyJwt, signTransportTicket } from '../utils/jwt.js'
 import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
+import { clearAuthCookies, revokeFamily } from '../utils/sessionUtils.js'
 import { env } from '../config.js'
 import { requireAuth } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
@@ -413,9 +414,7 @@ router.post('/refresh', async (req, res, next) => {
     if (!token) throw new ApiError(401, 'No refresh token')
     const payload = verifyJwt(token) as { jti?: string; sub?: string; deviceId?: string } | string | null;
     if (typeof payload === 'string' || !payload?.jti || !payload?.sub || !payload?.deviceId) {
-      const isProd = env.nodeEnv === 'production'
-      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      clearAuthCookies(res)
       throw new ApiError(401, 'Invalid refresh token')
     }
 
@@ -423,9 +422,7 @@ router.post('/refresh', async (req, res, next) => {
     if (!stored) {
       // Token doesn't exist in DB at all — either never existed or was fully deleted.
       // Clear cookies and require re-login.
-      const isProd = env.nodeEnv === 'production'
-      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      clearAuthCookies(res)
       throw new ApiError(401, 'Refresh token not found. Please login again.');
     }
 
@@ -434,28 +431,11 @@ router.post('/refresh', async (req, res, next) => {
     if (stored.revokedAt || stored.replacedById || stored.expiresAt < new Date()) {
       console.warn(`[Security] Refresh token reuse detected! JTI: ${payload.jti}, Family: ${stored.familyId}, User: ${payload.sub}`);
       
-      // Revoke ALL tokens in this family (compromise containment)
-      await prisma.refreshToken.updateMany({
-        where: { familyId: stored.familyId, revokedAt: null },
-        data: { revokedAt: new Date() }
-      });
-
-      // Add all JTIs in this family to Redis blacklist
-      const familyTokens = await prisma.refreshToken.findMany({
-        where: { familyId: stored.familyId },
-        select: { jti: true, expiresAt: true }
-      });
-      for (const ft of familyTokens) {
-        const expiresIn = Math.floor((new Date(ft.expiresAt).getTime() - Date.now()) / 1000);
-        if (expiresIn > 0) {
-          await redisClient.setEx(`revoked_jti:${ft.jti}`, expiresIn, '1').catch(() => {});
-        }
-      }
+      // Revoke ALL tokens in this family (compromise containment) + Redis blacklist
+      await revokeFamily(stored.familyId)
 
       // Clear cookies
-      const isProd = env.nodeEnv === 'production'
-      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      clearAuthCookies(res)
 
       // Alert the user via their active WebSocket connection
       try {
@@ -467,9 +447,7 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     if (stored.expiresAt < new Date()) {
-      const isProd = env.nodeEnv === 'production'
-      res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-      res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+      clearAuthCookies(res)
       throw new ApiError(401, 'Refresh token expired')
     }
 
@@ -637,9 +615,7 @@ router.post('/logout-all', requireAuth, async (req, res, next) => {
       }
     }
     
-    const isProd = env.nodeEnv === 'production'
-    res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-    res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+    clearAuthCookies(res)
 
     // Clear active device cache from Redis
     try {
@@ -662,23 +638,8 @@ router.post('/logout', async (req, res) => {
       const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
       
       if (stored) {
-        // Revoke ALL tokens in this family (logout all sessions from this device chain)
-        await prisma.refreshToken.updateMany({
-          where: { familyId: stored.familyId, revokedAt: null },
-          data: { revokedAt: new Date() }
-        });
-
-        // Blacklist all JTIs in Redis
-        const familyTokens = await prisma.refreshToken.findMany({
-          where: { familyId: stored.familyId },
-          select: { jti: true, expiresAt: true }
-        });
-        for (const ft of familyTokens) {
-          const expiresIn = Math.floor((new Date(ft.expiresAt).getTime() - Date.now()) / 1000);
-          if (expiresIn > 0) {
-            await redisClient.setEx(`revoked_jti:${ft.jti}`, expiresIn, '1').catch(() => {});
-          }
-        }
+        // Revoke ALL tokens in this family + Redis blacklist (paralel)
+        await revokeFamily(stored.familyId);
       } else {
         // Fallback: revoke just this JTI
         await prisma.refreshToken.updateMany({ where: { jti: payload.jti }, data: { revokedAt: new Date() } });
@@ -690,9 +651,7 @@ router.post('/logout', async (req, res) => {
       }
     }
   } catch (_e) {}
-  const isProd = env.nodeEnv === 'production'
-  res.clearCookie('at', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
-  res.clearCookie('rt', { path: '/', httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' })
+  clearAuthCookies(res)
   res.json({ ok: true })
 })
 

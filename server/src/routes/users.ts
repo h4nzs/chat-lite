@@ -1,10 +1,11 @@
 import { sendJsonToUser, broadcastToUsers, emitEventToUser, emitEventToUsers } from '../network/redisBridge.js';
+import { clearAuthCookies } from '../utils/sessionUtils.js';
 import { redisClient } from '../lib/redis.js';
 import { TransportOpCode } from '@nyx/shared';
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import { Router, CookieOptions } from 'express'
+import { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import { hashPassword, verifyPassword } from '../utils/password.js'
 import { env } from '../config.js'
@@ -319,15 +320,8 @@ router.delete('/me', zodValidate({
     // 2. Delete user
     await prisma.user.delete({ where: { id: userId } })
 
-    // 3. Clear cookies
-    const options: CookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
-    }
-    res.clearCookie('at', options)
-    res.clearCookie('rt', options)
+    // 3. Clear cookies (opsi konsisten dengan setAuthCookies)
+    clearAuthCookies(res)
 
     // 4. KICK WebTransport connections
     try {
@@ -345,13 +339,6 @@ router.delete('/me', zodValidate({
 router.post('/me/logout', async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.rt
-    const options: CookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
-    }
-
     if (refreshToken) {
       try {
         const payload = jwt.verify(refreshToken, env.jwtSecret) as { jti: string };
@@ -363,8 +350,7 @@ router.post('/me/logout', async (req, res, next) => {
       }
     }
 
-    res.clearCookie('at', options)
-    res.clearCookie('rt', options)
+    clearAuthCookies(res)
     res.status(200).json({ success: true })
   } catch (error) { next(error) }
 })

@@ -61,9 +61,7 @@ export async function emitEventToUser(userId: string, event: string, data: unkno
  * Emits a named event to multiple users.
  */
 export async function emitEventToUsers(userIds: string[], event: string, data: unknown) {
-  for (const userId of userIds) {
-    await emitEventToUser(userId, event, data);
-  }
+  await Promise.all(userIds.map(userId => emitEventToUser(userId, event, data)));
 }
 
 /**
@@ -78,9 +76,7 @@ export async function sendJsonToUser(targetUserId: string, opCode: TransportOpCo
  * Broadcasts a message to multiple users.
  */
 export async function broadcastToUsers(userIds: string[], opCode: TransportOpCode, data: unknown) {
-  for (const userId of userIds) {
-    await sendJsonToUser(userId, opCode, data);
-  }
+  await Promise.all(userIds.map(userId => sendJsonToUser(userId, opCode, data)));
 }
 
 async function handleUpstreamMessage(userId: string, deviceId: string, opCode: number, base64Payload: string, _msgIdFromWrapper?: string) {
@@ -271,26 +267,26 @@ async function handleChatMessage(userId: string, deviceId: string, payload: unkn
             if (msgId) await sendAck(userId, deviceId, msgId, { ok: false, error: 'Too many recipients (max 500)' });
             return;
         }
-        for (const targetId of targetRecipients) {
-            if (typeof targetId === 'string') {
-                await sendJsonToUser(targetId, TransportOpCode.CHAT_MESSAGE, safeMessage);
+        // PARALEL: publish ke semua penerima sekaligus (sebelumnya sequential per recipient)
+        await Promise.all(targetRecipients.map(async (targetIdRaw) => {
+            const targetId = String(targetIdRaw);
+            await sendJsonToUser(targetId, TransportOpCode.CHAT_MESSAGE, safeMessage);
 
-                if (targetId !== userId) {
-                    sendPushNotification(targetId, {
-                        type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
-                        data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
-                    }).catch((e: unknown) => { console.error("[RedisBridge] Failed to upsert UserHiddenConversation:", e); });
+            if (targetId !== userId) {
+                sendPushNotification(targetId, {
+                    type: pushPayloads ? 'ENCRYPTED_MESSAGE' : 'GENERIC_MESSAGE',
+                    data: { conversationId, messageId: safeMessage.id, pushPayloadMap: pushPayloads || undefined }
+                }).catch((e: unknown) => { console.error("[RedisBridge] Failed to send push notification:", e); });
 
-                    // Register this conversation for the target recipient so they can discover it later
-                    // (Critical for new users who have never synced this conversation before)
-                    prisma.userHiddenConversation.upsert({
-                        where: { userId_conversationId: { userId: targetId, conversationId } },
-                        create: { userId: targetId, conversationId },
-                        update: {} // No-op if already exists
-                    }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
-                }
+                // Register this conversation for the target recipient so they can discover it later
+                // (Critical for new users who have never synced this conversation before)
+                prisma.userHiddenConversation.upsert({
+                    where: { userId_conversationId: { userId: targetId, conversationId } },
+                    create: { userId: targetId, conversationId },
+                    update: {} // No-op if already exists
+                }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
             }
-        }
+        }));
     }
   } catch (error) {
     console.error('Failed to handle chat message:', error);

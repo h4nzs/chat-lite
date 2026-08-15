@@ -49,16 +49,16 @@ export async function requireAuth (req: Request, res: Response, next: NextFuncti
         })
 
         if (user?.bannedAt) {
-          // Cache ban status for 60 seconds
-          await redisClient.setEx(banCacheKey, 60, 'BANNED').catch(() => {})
+          // Cache ban status 15 menit (di-invalidate saat ban/unban di routes/admin.ts)
+          await redisClient.setEx(banCacheKey, 900, 'BANNED').catch(() => {})
           return res.status(403).json({
             error: 'ACCESS DENIED: Your account has been suspended.',
             reason: user.banReason || undefined
           })
         }
 
-        // Cache non-ban status for 60 seconds
-        await redisClient.setEx(banCacheKey, 60, 'OK').catch(() => {})
+        // Cache non-ban status 15 menit (mengurangi DB query per user per menit)
+        await redisClient.setEx(banCacheKey, 900, 'OK').catch(() => {})
       }
     } catch (_cacheErr) {
       console.warn('[Auth] Ban cache unavailable — falling back to direct DB query')

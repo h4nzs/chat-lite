@@ -165,6 +165,7 @@ model SessionKey {
 
   @@unique([deviceId, sessionId])
   @@index([conversationId, deviceId, sessionId])
+  @@index([expiresAt]) // System Sweeper: filter session key kadaluarsa (harian)
 }
 
 model PushSubscription {
@@ -240,6 +241,7 @@ model Message {
   @@index([sessionId])
   @@index([createdAt])
   @@index([repliedToId])
+  @@index([expiresAt]) // Message Sweeper: filter expiresAt <= now setiap menit
 }
 
 enum DeliveryStatus {

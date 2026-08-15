@@ -173,8 +173,10 @@ router.post('/', zodValidate({
     // EMIT & PUSH NOTIFICATION (Opaque Mailbox: explicit targetRecipients from client)
     const targetRecipients = req.body.targetRecipients as string[] | undefined;
     if (Array.isArray(targetRecipients) && targetRecipients.length > 0) {
-        for (const targetId of targetRecipients) {
-            if (typeof targetId === 'string' && targetId !== senderId) {
+        // PARALEL: relay ke semua penerima sekaligus (sebelumnya sequential)
+        await Promise.all(targetRecipients.map(async (targetIdRaw) => {
+            const targetId = String(targetIdRaw);
+            if (targetId !== senderId) {
                 await sendJsonToUser(targetId, TransportOpCode.CHAT_MESSAGE, safeMessage);
 
                 // Register for offline discovery
@@ -184,7 +186,7 @@ router.post('/', zodValidate({
                     update: {}
                 }).catch((e: unknown) => console.warn('[OpaqueMailbox] Failed to upsert UserHiddenConversation:', e));
             }
-        }
+        }));
     }
 
     // PUSH NOTIFICATIONS DEFERRED FOR OPAQUE MAILBOX

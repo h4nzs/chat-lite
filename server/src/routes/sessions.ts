@@ -11,6 +11,7 @@ import { UAParser } from 'ua-parser-js'
 import { verifyJwt } from '../utils/jwt.js'
 import { getSodium } from '../lib/sodium.js'
 import { redisClient } from '../lib/redis.js'
+import { revokeFamily } from '../utils/sessionUtils.js'
 
 const router: Router = Router()
 
