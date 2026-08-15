@@ -413,10 +413,33 @@ router.get('/:id', async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.params.id },
-      select: { id: true, encryptedProfile: true, isVerified: true, hasCompletedOnboarding: true }
+      select: { 
+        id: true, 
+        encryptedProfile: true, 
+        isVerified: true, 
+        hasCompletedOnboarding: true,
+        // Kunci publik device (blind) — dibutuhkan client untuk safety number /
+        // verify encryption handshake di modal profil. Tanpa ini modal selalu
+        // menampilkan "user belum menyiapkan kunci".
+        devices: {
+          orderBy: { lastActiveAt: 'desc' },
+          take: 1,
+          select: { publicKey: true, pqPublicKey: true, signingKey: true }
+        }
+      }
     })
     if (!user) return res.status(404).json({ error: 'User not found' })
-    res.json(user)
+
+    const latestDevice = user.devices[0]
+    res.json({
+      id: user.id,
+      encryptedProfile: user.encryptedProfile,
+      isVerified: user.isVerified,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
+      publicKey: latestDevice?.publicKey ? Buffer.from(latestDevice.publicKey).toString('base64url') : null,
+      pqPublicKey: latestDevice?.pqPublicKey ? Buffer.from(latestDevice.pqPublicKey).toString('base64url') : null,
+      signingKey: latestDevice?.signingKey ? Buffer.from(latestDevice.signingKey).toString('base64url') : null
+    })
   } catch (error) { next(error) }
 })
 

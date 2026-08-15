@@ -476,8 +476,16 @@ export async function decryptMessageObject(
             if (rawMsg.type !== 'USER') {
                 return null; // Drop system messages that fail decryption
             }
-            finalMessage.content = '🔒 Pesan gagal didekripsi (Kunci kedaluwarsa)';
-            finalMessage.error = true;
+            // BUGFIX: echo pesan MILIK SENDIRI yang gagal self-decrypt (mis. MK belum
+            // termigrasi / desync) jangan ditampilkan sebagai bubble "Pesan gagal
+            // didekripsi" — tandai waiting_for_key (retryable). Shield di store akan
+            // memakai salinan optimistik yang valid bila ada.
+            if (currentUser && rawMsg.senderId === currentUser.id) {
+                finalMessage.content = 'waiting_for_key';
+            } else {
+                finalMessage.content = '🔒 Pesan gagal didekripsi (Kunci kedaluwarsa)';
+                finalMessage.error = true;
+            }
         } else if (errMsg.includes('older than current state')) {
             if (rawMsg.type !== 'USER') {
                 return null; // Drop system messages that are too old

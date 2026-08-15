@@ -12,6 +12,13 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: 'en', // Kalau bahasa user ga didukung, balik ke Inggris
+    // Hanya ambil kode bahasa utama: en-US → en. Tanpa ini, detector browser
+    // yang mengembalikan region (mis. en-US) akan meminta /locales/en-US/*.json
+    // yang tidak ada → error "failed parsing" untuk seluruh namespace.
+    load: 'languageOnly',
+    // Jangan pakai React Suspense — i18next warn "suspended while translations
+    // are loading" di console bila useSuspense default true.
+    react: { useSuspense: false },
     debug: process.env.NODE_ENV === 'development',
     
     interpolation: {

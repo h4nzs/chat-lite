@@ -36,7 +36,8 @@
     "unknown": "Tidak Diketahui",
     "transmission_blocked": "KONTAK DIBLOKIR",
     "unblock_signal": "Buka Blokir",
-    "timer_off": "Mati"
+    "timer_off": "Mati",
+    "auto_delete": "Hapus Otomatis"
   },
   "actions": {
     "reply": "Balas",

@@ -36,7 +36,8 @@
     "unknown": "Desconocido",
     "transmission_blocked": "CONTACTO BLOQUEADO",
     "unblock_signal": "Desbloquear",
-    "timer_off": "Apagado"
+    "timer_off": "Apagado",
+    "auto_delete": "Autoeliminar"
   },
   "actions": {
     "reply": "Responder",

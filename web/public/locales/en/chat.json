@@ -36,7 +36,8 @@
     "unknown": "Unknown",
     "transmission_blocked": "TRANSMISSION BLOCKED",
     "unblock_signal": "Unblock Signal",
-    "timer_off": "Off"
+    "timer_off": "Off",
+    "auto_delete": "Auto-Delete"
   },
   "actions": {
     "reply": "Reply",

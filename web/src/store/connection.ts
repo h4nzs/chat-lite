@@ -33,6 +33,10 @@ function scheduleReconnect(status: () => ConnectionStatus) {
   const jitter = Math.random() * 1000;
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    // JANGAN reconnect bila sudah logout — sebelumnya timer terus memanggil
+    // transport-ticket dengan token basi (loop 401 tiap ~3 detik di console).
+    const { useAuthStore } = await import('./auth');
+    if (!useAuthStore.getState().accessToken) return;
     if (document.visibilityState === 'visible' && status() === 'disconnected') {
       const { connectSocket } = await import('@lib/transportClient');
       connectSocket();

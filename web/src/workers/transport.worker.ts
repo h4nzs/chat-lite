@@ -44,7 +44,10 @@ function enqueueSend(item: { opCode: number, payload: Uint8Array, useStream: boo
   }
   sendChain = sendChain
     .then(() => sendFrameItem(item))
-    .catch((e) => console.error("Transport: failed to send frame", e))
+    .catch((e) => {
+      // Expected race saat koneksi baru saja tertutup (reconnect) — bukan error nyata
+      console.debug("Transport: failed to send frame (connection closing):", e instanceof Error ? e.message : e);
+    })
     .finally(() => { pendingSends--; });
 }
 

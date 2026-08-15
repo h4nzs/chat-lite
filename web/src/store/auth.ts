@@ -369,7 +369,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           throw new Error("No valid session.");
         }
       } catch (error: unknown) {
-        console.log("Bootstrap failed (No session):", error);
+        // Kasus normal saat berkunjung tanpa sesi — debug, bukan error
+        console.debug("Bootstrap failed (No session):", error instanceof Error ? error.message : error);
         privateKeysCache = null;
         set({ user: null, accessToken: null, blockedUserIds: [] });
         clearAuthCookies();
@@ -444,9 +445,14 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
 
         // Call API
         const fingerprint = await getBrowserFingerprint();
+        // BUGFIX: login sebelumnya HANYA mengirim fingerprint — tanpa installationId
+        // server tidak bisa mengenali perangkat yang sama → selalu dianggap device baru
+        // dan modal recovery muncul setiap login ulang.
+        const { getPersistentInstallationId } = await import('@utils/fingerprint');
+        const installationId = await getPersistentInstallationId();
         const res = await api<{ user: User; accessToken: string; encryptedPrivateKey?: string; deviceId?: string }>("/api/auth/login", {
           method: "POST",
-          headers: { 'X-Nyx-Fingerprint': fingerprint },
+          headers: { 'X-Nyx-Fingerprint': fingerprint, 'X-Nyx-Installation-Id': installationId },
           body: JSON.stringify({ 
               usernameHash, 
               password,
@@ -806,7 +812,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           }
           return false;
         } catch (error) {
-          console.warn('[Auth] Silent refresh failed:', error);
+          console.debug('[Auth] Silent refresh failed:', error instanceof Error ? error.message : error);
           return false;
         } finally {
           refreshPromise = null;

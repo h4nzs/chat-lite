@@ -154,9 +154,15 @@ export default function Login() {
       // B. Browser minta fingerprint user (Login Server + Unlock Local Vault)
       const { authResp, recoveryPhrase } = await unlockWithBiometric(options as Record<string, unknown>);
 
-      // C. Verifikasi ke Server
+      // C. Verifikasi ke Server (sertakan device identity agar perangkat dikenali)
+      const { getBrowserFingerprint, getPersistentInstallationId } = await import('@utils/fingerprint');
+      const [fingerprint, installationId] = await Promise.all([
+        getBrowserFingerprint(),
+        getPersistentInstallationId()
+      ]);
       const result = await api<{ verified: boolean; user: User; accessToken: string; encryptedPrivateKey?: string }>("/api/auth/webauthn/login/verify", {
         method: "POST",
+        headers: { 'X-Nyx-Fingerprint': fingerprint, 'X-Nyx-Installation-Id': installationId },
         body: JSON.stringify(authResp)
       });
 
@@ -249,8 +255,14 @@ export default function Login() {
 
         await useAuthStore.getState().loadBlockedUsers();
 
-        // Note: App.tsx router will automatically redirect to /chat since user and hasRestoredKeys are now set
-        navigate("/chat");
+        // BUGFIX: JANGAN navigate("/chat") tanpa syarat — bila ini perangkat baru
+        // (kunci lokal belum ada), user harus menyelesaikan recovery dulu.
+        // App.tsx routing akan redirect otomatis SAAT hasRestoredKeys jadi true.
+        // Navigasi paksa di sini membuat user "masuk" beberapa detik setelah
+        // modal Identity Recovery muncul, padahal recovery belum diselesaikan.
+        if (useAuthStore.getState().hasRestoredKeys) {
+          navigate("/chat");
+        }
                             }
                             } catch (err: unknown) {
       console.error("Biometric login error:", err);

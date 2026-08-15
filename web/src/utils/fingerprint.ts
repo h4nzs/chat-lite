@@ -20,11 +20,22 @@ export async function getBrowserFingerprint(): Promise<string> {
     screen.availWidth + 'x' + screen.availHeight,
   ].join('|');
 
-  // Hash the signals using SHA-256 for a fixed-length ID
+  // Hash the signals using SHA-256 for a fixed-length ID.
+  // Guard: crypto.subtle bisa melempar (mis. konteks tidak aman / proteksi
+  // fingerprint browser) — rejection tak ter-tangani akan memutus flow koneksi.
   const msgUint8 = new TextEncoder().encode(signals);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (_e) {
+    // Fallback stabil (djb2) bila crypto.subtle diblokir environment
+    let hash = 5381;
+    for (let i = 0; i < msgUint8.length; i++) {
+      hash = ((hash << 5) + hash + msgUint8[i]!) | 0;
+    }
+    return 'fp_' + (hash >>> 0).toString(16).padStart(8, '0');
+  }
 }
 
 /**

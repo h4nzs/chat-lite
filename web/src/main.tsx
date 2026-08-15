@@ -180,13 +180,30 @@ if (navigator.storage && navigator.storage.persist) {
 }
 
 import { HelmetProvider } from 'react-helmet-async';
+import i18n from './i18n';
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <HelmetProvider>
-      <App />
-    </HelmetProvider>
-  </React.StrictMode>
-);
+// Tunggu i18n selesai memuat namespace sebelum render — mencegah "missingKey"
+// transient saat komponen pertama kali render sebelum JSON lokale tiba.
+async function bootstrap() {
+  try {
+    if (!i18n.isInitialized) {
+      await new Promise<void>((resolve) => {
+        i18n.on('initialized', () => resolve());
+        i18n.on('failedLoading', () => resolve());
+      });
+    }
+  } catch (_e) {
+    // Jangan blokir render bila i18n gagal — fallbackLng akan menangani
+  }
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <HelmetProvider>
+        <App />
+      </HelmetProvider>
+    </React.StrictMode>
+  );
+}
+
+bootstrap();
 
 registerServiceWorker();
