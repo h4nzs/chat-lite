@@ -8,55 +8,60 @@ let datagramWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
 // --- TRAFFIC COVER: CHAFFING ---
 const CHAFF_INTERVAL_MS = 3000;
 const CHAFF_JITTER_MS = 500;
-const PADDING_BLOCK_SIZE = 8192;
-let outgoingQueue: { opCode: number, payload: Uint8Array, useStream: boolean, queuedAt?: number }[] = [];
+// Ukuran chaff ≤ MTU datagram QUIC (~1200B) agar tidak drop diam-diam.
+const CHAFF_DATAGRAM_SIZE = 1000;
 let isChaffingActive = false;
+
+// Serialisasi pengiriman frame (FIFO) tanpa delay buatan:
+// pesan asli dikirim SEKETIKA, chaff dummy dikirim oleh loop interval.
+let sendChain: Promise<void> = Promise.resolve();
+let pendingSends = 0;
+
+async function sendFrameItem(item: { opCode: number, payload: Uint8Array, useStream: boolean }) {
+  if (!transport) return;
+  if (item.useStream) {
+    const stream = await transport.createUnidirectionalStream();
+    const writer = stream.getWriter();
+    const frame = new Uint8Array(5 + item.payload.length);
+    frame[0] = item.opCode;
+    new DataView(frame.buffer).setUint32(1, item.payload.length, false);
+    frame.set(item.payload, 5);
+    await writer.write(frame);
+    await writer.close();
+  } else if (datagramWriter) {
+    const frame = new Uint8Array(5 + item.payload.length);
+    frame[0] = item.opCode;
+    new DataView(frame.buffer).setUint32(1, item.payload.length, false);
+    frame.set(item.payload, 5);
+    await datagramWriter.write(frame);
+  }
+}
+
+function enqueueSend(item: { opCode: number, payload: Uint8Array, useStream: boolean }) {
+  pendingSends++;
+  if (import.meta.env.DEV && pendingSends > 10) {
+    console.debug(`[perf:transport] send chain depth ${pendingSends}`);
+  }
+  sendChain = sendChain
+    .then(() => sendFrameItem(item))
+    .catch((e) => console.error("Transport: failed to send frame", e))
+    .finally(() => { pendingSends--; });
+}
 
 async function chaffingLoop() {
     if (isChaffingActive) return;
     isChaffingActive = true;
 
     while (isChaffingActive) {
-        if (!transport) {
+        if (!transport || !datagramWriter) {
             await new Promise(r => setTimeout(r, 1000));
             continue;
         }
 
-        let item = outgoingQueue.shift();
-        if (item) {
-            // DEV instrumentation: waktu menunggu di antrean (drain rate chaffing)
-            if (import.meta.env.DEV && item.queuedAt !== undefined) {
-                const waitMs = performance.now() - item.queuedAt;
-                console.debug(`[perf:transport] queue wait ${waitMs.toFixed(0)}ms (depth ${outgoingQueue.length + 1})`);
-            }
-        } else {
-            // Generate encrypted-looking dummy data
-            const dummyPayload = new Uint8Array(PADDING_BLOCK_SIZE);
-            self.crypto.getRandomValues(dummyPayload);
-            // TRAFFIC COVER: Use Datagram (false) for Chaff to save memory and avoid stream exhaustion
-            item = { opCode: TransportOpCode.CHAFF, payload: dummyPayload, useStream: false };
-        }
-
-        try {
-            if (item.useStream) {
-                const stream = await transport.createUnidirectionalStream();
-                const writer = stream.getWriter();
-                const frame = new Uint8Array(5 + item.payload.length);
-                frame[0] = item.opCode;
-                new DataView(frame.buffer).setUint32(1, item.payload.length, false);
-                frame.set(item.payload, 5);
-                await writer.write(frame);
-                await writer.close();
-            } else if (datagramWriter) {
-                const frame = new Uint8Array(5 + item.payload.length);
-                frame[0] = item.opCode;
-                new DataView(frame.buffer).setUint32(1, item.payload.length, false);
-                frame.set(item.payload, 5);
-                await datagramWriter.write(frame);
-            }
-        } catch (e) {
-            console.error("Traffic Cover: Failed to send packet", e);
-        }
+        // Generate encrypted-looking dummy data (traffic cover saat idle)
+        const dummyPayload = new Uint8Array(CHAFF_DATAGRAM_SIZE);
+        self.crypto.getRandomValues(dummyPayload);
+        enqueueSend({ opCode: TransportOpCode.CHAFF, payload: dummyPayload, useStream: false });
 
         // Wait for next interval with jitter
         const jitter = Math.floor(Math.random() * (CHAFF_JITTER_MS * 2)) - CHAFF_JITTER_MS;
@@ -282,15 +287,12 @@ self.onmessage = async (event: MessageEvent<MainToTransportWorker>) => {
       break;
     case 'SEND_STREAM':
       if (transport) {
-        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: true, queuedAt: import.meta.env.DEV ? performance.now() : undefined });
-        if (import.meta.env.DEV && outgoingQueue.length > 10) {
-          console.debug(`[perf:transport] outgoingQueue depth ${outgoingQueue.length}`);
-        }
+        enqueueSend({ opCode: data.opCode, payload: data.payload, useStream: true });
       }
       break;
     case 'SEND_DATAGRAM':
       if (transport) {
-        outgoingQueue.push({ opCode: data.opCode, payload: data.payload, useStream: false, queuedAt: import.meta.env.DEV ? performance.now() : undefined });
+        enqueueSend({ opCode: data.opCode, payload: data.payload, useStream: false });
       }
       break;
     case 'START_HANDSHAKE':

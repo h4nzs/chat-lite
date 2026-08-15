@@ -269,7 +269,7 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
   }
 
   public sendEvent(event: string, data?: unknown, callback?: Function): void {
-    const msgId = Math.random().toString(36).substring(7);
+    const msgId = crypto.randomUUID();
     
     if (callback) {
        this.pendingAcks.set(msgId, {
@@ -289,7 +289,7 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
   public timeout(ms: number) {
     return {
       emit: (event: string, data: unknown, callback: Function) => {
-        const msgId = Math.random().toString(36).substring(7);
+        const msgId = crypto.randomUUID();
         this.pendingAcks.set(msgId, {
           resolve: (val) => callback(null, val),
           reject: (err) => callback(new Error('timeout'), null),

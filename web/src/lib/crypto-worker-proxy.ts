@@ -15,19 +15,33 @@ const uuidv4 = () => crypto.randomUUID();
 
 const worker = new CryptoWorker();
 
-// Utility function to safely convert any CryptoBuffer to an Array of numbers for postMessage
-function toArray(buffer: CryptoBuffer): number[] {
-    return Array.from(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer));
+// Kirim buffer sebagai typed array langsung (structured clone efisien) —
+// JANGAN konversi ke number[] (Array.from) karena sangat lambat & boros memori.
+function asBuffer(buffer: CryptoBuffer): Uint8Array {
+    return buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+}
+
+// Bungkus hasil ArrayBuffer/Uint8Array tanpa copy bila sudah berupa Uint8Array.
+function asU8(value: unknown): Uint8Array {
+    return value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
 }
 
 // Map untuk nyimpen Promise yang nunggu balasan worker
-const pendingRequests = new Map<string, { resolve: (val: unknown) => void; reject: (err: unknown) => void; startedAt: number; type: string }>();
+interface PendingRequest {
+  resolve: (val: unknown) => void;
+  reject: (err: unknown) => void;
+  startedAt: number;
+  type: string;
+  timeoutId?: ReturnType<typeof setTimeout>;
+}
+const pendingRequests = new Map<string, PendingRequest>();
 
 worker.onmessage = (e) => {
   const { id, success, result, error } = e.data;
   const pending = pendingRequests.get(id);
   if (!pending) return;
-  const { resolve, reject, startedAt, type } = pending;
+  const { resolve, reject, startedAt, type, timeoutId } = pending;
+  if (timeoutId) clearTimeout(timeoutId);
   if (import.meta.env.DEV) {
     const duration = performance.now() - startedAt;
     if (duration > 50) {
@@ -39,10 +53,22 @@ worker.onmessage = (e) => {
   pendingRequests.delete(id);
 };
 
-function sendToWorker<T>(type: string, payload: unknown, transfer?: Transferable[]): Promise<T> {
+const DEFAULT_TIMEOUT_MS = 120000; // 2 menit (worker hang => reject, bukan hang selamanya)
+
+function sendToWorker<T>(type: string, payload: unknown, transfer?: Transferable[], timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = uuidv4();
-    pendingRequests.set(id, { resolve: resolve as (val: unknown) => void, reject, startedAt: performance.now(), type });
+    const timeoutId = setTimeout(() => {
+      pendingRequests.delete(id);
+      reject(new Error(`Crypto worker timeout for ${type} after ${timeoutMs}ms`));
+    }, timeoutMs);
+    pendingRequests.set(id, {
+      resolve: resolve as (val: unknown) => void,
+      reject,
+      startedAt: performance.now(),
+      type,
+      timeoutId
+    });
     worker.postMessage({ id, type, payload }, transfer || []);
   });
 }
@@ -54,7 +80,7 @@ function sendToWorker<T>(type: string, payload: unknown, transfer?: Transferable
  * Output: Uint8Array (32 bytes)
  */
 export const deriveKeyFromPassword = async (password: string, salt: CryptoBuffer): Promise<Uint8Array> => {
-  const result = await sendToWorker<Uint8Array>('DERIVE_KEY', { password, salt: toArray(salt) });
+  const result = await sendToWorker<Uint8Array>('DERIVE_KEY', { password, salt: asBuffer(salt) });
   return new Uint8Array(result);
 };
 
@@ -63,7 +89,7 @@ export const deriveKeyFromPassword = async (password: string, salt: CryptoBuffer
  * Output: String (JSON representation of IV + Ciphertext)
  */
 export const encryptWithKey = async (keyBytes: CryptoBuffer, data: unknown): Promise<string> => {
-  return sendToWorker<string>('ENCRYPT_DATA', { keyBytes: toArray(keyBytes), data });
+  return sendToWorker<string>('ENCRYPT_DATA', { keyBytes: asBuffer(keyBytes), data });
 };
 
 /**
@@ -71,7 +97,7 @@ export const encryptWithKey = async (keyBytes: CryptoBuffer, data: unknown): Pro
  * Output: Original Data (Object / String)
  */
 export const decryptWithKey = async (keyBytes: CryptoBuffer, encryptedString: string): Promise<unknown> => {
-  return sendToWorker<unknown>('DECRYPT_DATA', { keyBytes: toArray(keyBytes), encryptedString });
+  return sendToWorker<unknown>('DECRYPT_DATA', { keyBytes: asBuffer(keyBytes), encryptedString });
 };
 
 // Define the type locally since the original file is gone.
@@ -155,7 +181,7 @@ export async function generateProfileKey(): Promise<string> {
 }
 
 export async function minePoW(salt: string, difficulty: number): Promise<{ nonce: number; hash: string }> {
-  return sendToWorker('minePoW', { salt, difficulty });
+  return sendToWorker('minePoW', { salt, difficulty }, undefined, 300000);
 }
 
 export async function hashUsername(username: string): Promise<string> {
@@ -167,7 +193,7 @@ export async function reEncryptBundleFromMasterKey(masterKey: Uint8Array, newPas
   encryptionPublicKeyB64: string;
   signingPublicKeyB64: string;
 }> {
-  return sendToWorker('reEncryptBundleFromMasterKey', { masterKey: toArray(masterKey), newPassword });
+  return sendToWorker('reEncryptBundleFromMasterKey', { masterKey: asBuffer(masterKey), newPassword });
 }
 
 export async function retrievePrivateKeys(encryptedDataStr: string, password:string): Promise<RetrieveKeysResult> {
@@ -189,7 +215,7 @@ export async function retrievePrivateKeys(encryptedDataStr: string, password:str
 }
 
 export async function generateSafetyNumber(myPublicKey: Uint8Array, theirPublicKey: Uint8Array): Promise<string> {
-    return sendToWorker('generateSafetyNumber', { myPublicKey: toArray(myPublicKey), theirPublicKey: toArray(theirPublicKey) });
+    return sendToWorker('generateSafetyNumber', { myPublicKey: asBuffer(myPublicKey), theirPublicKey: asBuffer(theirPublicKey) });
 }
 
 export function worker_generate_random_key(): Promise<Uint8Array> {
@@ -199,34 +225,34 @@ export function worker_generate_random_key(): Promise<Uint8Array> {
 // --- Internal Crypto Primitives Proxy Functions ---
 
 export function worker_crypto_secretbox_xchacha20poly1305_easy(message: string | CryptoBuffer, nonce: CryptoBuffer, key: CryptoBuffer): Promise<Uint8Array> {
-    return sendToWorker('crypto_secretbox_xchacha20poly1305_easy', { message: typeof message === 'string' ? message : toArray(message), nonce: toArray(nonce), key: toArray(key) });
+    return sendToWorker('crypto_secretbox_xchacha20poly1305_easy', { message: typeof message === 'string' ? message : asBuffer(message), nonce: asBuffer(nonce), key: asBuffer(key) });
 }
 
 export function worker_crypto_secretbox_xchacha20poly1305_open_easy(ciphertext: CryptoBuffer, nonce: CryptoBuffer, key: CryptoBuffer): Promise<Uint8Array> {
-    return sendToWorker('crypto_secretbox_xchacha20poly1305_open_easy', { ciphertext: toArray(ciphertext), nonce: toArray(nonce), key: toArray(key) });
+    return sendToWorker('crypto_secretbox_xchacha20poly1305_open_easy', { ciphertext: asBuffer(ciphertext), nonce: asBuffer(nonce), key: asBuffer(key) });
 }
 
 export function worker_crypto_box_seal(message: CryptoBuffer, publicKey: CryptoBuffer): Promise<Uint8Array> {
-    return sendToWorker('crypto_box_seal', { message: toArray(message), publicKey: toArray(publicKey) });
+    return sendToWorker('crypto_box_seal', { message: asBuffer(message), publicKey: asBuffer(publicKey) });
 }
 
 export function worker_crypto_box_seal_open(ciphertext: CryptoBuffer, publicKey: CryptoBuffer, privateKey: CryptoBuffer): Promise<Uint8Array> {
-    return sendToWorker('crypto_box_seal_open', { ciphertext: toArray(ciphertext), publicKey: toArray(publicKey), privateKey: toArray(privateKey) });
+    return sendToWorker('crypto_box_seal_open', { ciphertext: asBuffer(ciphertext), publicKey: asBuffer(publicKey), privateKey: asBuffer(privateKey) });
 }
 
 export function worker_pq_box_seal(message: CryptoBuffer | string, pqPublicKey: CryptoBuffer, classicalPublicKey: CryptoBuffer): Promise<Uint8Array> {
     return sendToWorker('pq_box_seal', { 
-        message: typeof message === 'string' ? message : toArray(message), 
-        pqPublicKey: toArray(pqPublicKey), 
-        classicalPublicKey: toArray(classicalPublicKey) 
+        message: typeof message === 'string' ? message : asBuffer(message), 
+        pqPublicKey: asBuffer(pqPublicKey), 
+        classicalPublicKey: asBuffer(classicalPublicKey) 
     });
 }
 
 export function worker_pq_box_seal_open(combinedPayload: CryptoBuffer, pqPrivateKey: CryptoBuffer, classicalPrivateKey: CryptoBuffer): Promise<Uint8Array> {
     return sendToWorker('pq_box_seal_open', { 
-        combinedPayload: toArray(combinedPayload), 
-        pqPrivateKey: toArray(pqPrivateKey), 
-        classicalPrivateKey: toArray(classicalPrivateKey) 
+        combinedPayload: asBuffer(combinedPayload), 
+        pqPrivateKey: asBuffer(pqPrivateKey), 
+        classicalPrivateKey: asBuffer(classicalPrivateKey) 
     });
 }
 
@@ -245,19 +271,19 @@ export function worker_x3dh_initiator(payload: {
     theirPqOneTimePreKey?: CryptoBuffer
 }): Promise<{ sessionKey: Uint8Array, initiatorCiphertexts: Uint8Array }> {
     return sendToWorker<{ sessionKey: ArrayBuffer, initiatorCiphertexts: ArrayBuffer }>('x3dh_initiator', {
-      mySigningKey: { privateKey: toArray(payload.mySigningKey.privateKey) },
-      theirIdentityKey: toArray(payload.theirIdentityKey),
-      theirPqIdentityKey: payload.theirPqIdentityKey ? toArray(payload.theirPqIdentityKey) : undefined,
-      theirSignedPreKey: toArray(payload.theirSignedPreKey),
-      theirPqSignedPreKey: payload.theirPqSignedPreKey ? toArray(payload.theirPqSignedPreKey) : undefined,
-      theirSigningKey: toArray(payload.theirSigningKey),
-      signature: toArray(payload.signature),
-      pqSignature: payload.pqSignature ? toArray(payload.pqSignature) : undefined,
-      theirOneTimePreKey: payload.theirOneTimePreKey ? toArray(payload.theirOneTimePreKey) : undefined,
-      theirPqOneTimePreKey: payload.theirPqOneTimePreKey ? toArray(payload.theirPqOneTimePreKey) : undefined
+      mySigningKey: { privateKey: asBuffer(payload.mySigningKey.privateKey) },
+      theirIdentityKey: asBuffer(payload.theirIdentityKey),
+      theirPqIdentityKey: payload.theirPqIdentityKey ? asBuffer(payload.theirPqIdentityKey) : undefined,
+      theirSignedPreKey: asBuffer(payload.theirSignedPreKey),
+      theirPqSignedPreKey: payload.theirPqSignedPreKey ? asBuffer(payload.theirPqSignedPreKey) : undefined,
+      theirSigningKey: asBuffer(payload.theirSigningKey),
+      signature: asBuffer(payload.signature),
+      pqSignature: payload.pqSignature ? asBuffer(payload.pqSignature) : undefined,
+      theirOneTimePreKey: payload.theirOneTimePreKey ? asBuffer(payload.theirOneTimePreKey) : undefined,
+      theirPqOneTimePreKey: payload.theirPqOneTimePreKey ? asBuffer(payload.theirPqOneTimePreKey) : undefined
     }).then(res => ({
-        sessionKey: new Uint8Array(res.sessionKey),
-        initiatorCiphertexts: new Uint8Array(res.initiatorCiphertexts)
+        sessionKey: asU8(res.sessionKey),
+        initiatorCiphertexts: asU8(res.initiatorCiphertexts)
     }));
 }
 
@@ -273,13 +299,13 @@ export function worker_x3dh_recipient(payload: {
     const transfer: Transferable[] = [payload.initiatorCiphertexts.buffer];
     
     return sendToWorker<ArrayBuffer>('x3dh_recipient', {
-      myIdentityKey: { privateKey: toArray(payload.myIdentityKey.privateKey) },
-      mySignedPreKey: { privateKey: toArray(payload.mySignedPreKey.privateKey) },
-      myPqIdentityKey: { privateKey: toArray(payload.myPqIdentityKey.privateKey) },
-      myPqSignedPreKey: { privateKey: toArray(payload.myPqSignedPreKey.privateKey) },
-      theirSigningKey: toArray(payload.theirSigningKey),
+      myIdentityKey: { privateKey: asBuffer(payload.myIdentityKey.privateKey) },
+      mySignedPreKey: { privateKey: asBuffer(payload.mySignedPreKey.privateKey) },
+      myPqIdentityKey: { privateKey: asBuffer(payload.myPqIdentityKey.privateKey) },
+      myPqSignedPreKey: { privateKey: asBuffer(payload.myPqSignedPreKey.privateKey) },
+      theirSigningKey: asBuffer(payload.theirSigningKey),
       initiatorCiphertexts: payload.initiatorCiphertexts,
-      myOneTimePreKey: payload.myOneTimePreKey ? { privateKey: toArray(payload.myOneTimePreKey.privateKey) } : undefined
+      myOneTimePreKey: payload.myOneTimePreKey ? { privateKey: asBuffer(payload.myOneTimePreKey.privateKey) } : undefined
     }, transfer).then(res => new Uint8Array(res));
 }
 
@@ -297,12 +323,12 @@ export function worker_x3dh_recipient_regenerate(payload: {
 
     return sendToWorker<ArrayBuffer>('x3dh_recipient_regenerate', { 
         keyId: payload.keyId, 
-        masterSeed: toArray(payload.masterSeed),
-        myIdentityKey: { privateKey: toArray(payload.myIdentityKey.privateKey) },
-        mySignedPreKey: { privateKey: toArray(payload.mySignedPreKey.privateKey) },
-        myPqIdentityKey: { privateKey: toArray(payload.myPqIdentityKey.privateKey) },
-        myPqSignedPreKey: { privateKey: toArray(payload.myPqSignedPreKey.privateKey) },
-        theirSigningKey: toArray(payload.theirSigningKey),
+        masterSeed: asBuffer(payload.masterSeed),
+        myIdentityKey: { privateKey: asBuffer(payload.myIdentityKey.privateKey) },
+        mySignedPreKey: { privateKey: asBuffer(payload.mySignedPreKey.privateKey) },
+        myPqIdentityKey: { privateKey: asBuffer(payload.myPqIdentityKey.privateKey) },
+        myPqSignedPreKey: { privateKey: asBuffer(payload.myPqSignedPreKey.privateKey) },
+        theirSigningKey: asBuffer(payload.theirSigningKey),
         initiatorCiphertexts: payload.initiatorCiphertexts
     }, transfer).then(res => new Uint8Array(res));
 }
@@ -310,29 +336,29 @@ export function worker_x3dh_recipient_regenerate(payload: {
 // --- LARGE FILE STREAMING PROXY FUNCTIONS ---
 
 export function worker_file_encrypt(fileBuffer: ArrayBuffer | Blob): Promise<{ combinedData: ArrayBuffer, key: Uint8Array }> {
-    return sendToWorker('file_encrypt', { fileBuffer });
+    return sendToWorker('file_encrypt', { fileBuffer }, undefined, 600000);
 }
 
 export function worker_file_decrypt(combinedData: ArrayBuffer | Blob, keyBytes: Uint8Array): Promise<ArrayBuffer> {
-    return sendToWorker('file_decrypt', { combinedData, keyBytes: toArray(keyBytes) });
+    return sendToWorker('file_decrypt', { combinedData, keyBytes: asBuffer(keyBytes) }, undefined, 600000);
 }
 
 export function worker_encrypt_session_key(sessionKey: Uint8Array, masterSeed: CryptoBuffer): Promise<Uint8Array> {
     return sendToWorker('encrypt_session_key', { 
-        sessionKey: toArray(sessionKey), 
-        masterSeed: toArray(masterSeed) 
+        sessionKey: asBuffer(sessionKey), 
+        masterSeed: asBuffer(masterSeed) 
     });
 }
 
 export function worker_decrypt_session_key(encryptedKey: Uint8Array, masterSeed: CryptoBuffer): Promise<Uint8Array> {
     return sendToWorker('decrypt_session_key', { 
-        encryptedKey: toArray(encryptedKey), 
-        masterSeed: toArray(masterSeed) 
+        encryptedKey: asBuffer(encryptedKey), 
+        masterSeed: asBuffer(masterSeed) 
     });
 }
 
 export function worker_generate_otpk_batch(count: number, startId: number, masterSeed: CryptoBuffer): Promise<Array<{ keyId: number, publicKey: string, pqPublicKey?: string, encryptedPrivateKey: Uint8Array }>> {
-    return sendToWorker('generate_otpk_batch', { count, startId, masterSeed: toArray(masterSeed) });
+    return sendToWorker('generate_otpk_batch', { count, startId, masterSeed: asBuffer(masterSeed) });
 }
 
 // --- POST-QUANTUM DOUBLE RATCHET PROXY FUNCTIONS ---
@@ -342,8 +368,8 @@ export function worker_dr_init_alice(payload: {
     theirPqSignedPreKeyPublic: Uint8Array
 }): Promise<DoubleRatchetState> {
     return sendToWorker('dr_init_alice', {
-        sk: toArray(payload.sk),
-        theirPqSignedPreKeyPublic: toArray(payload.theirPqSignedPreKeyPublic)
+        sk: asBuffer(payload.sk),
+        theirPqSignedPreKeyPublic: asBuffer(payload.theirPqSignedPreKeyPublic)
     });
 }
 
@@ -352,10 +378,10 @@ export function worker_dr_init_bob(payload: {
     myPqSignedPreKey: { publicKey: Uint8Array, privateKey: Uint8Array }
 }): Promise<DoubleRatchetState> {
     return sendToWorker('dr_init_bob', {
-        sk: toArray(payload.sk),
+        sk: asBuffer(payload.sk),
         myPqSignedPreKey: {
-            publicKey: toArray(payload.myPqSignedPreKey.publicKey),
-            privateKey: toArray(payload.myPqSignedPreKey.privateKey)
+            publicKey: asBuffer(payload.myPqSignedPreKey.publicKey),
+            privateKey: asBuffer(payload.myPqSignedPreKey.privateKey)
         }
     });
 }
@@ -365,11 +391,11 @@ export function worker_dr_ratchet_encrypt(payload: {
 }): Promise<{ state: DoubleRatchetState, header: DoubleRatchetHeader, ciphertext: Uint8Array, mk: Uint8Array }> {
     return sendToWorker<{ state: DoubleRatchetState, header: DoubleRatchetHeader, ciphertext: ArrayBuffer, mk: ArrayBuffer }>('dr_ratchet_encrypt', {
         serializedState: payload.serializedState,
-        plaintext: typeof payload.plaintext === 'string' ? payload.plaintext : toArray(payload.plaintext)
+        plaintext: typeof payload.plaintext === 'string' ? payload.plaintext : asBuffer(payload.plaintext)
     }).then(res => ({
         ...res,
-        ciphertext: new Uint8Array(res.ciphertext),
-        mk: new Uint8Array(res.mk)
+        ciphertext: asU8(res.ciphertext),
+        mk: asU8(res.mk)
     }));
 }
 
@@ -381,11 +407,11 @@ export function worker_dr_ratchet_decrypt(payload: {
     return sendToWorker<{ state: DoubleRatchetState, plaintext: ArrayBuffer, skippedKeys: { kemPk: string, n: number, mk: string }[], mk: ArrayBuffer }>('dr_ratchet_decrypt', {
         serializedState: payload.serializedState,
         header: payload.header,
-        ciphertext: toArray(payload.ciphertext)
+        ciphertext: asBuffer(payload.ciphertext)
     }).then(res => ({
         ...res,
-        plaintext: new Uint8Array(res.plaintext),
-        mk: new Uint8Array(res.mk)
+        plaintext: asU8(res.plaintext),
+        mk: asU8(res.mk)
     }));
 }
 
@@ -402,12 +428,12 @@ export async function groupRatchetEncrypt(
 ): Promise<{ state: GroupRatchetState, header: GroupRatchetHeader, ciphertext: Uint8Array, signature: string, mk: Uint8Array }> {
   return sendToWorker<{ state: GroupRatchetState, header: GroupRatchetHeader, ciphertext: ArrayBuffer, signature: string, mk: ArrayBuffer }>('group_ratchet_encrypt', { 
     serializedState, 
-    plaintext: typeof plaintext === 'string' ? plaintext : toArray(plaintext),
-    signingPrivateKey: toArray(signingPrivateKey) 
+    plaintext: typeof plaintext === 'string' ? plaintext : asBuffer(plaintext),
+    signingPrivateKey: asBuffer(signingPrivateKey) 
   }).then(res => ({
       ...res,
-      ciphertext: new Uint8Array(res.ciphertext),
-      mk: new Uint8Array(res.mk)
+      ciphertext: asU8(res.ciphertext),
+      mk: asU8(res.mk)
   }));
 }
 
@@ -421,13 +447,13 @@ export async function groupRatchetDecrypt(
   return sendToWorker<{ state: GroupRatchetState, plaintext: ArrayBuffer, skippedKeys: { n: number; mk: string }[], mk: ArrayBuffer }>('group_ratchet_decrypt', { 
     serializedState, 
     header, 
-    ciphertext: toArray(ciphertext), 
+    ciphertext: asBuffer(ciphertext), 
     signature, 
-    senderSigningPublicKey: toArray(senderSigningPublicKey) 
+    senderSigningPublicKey: asBuffer(senderSigningPublicKey) 
   }).then(res => ({
       ...res,
-      plaintext: new Uint8Array(res.plaintext),
-      mk: new Uint8Array(res.mk)
+      plaintext: asU8(res.plaintext),
+      mk: asU8(res.mk)
   }));
 }
 
@@ -441,11 +467,11 @@ export async function groupDecryptSkipped(
   return sendToWorker<{ plaintext: ArrayBuffer }>('group_decrypt_skipped', {
     mk,
     headerN,
-    ciphertext: toArray(ciphertext),
+    ciphertext: asBuffer(ciphertext),
     signature,
-    senderSigningPublicKey: toArray(senderSigningPublicKey)
+    senderSigningPublicKey: asBuffer(senderSigningPublicKey)
   }).then(res => ({
-    plaintext: new Uint8Array(res.plaintext)
+    plaintext: asU8(res.plaintext)
   }));
 }
 
@@ -458,8 +484,8 @@ export function worker_burner_dr_init_guest(payload: {
   hostPqPk: CryptoBuffer;
 }): Promise<{ state: BurnerDoubleRatchetState; guestClassicalPk: string }> {
   return sendToWorker<{ state: BurnerDoubleRatchetState; guestClassicalPk: string }>('burner_dr_init_guest', {
-    hostClassicalPk: toArray(payload.hostClassicalPk),
-    hostPqPk: toArray(payload.hostPqPk)
+    hostClassicalPk: asBuffer(payload.hostClassicalPk),
+    hostPqPk: asBuffer(payload.hostPqPk)
   });
 }
 
@@ -470,10 +496,10 @@ export function worker_burner_dr_init_host(payload: {
   hostPqSk: CryptoBuffer;
 }): Promise<{ state: BurnerDoubleRatchetState }> {
   return sendToWorker<{ state: BurnerDoubleRatchetState }>('burner_dr_init_host', {
-    guestClassicalPk: toArray(payload.guestClassicalPk),
-    hostClassicalSk: toArray(payload.hostClassicalSk),
-    savedCt: toArray(payload.savedCt),
-    hostPqSk: toArray(payload.hostPqSk)
+    guestClassicalPk: asBuffer(payload.guestClassicalPk),
+    hostClassicalSk: asBuffer(payload.hostClassicalSk),
+    savedCt: asBuffer(payload.savedCt),
+    hostPqSk: asBuffer(payload.hostPqSk)
   });
 }
 
@@ -483,7 +509,7 @@ export function worker_burner_dr_encrypt(payload: {
 }): Promise<{ state: BurnerDoubleRatchetState; header: BurnerDoubleRatchetHeader; ciphertext: Uint8Array; mk: Uint8Array }> {
   return sendToWorker<{ state: BurnerDoubleRatchetState; header: BurnerDoubleRatchetHeader; ciphertext: ArrayBuffer; mk: ArrayBuffer }>('burner_dr_encrypt', {
     state: payload.state,
-    plaintext: typeof payload.plaintext === 'string' ? payload.plaintext : toArray(payload.plaintext)
+    plaintext: typeof payload.plaintext === 'string' ? payload.plaintext : asBuffer(payload.plaintext)
   }).then(res => ({
     ...res,
     ciphertext: new Uint8Array(res.ciphertext),
@@ -499,7 +525,7 @@ export function worker_burner_dr_decrypt(payload: {
   return sendToWorker<{ state: BurnerDoubleRatchetState; plaintext: ArrayBuffer; skippedKeys: { kemPk: string; n: number; mk: string }[]; mk: ArrayBuffer }>('burner_dr_decrypt', {
     state: payload.state,
     header: payload.header,
-    ciphertext: toArray(payload.ciphertext)
+    ciphertext: asBuffer(payload.ciphertext)
   }).then(res => ({
     ...res,
     plaintext: new Uint8Array(res.plaintext),

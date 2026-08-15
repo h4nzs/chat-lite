@@ -22,6 +22,26 @@ let isReady = false;
 
 const B64_VARIANT = 'URLSAFE_NO_PADDING';
 
+/**
+ * Kumpulkan buffer yang bisa ditransfer (zero-copy) dari result op.
+ * Hanya buffer level-atas (hasil dibangun sebagai objek datar) — worker
+ * tidak menggunakan ulang buffer ini setelah postMessage.
+ */
+function collectTransferables(value: unknown): Transferable[] {
+  const transferables: Transferable[] = [];
+  if (value instanceof ArrayBuffer) {
+    transferables.push(value);
+  } else if (value instanceof Uint8Array) {
+    transferables.push(value.buffer);
+  } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      if (v instanceof ArrayBuffer) transferables.push(v);
+      else if (v instanceof Uint8Array) transferables.push(v.buffer);
+    }
+  }
+  return transferables;
+}
+
 // Konfigurasi Argon2
 const ARGON_VAULT_CONFIG = {
   parallelism: 1,
@@ -206,6 +226,9 @@ async function _encryptData(keyBytes: Uint8Array, data: unknown): Promise<string
     );
 
     return JSON.stringify({
+      // NOTE: tetap number[] (bukan Uint8Array) — JSON.stringify(Uint8Array)
+      // menghasilkan {"0":..} yang tidak bisa didekripsi balik. Format ini juga
+      // harus kompatibel dengan bundle terenkripsi yang sudah tersimpan.
       iv: Array.from(iv),
       data: Array.from(encryptedContent)
     });
@@ -1456,6 +1479,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           const pqKeyPair = sodium.crypto_kem_xwing_seed_keypair(pqKeySeed);
           
           // Serialize private keys
+          // NOTE: Array.from (number[]) wajib — JSON.stringify(Uint8Array) menghasilkan
+          // objek {"0":..} yang tidak kompatibel dengan parser di sisi x3dh_recipient.
           const privateKeysJson = JSON.stringify({
             classical: Array.from(keyPair.privateKey),
             pq: Array.from(pqKeyPair.privateKey)
@@ -1705,8 +1730,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           result = {
             state: serializeState(state),
             header,
-            ciphertext: Array.from(combined),
-            mk: Array.from(mk)
+            ciphertext: combined.slice(),
+            mk: mk.slice()
           };
         } finally {
           if (state.KEMs) sodium.memzero(state.KEMs.privateKey);
@@ -1836,9 +1861,9 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
           result = {
             state: serializeState(state),
-            plaintext: Array.from(plaintext),
+            plaintext: plaintext.slice(),
             skippedKeys,
-            mk: Array.from(mk)
+            mk: mk.slice()
           };
         } finally {
           if (sharedSecret1) sodium.memzero(sharedSecret1);
@@ -1907,7 +1932,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                header,
                ciphertext: combined,
                signature: sodium.to_base64(signature, sodium.base64_variants.URLSAFE_NO_PADDING),
-               mk: Array.from(mk)
+               mk: mk.slice()
             };
         } finally {
             if (CKBytes) sodium.memzero(CKBytes);
@@ -1993,7 +2018,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
            state: { ...serializedState, CK: bytesToB64(CKBytes) || '', N: currentN },
            plaintext,
            skippedKeys,
-           mk: Array.from(mk)
+           mk: mk.slice()
         };
 
         sodium.memzero(CKBytes);
@@ -2181,8 +2206,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           result = {
             state,
             header,
-            ciphertext: Array.from(combined),
-            mk: Array.from(mk)
+            ciphertext: combined.slice(),
+            mk: mk.slice()
           };
         } finally {
           if (mk) sodium.memzero(mk);
@@ -2338,9 +2363,9 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
           result = {
             state,
-            plaintext: Array.from(plaintext),
+            plaintext: plaintext.slice(),
             skippedKeys,
-            mk: Array.from(mk)
+            mk: mk.slice()
           };
         } finally {
           if (sharedSecret1) sodium.memzero(sharedSecret1);
@@ -2360,7 +2385,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         return;
     }
     
-    self.postMessage({ success: true, id, result });
+    self.postMessage({ success: true, id, result }, collectTransferables(result));
 
   } catch (error: unknown) {
     const sanitizedError = _sanitizeError(error);

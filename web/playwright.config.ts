@@ -16,13 +16,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'pnpm --filter server dev',
-      url: 'http://localhost:4000',
+      command: 'pnpm --filter nyx-server dev',
+      url: 'http://localhost:4000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
     {
-      command: 'pnpm --filter web dev',
+      command: 'pnpm --filter nyx-web dev',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

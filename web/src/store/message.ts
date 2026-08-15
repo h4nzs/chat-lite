@@ -2601,7 +2601,14 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
   doAddIncomingMessage: async (conversationId, message) => {
       const currentUser = useAuthStore.getState().user;
 
-      // 0. PENCEGAHAN GHOST MESSAGE (Bypass UI/Storage untuk Pesan Kontrol)
+      // 0. DEDUP: pesan dengan id yang sama mungkin datang dua kali (race antara
+      // live event `message:new` dan REST sync saat reconnect). Skip kalau sudah ada di state.
+      if (!message.tempId) {
+          const existing = get().messages[conversationId]?.find(m => m.id === message.id);
+          if (existing) return existing;
+      }
+
+      // 1. PENCEGAHAN GHOST MESSAGE (Bypass UI/Storage untuk Pesan Kontrol)
       if (typeof message.content === 'string' && (message.content.includes('SYSTEM_KEY_REQUEST') || message.content.includes('GROUP_KEY_DISTRIBUTION'))) {
           // Hanya tangkap payload kontrol, jangan simpan / kembalikan objek pesannya ke UI
           try {

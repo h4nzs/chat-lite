@@ -630,6 +630,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         
         set({ user: null, accessToken: null, hasRestoredKeys: false });
         disconnectSocket();
+        const { clearReconnectTimer } = await import('./connection');
+        clearReconnectTimer();
         const { clearBlobCache } = await import('../utils/blobCache');
         clearBlobCache();
 

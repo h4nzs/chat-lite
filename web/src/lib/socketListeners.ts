@@ -31,6 +31,10 @@ async function doSyncMessages() {
       if (conv.isGroup && !conv.decryptedMetadata) continue;
       await messageStore.loadMessagesForConversation(conv.id);
     }
+    // Kirim pesan offline yang tertahan (idempotent, self-guarded)
+    messageStore.processOfflineQueue().catch((e) => {
+      console.error('[Offline Queue] Failed to process after sync:', e);
+    });
   } catch (e) {
     console.error('[Offline Sync] Failed to sync messages on connect:', e);
   }

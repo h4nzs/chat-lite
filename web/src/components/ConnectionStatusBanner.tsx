@@ -36,6 +36,7 @@ export default function ConnectionStatusBanner() {
           transition={{ type: "spring", stiffness: 120, damping: 20, mass: 1.5 }}
           className={`
             fixed top-0 left-0 w-full z-[100]
+            pointer-events-none
             ${config.bg} ${config.text}
             border-b-4 border-black/20
             shadow-[0_10px_30px_rgba(0,0,0,0.5)]
@@ -73,6 +74,7 @@ export default function ConnectionStatusBanner() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="
+                  pointer-events-auto
                   flex items-center gap-2 px-4 py-1.5 rounded-md
                   bg-black/20 hover:bg-black/30 
                   border border-black/10

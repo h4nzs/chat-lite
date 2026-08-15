@@ -23,7 +23,8 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const redis = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const redis = createClient({ url: redisUrl });
 
 async function reset() {
   // 🚨 CRITICAL GUARDRAIL: Mencegah eksekusi tidak sengaja di Production atau DB eksternal
@@ -40,7 +41,6 @@ async function reset() {
     await prisma.$transaction([
       prisma.messageStatus.deleteMany(),
       prisma.message.deleteMany(),
-      prisma.participant.deleteMany(),
       prisma.userHiddenConversation.deleteMany(),
       prisma.conversation.deleteMany(),
       prisma.story.deleteMany(),
@@ -55,12 +55,11 @@ async function reset() {
       prisma.user.deleteMany(),
     ]);
     
-    await redis.connect();
-    if (!REDIS_URL.includes('localhost') && !REDIS_URL.includes('127.0.0.1')) {
+    if (!redisUrl.includes('localhost') && !redisUrl.includes('127.0.0.1')) {
       console.error('❌ DANGER: Redis URL is not local! Aborting wipe.');
       process.exit(1);
     }
-    await redis.select(TEST_DB_INDEX);
+    await redis.connect();
     await redis.flushDb();
     await redis.quit();
 

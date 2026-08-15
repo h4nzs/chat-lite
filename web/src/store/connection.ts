@@ -21,7 +21,32 @@ interface ConnectionState {
 
 let isFetchingDevices = false;
 
-let reconnectInterval: ReturnType<typeof setInterval> | null = null;
+let reconnectAttempts = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+const MAX_RECONNECT_DELAY_MS = 30000; // cap 30 detik
+const BASE_RECONNECT_DELAY_MS = 1000;
+
+function scheduleReconnect(status: () => ConnectionStatus) {
+  if (reconnectTimer || document.visibilityState !== 'visible') return;
+  const exponential = Math.min(BASE_RECONNECT_DELAY_MS * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY_MS);
+  const jitter = Math.random() * 1000;
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    if (document.visibilityState === 'visible' && status() === 'disconnected') {
+      const { connectSocket } = await import('@lib/transportClient');
+      connectSocket();
+    }
+  }, exponential + jitter);
+}
+
+export function clearReconnectTimer() {
+  reconnectAttempts = 0;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   status: 'connecting',
@@ -31,20 +56,16 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   setStatus: (status) => {
     set({ status });
     if (status === 'connected') {
+      // Koneksi pulih → reset backoff
+      reconnectAttempts = 0;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       get().fetchMyDevices(true); // Re-fetch on reconnect
-      if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-        reconnectInterval = null;
-      }
     } else if (status === 'disconnected') {
-      if (!reconnectInterval && document.visibilityState === 'visible') {
-        reconnectInterval = setInterval(async () => {
-          if (document.visibilityState === 'visible' && get().status === 'disconnected') {
-            const { connectSocket } = await import('@lib/transportClient');
-            connectSocket();
-          }
-        }, 5000);
-      }
+      reconnectAttempts++;
+      scheduleReconnect(() => get().status);
     }
   },
 

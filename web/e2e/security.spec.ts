@@ -9,28 +9,39 @@ async function registerUser(page: Page, displayName: string, username: string) {
   await page.getByRole('textbox', { name: /Password/i }).fill('StrongPass123!');
   await page.getByRole('button', { name: /Initialize Identity/i }).click();
 
-  // 1. Bypass Biometric
-  const skipBiometricBtn = page.locator('button:has-text("Skip"), button:has-text("Continue")').first();
-  await expect(skipBiometricBtn).toBeVisible({ timeout: 30000 });
-  await skipBiometricBtn.click();
+  // 1. TRUST LEVEL VERIFICATION (muncul setelah registrasi selesai, ~15-20 detik)
+  await page.getByRole('button', { name: /Skip for now/i }).waitFor({ state: 'visible', timeout: 60000 });
+  await page.getByRole('button', { name: /Skip for now/i }).click();
 
-  // 2. Bypass Recovery Modal
+  // 2. Protocol: Recovery
+  await page.getByRole('button', { name: /Acknowledge/i }).waitFor({ state: 'visible', timeout: 20000 });
   await page.getByRole('button', { name: /Acknowledge/i }).click();
-  const closeRecoveryBtn = page.locator('button[aria-label="Close"], button:has-text("×")').first();
-  await expect(closeRecoveryBtn).toBeVisible({ timeout: 5000 });
-  await closeRecoveryBtn.click();
 
-  // 3. Bypass System Init Modal
+  // 3. Secure Phrase
+  await page.getByRole('button', { name: /Sequence Recorded/i }).waitFor({ state: 'visible', timeout: 20000 });
+  await page.getByRole('button', { name: /Sequence Recorded/i }).click();
+
+  // 4. Verify Sequence (tutup via × — kadang butuh dua klik karena regenerasi kata)
+  const closeVerifyBtn = page.locator('button[aria-label="Close"], button:has-text("×")').first();
+  await closeVerifyBtn.waitFor({ state: 'visible', timeout: 20000 });
+  await closeVerifyBtn.click();
+  await page.waitForTimeout(1000);
+  const closeVerifyBtn2 = page.locator('button[aria-label="Close"], button:has-text("×")').first();
+  if (await closeVerifyBtn2.isVisible().catch(() => false)) {
+    await closeVerifyBtn2.click();
+  }
+
+  // 5. Bypass System Init Modal
   const skipSystemInitBtn = page.getByRole('button', { name: /Skip for now/i });
   try {
-    await skipSystemInitBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await skipSystemInitBtn.waitFor({ state: 'visible', timeout: 15000 });
     await skipSystemInitBtn.click();
     await skipSystemInitBtn.waitFor({ state: 'hidden', timeout: 5000 });
   } catch (e) {
     console.log('System Init modal skipped or not found');
   }
 
-  // 4. Bypass Quick Tour Modal (If it appears)
+  // 6. Bypass Quick Tour Modal (If it appears)
   const closeTourBtn = page.getByRole('button', { name: /Close modal/i });
   try {
     await closeTourBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -40,12 +51,12 @@ async function registerUser(page: Page, displayName: string, username: string) {
   }
 
   // Verifikasi mendarat di Dashboard
-  await expect(page.getByRole('heading', { name: /System Ready/i })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /System Ready/i })).toBeVisible({ timeout: 30000 });
 }
 
 test.describe('Security & Sessions', () => {
   test('View active sessions and verify current device', async ({ page }) => {
-    test.setTimeout(60000);
+    test.setTimeout(150000);
     const username = `secuser_${Date.now()}`;
     await registerUser(page, 'Sec User', username);
 
