@@ -12,7 +12,7 @@ allowBuilds:
   argon2: true
   esbuild: true
   prisma: true
-  puppeteer: true
+  puppeteer: set this to true or false
   sharp: true
   unrs-resolver: true
 

@@ -56,7 +56,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@mermaid-js/mermaid-cli": "^11.16.0",
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
@@ -82,7 +81,6 @@
     "eslint-plugin-promise": "^7.3.0",
     "jest": "^30.4.2",
     "prisma": "^7.9.1",
-    "prisma-erd-generator": "^2.4.4",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"

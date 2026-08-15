@@ -16,12 +16,13 @@ const env = process.env.NODE_ENV || 'development';
 // which crashes pg-protocol's startup serialization (Buffer.byteLength
 // throws on Object values in Node v24 when used with @prisma/adapter-pg).
 //
-// For non-local environments, we add sslmode=require (TLS without cert
-// verification). Production deployments that need verify-full should
-// configure SSL directly in the DATABASE_URL (e.g., 
-// ?sslmode=verify-full) and trust the CA cert at the OS level.
+// Untuk database REMOTE (mis. Aiven), kita tambahkan sslmode=require (TLS tanpa
+// verifikasi cert). Untuk database LOKAL (localhost/127.0.0.1) JANGAN dipaksa
+// TLS — PostgreSQL lokal pakai cert self-signed (snakeoil Debian) sehingga
+// sslmode=require akan gagal dengan TlsConnectionError.
 let finalUrl = connectionString;
-if (env !== 'development' && env !== 'test') {
+const isLocalDb = /(^|@)(localhost|127\.0\.0\.1)(:|$|\/)/i.test(connectionString);
+if (env !== 'development' && env !== 'test' && !isLocalDb) {
   finalUrl += `${connectionString.includes('?') ? '&' : '?'}sslmode=require`;
 }
 

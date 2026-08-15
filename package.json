@@ -54,7 +54,6 @@
     "argon2",
     "esbuild",
     "prisma",
-    "puppeteer",
     "sharp",
     "unrs-resolver",
     "@sentry/cli",
