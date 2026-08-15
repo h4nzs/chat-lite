@@ -43,7 +43,7 @@ export default function UserInfoPanel({ userId }: { userId: UserId }) {
     { id: 'media', label: t('modals:user_info.tabs.media') },
   ];
 
-  const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
+  const isAlreadyVerified = activeId ? !!verifiedStatus[activeId] : false;
 
   useEffect(() => {
     if (!userId) {

@@ -94,12 +94,13 @@ export function hoistKeys(user: UserWithDevices): HoistedUser {
     signingKey: Buffer.from(d.signingKey).toString('base64url')
   }));
 
+  const primaryDevice = mappedDevices[0];
   return {
     ...user,
     devices: mappedDevices,
-    publicKey: mappedDevices[0].publicKey,
-    pqPublicKey: mappedDevices[0].pqPublicKey,
-    signingKey: mappedDevices[0].signingKey
+    publicKey: primaryDevice?.publicKey,
+    pqPublicKey: primaryDevice?.pqPublicKey,
+    signingKey: primaryDevice?.signingKey
   };
 }
 

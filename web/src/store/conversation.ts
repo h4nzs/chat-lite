@@ -212,7 +212,7 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         let localLastMessage: Message | null = null;
         try {
             const localMsgs = await shadowVault.getMessagesByConversation(c.id, 1);
-            if (localMsgs.length > 0) {
+            if (localMsgs.length > 0 && localMsgs[0]) {
                 localLastMessage = localMsgs[0];
             }
         } catch (_e) {}

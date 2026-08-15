@@ -54,7 +54,7 @@ export default function UserInfoModal() {
     { id: 'media', label: t('modals:user_info_modal.media', 'Media') },
   ];
 
-  const isAlreadyVerified = activeId ? verifiedStatus[activeId] : false;
+  const isAlreadyVerified = activeId ? !!verifiedStatus[activeId] : false;
 
   useEffect(() => {
     if (!profileUserId) {

@@ -751,7 +751,7 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
 
         if (ckPlain.substring(0, 8) === keyId) {
             const parts = record.id.split('_');
-            const senderId = parts[1];
+            const senderId = parts[1] ?? '';
             
             return {
                 id: record.id,
@@ -759,7 +759,7 @@ export async function getGroupReceiverStateByKeyId(conversationId: string, keyId
                 senderId: asUserId(senderId),
                 CK: ckPlain,
                 N: record.state.N,
-                skippedKeys: await decryptSkippedKeysAtRest(record.state.skippedKeys)
+                skippedKeys: await decryptSkippedKeysAtRest(record.state.skippedKeys ?? {})
             };
         }
     }

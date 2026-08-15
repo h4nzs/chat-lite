@@ -16,7 +16,7 @@ export default function DefaultAvatar({ name, id, className = "w-8 h-8 text-xs" 
     const words = cleanName.split(' ');
     if (words.length >= 2) {
       // Ambil huruf pertama dari kata pertama dan kedua (misal: "Budi Santoso" -> "BS")
-      return (words[0][0] + words[1][0]).toUpperCase();
+      return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase();
     }
     // Jika cuma 1 kata, ambil 2 huruf pertamanya (misal: "Budi" -> "BU")
     return cleanName.substring(0, 2).toUpperCase();

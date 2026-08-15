@@ -21,12 +21,13 @@ type ProfileState = {
 export const useProfileStore = createWithEqualityFn<ProfileState>((set, get) => ({
   profiles: {},
 
-  getCacheOnly: async (userId, encryptedProfile) => {
+  getCacheOnly: async (userId, encryptedProfile): Promise<DecryptedProfile | null> => {
     if (!encryptedProfile) return null;
     const cacheKey = `${userId}_${encryptedProfile.substring(0, 32)}`;
     
     // 1. Check RAM
-    if (get().profiles[cacheKey]) return get().profiles[cacheKey];
+    const cached = get().profiles[cacheKey];
+    if (cached) return cached;
 
     // 2. Check IndexedDB
     const idbCache = await db.profileCache.get(userId);
@@ -48,7 +49,8 @@ export const useProfileStore = createWithEqualityFn<ProfileState>((set, get) => 
     const cacheKey = encryptedProfile ? `${userId}_${encryptedProfile.substring(0, 32)}` : userId;
 
     // 2. Return RAM cache if exists
-    if (get().profiles[cacheKey]) return get().profiles[cacheKey];
+    const cached = get().profiles[cacheKey];
+    if (cached) return cached;
     
     // 3. Default fallback
     const fallback: DecryptedProfile = { name: "Encrypted User" };

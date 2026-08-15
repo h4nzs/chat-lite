@@ -29,7 +29,7 @@ const arrayBufferToBase64 = (buffer: Uint8Array) => {
   let binary = '';
   const len = buffer.byteLength;
   for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(buffer[i]);
+    binary += String.fromCharCode(buffer[i] ?? 0);
   }
   return window.btoa(binary);
 };

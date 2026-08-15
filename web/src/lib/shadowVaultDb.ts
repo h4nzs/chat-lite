@@ -87,7 +87,7 @@ class NyxShadowVaultProxy {
       if (records.length === 0) return undefined;
 
       records.sort((a, b) => b.lastActivity - a.lastActivity);
-      return this.decryptPqDrSession(records[0]);
+      return records[0] ? this.decryptPqDrSession(records[0]) : undefined;
     } catch (e) {
       console.error("Failed to get PQ-DR session:", e);
       return undefined;
@@ -369,7 +369,7 @@ class NyxShadowVaultProxy {
       if (!r) return null;
       
       const parsedArray = await this.parseRecordsToMessages([r]);
-      return parsedArray.length > 0 ? parsedArray[0] : null;
+      return parsedArray.length > 0 ? (parsedArray[0] ?? null) : null;
     } catch (_e) {
       return null;
     }

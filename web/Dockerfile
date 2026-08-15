@@ -4,8 +4,10 @@ FROM node:24-alpine AS builder
 RUN corepack enable
 WORKDIR /app
 
-# Copy dependency files
-COPY package.json pnpm-lock.yaml ./
+# Copy dependency files — termasuk pnpm-workspace.yaml & package.json packages
+# lain yang di-reference workspace (mis. @nyx/shared) agar install tidak gagal.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile
 
 # Copy source code

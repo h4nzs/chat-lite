@@ -1687,11 +1687,11 @@ export async function storeReceivedSessionKey(payload: ReceiveKeyPayload): Promi
     // Skip our own key distribution — we already have the sender state
     const myId = useAuthStore.getState().user?.id;
     if (senderId === myId) {
-        console.log(`[storeReceivedSessionKey] Skipping own GROUP_KEY distribution for conv=${conversationId}`);
+        console.debug(`[storeReceivedSessionKey] Skipping own GROUP_KEY distribution for conv=${conversationId}`);
         return;
     }
     
-    console.log(`[storeReceivedSessionKey] conv=${conversationId} senderId=${senderId} senderDeviceKey=${senderDeviceKey} encryptedKeyLen=${encryptedKey?.length}`);
+    console.debug(`[storeReceivedSessionKey] conv=${conversationId} senderId=${senderId} senderDeviceKey=${senderDeviceKey} encryptedKeyLen=${encryptedKey?.length}`);
 
     const reqKey = senderDeviceKey ? `${conversationId}_${senderId}_${senderDeviceKey}` : conversationId;
     const pendingRequest = pendingGroupKeyRequests.get(reqKey) || pendingGroupKeyRequests.get(conversationId);

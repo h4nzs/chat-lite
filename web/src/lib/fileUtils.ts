@@ -4,7 +4,8 @@ import imageCompression from 'browser-image-compression';
 // Ambil ekstensi dari path/url (tanpa query string)
 function getExtension(filename: string): string {
   if (!filename) return ""
-  const clean = filename.split("?")[0].split("#")[0] // buang query/hash
+  const clean = filename.split("?")[0]?.split("#")[0] // buang query/hash
+  if (!clean) return ""
   return clean.slice(((clean.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase()
 }
 

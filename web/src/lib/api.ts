@@ -232,7 +232,9 @@ export async function getPreKeyBundle(userId: string): Promise<PreKeyBundle> {
   const bundles = await authFetch<Record<string, PreKeyBundle[]>>(`/api/keys/prekey-bundle/${userId}`);
   const userBundles = bundles[userId];
   if (!userBundles || userBundles.length === 0) throw new Error("User has no active devices");
-  return userBundles[0];
+  const firstBundle = userBundles[0];
+  if (!firstBundle) throw new Error("User has no active devices");
+  return firstBundle;
 }
 
 // Upload menggunakan XMLHttpRequest native (untuk Progress Bar)

@@ -133,6 +133,7 @@ test.describe('Real-time Transport (WebTransport)', () => {
         const convs = useConversationStore.getState().conversations as { id: string }[];
         if (convs.length === 0) return 'NO_CONVERSATION';
         const conv = convs[0];
+        if (!conv) return 'NO_CONVERSATION';
         const state = useMessageStore.getState();
         const target = ((state.messages as Record<string, { content: string | null; id: string }[]>)[conv.id] || []).find((m) => m.content === msgText);
         if (!target) return 'MESSAGE_NOT_FOUND';

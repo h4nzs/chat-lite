@@ -108,7 +108,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
   useEffect(() => {
     if (!ref.current || mine) return;
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
+      if (entry?.isIntersecting) {
         onVisibilityChange?.(message.id, true);
         const alreadyRead = message.statuses?.some((s: MessageStatus) => s.userId === meId && s.status === 'READ');
   if (!alreadyRead) {

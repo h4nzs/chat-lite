@@ -117,7 +117,11 @@ async function initWebTransport(url: string, token: string, certificateHash?: st
     datagramWriter = transport.datagrams.writable.getWriter();
     
     // Auth Payload: Combine JWT Token and Device Identity Metadata
-    const authData = JSON.stringify({ token, identity: deviceIdentity ? JSON.parse(deviceIdentity) : null });
+    let parsedIdentity: unknown = null;
+    if (deviceIdentity) {
+      try { parsedIdentity = JSON.parse(deviceIdentity); } catch (_e) { parsedIdentity = null; }
+    }
+    const authData = JSON.stringify({ token, identity: parsedIdentity });
     const authBytes = new TextEncoder().encode(authData);
     
     // Simple framing: OP_CODE (0x00 for auth) + length + authData

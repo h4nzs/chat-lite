@@ -1532,7 +1532,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                  try {
                     const payload = JSON.parse(message.content || '{}') as SystemMessagePayload;
                     if (payload.type === 'GROUP_KEY_DISTRIBUTION' || payload.type === 'GROUP_KEY') {
-                      console.log('[Offline Sync] Memproses Kunci Distribusi untuk conversation:', message.conversationId || payload.conversationId);
+                      console.debug('[Offline Sync] Memproses Kunci Distribusi untuk conversation:', message.conversationId || payload.conversationId);
 
                       const { getMyEncryptionKeyPair, getSodiumLib } = await import('@utils/crypto');
                       const sodium = await getSodiumLib();
@@ -1605,7 +1605,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
                   try {
                       const payload = JSON.parse(message.content);
                       if (payload.encryptedMetadata) {
-                          console.log(`[Offline Sync] Memproses Metadata Update untuk conversation: ${message.conversationId}`);
+                          console.debug(`[Offline Sync] Memproses Metadata Update untuk conversation: ${message.conversationId}`);
                           const { useConversationStore } = await import('@store/conversation');
                           await useConversationStore.getState().updateConversation(message.conversationId, {
                               encryptedMetadata: payload.encryptedMetadata
@@ -1926,7 +1926,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
               return existing;
           }
 
-          console.log(`[Ratchet] Decryption failed for ${message.id}. Retrying once in 500ms...`);
+          console.debug(`[Ratchet] Decryption failed for ${message.id}. Retrying once in 500ms...`);
           await new Promise(r => setTimeout(r, 500));
           const retriedDecrypted = await decryptMessageObject(message);
           if (!retriedDecrypted) return null;
@@ -2066,7 +2066,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           
           if (silentPayload.type === 'GHOST_SYNC') {
               cleanUpOptimisticBubble(); // ✅ Bersihkan
-              console.log(`[Ghost Sync] Received sync from ${decrypted.senderId}. Settle ratchet state silently.`);
+              console.debug(`[Ghost Sync] Received sync from ${decrypted.senderId}. Settle ratchet state silently.`);
               return decrypted; 
           }
 
@@ -2169,6 +2169,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
           // PESAN NORMAL (BUKAN SILENT, REAKSI, EDIT)
           // ==========================================
           const [enriched] = enrichMessagesWithSenderProfile(conversationId, [decrypted]);
+          if (!enriched) return decrypted;
           const finalDecrypted = enriched;
 
           // JIKA PESAN DARI DIRI SENDIRI (SINKRONISASI / OPTIMISTIC UI)
@@ -2433,7 +2434,10 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             updateSenderDetails: (user) => set(state => {
             const newMessages = { ...state.messages };
             for (const convoId in newMessages) {
-            newMessages[convoId] = newMessages[convoId].map(m => m.sender?.id === user.id ? { ...m, sender: { ...(m.sender || { id: user.id }), ...user } } : m) as Message[];
+            const list = newMessages[convoId];
+            if (list) {
+              newMessages[convoId] = list.map(m => m.sender?.id === user.id ? { ...m, sender: { ...(m.sender || { id: user.id }), ...user } } : m) as Message[];
+            }
             }
             return { messages: newMessages };
             }),
@@ -2575,7 +2579,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
             const decrypted = await decryptMessageObject(msg);
             if (decrypted) {
                 const [enriched] = enrichMessagesWithSenderProfile(conversationId, [decrypted]);
-                reDecryptedMessages.push(enriched);
+                if (enriched) reDecryptedMessages.push(enriched);
             }
         } catch (e) {
             console.error(`[Re-Decrypt] Failed for msg ${msg.id}:`, e);

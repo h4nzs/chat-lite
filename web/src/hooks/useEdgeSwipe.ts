@@ -6,7 +6,7 @@ export const useEdgeSwipe = (onSwipeRight: () => void, edgeThreshold = 40, swipe
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
-      if (touch.clientX <= edgeThreshold) {
+      if (touch && touch.clientX <= edgeThreshold) {
         touchStartRef.current = { x: touch.clientX, y: touch.clientY };
       }
     };
@@ -15,6 +15,7 @@ export const useEdgeSwipe = (onSwipeRight: () => void, edgeThreshold = 40, swipe
       if (!touchStartRef.current) return;
       
       const touch = e.changedTouches[0];
+      if (!touch) return;
       const deltaX = touch.clientX - touchStartRef.current.x;
       const deltaY = touch.clientY - touchStartRef.current.y;
 

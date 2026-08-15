@@ -207,7 +207,7 @@ jobs:
             pm2 start $TARGET_DIR/server/dist/index.js \
               --name "nyx-api" \
               -i max \
-              --node-args="--max-old-space-size=768" \
+              --node-args="--max-old-space-size=1024" \
               --cwd $TARGET_DIR/server
 
             echo "🦀 Starting Rust WebTransport Sidecar..."

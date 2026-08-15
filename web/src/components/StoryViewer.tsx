@@ -226,7 +226,7 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
       useStoryStore.setState(state => ({
         stories: {
           ...state.stories,
-          [userId]: state.stories[userId].filter(s => s.id !== currentStory.id)
+          [userId]: (state.stories[userId] ?? []).filter(s => s.id !== currentStory.id)
         }
       }));
       toast.success(t('stories.story_deleted'));

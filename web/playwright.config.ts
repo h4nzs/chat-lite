@@ -3,9 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  // Batasi worker: server dev lokal + Postgres/Redis bersama mudah contention
-  // bila 6+ browser jalan bersamaan (flaky pada spec profile/chat).
-  workers: 2,
+  // workers: 1 (serial) — suite berbagi 1 server dev + Postgres/Redis lokal;
+  // spec profile/settings flaky bila >1 browser berjalan bersamaan (timing event
+  // `user:updated` & profil REST). Serial = deterministik untuk CI.
+  workers: 1,
   globalSetup: './e2e/global.setup.ts',
   use: {
     baseURL: 'http://localhost:5173',

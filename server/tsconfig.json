@@ -17,7 +17,8 @@
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
-    ]
+    ],
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "src/**/*"

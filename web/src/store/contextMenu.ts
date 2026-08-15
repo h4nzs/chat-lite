@@ -38,8 +38,11 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
       clientX = e.clientX;
       clientY = e.clientY;
     } else if ('touches' in e && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      const touch = e.touches[0];
+      if (touch) {
+        clientX = touch.clientX;
+        clientY = touch.clientY;
+      }
     }
 
     set({

@@ -198,7 +198,7 @@ router.get(
         }
 
         const device = devices[0];
-        if (!device.signingKey || !device.publicKey) {
+        if (!device || !device.signingKey || !device.publicKey) {
           throw new ApiError(404, 'Device identity not fully initialized.');
         }
 

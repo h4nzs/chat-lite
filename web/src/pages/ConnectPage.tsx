@@ -56,6 +56,11 @@ export default function ConnectPage() {
             }
             
             const targetUser = results[0];
+            if (!targetUser) {
+              toast.error(t('connect.user_not_found'));
+              navigate('/chat');
+              return;
+            }
             targetId = targetUser.id;
             encryptedProfile = targetUser.encryptedProfile || null;
 

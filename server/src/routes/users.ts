@@ -309,7 +309,7 @@ router.delete('/me', zodValidate({
       const userFileKeys = fileKeys.filter((k: string) => {
         const parts = k.split('/');
         const fileName = parts.length > 1 ? parts[1] : parts[0];
-        return fileName.startsWith(`${userId}-`);
+        return !!fileName && fileName.startsWith(`${userId}-`);
       });
 
       if (userFileKeys.length > 0) {

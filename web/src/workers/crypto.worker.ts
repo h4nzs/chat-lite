@@ -368,6 +368,7 @@ async function retrievePrivateKeys(encryptedDataWithSaltStr: string, password: s
 
       const saltStr = parts[0];
       const encryptedString = parts[1];
+      if (!saltStr || !encryptedString) return { success: false, reason: 'decryption_failed' };
 
       // Try multiple B64 variants for the salt to handle legacy encodings
       let salt: Uint8Array;
@@ -392,7 +393,7 @@ async function retrievePrivateKeys(encryptedDataWithSaltStr: string, password: s
         privateKeysRaw = await _decryptData(kek, encryptedString);
       } catch (decryptErr: unknown) {
         const errMsg = _sanitizeError(decryptErr);
-        if (errMsg.includes('decrypted')) {
+        if (errMsg?.includes('decrypted')) {
             // This is the classic "incorrect password" signal from libsodium
             return { success: false, reason: 'incorrect_password' };
         }

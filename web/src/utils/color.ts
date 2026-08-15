@@ -16,5 +16,5 @@ export function getUserColor(userId: string): string {
     hash = userId.charCodeAt(i) + ((hash << 5) - hash);
   }
   const index = Math.abs(hash) % colorPalette.length;
-  return colorPalette[index];
+  return colorPalette[index] ?? colorPalette[0] ?? '#6366f1';
 }

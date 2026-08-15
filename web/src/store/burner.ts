@@ -86,7 +86,11 @@ export const useBurnerStore = createWithEqualityFn<BurnerState & BurnerActions>(
         throw new Error('Invalid burner link format.');
       }
       
-      const [roomId, hostUserId, hostDeviceId, hostPqPk, hostClassicalPk] = parts;
+      const roomId = parts[0] ?? '';
+      const hostUserId = parts[1] ?? '';
+      const hostDeviceId = parts[2] ?? '';
+      const hostPqPk = parts[3] ?? '';
+      const hostClassicalPk = parts[4] ?? '';
       
       const sodium = await getSodiumLib();
       // Ensure we safely decode URL-encoded base64 components

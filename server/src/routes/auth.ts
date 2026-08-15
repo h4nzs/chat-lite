@@ -214,7 +214,9 @@ async (req, res, next) => {
       }
     })
 
-    const deviceId = user.devices[0].id
+    const device = user.devices[0]
+    if (!device) throw new ApiError(500, 'Registration succeeded but device was not created.')
+    const deviceId = device.id
     const tokens = await issueTokens(user, deviceId, req)
     setAuthCookies(res, tokens)
 
@@ -950,7 +952,7 @@ router.post('/webauthn/login/verify', async (req, res, next) => {
           // Force recovery flow by not sending tokens or keys.
           // The client will see a 200 OK without keys and throw IDENTITY_RECOVERY_REQUIRED.
       } else {
-          encryptedPrivKeyStr = latestDevice.encryptedPrivateKey
+          encryptedPrivKeyStr = latestDevice?.encryptedPrivateKey
             ? Buffer.from(latestDevice.encryptedPrivateKey).toString('utf8')
             : null;
       }

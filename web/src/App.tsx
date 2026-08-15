@@ -78,7 +78,7 @@ const Home = () => {
   }
 
   // Jika user punya percakapan, redirect ke yang paling terakhir/pertama
-  if (conversations.length > 0) {
+  if (conversations.length > 0 && conversations[0]) {
     return <Navigate to={`/chat/${conversations[0].id}`} replace />;
   }
 

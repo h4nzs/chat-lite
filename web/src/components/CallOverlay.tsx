@@ -188,6 +188,7 @@ export default function CallOverlay() {
       // Request new camera
       const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newMode } });
       const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) throw new Error('Camera track unavailable');
 
       // Call WebRTC helper to send the new track to the peer
       await replaceVideoTrack(newVideoTrack);
@@ -233,13 +234,15 @@ export default function CallOverlay() {
         // --- START SCREEN SHARING ---
         const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = displayStream.getVideoTracks()[0];
+        if (!screenTrack) throw new Error('Screen track unavailable');
         screenTrackRef.current = screenTrack;
 
         // Save the current camera track WITHOUT stopping or cloning it
         if (localVideoRef.current) {
             const currentStream = localVideoRef.current.srcObject as MediaStream;
-            if (currentStream && currentStream.getVideoTracks().length > 0) {
-                originalVideoTrackRef.current = currentStream.getVideoTracks()[0];
+            const camTrack = currentStream?.getVideoTracks()[0];
+            if (currentStream && camTrack) {
+                originalVideoTrackRef.current = camTrack;
             }
         }
 
@@ -294,7 +297,7 @@ export default function CallOverlay() {
 
   const mainRemoteUser = remoteUsers[0] || { id: 'unknown', name: t('common:defaults.someone', 'Someone') };
   const profileName = remoteUsers.length > 1 ? `Group (${remoteUsers.length})` : (mainRemoteUser.name || t('common:defaults.someone', 'Someone'));
-  const profileAvatar = toAbsoluteUrl(mainRemoteUser.avatarUrl);
+  const profileAvatar = toAbsoluteUrl((mainRemoteUser as { avatarUrl?: string | null }).avatarUrl);
 
   return (
     <AnimatePresence>
