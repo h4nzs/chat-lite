@@ -424,8 +424,8 @@ router.post('/refresh', async (req, res, next) => {
       throw new ApiError(401, 'Invalid refresh token')
     }
 
-    const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } })
-    if (!stored) {
+    let basis = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } })
+    if (!basis) {
       // Token doesn't exist in DB at all — either never existed or was fully deleted.
       // Clear cookies and require re-login.
       clearAuthCookies(res)
@@ -433,26 +433,49 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     // --- REUSE DETECTION ---
-    // If token is already revoked, replaced, or expired → this is a REUSE ATTACK!
-    if (stored.revokedAt || stored.replacedById || stored.expiresAt < new Date()) {
-      console.warn(`[Security] Refresh token reuse detected! JTI: ${payload.jti}, Family: ${stored.familyId}, User: ${payload.sub}`);
-      
-      // Revoke ALL tokens in this family (compromise containment) + Redis blacklist
-      await revokeFamily(stored.familyId)
+    // A presented token that was already revoked/replaced is a duplicate of a
+    // rotation. This can be EITHER a genuine reuse attack (stolen token replayed)
+    // OR a benign concurrent/duplicate request from the same browser — e.g. the
+    // main app tab and the burner "/drop" tab both bootstrap and refresh with the
+    // SAME httpOnly `rt` cookie at the same instant. We must NOT brick the whole
+    // session family for the benign case.
+    if (basis.revokedAt || basis.replacedById) {
+      const FRESH_ROTATION_GRACE_MS = 5000;
+      const newest = await prisma.refreshToken.findFirst({
+        where: { familyId: basis.familyId, deviceId: basis.deviceId, revokedAt: null, replacedById: null },
+        orderBy: { createdAt: 'desc' },
+      });
 
-      // Clear cookies
-      clearAuthCookies(res)
+      const isFreshDuplicate =
+        !!newest &&
+        basis.deviceId === payload.deviceId &&
+        (Date.now() - newest.createdAt.getTime()) < FRESH_ROTATION_GRACE_MS;
 
-      // Alert the user via their active WebSocket connection
-      try {
-        const { emitEventToUser } = await import('../network/redisBridge.js');
-        await emitEventToUser(payload.sub, 'force_logout', { reason: 'session_hijacked', message: 'Your session was compromised. Please login again.' });
-      } catch (_e) {}
+      if (isFreshDuplicate) {
+        // Benign: another tab/window already rotated this token moments ago.
+        // Continue the chain from the freshest valid token instead of revoking.
+        console.info(`[Auth] Concurrent refresh detected (token ${payload.jti} superseded within ${FRESH_ROTATION_GRACE_MS}ms) — continuing session.`);
+        basis = newest;
+      } else {
+        console.warn(`[Security] Refresh token reuse detected! JTI: ${payload.jti}, Family: ${basis.familyId}, User: ${payload.sub}`);
 
-      throw new ApiError(401, 'Refresh token reuse detected. All sessions in this family have been revoked for security.');
+        // Revoke ALL tokens in this family (compromise containment) + Redis blacklist
+        await revokeFamily(basis.familyId)
+
+        // Clear cookies
+        clearAuthCookies(res)
+
+        // Alert the user via their active WebSocket connection
+        try {
+          const { emitEventToUser } = await import('../network/redisBridge.js');
+          await emitEventToUser(payload.sub, 'force_logout', { reason: 'session_hijacked', message: 'Your session was compromised. Please login again.' });
+        } catch (_e) {}
+
+        throw new ApiError(401, 'Refresh token reuse detected. All sessions in this family have been revoked for security.');
+      }
     }
 
-    if (stored.expiresAt < new Date()) {
+    if (basis.expiresAt < new Date()) {
       clearAuthCookies(res)
       throw new ApiError(401, 'Refresh token expired')
     }
@@ -465,7 +488,7 @@ router.post('/refresh', async (req, res, next) => {
     // 1. Mark old token as replaced (don't delete — keep for reuse detection)
     const newJtiValue = newJti();
     await prisma.refreshToken.update({
-      where: { jti: payload.jti },
+      where: { jti: basis.jti },
       data: { revokedAt: new Date() }
     });
 
@@ -475,24 +498,24 @@ router.post('/refresh', async (req, res, next) => {
     const userAgent = req.headers['user-agent'];
 
     // 2. Create new token linked to the old one via replacedById chain
-    const access = signAccessToken({ id: user.id, role: user.role, deviceId: stored.deviceId, jti: newJti() });
-    const refresh = signAccessToken({ sub: user.id, jti: newJtiValue, deviceId: stored.deviceId }, { expiresIn: '30d' });
+    const access = signAccessToken({ id: user.id, role: user.role, deviceId: basis.deviceId, jti: newJti() });
+    const refresh = signAccessToken({ sub: user.id, jti: newJtiValue, deviceId: basis.deviceId }, { expiresIn: '30d' });
 
     await prisma.refreshToken.create({
       data: {
         jti: newJtiValue,
-        familyId: stored.familyId,
-        deviceId: stored.deviceId,
+        familyId: basis.familyId,
+        deviceId: basis.deviceId,
         expiresAt: refreshExpiryDate(),
         ipAddress,
         userAgent,
-        replacedById: stored.id // Link to the previous token in the chain
+        replacedById: basis.id // Link to the previous token in the chain
       }
     });
 
     // Update Redis active device
     try {
-      await redisClient.setEx(`active_device:${user.id}`, 86400 * 30, stored.deviceId);
+      await redisClient.setEx(`active_device:${user.id}`, 86400 * 30, basis.deviceId);
     } catch (_e) {}
 
     setAuthCookies(res, { access, refresh });

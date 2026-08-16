@@ -815,9 +815,12 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
       refreshPromise = (async () => {
         try {
           const { api } = await import('@lib/api');
-          const data = await api<Record<string, unknown>>('/api/auth/refresh', {
-            method: 'POST',
-          });
+          const { runExclusive } = await import('@lib/refreshLock');
+          const data = await runExclusive(async () =>
+            api<Record<string, unknown>>('/api/auth/refresh', {
+              method: 'POST',
+            })
+          );
 
           if (data && typeof data === 'object' && 'accessToken' in data && typeof data.accessToken === 'string') {
             set({ accessToken: data.accessToken });

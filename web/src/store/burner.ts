@@ -4,6 +4,11 @@ import { transportClient, } from '../lib/transportClient';
 import { worker_burner_dr_init_guest, worker_burner_dr_encrypt, worker_burner_dr_decrypt } from '../lib/crypto-worker-proxy';
 import { getSodiumLib } from '../utils/crypto';
 import { useAuthStore } from './auth';
+// Burner file metadata arrives in TWO schemas depending on which UI sent it:
+// - Guest (/drop BurnerChat): { fileUrl, fileName, fileType, fileSize, fileKey }
+// - Host (main ChatWindow MessageInput/coreSendMessage): { url, key, name, size, mimeType }
+// Normalize both so the receiving bubble always shows the preview/decrypt works.
+import { extractBurnerFileData } from '../lib/burnerFileData';
 
 export type BurnerMessage = {
   id: string;
@@ -215,13 +220,7 @@ export const useBurnerStore = createWithEqualityFn<BurnerState & BurnerActions>(
                 const data = JSON.parse(content);
                 if (data.type === 'file') {
                   parsedContent = data.text || '';
-                  fileData = {
-                    fileUrl: data.fileUrl,
-                    fileName: data.fileName,
-                    fileType: data.fileType,
-                    fileSize: data.fileSize,
-                    fileKey: data.fileKey
-                  };
+                  fileData = extractBurnerFileData(data);
                 }
               }
             } catch (e) {}
@@ -333,13 +332,7 @@ export const useBurnerStore = createWithEqualityFn<BurnerState & BurnerActions>(
             const data = JSON.parse(content);
             if (data.type === 'file') {
               parsedContent = data.text || '';
-              fileData = {
-                fileUrl: data.fileUrl,
-                fileName: data.fileName,
-                fileType: data.fileType,
-                fileSize: data.fileSize,
-                fileKey: data.fileKey
-              };
+              fileData = extractBurnerFileData(data);
             }
           } catch (e) {
             console.warn('Failed to parse message JSON:', e);
