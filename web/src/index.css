@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Dark variant follows the app's theme toggle (html.light / html.dark),
+   NOT the OS preference — otherwise `dark:*` utilities desync from the
+   palette when the user overrides the theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Screens */
   --breakpoint-md: 768px;

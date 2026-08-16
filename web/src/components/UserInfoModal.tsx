@@ -188,14 +188,14 @@ export default function UserInfoModal() {
                w-full p-4 rounded-xl min-h-[80px]
                bg-bg-main text-text-primary text-sm font-medium
                shadow-neu-pressed dark:shadow-neu-pressed-dark
-               border border-white/5
+               border border-text-secondary/10
              ">
                {profile.description || <span className="opacity-40 italic">{t('modals:user_info_modal.no_data')}</span>}
              </div>
           </div>
           
           <div className="w-full">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-bg-main shadow-neu-pressed dark:shadow-neu-pressed-dark border border-white/5">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-bg-main shadow-neu-pressed dark:shadow-neu-pressed-dark border border-text-secondary/10">
               <div className="flex flex-col gap-0.5">
                 <span className="font-bold text-sm uppercase tracking-wider text-text-primary">{t('modals:user_info.pq_status')}</span>
                 <span className="text-[10px] text-text-secondary opacity-60">{t('modals:user_info.pq_desc')}</span>
@@ -227,7 +227,7 @@ export default function UserInfoModal() {
             <>
               {renderContent()}
               {user && (
-                <div className="w-full grid grid-cols-1 gap-3 pt-6 border-t border-white/5">
+                <div className="w-full grid grid-cols-1 gap-3 pt-6 border-t border-text-secondary/10">
                   <button
                     onClick={handleViewProfile}
                     className="

@@ -142,7 +142,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
             className="w-full input-neumorphic"
           />
           {userList.length > 0 && (
-            <div className="absolute top-full left-0 right-0 max-h-60 overflow-y-auto z-10 rounded-xl p-2 space-y-2 bg-bg-main/50 backdrop-blur-md shadow-neu-flat dark:shadow-neu-flat-dark border border-white/10 mt-2">
+            <div className="absolute top-full left-0 right-0 max-h-60 overflow-y-auto z-10 rounded-xl p-2 space-y-2 bg-bg-main/50 backdrop-blur-md shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 mt-2">
               {userList.map(user => {
                 const isSelected = selectedUsers.some(u => u.id === user.id);
                 return (
@@ -167,7 +167,7 @@ export default function CreateGroupChat({ onClose }: { onClose: () => void }) {
                       )}
                       <div className={`
                         absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300
-                        ${isSelected ? 'bg-accent scale-100 shadow-[0_0_10px_rgba(var(--accent),0.6)]' : 'bg-transparent scale-0'}
+                        ${isSelected ? 'bg-accent scale-100 shadow-neu-icon' : 'bg-transparent scale-0'}
                       `}>
                         <FiCheck size={10} className="text-white" />
                       </div>

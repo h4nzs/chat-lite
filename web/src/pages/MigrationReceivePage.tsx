@@ -166,7 +166,7 @@ export default function MigrationReceivePage() {
         ) : qrData ? (
           <QRCode value={qrData} size={250} level="M" />
         ) : (
-          <div className="w-[250px] h-[250px] bg-gray-200 animate-pulse rounded-xl"></div>
+          <div className="w-[250px] h-[250px] bg-bg-surface animate-pulse rounded-xl"></div>
         )}
         
         {status === 'receiving' && (

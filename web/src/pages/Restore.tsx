@@ -154,7 +154,7 @@ export default function RestorePage() {
           </p>
         </div>
         
-        <form onSubmit={handleRestore} className="bg-bg-surface p-8 rounded-2xl shadow-neumorphic-convex border border-white/5 relative overflow-hidden">
+        <form onSubmit={handleRestore} className="bg-bg-surface p-8 rounded-2xl shadow-neumorphic-convex border border-text-secondary/10 relative overflow-hidden">
           {/* Visual Indicator for Mode */}
           <div className={`absolute top-0 left-0 w-full h-1 ${isVerifyMode ? 'bg-accent' : 'bg-orange-500'} opacity-50`}></div>
 

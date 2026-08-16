@@ -27,12 +27,12 @@ function SearchResultItem({ u, loadingId, onStarted }: { u: SearchUser, loadingI
       className={`w-full text-left p-3 rounded-lg transition flex items-center hover:bg-primary/50 disabled:opacity-50`}
     >
       {profile.avatarUrl ? (
-        <img src={toAbsoluteUrl(profile.avatarUrl)} alt={profile.name} className="w-10 h-10 rounded-full bg-gray-700 mr-3" />
+        <img src={toAbsoluteUrl(profile.avatarUrl)} alt={profile.name} className="w-10 h-10 rounded-full bg-bg-surface mr-3" />
       ) : (
-        <DefaultAvatar name={profile.name} id={u.id} className="w-10 h-10 mr-3 bg-gray-700" />
+        <DefaultAvatar name={profile.name} id={u.id} className="w-10 h-10 mr-3 bg-bg-surface" />
       )}
       <div className="flex-1 text-left">
-        <div className="font-medium text-white">{profile.name}</div>
+        <div className="font-medium text-text-primary">{profile.name}</div>
       </div>
       {loadingId === u.id && <span className="ml-2 text-xs text-text-secondary">{t('actions.starting')}</span>}
     </button>

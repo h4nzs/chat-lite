@@ -131,7 +131,7 @@ function MessageBubble({ message, isOwn, onImageClick, isLastInSequence = true }
           <>
             {/* ✅ FIX LOGIKA VIEW ONCE: Tidak perlu mensyaratkan message.fileUrl! */}
             {message.isViewOnce ? (
-              <div className="p-3 bg-black/20 rounded-xl flex items-center justify-center min-w-[160px] my-1 mx-2 border border-white/5">
+              <div className="p-3 bg-black/20 rounded-xl flex items-center justify-center min-w-[160px] my-1 mx-2 border border-text-secondary/10">
                 {message.isViewed ? (
                   <div className="flex items-center gap-2 text-text-secondary/50 italic select-none">
                     <FiEyeOff size={18} />

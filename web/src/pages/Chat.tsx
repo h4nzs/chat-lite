@@ -110,7 +110,7 @@ export default function Chat() {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-y-0 left-0 w-[85%] max-w-sm bg-bg-main border-r border-white/10 z-40 shadow-2xl"
+            className="fixed inset-y-0 left-0 w-[85%] max-w-sm bg-bg-main border-r border-text-secondary/10 z-40 shadow-2xl"
           >
             <ChatList />
           </motion.aside>
@@ -122,7 +122,7 @@ export default function Chat() {
         <aside className="
           relative z-20 h-full 
           w-1/3 lg:w-1/4 2xl:w-1/5 
-          bg-bg-main border-r border-white/10 dark:border-black/10
+          bg-bg-main border-r border-text-secondary/10 dark:border-black/10
           shadow-neu-flat-light dark:shadow-neu-flat-dark
         ">
           <ChatList />
@@ -176,7 +176,7 @@ export default function Chat() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="
               hidden 2xl:flex w-1/4 h-full 
-              bg-bg-main border-l border-white/10 dark:border-black/10
+              bg-bg-main border-l border-text-secondary/10 dark:border-black/10
               shadow-[-5px_0_15px_rgba(0,0,0,0.05)] z-20
             "
           >

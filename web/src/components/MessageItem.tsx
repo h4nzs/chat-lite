@@ -141,7 +141,7 @@ const MessageItem = ({ message, isGroup, participants, isHighlighted, onImageCli
       <div className="flex justify-center my-4 w-full">
         <div className="flex flex-col items-center gap-2">
           <div className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium shadow-neu-pressed-dark border border-white/5",
+            "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium shadow-neu-pressed-dark border border-text-secondary/10",
             isError 
               ? "bg-red-500/10 text-red-500" 
               : "bg-black/20 text-text-secondary"
@@ -223,7 +223,7 @@ if (socket?.connected) {
   if (message.isDeletedLocal || message.deletedAt || message.content === "[This message was deleted]") {
     return (
       <div ref={ref} className={`flex items-center p-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-        <div className="flex items-center gap-2 text-xs italic text-text-secondary bg-bg-surface px-3 py-1.5 rounded-xl border border-white/5 shadow-sm">
+        <div className="flex items-center gap-2 text-xs italic text-text-secondary bg-bg-surface px-3 py-1.5 rounded-xl border border-text-secondary/10 shadow-sm">
            <FiTrash2 size={12} />
            <span>{t('chat:messages.message_deleted')}</span>
         </div>

@@ -79,7 +79,7 @@ export default function ReportBugModal({ onClose }: Props) {
           <button 
             type="button" 
             onClick={onClose} 
-            className="px-4 py-2 rounded-lg text-text-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            className="px-4 py-2 rounded-lg text-text-secondary hover:bg-black/5 dark:hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors"
           >
             {t('common:actions.cancel')}
           </button>

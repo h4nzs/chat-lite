@@ -268,9 +268,9 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
       <div className="absolute top-6 left-0 right-0 px-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/60 to-transparent pb-4 pt-2 pointer-events-auto">
         <div className="flex items-center gap-2">
           {profile.avatarUrl ? (
-            <img src={toAbsoluteUrl(profile.avatarUrl)} alt="avatar" className="w-8 h-8 rounded-full border border-white/20 object-cover" />
+            <img src={toAbsoluteUrl(profile.avatarUrl)} alt="avatar" className="w-8 h-8 rounded-full border border-black/10 dark:border-white/10 object-cover" />
           ) : (
-            <DefaultAvatar name={profile.name} id={targetUser?.id} className="w-8 h-8 border border-white/20" />
+            <DefaultAvatar name={profile.name} id={targetUser?.id} className="w-8 h-8 border border-black/10 dark:border-white/10" />
           )}
           <div>
             <p className="text-white text-sm font-bold shadow-sm drop-shadow-md">{profile.name}</p>
@@ -323,7 +323,7 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
             ) : currentStory.decryptedData.mediaUrl ? (
               // Loading state while decrypting
               <div className="flex flex-col items-center justify-center gap-3">
-                 <div className="animate-spin w-8 h-8 border-4 border-white/20 border-t-white rounded-full" />
+                 <div className="animate-spin w-8 h-8 border-4 border-black/10 dark:border-white/10 border-t-white rounded-full" />
                  <span className="text-white/60 text-xs font-medium uppercase tracking-wider">{t('media.decrypting', 'Decrypting...')}</span>
               </div>
             ) : null}
@@ -346,7 +346,7 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
           </>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3">
-             <div className="animate-spin w-8 h-8 border-4 border-white/20 border-t-white rounded-full" />
+             <div className="animate-spin w-8 h-8 border-4 border-black/10 dark:border-white/10 border-t-white rounded-full" />
              <span className="text-white/60 text-xs font-medium uppercase tracking-wider">{t('media.decrypting', 'Decrypting...')}</span>
           </div>
         )}
@@ -361,7 +361,7 @@ export default function StoryViewer({ userId, onClose, onReply }: { userId: User
                handleSendReply(); 
                setIsTyping(false);
              }} 
-             className="flex items-center gap-2 max-w-lg mx-auto bg-black/40 backdrop-blur-xl rounded-full px-4 py-2 border border-white/10 shadow-lg"
+             className="flex items-center gap-2 max-w-lg mx-auto bg-black/40 backdrop-blur-xl rounded-full px-4 py-2 border border-text-secondary/10 shadow-lg"
              // Hindari pause saat user memencet area ketik
              onPointerDown={(e) => e.stopPropagation()}
            >

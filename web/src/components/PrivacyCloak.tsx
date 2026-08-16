@@ -64,7 +64,7 @@ export default function PrivacyCloak() {
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="flex flex-col items-center gap-6 relative z-10"
           >
-            <div className="w-24 h-24 rounded-full bg-bg-surface border border-white/10 shadow-2xl flex items-center justify-center text-accent">
+            <div className="w-24 h-24 rounded-full bg-bg-surface border border-text-secondary/10 shadow-2xl flex items-center justify-center text-accent">
               <FiShield size={48} className="animate-pulse" />
             </div>
             

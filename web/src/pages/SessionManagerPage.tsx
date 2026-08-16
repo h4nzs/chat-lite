@@ -27,7 +27,7 @@ const SessionBlade = ({ session, onLogout, isCurrent }: { session: { userAgent: 
       flex items-center justify-between p-4 rounded-xl mb-4
       bg-bg-main
       shadow-neu-flat-light dark:shadow-neu-flat-dark
-      border border-white/20 dark:border-black/20
+      border border-black/10 dark:border-white/10 dark:border-black/20
       ${isCurrent ? 'ring-1 ring-green-500/50' : ''}
     `}>
       {/* LED Indicator */}

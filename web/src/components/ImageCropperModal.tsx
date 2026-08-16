@@ -44,7 +44,7 @@ export default function ImageCropperModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg h-[75vh] flex flex-col bg-bg-main rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+      <div className="relative w-full max-w-lg h-[75vh] flex flex-col bg-bg-main rounded-2xl overflow-hidden shadow-2xl border border-text-secondary/10">
         <div className="relative flex-1 bg-black">
           <Cropper
             image={url}
@@ -88,7 +88,7 @@ export default function ImageCropperModal({
             <button 
               onClick={() => setRotation((prev) => (prev + 90) % 360)} 
               disabled={isProcessing} 
-              className="flex items-center justify-center gap-2 p-3 bg-white/5 text-text-primary rounded-xl hover:bg-white/10 transition-colors flex-1 font-bold text-sm"
+              className="flex items-center justify-center gap-2 p-3 bg-black/5 dark:bg-white/5 text-text-primary rounded-xl hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 transition-colors flex-1 font-bold text-sm"
             >
               <FiRotateCw size={18} /> {t('modals:editor.rotate', 'Rotate')}
             </button>
@@ -97,7 +97,7 @@ export default function ImageCropperModal({
               disabled={isProcessing} 
               aria-label={t('common:actions.save', 'Save')}
               title={t('common:actions.save', 'Save')}
-              className="p-3 bg-accent text-white rounded-xl hover:scale-105 transition-all shadow-[0_0_15px_rgba(var(--accent),0.4)]"
+              className="p-3 bg-accent text-white rounded-xl hover:scale-105 transition-all shadow-neu-icon"
             >
               <FiCheck size={20} />
             </button>

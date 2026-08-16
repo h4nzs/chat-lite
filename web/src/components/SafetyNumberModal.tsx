@@ -45,7 +45,7 @@ export default function SafetyNumberModal({
       <div 
         className="
           bg-bg-surface rounded-3xl p-8 w-full max-w-md relative 
-          shadow-neumorphic-convex border border-white/10
+          shadow-neumorphic-convex border border-text-secondary/10
         " 
         onClick={e => e.stopPropagation()}
       >
@@ -85,7 +85,7 @@ export default function SafetyNumberModal({
                  <div className="
                    font-mono text-lg tracking-widest text-accent text-center
                    p-4 bg-bg-main rounded-xl shadow-neumorphic-concave
-                   border border-white/5 break-all
+                   border border-text-secondary/10 break-all
                  ">
                    {formattedNumber}
                  </div>

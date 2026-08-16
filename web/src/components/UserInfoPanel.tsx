@@ -166,7 +166,7 @@ export default function UserInfoPanel({ userId }: { userId: UserId }) {
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="p-4 text-center border-b border-white/5 dark:border-black/5">
+        <div className="p-4 text-center border-b border-text-secondary/10 dark:border-black/5">
             <h2 className="text-lg font-semibold">{t('modals:user_info.about', { name: profile.name || t('common:defaults.user') })}</h2>
         </div>
         

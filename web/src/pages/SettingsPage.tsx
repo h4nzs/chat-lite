@@ -660,14 +660,14 @@ export default function SettingsPage() {
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary/50">{t('settings:power.status')}</span>
-                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_15px_rgba(var(--accent),0.4)]">
+                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent shadow-neu-icon">
                    <FiHeart className="fill-current" />
                 </div>
               </div>
             </div>
             
             {/* Glowing Bottom Bar */}
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-accent shadow-[0_-2px_10px_rgba(var(--accent),1)]"></div>
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-accent shadow-neu-icon"></div>
           </a>
         </div>
 
@@ -695,7 +695,7 @@ export default function SettingsPage() {
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <span className="text-[10px] uppercase font-bold tracking-widest text-text-secondary/50">Status</span>
-                <div className={`px-3 py-1 rounded font-bold uppercase tracking-wider text-[10px] flex items-center gap-1 ${user?.subscriptionTier === 'SUBSCRIBER' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-white/5 text-text-secondary'}`}>
+                <div className={`px-3 py-1 rounded font-bold uppercase tracking-wider text-[10px] flex items-center gap-1 ${user?.subscriptionTier === 'SUBSCRIBER' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-black/5 dark:bg-white/5 text-text-secondary'}`}>
                   {user?.subscriptionTier === 'SUBSCRIBER' ? 'Active PRO' : 'Free Tier'}
                 </div>
               </div>
@@ -739,7 +739,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Language Switcher */}
-              <div className="space-y-3 pt-4 border-t border-white/5 mt-4">
+              <div className="space-y-3 pt-4 border-t border-text-secondary/10 mt-4">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary pl-1">
                   {t('settings:visual.language', 'Language')}
                 </span>
@@ -805,7 +805,7 @@ export default function SettingsPage() {
               )}
 
             {/* PANIC PASSWORD */}
-            <div className="pt-4 border-t border-white/5 space-y-3 mt-4">
+            <div className="pt-4 border-t border-text-secondary/10 space-y-3 mt-4">
               <div>
                 <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
                   <FiShield className="text-red-500" /> {t('settings:privacy.panic_password')}
@@ -820,7 +820,7 @@ export default function SettingsPage() {
                    value={panicPass} 
                    onChange={e => setPanicPass(e.target.value)} 
                    placeholder={t('auth:fields.password')} 
-                   className="bg-bg-main border border-white/10 rounded-lg px-4 py-2 text-sm text-text-primary focus:ring-red-500/50 flex-1 outline-none" 
+                   className="bg-bg-main border border-text-secondary/10 rounded-lg px-4 py-2 text-sm text-text-primary focus:ring-red-500/50 flex-1 outline-none" 
                  />
                  <button 
                    type="button"
@@ -837,7 +837,7 @@ export default function SettingsPage() {
             </div>
 
             {/* DEAD MAN'S SWITCH */}
-            <div className="pt-4 border-t border-white/5 space-y-3 mt-4">
+            <div className="pt-4 border-t border-text-secondary/10 space-y-3 mt-4">
              <div>
                <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
                  <span className="text-red-500"><FiAlertTriangle size={18} /></span> {t('settings:privacy.dead_man')}
@@ -859,7 +859,7 @@ export default function SettingsPage() {
                         toast.success(t('common:actions.saved'));
                      } catch (err) { toast.error(t('common:errors.network')); }
                    }}
-                   className="bg-bg-main border border-white/10 rounded-lg px-4 py-2 text-sm text-text-primary focus:ring-accent flex-1 outline-none"
+                   className="bg-bg-main border border-text-secondary/10 rounded-lg px-4 py-2 text-sm text-text-primary focus:ring-accent flex-1 outline-none"
                  >
                    <option value="">{t('settings:privacy.auto_destruct_options.disabled')}</option>
                    <option value="7">{t('settings:privacy.auto_destruct_options.7_days')}</option>
@@ -986,7 +986,7 @@ export default function SettingsPage() {
                       <p className="mb-2">
                         {t('settings:support.background_desc')}
                       </p>
-                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 text-xs">
+                      <div className="bg-black/20 p-3 rounded-xl border border-text-secondary/10 space-y-2 text-xs">
                         <p>
                           <Trans i18nKey="settings:support.android_guide_steps">
                             <strong className="text-text-primary">🤖 Android:</strong> Install app via browser menu. Then Settings {'>'} Apps {'>'} NYX (or your browser) {'>'} Battery {'>'} <span className="text-emerald-400">Unrestricted</span>
@@ -1075,7 +1075,7 @@ export default function SettingsPage() {
              {/* Option 1: Biometric */}
              <button
                onClick={handleRegisterPasskey}
-               className="p-4 bg-bg-surface rounded-xl border border-white/5 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group"
+               className="p-4 bg-bg-surface rounded-xl border border-text-secondary/10 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group"
              >
                <div className="p-3 bg-accent/10 text-accent rounded-full group-hover:bg-accent group-hover:text-white transition-colors">
                  <FiZap size={24} />
@@ -1090,7 +1090,7 @@ export default function SettingsPage() {
              <button
                onClick={handleProofOfWork}
                disabled={miningStatus !== 'idle'}
-               className="p-4 bg-bg-surface rounded-xl border border-white/5 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50 disabled:cursor-not-allowed"
+               className="p-4 bg-bg-surface rounded-xl border border-text-secondary/10 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50 disabled:cursor-not-allowed"
              >
                <div className="p-3 bg-blue-500/10 text-blue-500 rounded-full group-hover:bg-blue-500 group-hover:text-white transition-colors">
                  {miningStatus === 'idle' ? <FiCpu size={24} /> : <Spinner size="sm" />}

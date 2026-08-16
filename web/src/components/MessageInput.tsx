@@ -495,7 +495,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
   // --- Render ---
 
   return (
-    <div className="bg-bg-main border-t border-white/10 z-20 relative pb-safe pb-3 md:pb-0">
+    <div className="bg-bg-main border-t border-text-secondary/10 z-20 relative pb-safe pb-3 md:pb-0">
       <div className="absolute bottom-full left-0 w-full">
         <SmartReply lastMessage={lastDecryptedText} isFromMe={!isLastMessageFromOther} onSelectReply={handleSmartReplySelect} />
         <div className="px-4">
@@ -509,12 +509,12 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
             )}
             
             {stagedFiles.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-2 p-3 bg-bg-surface backdrop-blur-md rounded-2xl shadow-neumorphic-convex border border-white/5 flex gap-3 overflow-x-auto scrollbar-hide">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-2 p-3 bg-bg-surface backdrop-blur-md rounded-2xl shadow-neumorphic-convex border border-text-secondary/10 flex gap-3 overflow-x-auto scrollbar-hide">
                     {stagedFiles.map((staged) => {
                         const isImage = staged.file.type.startsWith('image/');
                         const url = isImage ? filePreviews.get(staged.id) : null;
                         return (
-                            <div key={staged.id} className="relative w-20 h-20 flex-shrink-0 rounded-xl shadow-neumorphic-concave overflow-hidden border border-white/5 group bg-bg-main">
+                            <div key={staged.id} className="relative w-20 h-20 flex-shrink-0 rounded-xl shadow-neumorphic-concave overflow-hidden border border-text-secondary/10 group bg-bg-main">
                                 {isImage && url ? (
                                     <>
                                       <img src={url} alt="preview" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -547,10 +547,10 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
       )}
 
       {showTimerMenu && (
-        <div ref={timerMenuRef} className="absolute bottom-full left-10 mb-2 z-50 bg-bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden min-w-[120px]">
-          <div className="p-2 text-[10px] uppercase font-bold text-text-secondary border-b border-white/5">{t('chat:input.auto_delete', 'Auto-Delete')}</div>
+        <div ref={timerMenuRef} className="absolute bottom-full left-10 mb-2 z-50 bg-bg-surface border border-text-secondary/10 rounded-xl shadow-xl overflow-hidden min-w-[120px]">
+          <div className="p-2 text-[10px] uppercase font-bold text-text-secondary border-b border-text-secondary/10">{t('chat:input.auto_delete', 'Auto-Delete')}</div>
           {DURATIONS.map((opt) => (
-            <button key={opt.label} onClick={() => { setExpiresIn(opt.value); setShowTimerMenu(false); setShowPlusMenu(false); }} className={clsx("w-full text-left px-4 py-2 text-sm hover:bg-white/5 transition-colors flex items-center justify-between", expiresIn === opt.value ? "text-orange-500 font-bold" : "text-text-primary")}>
+            <button key={opt.label} onClick={() => { setExpiresIn(opt.value); setShowTimerMenu(false); setShowPlusMenu(false); }} className={clsx("w-full text-left px-4 py-2 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors flex items-center justify-between", expiresIn === opt.value ? "text-orange-500 font-bold" : "text-text-primary")}>
               {opt.label}
               {expiresIn === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
             </button>
@@ -559,13 +559,13 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
       )}
 
       {showPlusMenu && (
-        <div ref={plusMenuRef} className="absolute bottom-full left-4 mb-2 z-50 bg-bg-surface border border-white/10 rounded-xl shadow-xl overflow-hidden min-w-[160px] flex flex-col p-1">
-          <button onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary"><FiPaperclip size={18} /><span>{t('input.attach_file')}</span></button>
-          <button onClick={() => { setShowTimerMenu(true); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary"><FiClock size={18} className={expiresIn ? "text-orange-500" : ""} /><span>{t('input.set_timer')}</span></button>
-          <button onClick={() => { setIsViewOnce(!isViewOnce); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary"><FiEye size={18} className={isViewOnce ? "text-accent" : ""} /><span>{t('input.toggle_view_once')}</span></button>
-          <button onClick={() => { setIsHD(!isHD); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary font-bold"><span className={isHD ? "text-accent" : "text-text-secondary"}>HD</span><span>{isHD ? t('chat:input.hd_on', 'HD Quality: ON') : t('chat:input.hd_off', 'Standard Quality')}</span></button>
-          <button onClick={() => { setIsVoiceAnonymized(!isVoiceAnonymized); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary font-bold"><FiCpu size={18} className={isVoiceAnonymized ? "text-red-500" : "text-text-secondary"} /><span className={isVoiceAnonymized ? "text-red-500" : ""}>{isVoiceAnonymized ? t('chat:input.anon_on', 'Anon Voice: ON') : t('chat:input.anon_off', 'Anon Voice: OFF')}</span></button>
-          <button onClick={() => { setShowEmojiPicker(true); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-white/5 rounded-lg transition-colors text-text-primary"><FiSmile size={18} /><span>{t('input.insert_emoji')}</span></button>
+        <div ref={plusMenuRef} className="absolute bottom-full left-4 mb-2 z-50 bg-bg-surface border border-text-secondary/10 rounded-xl shadow-xl overflow-hidden min-w-[160px] flex flex-col p-1">
+          <button onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary"><FiPaperclip size={18} /><span>{t('input.attach_file')}</span></button>
+          <button onClick={() => { setShowTimerMenu(true); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary"><FiClock size={18} className={expiresIn ? "text-orange-500" : ""} /><span>{t('input.set_timer')}</span></button>
+          <button onClick={() => { setIsViewOnce(!isViewOnce); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary"><FiEye size={18} className={isViewOnce ? "text-accent" : ""} /><span>{t('input.toggle_view_once')}</span></button>
+          <button onClick={() => { setIsHD(!isHD); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary font-bold"><span className={isHD ? "text-accent" : "text-text-secondary"}>HD</span><span>{isHD ? t('chat:input.hd_on', 'HD Quality: ON') : t('chat:input.hd_off', 'Standard Quality')}</span></button>
+          <button onClick={() => { setIsVoiceAnonymized(!isVoiceAnonymized); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary font-bold"><FiCpu size={18} className={isVoiceAnonymized ? "text-red-500" : "text-text-secondary"} /><span className={isVoiceAnonymized ? "text-red-500" : ""}>{isVoiceAnonymized ? t('chat:input.anon_on', 'Anon Voice: ON') : t('chat:input.anon_off', 'Anon Voice: OFF')}</span></button>
+          <button onClick={() => { setShowEmojiPicker(true); setShowPlusMenu(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors text-text-primary"><FiSmile size={18} /><span>{t('input.insert_emoji')}</span></button>
         </div>
       )}
 
@@ -582,7 +582,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
              <span className="font-mono text-sm md:text-lg text-text-primary tracking-widest flex-shrink-0">{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</span>
              <span className="hidden md:inline text-xs text-text-secondary uppercase tracking-wider ml-auto truncate">{t('input.recording_state')}</span>
           </div>
-          <button onClick={handleStopRecording} className="p-3 rounded-full bg-accent text-white shadow-[0_0_15px_rgba(var(--accent),0.5)] hover:scale-110 active:scale-95 transition-all flex-shrink-0" title={t('input.send_voice')}><FiSend size={20} /></button>
+          <button onClick={handleStopRecording} className="p-3 rounded-full bg-accent text-white shadow-neu-icon hover:scale-110 active:scale-95 transition-all flex-shrink-0" title={t('input.send_voice')}><FiSend size={20} /></button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="relative flex items-center gap-2 p-2 rounded-2xl bg-bg-main w-full m-2 md:m-4 shadow-neu-pressed dark:shadow-neu-pressed-dark max-w-[calc(100%-1rem)] md:max-w-[calc(100%-2rem)]">
@@ -615,8 +615,8 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
           <div className="relative">
             <AnimatePresence>
                {showSilentMenu && (
-                  <motion.div initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.9 }} className="absolute bottom-full right-0 mb-2 p-2 bg-bg-surface backdrop-blur-xl border border-white/10 rounded-xl shadow-neumorphic-convex z-50 whitespace-nowrap">
-                     <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSubmit(undefined, true); }} className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-text-primary hover:bg-white/5 rounded-lg transition-colors w-full"><FiVolumeX className="text-accent" size={16} /> {t('input.send_silent')}</button>
+                  <motion.div initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.9 }} className="absolute bottom-full right-0 mb-2 p-2 bg-bg-surface backdrop-blur-xl border border-text-secondary/10 rounded-xl shadow-neumorphic-convex z-50 whitespace-nowrap">
+                     <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSubmit(undefined, true); }} className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-text-primary hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-lg transition-colors w-full"><FiVolumeX className="text-accent" size={16} /> {t('input.send_silent')}</button>
                   </motion.div>
                )}
             </AnimatePresence>

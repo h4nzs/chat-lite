@@ -23,9 +23,9 @@ export const SystemBanner: React.FC = () => {
   if (!banner.active || !banner.message) return null;
 
   const colors = {
-    info: 'bg-[#0B0F19]/80 border-cyan-500/30 text-cyan-400 shadow-[0_8px_32px_rgba(8,145,178,0.25)]',
-    warning: 'bg-[#0B0F19]/80 border-amber-500/30 text-amber-400 shadow-[0_8px_32px_rgba(217,119,6,0.25)]',
-    error: 'bg-[#0B0F19]/80 border-rose-500/30 text-rose-400 shadow-[0_8px_32px_rgba(225,29,72,0.25)]'
+    info: 'bg-bg-surface/80 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-neu-flat',
+    warning: 'bg-bg-surface/80 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-neu-flat',
+    error: 'bg-bg-surface/80 border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-neu-flat'
   };
 
   const Icon = banner.type === 'error' ? FiAlertCircle : banner.type === 'warning' ? FiAlertTriangle : FiInfo;
@@ -44,7 +44,7 @@ export const SystemBanner: React.FC = () => {
         {banner.actionText && banner.actionLink && (
           <button
             onClick={handleAction}
-            className="flex items-center gap-1 ml-1 px-3 py-1 text-xs font-semibold rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="flex items-center gap-1 ml-1 px-3 py-1 text-xs font-semibold rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
           >
             {banner.actionText}
             <FiExternalLink className="w-3 h-3" />
@@ -53,7 +53,7 @@ export const SystemBanner: React.FC = () => {
 
         <button
           onClick={handleDismiss}
-          className="ml-1 p-1 rounded-full hover:bg-white/10 transition-colors"
+          className="ml-1 p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
           aria-label="Dismiss"
         >
           <FiX className="w-3.5 h-3.5" />

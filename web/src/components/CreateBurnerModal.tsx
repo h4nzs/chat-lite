@@ -85,11 +85,11 @@ export default function CreateBurnerModal({ onClose }: Props) {
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-bg-surface border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
+          className="bg-bg-surface border border-text-secondary/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
         >
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-text-secondary hover:text-white bg-black/20 rounded-full hover:bg-black/40 transition-colors"
+            className="absolute top-4 right-4 p-2 text-text-secondary hover:text-text-primary bg-black/5 dark:bg-white/5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           >
             <FiX size={20} />
           </button>

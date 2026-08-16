@@ -140,7 +140,7 @@ export default function ProfilePage() {
           
           {/* COLUMN 1: Visual ID Card */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-bg-main rounded-2xl p-6 shadow-neu-flat dark:shadow-neu-flat-dark border border-white/50 dark:border-white/5 text-center relative overflow-hidden group">
+            <div className="bg-bg-main rounded-2xl p-6 shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 dark:border-white/5 text-center relative overflow-hidden group">
               {/* ID Badge Aesthetics */}
               <div className="absolute top-0 left-0 w-full h-1 bg-accent/50" />
               <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
@@ -172,7 +172,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Technical Stats Widget */}
-            <div className="bg-bg-main rounded-xl p-5 shadow-neu-flat dark:shadow-neu-flat-dark border border-white/50 dark:border-white/5">
+            <div className="bg-bg-main rounded-xl p-5 shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 dark:border-white/5">
               <h3 className="text-xs font-black uppercase tracking-widest text-text-secondary mb-4 flex items-center gap-2">
                 <FiCpu /> {t('common:profile.system_telemetry')}
               </h3>
@@ -194,7 +194,7 @@ export default function ProfilePage() {
 
           {/* COLUMN 2: Data Entry */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-bg-main rounded-2xl p-8 shadow-neu-flat dark:shadow-neu-flat-dark border border-white/50 dark:border-white/5">
+            <div className="bg-bg-main rounded-2xl p-8 shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 dark:border-white/5">
               <h3 className="text-xs font-black uppercase tracking-widest text-text-secondary mb-6 border-b border-black/5 dark:border-white/5 pb-2">
                 {t('common:profile.bio_data')}
               </h3>
@@ -225,7 +225,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Advanced: Public Key Visualization */}
-            <div className="bg-bg-main rounded-2xl p-8 shadow-neu-flat dark:shadow-neu-flat-dark border border-white/50 dark:border-white/5 overflow-hidden relative">
+            <div className="bg-bg-main rounded-2xl p-8 shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 dark:border-white/5 overflow-hidden relative">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <FiKey size={100} />
               </div>

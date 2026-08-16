@@ -222,7 +222,7 @@ const VoiceMessagePlayer = ({ message }: VoiceMessagePlayerProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-3 w-full max-w-[280px] h-[60px] bg-bg-main/50 p-2 rounded-2xl border border-white/5">
+      <div className="flex items-center gap-3 w-full max-w-[280px] h-[60px] bg-bg-main/50 p-2 rounded-2xl border border-text-secondary/10">
         <Spinner size="sm" />
         <span className="text-sm text-text-secondary">{t('media.decrypting')}</span>
       </div>
@@ -239,7 +239,7 @@ const VoiceMessagePlayer = ({ message }: VoiceMessagePlayerProps) => {
   }
 
   return (
-    <div className="flex items-center gap-3 w-full bg-bg-main/50 p-2 rounded-2xl border border-white/5 shadow-inner">
+    <div className="flex items-center gap-3 w-full bg-bg-main/50 p-2 rounded-2xl border border-text-secondary/10 shadow-inner">
       <button 
         onClick={togglePlay} 
         disabled={!isReady}

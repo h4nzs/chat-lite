@@ -56,7 +56,7 @@ export default function BanUserModal({ isOpen, onClose, targetUserId, onSuccess 
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             placeholder="User ID..."
-            className="w-full p-3 rounded-xl bg-bg-main text-text-primary border border-white/10 outline-none focus:border-red-500/50 font-mono"
+            className="w-full p-3 rounded-xl bg-bg-main text-text-primary border border-text-secondary/10 outline-none focus:border-red-500/50 font-mono"
             disabled={!!targetUserId} // Lock if ID passed via props
           />
         </div>
@@ -69,7 +69,7 @@ export default function BanUserModal({ isOpen, onClose, targetUserId, onSuccess 
             placeholder={t('modals:ban.reason_placeholder')}
             className="
               w-full p-3 rounded-xl bg-bg-main text-text-primary 
-              border border-white/10 outline-none focus:border-red-500/50
+              border border-text-secondary/10 outline-none focus:border-red-500/50
               min-h-[80px] resize-none
             "
             autoFocus
@@ -80,7 +80,7 @@ export default function BanUserModal({ isOpen, onClose, targetUserId, onSuccess 
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-text-secondary hover:bg-white/5 transition-colors text-sm font-bold"
+            className="px-4 py-2 rounded-lg text-text-secondary hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors text-sm font-bold"
           >
             {t('common:actions.cancel')}
           </button>

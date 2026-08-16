@@ -41,7 +41,7 @@ const UserStoryRing = memo(function UserStoryRing({ userId, onClick }: { userId:
     >
       <div className={clsx(
         "relative w-14 h-14 rounded-full p-[2px] transition-all duration-300 shadow-neu-flat dark:shadow-neu-flat-dark group-active:scale-95",
-        hasUnseen ? "bg-gradient-to-tr from-accent to-orange-400" : "bg-white/10"
+        hasUnseen ? "bg-gradient-to-tr from-accent to-orange-400" : "bg-black/10 dark:bg-white/10"
       )}>
         <div className="w-full h-full rounded-full border-2 border-bg-main overflow-hidden bg-bg-main">
           {profile.avatarUrl ? (
@@ -95,7 +95,7 @@ export default function StoryTray() {
 
   return (
     <>
-      <div className="w-full overflow-x-auto no-scrollbar py-4 px-4 border-b border-white/5 bg-bg-main">
+      <div className="w-full overflow-x-auto no-scrollbar py-4 px-4 border-b border-text-secondary/10 bg-bg-main">
         <div className="flex items-start gap-4">
           
           {/* Add Story Button (Self) */}

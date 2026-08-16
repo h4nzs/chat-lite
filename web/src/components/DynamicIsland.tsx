@@ -35,10 +35,10 @@ const NotificationView = ({ activity }: { activity: NotificationActivity }) => {
           <img 
             src={toAbsoluteUrl(profile.avatarUrl)}
             alt={profile.name || t('common:defaults.avatar', 'Avatar')}
-            className="w-8 h-8 rounded-full object-cover border border-white/10"
+            className="w-8 h-8 rounded-full object-cover border border-text-secondary/10"
           />
         ) : (
-          <DefaultAvatar name={profile.name || t('common:defaults.user')} id={activity.sender?.id} className="w-8 h-8 border border-white/10" />
+          <DefaultAvatar name={profile.name || t('common:defaults.user')} id={activity.sender?.id} className="w-8 h-8 border border-text-secondary/10" />
         )}
         <div className="absolute -bottom-1 -right-1 bg-accent rounded-full p-0.5 border border-black">
            <FiMessageSquare size={8} className="text-white" />
@@ -47,10 +47,10 @@ const NotificationView = ({ activity }: { activity: NotificationActivity }) => {
       
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex justify-between items-baseline">
-           <p className="text-[10px] font-bold text-white/90 uppercase tracking-wider">{profile.name || t('common:defaults.user')}</p>
-           <span className="text-[8px] text-white/40 font-mono">{t('common:time.now', 'NOW')}</span>
+           <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">{profile.name || t('common:defaults.user')}</p>
+           <span className="text-[8px] text-text-secondary font-mono">{t('common:time.now', 'NOW')}</span>
         </div>
-        <p className="text-xs text-white/70 truncate font-medium group-hover:text-white transition-colors">
+        <p className="text-xs text-text-secondary truncate font-medium group-hover:text-text-primary transition-colors">
           {activity.message.includes(':') 
             ? activity.message.substring(activity.message.indexOf(':') + 2) 
             : activity.message}
@@ -65,18 +65,18 @@ const UploadView = ({ activity }: { activity: UploadActivity }) => {
 
   return (
     <div className="w-full h-full flex items-center gap-3 px-1">
-      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/80">
+      <div className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-text-secondary">
         <FiUploadCloud size={14} className="animate-pulse" />
       </div>
       
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex justify-between items-center">
-           <p className="text-[10px] font-bold text-white/90 uppercase tracking-wider truncate max-w-[120px]">{activity.fileName}</p>
+           <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider truncate max-w-[120px]">{activity.fileName}</p>
            <span className="text-[9px] font-mono text-accent">{Math.round(activity.progress)}%</span>
         </div>
-        <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
+        <div className="w-full bg-black/10 dark:bg-white/10 rounded-full h-1 overflow-hidden">
           <motion.div 
-            className="bg-accent h-full rounded-full shadow-[0_0_10px_rgba(var(--accent),0.8)]" 
+            className="bg-accent h-full rounded-full shadow-neu-icon" 
             initial={{ width: 0 }}
             animate={{ width: `${activity.progress}%` }}
             transition={{ type: "spring", damping: 20 }}
@@ -86,7 +86,7 @@ const UploadView = ({ activity }: { activity: UploadActivity }) => {
       
       <button 
         onClick={(e) => { e.stopPropagation(); removeActivity(activity.id); }}
-        className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-all"
+        className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 text-text-secondary hover:text-text-primary transition-all"
       >
         <FiX size={12} />
       </button>
@@ -105,7 +105,7 @@ const UpsellView = ({ activity, onUpgrade }: { activity: UpsellActivity, onUpgra
       
       <div className="flex-1 min-w-0 flex flex-col justify-center cursor-pointer" onClick={() => { removeActivity(activity.id); onUpgrade(); }}>
         <div className="flex justify-between items-baseline">
-           <p className="text-[10px] font-bold text-white/90 uppercase tracking-wider">NYX PRO</p>
+           <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">NYX PRO</p>
         </div>
         <p className="text-xs text-yellow-500/80 truncate font-medium hover:text-yellow-500 transition-colors">
           {activity.message}
@@ -114,7 +114,7 @@ const UpsellView = ({ activity, onUpgrade }: { activity: UpsellActivity, onUpgra
       
       <button 
         onClick={(e) => { e.stopPropagation(); removeActivity(activity.id); onUpgrade(); }}
-        className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500 text-bg-dark px-2 py-1 rounded"
+        className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500 text-slate-900 px-2 py-1 rounded"
       >
         Upgrade
       </button>
@@ -151,14 +151,14 @@ const DynamicIsland = () => {
               relative pointer-events-auto overflow-hidden
               bg-bg-main
               rounded-full px-4
-              border border-white/50 dark:border-white/10
+              border border-text-secondary/10 dark:border-white/10
               shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)]
               dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.7)]
               flex items-center
             "
           >
             {/* Glossy Reflection */}
-            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-black/5 dark:from-white/5 to-transparent pointer-events-none" />
             
             {renderActivity(currentActivity)}
           </motion.div>

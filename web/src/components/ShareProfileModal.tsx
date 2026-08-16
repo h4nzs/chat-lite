@@ -61,7 +61,7 @@ export default function ShareProfileModal({ onClose }: Props) {
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-bg-surface border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
+          className="bg-bg-surface border border-text-secondary/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
         >
           <button 
             onClick={onClose}
@@ -95,7 +95,7 @@ export default function ShareProfileModal({ onClose }: Props) {
 
           <button 
             onClick={handleCopy}
-            className="w-full py-3 rounded-xl bg-bg-main border border-white/5 text-text-primary font-bold uppercase tracking-wider hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl bg-bg-main border border-text-secondary/10 text-text-primary font-bold uppercase tracking-wider hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors flex items-center justify-center gap-2"
           >
             {copied ? <FiCheck className="text-green-500" /> : <FiCopy />}
             {copied ? t('common:actions.copied_label') : t('common:actions.copy_link')}

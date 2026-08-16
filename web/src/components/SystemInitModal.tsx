@@ -90,7 +90,7 @@ export default function SystemInitModal() {
       >
         <motion.div 
           initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }}
-          className="bg-bg-surface border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden"
+          className="bg-bg-surface border border-text-secondary/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden"
         >
           {/* Hacker-y background lines */}
           <div className="absolute top-0 left-0 w-full h-1 bg-[repeating-linear-gradient(90deg,transparent,transparent_10px,#4f46e5_10px,#4f46e5_20px)] opacity-50"></div>
@@ -105,7 +105,7 @@ export default function SystemInitModal() {
           </p>
 
           <div className="space-y-4 mb-8 font-mono text-sm">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-bg-main border border-white/5">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-bg-main border border-text-secondary/10">
                <div className="flex items-center gap-3">
                  <FiBell className="text-text-primary" />
                  <span>{t('system_init.push_notif')}</span>
@@ -113,7 +113,7 @@ export default function SystemInitModal() {
                {renderIcon(notifStatus)}
             </div>
             
-            <div className="flex items-center justify-between p-3 rounded-lg bg-bg-main border border-white/5">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-bg-main border border-text-secondary/10">
                <div className="flex items-center gap-3">
                  <FiCamera className="text-text-primary" />
                  <span>{t('system_init.camera_mic')}</span>

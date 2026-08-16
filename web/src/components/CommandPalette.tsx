@@ -87,7 +87,7 @@ export default function CommandPalette() {
             <div className="
               relative overflow-hidden rounded-lg
               bg-black border border-accent/50
-              shadow-[0_0_30px_rgba(var(--accent),0.2)]
+              shadow-neu-icon
             ">
               {/* Terminal Header */}
               <div className="flex items-center justify-between px-4 py-2 bg-accent/10 border-b border-accent/20">
@@ -113,7 +113,7 @@ export default function CommandPalette() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="
                     w-full bg-transparent 
-                    text-lg font-mono text-white 
+                    text-lg font-mono text-text-primary 
                     placeholder-white/20 
                     focus:outline-none caret-accent
                   "
@@ -132,8 +132,8 @@ export default function CommandPalette() {
                       className={`
                         w-full text-left p-3 flex items-center gap-4 rounded-md transition-all font-mono text-sm
                         ${index === selectedIndex 
-                          ? 'bg-accent/20 text-accent border border-accent/30 shadow-[inset_0_0_10px_rgba(var(--accent),0.1)]' 
-                          : 'text-white/60 hover:text-white hover:bg-white/5'}
+                          ? 'bg-accent/20 text-accent border border-accent/30 shadow-neu-pressed' 
+                          : 'text-text-secondary hover:text-text-primary hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5'}
                       `}
                     >
                       <span className="opacity-50">{cmd.icon || <FiTerminal />}</span>

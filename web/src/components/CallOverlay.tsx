@@ -29,7 +29,7 @@ const RemoteStream = ({ userId, stream, isVideo, profile }: { userId: UserId, st
   const avatarUrl = String(profile?.avatarUrl ?? '') || undefined;
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-2xl overflow-hidden shadow-xl border border-white/10 group flex items-center justify-center">
+    <div className="relative w-full h-full bg-gray-900 rounded-2xl overflow-hidden shadow-xl border border-text-secondary/10 group flex items-center justify-center">
       {isVideo ? (
         <>
           <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
@@ -55,7 +55,7 @@ const RemoteStream = ({ userId, stream, isVideo, profile }: { userId: UserId, st
            <span className="text-xs font-bold text-white/70 uppercase tracking-widest">{name}</span>
         </div>
       )}
-      <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[9px] text-white/90 font-black uppercase tracking-tighter border border-white/10">
+      <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[9px] text-white/90 font-black uppercase tracking-tighter border border-text-secondary/10">
         {name}
       </div>
     </div>
@@ -311,7 +311,7 @@ export default function CallOverlay() {
           <motion.div 
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
-            className="bg-bg-surface/80 p-8 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center backdrop-blur-md min-w-[320px]"
+            className="bg-bg-surface/80 p-8 rounded-3xl border border-text-secondary/10 shadow-2xl flex flex-col items-center backdrop-blur-md min-w-[320px]"
           >
             <div className="relative mb-6">
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-accent/50">
@@ -372,14 +372,14 @@ export default function CallOverlay() {
           style={isMinimized ? { touchAction: "none" } : {}}
           className={
             isMinimized 
-            ? "fixed bottom-20 right-4 w-28 h-40 sm:w-48 sm:h-72 z-[9999] bg-bg-main/90 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-white/10 group"
+            ? "fixed bottom-20 right-4 w-28 h-40 sm:w-48 sm:h-72 z-[9999] bg-bg-main/90 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-text-secondary/10 group"
             : "fixed inset-0 z-[9999] bg-black flex flex-col overflow-hidden transition-all duration-300 cursor-default"
           }
         >
           {!isMinimized && (
             <button 
               onClick={(e) => { e.stopPropagation(); toggleMinimize(); }} 
-              className="p-3 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition-all text-white absolute top-6 left-6 z-50"
+              className="p-3 bg-black/10 dark:bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md transition-all text-white absolute top-6 left-6 z-50"
               title={t('chat:calls.actions.minimize')}
             >
               <FiMinimize2 size={24} />
@@ -435,7 +435,7 @@ export default function CallOverlay() {
             
             {/* Local Preview (Floating) */}
             {!isMinimized && isVideoCall && (
-              <div className="absolute bottom-24 right-6 w-32 h-48 md:w-48 md:h-72 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-white/20 z-30">
+              <div className="absolute bottom-24 right-6 w-32 h-48 md:w-48 md:h-72 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-black/10 dark:border-white/10 z-30">
                 <video 
                   ref={localVideoRef} 
                   autoPlay 
@@ -466,7 +466,7 @@ export default function CallOverlay() {
                 <button 
                   onClick={handleFlipCamera} 
                   aria-label={t('chat:calls.actions.flip_camera')}
-                  className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/5"
+                  className="w-12 h-12 rounded-full bg-black/10 dark:bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-md border border-text-secondary/10"
                 >
                   <FiRefreshCw size={20} />
                 </button>
@@ -477,7 +477,7 @@ export default function CallOverlay() {
                 <button 
                   onClick={handleToggleScreenShare} 
                   aria-label={isScreenSharing ? t('chat:calls.actions.stop_sharing') : t('chat:calls.actions.share_screen')}
-                  className={`w-12 h-12 rounded-full ${isScreenSharing ? 'bg-blue-500' : 'bg-white/10 hover:bg-white/20'} text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/5`}
+                  className={`w-12 h-12 rounded-full ${isScreenSharing ? 'bg-blue-500' : 'bg-black/10 dark:bg-white/10 hover:bg-white/20'} text-white flex items-center justify-center transition-all backdrop-blur-md border border-text-secondary/10`}
                   title={isScreenSharing ? t('chat:calls.actions.stop_sharing') : t('chat:calls.actions.share_screen')}
                 >
                   <FiMonitor size={20} />
@@ -487,7 +487,7 @@ export default function CallOverlay() {
               <button 
                 onClick={(e) => { e.stopPropagation(); toggleMute(); }}
                 aria-label={isMuted ? t('chat:calls.actions.unmute') : t('chat:calls.actions.mute')}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isMuted ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'} backdrop-blur-md border border-white/10`}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isMuted ? 'bg-white text-black' : 'bg-black/10 dark:bg-white/10 text-white hover:bg-white/20'} backdrop-blur-md border border-text-secondary/10`}
               >
                 {isMuted ? <FiMicOff size={24} /> : <FiMic size={24} />}
               </button>
@@ -496,7 +496,7 @@ export default function CallOverlay() {
                 <button 
                   onClick={(e) => { e.stopPropagation(); toggleVideo(); }}
                   aria-label={isVideoOff ? t('chat:calls.actions.video_on') : t('chat:calls.actions.video_off')}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isVideoOff ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'} backdrop-blur-md border border-white/10`}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isVideoOff ? 'bg-white text-black' : 'bg-black/10 dark:bg-white/10 text-white hover:bg-white/20'} backdrop-blur-md border border-text-secondary/10`}
                 >
                   {isVideoOff ? <FiVideoOff size={24} /> : <FiVideo size={24} />}
                 </button>
@@ -506,7 +506,7 @@ export default function CallOverlay() {
               <button 
                 onClick={handleToggleSpeaker} 
                 aria-label={isSpeakerphone ? t('chat:calls.actions.earpiece') : t('chat:calls.actions.speaker')}
-                className={`w-12 h-12 rounded-full ${isSpeakerphone ? 'bg-white/10' : 'bg-accent'} hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/5`}
+                className={`w-12 h-12 rounded-full ${isSpeakerphone ? 'bg-black/10 dark:bg-white/10' : 'bg-accent'} hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-md border border-text-secondary/10`}
               >
                 {isSpeakerphone ? <FiVolume2 size={20} /> : <FiVolumeX size={20} />}
               </button>

@@ -236,7 +236,7 @@ export default function LazyImage({
             ref={imgRef}
             src={imageUrl}
             alt={alt || "Message attachment"}
-            className={`w-full h-full transition-opacity duration-300 ${decryptionStatus === 'succeeded' ? 'opacity-100' : 'opacity-0'} ${message.fileType === 'image/svg+xml' ? 'object-contain bg-white/5 p-2' : 'object-cover'}`}
+            className={`w-full h-full transition-opacity duration-300 ${decryptionStatus === 'succeeded' ? 'opacity-100' : 'opacity-0'} ${message.fileType === 'image/svg+xml' ? 'object-contain bg-black/5 dark:bg-white/5 p-2' : 'object-cover'}`}
             {...props}
           />
           {decryptionStatus === 'succeeded' && (

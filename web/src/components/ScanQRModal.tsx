@@ -79,7 +79,7 @@ export default function ScanQRModal({ onClose, onScanSuccess }: Props) {
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-bg-surface border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative overflow-hidden"
+          className="bg-bg-surface border border-text-secondary/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative overflow-hidden"
         >
           <button 
             onClick={onClose}
@@ -96,7 +96,7 @@ export default function ScanQRModal({ onClose, onScanSuccess }: Props) {
             <p className="text-xs text-text-secondary mt-1 font-mono">{t('scan.desc')}</p>
           </div>
 
-          <div className="w-full aspect-square bg-black rounded-2xl overflow-hidden relative shadow-inner border-2 border-white/5">
+          <div className="w-full aspect-square bg-black rounded-2xl overflow-hidden relative shadow-inner border-2 border-text-secondary/10">
              {error ? (
                <div className="absolute inset-0 flex items-center justify-center text-red-500 text-sm text-center p-4">
                  {error}

@@ -368,7 +368,7 @@ export default function Login() {
              {/* Option 1: Phrase */}
              <button
                 onClick={() => navigate("/restore", { state: { mode: 'verify' } })}
-                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-white/5 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-text-secondary/10 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
              >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
@@ -385,7 +385,7 @@ export default function Login() {
              {/* Option 2: QR Transfer */}
              <button
                 onClick={() => navigate("/migrate-receive")}
-                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-white/5 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-text-secondary/10 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
              >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
@@ -402,7 +402,7 @@ export default function Login() {
              {/* Option 3: Manual Import */}
              <button
                 onClick={() => vaultInputRef.current?.click()}
-                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-white/5 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-bg-main border border-text-secondary/10 shadow-neu-flat dark:shadow-neu-flat-dark hover:text-accent transition-all group"
              >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
@@ -461,14 +461,14 @@ export default function Login() {
             </button>
           )}
 
-          <div className="text-center mt-8 pt-6 border-t border-white/10 dark:border-white/5">
+          <div className="text-center mt-8 pt-6 border-t border-text-secondary/10 dark:border-white/5">
             <p className="text-text-secondary text-sm mb-4">
               {t('auth:links.no_account')} <Link to="/register" className="font-bold text-accent hover:underline">{t('auth:links.sign_up')}</Link>
             </p>
             <div className="flex justify-center">
               <Link to="/restore" className="text-sm text-accent hover:underline">{t('auth:links.restore')}</Link>
             </div>
-            <div className="mt-4 pt-4 border-t border-white/10 dark:border-white/5">
+            <div className="mt-4 pt-4 border-t border-text-secondary/10 dark:border-white/5">
               <a href="https://nyx-app.my.id/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-text-secondary hover:text-accent transition-colors">{t('common:nav.privacy')} & {t('common:nav.terms')}</a>
             </div>
           </div>
@@ -496,7 +496,7 @@ export default function Login() {
             <div className="w-48 h-48 rounded-full border-4 border-accent/30 flex items-center justify-center">
               <div className="w-32 h-32 rounded-full border-4 border-accent/20 flex items-center justify-center">
                 <div className="w-20 h-20 rounded-full border-4 border-accent/10 flex items-center justify-center shadow-neu-pressed dark:shadow-neu-pressed-dark">
-                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center shadow-[0_0_20px_rgba(var(--accent),0.5)]">
+                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center shadow-neu-icon">
                     <div className="w-6 h-6 rounded-full bg-bg-main animate-pulse opacity-50"></div>
                   </div>
                 </div>

@@ -152,7 +152,7 @@ export default function KeyManagementPage() {
         w-full max-w-2xl relative overflow-hidden
         bg-bg-main rounded-3xl
         shadow-neu-flat-light dark:shadow-neu-flat-dark
-        border border-white/20 dark:border-black/20
+        border border-black/10 dark:border-white/10 dark:border-black/20
       ">
         {/* Vault Header */}
         <div className="bg-bg-surface p-8 border-b border-black/5 dark:border-white/5 relative">
@@ -181,7 +181,7 @@ export default function KeyManagementPage() {
 
           <div className="space-y-6">
             {/* Recovery Option */}
-            <div className="p-6 rounded-2xl bg-bg-main shadow-neu-pressed-light dark:shadow-neu-pressed-dark border border-white/10">
+            <div className="p-6 rounded-2xl bg-bg-main shadow-neu-pressed-light dark:shadow-neu-pressed-dark border border-text-secondary/10">
               <div className="flex items-start gap-4 mb-4">
                  <FiShield className="text-green-500 mt-1" size={20} />
                  <div>

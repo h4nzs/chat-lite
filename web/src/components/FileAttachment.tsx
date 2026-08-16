@@ -379,7 +379,7 @@ export default function FileAttachment({ message, isOwn }: FileAttachmentProps) 
     <a 
       href={decryptedUrl} 
       download={message.fileName || 'download'} 
-      className={`${containerClass} flex items-center gap-3 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.98] transition-all`}
+      className={`${containerClass} flex items-center gap-3 cursor-pointer hover:bg-black/5 dark:hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 active:scale-[0.98] transition-all`}
     >
       <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-full text-gray-500 dark:text-gray-300">
         <FiFile size={20} />

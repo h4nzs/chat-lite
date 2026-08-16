@@ -68,7 +68,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
               bg-bg-main 
               rounded-2xl 
               shadow-neu-flat-light dark:shadow-neu-flat-dark
-              border border-white/20 dark:border-black/20
+              border border-black/10 dark:border-white/10 dark:border-black/20
               flex flex-col max-h-[90vh] overflow-hidden
             "
             onMouseDown={(e) => e.stopPropagation()}
@@ -80,7 +80,7 @@ const ModalBase: React.FC<ModalBaseProps> = ({ isOpen, onClose, title, children,
               bg-bg-main
             ">
               <div className="flex items-center gap-3">
-                <div className="w-1.5 h-4 bg-accent rounded-full shadow-[0_0_8px_rgba(var(--accent),0.6)]"></div>
+                <div className="w-1.5 h-4 bg-accent rounded-full shadow-neu-icon"></div>
                 <h2 id="modal-title" className="text-sm font-black uppercase tracking-widest text-text-primary">
                   {title}
                 </h2>

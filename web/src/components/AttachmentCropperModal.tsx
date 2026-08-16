@@ -46,7 +46,7 @@ export default function AttachmentCropperModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-xl md:p-4 overscroll-none">
-      <div className="relative w-full h-full md:max-w-5xl md:h-[90vh] flex flex-col bg-bg-main md:rounded-3xl overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.8)] border border-white/10">
+      <div className="relative w-full h-full md:max-w-5xl md:h-[90vh] flex flex-col bg-bg-main md:rounded-3xl overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.8)] border border-text-secondary/10">
         {/* Dynamic Image Area */}
         <div className="flex-1 w-full bg-black relative flex items-center justify-center overflow-hidden">
           <Cropper
@@ -63,7 +63,7 @@ export default function AttachmentCropperModal({
         </div>
         
         {/* Responsive Control Bar */}
-        <div className="p-6 bg-bg-surface flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5 pb-safe">
+        <div className="p-6 bg-bg-surface flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-text-secondary/10 pb-safe">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button 
                 onClick={onClose} 
@@ -77,7 +77,7 @@ export default function AttachmentCropperModal({
             <button 
                 onClick={handleRotate} 
                 disabled={isProcessing} 
-                className="flex items-center justify-center gap-2 p-3.5 bg-white/5 text-text-primary rounded-2xl hover:bg-white/10 transition-all flex-1 sm:px-6 font-black uppercase tracking-widest text-xs border border-white/5"
+                className="flex items-center justify-center gap-2 p-3.5 bg-black/5 dark:bg-white/5 text-text-primary rounded-2xl hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 transition-all flex-1 sm:px-6 font-black uppercase tracking-widest text-xs border border-text-secondary/10"
             >
                 <FiRotateCw size={18} /> {t('modals:editor.rotate', 'Rotate')}
             </button>
@@ -91,7 +91,7 @@ export default function AttachmentCropperModal({
             className="
                 w-full sm:w-auto px-10 py-3.5 bg-accent text-white rounded-2xl 
                 hover:scale-105 active:scale-95 transition-all 
-                shadow-[0_15px_35px_rgba(var(--accent),0.5)]
+                shadow-neu-icon
                 font-black uppercase tracking-tighter text-sm
                 disabled:opacity-50 disabled:grayscale
             "

@@ -187,7 +187,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
           <a
             href={decryptedUrl}
             download={message.fileName || 'download'}
-            className="text-white/80 hover:text-white transition-all p-2 bg-white/5 hover:bg-white/10 rounded-full active:scale-95"
+            className="text-white/80 hover:text-white transition-all p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 rounded-full active:scale-95"
             onClick={(e) => e.stopPropagation()}
             title={t('media.download', 'Download')}
           >
@@ -195,7 +195,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
           </a>
         )}
         <button
-          className="text-white/80 hover:text-white transition-all p-2 bg-white/5 hover:bg-white/10 rounded-full active:scale-95"
+          className="text-white/80 hover:text-white transition-all p-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 rounded-full active:scale-95"
           onClick={handleClose}
         >
           <FiX size={24} />
@@ -212,7 +212,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
           isVideo ? (
             <video src={decryptedUrl} autoPlay controls playsInline className="max-w-full max-h-[90vh] shadow-2xl rounded-lg outline-none bg-black" onEnded={handleClose} />
           ) : isAudio ? (
-             <div className="bg-bg-surface p-8 rounded-3xl flex flex-col items-center justify-center gap-6 border border-white/10 shadow-2xl min-w-[280px]">
+             <div className="bg-bg-surface p-8 rounded-3xl flex flex-col items-center justify-center gap-6 border border-text-secondary/10 shadow-2xl min-w-[280px]">
                 <div className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center relative">
                    <div className="absolute inset-0 rounded-full border-4 border-accent animate-ping opacity-50"></div>
                    <span className="text-4xl text-accent">🎵</span>
@@ -224,7 +224,7 @@ export default function Lightbox({ message, onClose }: LightboxProps) {
             <img 
               src={decryptedUrl} 
               alt={message.fileName || t('media.lightbox_view')} 
-              className={`object-contain max-w-full max-h-[90vh] select-none shadow-2xl rounded-lg ${message.fileType === 'image/svg+xml' ? 'bg-white/5 p-4' : ''}`} 
+              className={`object-contain max-w-full max-h-[90vh] select-none shadow-2xl rounded-lg ${message.fileType === 'image/svg+xml' ? 'bg-black/5 dark:bg-white/5 p-4' : ''}`} 
               onError={() => { setError(t('media.load_failed')); setIsLoading(false); }} 
             />
           )

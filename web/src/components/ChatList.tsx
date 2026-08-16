@@ -87,7 +87,7 @@ const UserProfile = memo(function UserProfile() {
             onClick={() => setPrivacyCloak(!privacyCloak)}
             className={clsx(
               "p-2.5 rounded-xl transition-all shadow-neumorphic-concave focus:outline-none",
-              privacyCloak ? "text-accent bg-white/5" : "text-text-secondary hover:text-accent hover:bg-white/5"
+              privacyCloak ? "text-accent bg-black/5 dark:bg-white/5" : "text-text-secondary hover:text-accent hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5"
             )}
             title={t('common:actions.toggle_cloak', 'Toggle Privacy Cloak')}
             aria-label={t('common:actions.toggle_cloak', 'Toggle Privacy Cloak')}
@@ -269,7 +269,7 @@ const ConversationItem = memo(function ConversationItem({
         'relative mx-4 my-3 rounded-2xl p-1 transition-all duration-200 select-none group',
         isActive 
           ? 'bg-bg-main shadow-neu-pressed dark:shadow-neu-pressed-dark border border-transparent' 
-          : 'bg-bg-main shadow-neu-flat dark:shadow-neu-flat-dark border border-white/50 dark:border-white/5 active:scale-[0.98]'
+          : 'bg-bg-main shadow-neu-flat dark:shadow-neu-flat-dark border border-text-secondary/10 dark:border-white/5 active:scale-[0.98]'
       )}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}

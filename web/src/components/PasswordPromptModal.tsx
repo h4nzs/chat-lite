@@ -104,17 +104,17 @@ export default function PasswordPromptModal() {
       onClick={handleCancel}
     >
       <div 
-        className="bg-[#1f2937] border-2 border-gray-700 rounded-lg p-8 w-full max-w-md mx-4 shadow-2xl"
+        className="bg-bg-surface rounded-2xl p-8 w-full max-w-md mx-4 border border-text-secondary/10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-gray-800 border-2 border-orange-500 flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-full bg-bg-main border-2 border-orange-500 flex items-center justify-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">{t('modals:password_prompt.title')}</h2>
-          <p className="text-gray-400 text-sm">{t('modals:password_prompt.desc')}</p>
+          <h2 className="text-2xl font-bold text-text-primary mb-2">{t('modals:password_prompt.title')}</h2>
+          <p className="text-text-secondary text-sm">{t('modals:password_prompt.desc')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -130,12 +130,12 @@ export default function PasswordPromptModal() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className="w-full bg-[#111827] border-2 border-gray-700 rounded-lg py-4 px-4 pr-12 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all duration-300 disabled:opacity-50"
+              className="w-full bg-bg-main border-2 border-text-secondary/10 rounded-xl py-4 px-4 pr-12 text-text-primary focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all duration-300 disabled:opacity-50"
               placeholder={t('modals:password_prompt.placeholder')}
               autoFocus
             />
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
             </div>
@@ -144,9 +144,9 @@ export default function PasswordPromptModal() {
           {hasBioVault && (
             <div className="flex flex-col gap-2">
               <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-700"></div>
-                <span className="flex-shrink-0 mx-4 text-gray-500 text-xs uppercase tracking-wider">{t('common:words.or')}</span>
-                <div className="flex-grow border-t border-gray-700"></div>
+                <div className="flex-grow border-t border-text-secondary/10"></div>
+                <span className="flex-shrink-0 mx-4 text-text-secondary text-xs uppercase tracking-wider">{t('common:words.or')}</span>
+                <div className="flex-grow border-t border-text-secondary/10"></div>
               </div>
               <button
                 type="button"
@@ -165,14 +165,14 @@ export default function PasswordPromptModal() {
               type="button"
               onClick={handleCancel}
               disabled={isLoading}
-              className="py-3 px-4 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 transition-all duration-300 disabled:opacity-50"
+              className="py-3 px-4 rounded-xl bg-bg-main text-text-primary border border-text-secondary/10 hover:bg-bg-surface transition-all duration-300 disabled:opacity-50"
             >
               {t('common:actions.abort')}
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="py-3 px-4 rounded-lg bg-orange-600 text-white hover:bg-orange-700 shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="py-3 px-4 rounded-xl bg-orange-600 text-white hover:bg-orange-700 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -186,8 +186,8 @@ export default function PasswordPromptModal() {
           </div>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-gray-800">
-          <div className="flex justify-between text-xs text-gray-500">
+        <div className="mt-6 pt-4 border-t border-text-secondary/10">
+          <div className="flex justify-between text-xs text-text-secondary">
             <span>{t('modals:password_prompt.vault_id')}</span>
             <span>{t('modals:password_prompt.status_locked')}</span>
           </div>

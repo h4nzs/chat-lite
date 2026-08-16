@@ -108,7 +108,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
       <h2 className="text-xl font-black uppercase tracking-wide text-text-primary text-center mb-2">{t('modals:recovery.step2_title')}</h2>
       <p className="text-xs text-text-secondary text-center mb-6 font-mono">{t('modals:recovery.step2_desc')}</p>
       
-      <div className="relative bg-bg-main p-6 rounded-2xl shadow-neumorphic-concave mb-6 border border-white/5 min-h-[200px]">
+      <div className="relative bg-bg-main p-6 rounded-2xl shadow-neumorphic-concave mb-6 border border-text-secondary/10 min-h-[200px]">
         {/* Content Layer */}
         <div className={`grid grid-cols-3 gap-3 transition-all duration-300 ${!showPhrase ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {words.length === 0 && showPhrase && (
@@ -117,7 +117,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
              </div>
           )}
           {words.map((word, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 rounded bg-black/5 dark:bg-white/5 border border-white/10">
+            <div key={index} className="flex items-center gap-2 p-2 rounded bg-black/5 dark:bg-white/5 border border-text-secondary/10">
                <span className="text-[10px] text-text-secondary font-mono w-4 select-none">{index + 1}.</span>
                <span className="text-sm font-bold text-gray-900 dark:text-gray-100 tracking-wide select-all">{word}</span>
             </div>
@@ -134,7 +134,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
                 flex items-center gap-2 px-6 py-3 rounded-full 
                 bg-bg-surface text-text-primary font-bold text-sm
                 shadow-neumorphic-convex active:shadow-neumorphic-pressed
-                transition-all border border-white/5 hover:scale-105
+                transition-all border border-text-secondary/10 hover:scale-105
               "
             >
               <FiEye /> {t('modals:recovery.button_reveal')}
@@ -184,7 +184,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
       <div className="
         bg-bg-main p-4 rounded-xl shadow-neumorphic-concave
         min-h-[100px] mb-6 font-mono text-sm text-center flex flex-wrap gap-2 justify-center items-center
-        border border-white/5
+        border border-text-secondary/10
       ">
         {selectedIndices.length === 0 && <span className="text-text-secondary/40">{t('modals:recovery.select_words')}</span>}
         {selectedIndices.map((origIdx) => (
@@ -231,7 +231,7 @@ export default function RecoveryPhraseModal({ phrase, onClose }: RecoveryPhraseM
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-surface p-8 rounded-3xl shadow-neumorphic-convex w-full max-w-md relative border border-white/10">
+      <div className="bg-bg-surface p-8 rounded-3xl shadow-neumorphic-convex w-full max-w-md relative border border-text-secondary/10">
         <button 
           onClick={onClose} 
           className="absolute top-4 right-4 p-2 rounded-full text-text-secondary shadow-neumorphic-convex active:shadow-neumorphic-pressed hover:text-red-500 transition-all"

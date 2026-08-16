@@ -130,7 +130,7 @@ const ChatHeader = ({ conversation, onBack, onInfoToggle, onMenuClick }: { conve
     <div className="
       flex items-center justify-between px-4 py-3 z-30
       bg-bg-main
-      border-b border-white/10
+      border-b border-text-secondary/10
       shadow-[0_1px_0_rgba(255,255,255,0.05)] dark:shadow-[0_1px_0_rgba(0,0,0,0.2)]
       relative
     ">
@@ -490,9 +490,9 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
           return (
             <>
               {isSelectionMode ? (
-                  <div className="h-16 flex items-center justify-between px-4 bg-accent/10 border-b border-white/5 backdrop-blur-md z-30">
+                  <div className="h-16 flex items-center justify-between px-4 bg-accent/10 border-b border-text-secondary/10 backdrop-blur-md z-30">
                       <div className="flex items-center gap-4">
-                          <button onClick={clearMessageSelection} aria-label={t('common:actions.cancel_bracket')} className="p-2 hover:bg-white/10 rounded-full transition-colors text-text-secondary hover:text-white">
+                          <button onClick={clearMessageSelection} aria-label={t('common:actions.cancel_bracket')} className="p-2 hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 rounded-full transition-colors text-text-secondary hover:text-text-primary">
                               <FiX size={20} />
                           </button>
                           <span className="font-bold text-lg text-accent tracking-wide">{t('messages.selected_count', { count: selectedMessageIds.length })}</span>
@@ -544,7 +544,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                     >
                       <div className="
                         px-4 py-2 rounded-full
-                        bg-bg-surface/80 backdrop-blur-md border border-white/10
+                        bg-bg-surface/80 backdrop-blur-md border border-text-secondary/10
                         shadow-neumorphic-convex
                         flex items-center gap-3
                       ">
@@ -567,7 +567,7 @@ export default function ChatWindow({ id, onMenuClick }: { id: string, onMenuClic
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       onClick={scrollToBottom}
-                      className="absolute bottom-4 right-6 z-20 p-3 rounded-full bg-bg-surface/80 backdrop-blur-md border border-white/10 shadow-neumorphic-convex text-text-primary hover:text-accent transition-colors"
+                      className="absolute bottom-4 right-6 z-20 p-3 rounded-full bg-bg-surface/80 backdrop-blur-md border border-text-secondary/10 shadow-neumorphic-convex text-text-primary hover:text-accent transition-colors"
                       aria-label="Scroll to bottom"
                     >
                       <FiChevronDown size={20} />

@@ -245,7 +245,7 @@ export default function Register() {
               <button
                 onClick={handleBiometricRegister}
                 disabled={isVerifyingBio || miningStatus !== 'idle'}
-                className="w-full p-4 rounded-xl bg-bg-main border border-white/5 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50"
+                className="w-full p-4 rounded-xl bg-bg-main border border-text-secondary/10 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50"
               >
                 <div className="p-3 bg-accent/10 text-accent rounded-full group-hover:bg-accent group-hover:text-white transition-colors">
                   {isVerifyingBio ? <Spinner size="sm" /> : <FiZap size={24} />}
@@ -261,7 +261,7 @@ export default function Register() {
             <button
               onClick={handleProofOfWork}
               disabled={miningStatus !== 'idle' || isVerifyingBio}
-              className="w-full p-4 rounded-xl bg-bg-main border border-white/5 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50"
+              className="w-full p-4 rounded-xl bg-bg-main border border-text-secondary/10 shadow-neu-flat hover:border-accent/50 transition-all text-left flex items-start gap-4 group disabled:opacity-50"
             >
               <div className="p-3 bg-blue-500/10 text-blue-500 rounded-full group-hover:bg-blue-500 group-hover:text-white transition-colors">
                 {miningStatus === 'idle' ? <FiCpu size={24} /> : <Spinner size="sm" />}

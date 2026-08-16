@@ -23,7 +23,7 @@ const NewMessageToast = ({ t, senderName, senderAvatar, message, conversationId 
     <div
       className={`
         max-w-md w-full bg-gray-900/80 backdrop-blur-lg shadow-lg rounded-full 
-        pointer-events-auto flex ring-1 ring-white/10 transition-all duration-300 ease-in-out
+        pointer-events-auto flex ring-1 ring-text-secondary/20 transition-all duration-300 ease-in-out
         ${t.visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}
       `}
       onClick={handleClick}

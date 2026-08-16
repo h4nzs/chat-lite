@@ -164,13 +164,13 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-bg-main text-text-primary p-8 font-mono overflow-y-auto">
-      <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
+      <div className="flex items-center justify-between mb-6 border-b border-text-secondary/10 pb-4">
         <h1 className="text-2xl text-accent tracking-widest font-bold">
           NYX MISSION CONTROL
         </h1>
         <button 
           onClick={loadAllData} 
-          className="p-2 hover:bg-white/5 rounded-full text-text-secondary transition-colors"
+          className="p-2 hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 rounded-full text-text-secondary transition-colors"
           title="Refresh Data"
         >
           <FiRefreshCw size={20} />
@@ -180,13 +180,13 @@ export default function AdminDashboard() {
       <div className="flex gap-4 mb-8">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'dashboard' ? 'bg-accent text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
+          className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'dashboard' ? 'bg-accent text-white' : 'bg-black/5 dark:bg-white/5 text-text-secondary hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10'}`}
         >
           {t('system_dashboard', 'SYSTEM DASHBOARD')}
         </button>
         <button
           onClick={() => setActiveTab('tenants')}
-          className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'tenants' ? 'bg-accent text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
+          className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'tenants' ? 'bg-accent text-white' : 'bg-black/5 dark:bg-white/5 text-text-secondary hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10'}`}
         >
           {t('b2b_tenants', 'B2B ENGINE / TENANTS')}
         </button>
@@ -196,12 +196,12 @@ export default function AdminDashboard() {
         <>
           {/* Grid Statistik */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+            <div className="bg-bg-surface p-6 rounded-xl border border-text-secondary/10 shadow-lg">
               <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">VPS RAM USAGE</h3>
               <p className="text-xl font-bold">{metrics?.vps.ramUsage}</p>
               <p className="text-xs text-text-secondary mt-2">Uptime: {metrics?.vps.uptime}</p>
             </div>
-            <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+            <div className="bg-bg-surface p-6 rounded-xl border border-text-secondary/10 shadow-lg">
               <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">ACTIVE DATABASE</h3>
               <div className="flex justify-between items-end">
                  <div>
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
                  </div>
               </div>
             </div>
-            <div className="bg-bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+            <div className="bg-bg-surface p-6 rounded-xl border border-text-secondary/10 shadow-lg">
               <h3 className="text-xs font-bold opacity-50 mb-2 tracking-wider">R2 STORAGE</h3>
               <p className="text-2xl font-bold text-blue-400">{metrics?.storage.totalSizeMB}</p>
               <p className="text-xs text-text-secondary mt-2">{metrics?.storage.totalFiles} Files</p>
@@ -243,8 +243,8 @@ export default function AdminDashboard() {
 
             {/* Banned Users List */}
             <div className="lg:col-span-2">
-              <div className="bg-bg-surface rounded-xl border border-white/10 shadow-lg overflow-hidden flex flex-col h-[500px]">
-                <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+              <div className="bg-bg-surface rounded-xl border border-text-secondary/10 shadow-lg overflow-hidden flex flex-col h-[500px]">
+                <div className="p-4 border-b border-text-secondary/10 bg-black/5 dark:bg-white/5 flex justify-between items-center">
                   <h3 className="font-bold text-sm tracking-wider">{t('suspended_accounts', 'SUSPENDED ACCOUNTS')} ({bannedUsers.length})</h3>
                 </div>
                 
@@ -256,15 +256,15 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     bannedUsers.map(bannedUser => (
-                      <div key={bannedUser.id} className="bg-bg-main p-4 rounded-lg border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div key={bannedUser.id} className="bg-bg-main p-4 rounded-lg border border-text-secondary/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-red-400">@{bannedUser.username}</span>
-                            <span className="text-xs text-text-secondary bg-white/5 px-2 py-0.5 rounded">{bannedUser.email}</span>
+                            <span className="text-xs text-text-secondary bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{bannedUser.email}</span>
                           </div>
                           <div className="text-xs text-text-secondary font-mono mb-1">ID: {bannedUser.id}</div>
                           <div className="text-xs text-text-secondary">
-                            <span className="opacity-60">{t('reason', 'Reason:')}</span> <span className="italic text-white/80">&quot;{bannedUser.banReason}&quot;</span>
+                            <span className="opacity-60">{t('reason', 'Reason:')}</span> <span className="italic text-text-secondary">&quot;{bannedUser.banReason}&quot;</span>
                           </div>
                           <div className="text-[10px] text-text-secondary mt-1 opacity-50">
                             {t('banned', 'Banned:')} {new Date(bannedUser.bannedAt).toLocaleString()}
@@ -293,7 +293,7 @@ export default function AdminDashboard() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <div className="bg-bg-surface p-8 rounded-xl border border-white/10 shadow-lg">
+            <div className="bg-bg-surface p-8 rounded-xl border border-text-secondary/10 shadow-lg">
               <h2 className="text-lg text-accent mb-6 font-bold flex items-center gap-2">
                 {t('add_tenant', 'ADD TENANT')}
               </h2>
@@ -329,8 +329,8 @@ export default function AdminDashboard() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-bg-surface rounded-xl border border-white/10 shadow-lg overflow-hidden flex flex-col h-[500px]">
-              <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+            <div className="bg-bg-surface rounded-xl border border-text-secondary/10 shadow-lg overflow-hidden flex flex-col h-[500px]">
+              <div className="p-4 border-b border-text-secondary/10 bg-black/5 dark:bg-white/5 flex justify-between items-center">
                 <h3 className="font-bold text-sm tracking-wider">{t('b2b_tenants', 'B2B TENANTS')} ({tenants.length})</h3>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -344,7 +344,7 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   tenants.map(tenant => (
-                    <div key={tenant.id} className="bg-bg-main p-4 rounded-lg border border-white/5 flex flex-col gap-3">
+                    <div key={tenant.id} className="bg-bg-main p-4 rounded-lg border border-text-secondary/10 flex flex-col gap-3">
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-bold text-lg">{tenant.name}</h4>
@@ -366,7 +366,7 @@ export default function AdminDashboard() {
                         <span className="text-text-secondary text-xs uppercase tracking-wider block mb-1">{t('allowed_domains', 'Allowed Domains')}:</span>
                         <div className="flex flex-wrap gap-2">
                           {tenant.allowedDomains.length > 0 ? tenant.allowedDomains.map(d => (
-                            <span key={d} className="bg-white/5 px-2 py-1 rounded text-xs">{d}</span>
+                            <span key={d} className="bg-black/5 dark:bg-white/5 px-2 py-1 rounded text-xs">{d}</span>
                           )) : <span className="text-text-secondary italic text-xs">None</span>}
                         </div>
                       </div>
@@ -379,7 +379,7 @@ export default function AdminDashboard() {
                           </code>
                           <button
                             onClick={() => copyApiKey(tenant.apiKey)}
-                            className="bg-white/5 hover:bg-white/10 p-2 rounded transition-colors text-text-secondary hover:text-white"
+                            className="bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 p-2 rounded transition-colors text-text-secondary hover:text-white"
                             title="Copy API Key"
                           >
                             <FiCopy />

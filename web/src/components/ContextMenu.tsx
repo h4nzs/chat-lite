@@ -79,7 +79,7 @@ export default function ContextMenu() {
           style={{ top: position.top, left: position.left }}
           className="fixed z-[100] min-w-[200px] flex flex-col rounded-2xl
                      bg-bg-main/80 backdrop-blur-xl
-                     border border-white/20 dark:border-white/10
+                     border border-black/10 dark:border-white/10 dark:border-white/10
                      shadow-[0_8px_32px_rgba(0,0,0,0.25)]
                      dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                      overflow-hidden"
@@ -91,10 +91,10 @@ export default function ContextMenu() {
                animate={{ height: 'auto', opacity: 1 }} 
                className="flex flex-col"
             >
-               <div className="flex items-center p-2 border-b border-white/10 bg-secondary/30">
+               <div className="flex items-center p-2 border-b border-text-secondary/10 bg-secondary/30">
                   <button 
                      onClick={() => setShowAllEmojis(false)}
-                     className="p-2 rounded-full hover:bg-white/10 text-text-secondary transition-colors"
+                     className="p-2 rounded-full hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 text-text-secondary transition-colors"
                   >
                      <FiChevronLeft size={18} />
                   </button>
@@ -140,7 +140,7 @@ export default function ContextMenu() {
                   {/* EXPAND BUTTON */}
                   <button
                     onClick={() => setShowAllEmojis(true)}
-                    className="p-2.5 rounded-full hover:bg-white/10 hover:scale-110 active:scale-95 transition-all text-text-secondary shadow-neumorphic-convex-sm flex items-center justify-center ml-1 bg-white/5"
+                    className="p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 hover:scale-110 active:scale-95 transition-all text-text-secondary shadow-neumorphic-convex-sm flex items-center justify-center ml-1 bg-black/5 dark:bg-white/5"
                     title={t('common:actions.more_reactions', 'More Reactions')}
                     aria-label={t('common:actions.more_reactions', 'More Reactions')}
                   >
@@ -162,7 +162,7 @@ export default function ContextMenu() {
                       "flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors",
                       option.destructive
                         ? "text-red-500 hover:bg-red-500/10"
-                        : "text-text-primary hover:bg-white/10 dark:hover:bg-white/5"
+                        : "text-text-primary hover:bg-black/10 dark:hover:bg-black/10 dark:bg-white/10 dark:hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5"
                     )}
                   >
                     {option.icon && <span className="opacity-80">{option.icon}</span>}

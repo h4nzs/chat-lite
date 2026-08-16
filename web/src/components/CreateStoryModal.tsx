@@ -30,12 +30,12 @@ const ContactItem = ({ contact, isSelected, onToggle }: { contact: { id: string;
   const avatarUrl = profile?.avatarUrl || contact.avatarUrl;
 
   return (
-    <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group">
+    <label className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 cursor-pointer transition-colors group">
       <div className="flex items-center gap-3">
         {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full border border-white/10 group-hover:border-accent/50 transition-colors object-cover" />
+          <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full border border-text-secondary/10 group-hover:border-accent/50 transition-colors object-cover" />
         ) : (
-          <DefaultAvatar name={name} id={contact.id} className="w-9 h-9 border border-white/10 group-hover:border-accent/50 transition-colors" />
+          <DefaultAvatar name={name} id={contact.id} className="w-9 h-9 border border-text-secondary/10 group-hover:border-accent/50 transition-colors" />
         )}
         <span className="text-sm font-medium text-text-primary">{name}</span>
       </div>
@@ -161,7 +161,7 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
                </div>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 rounded-xl hover:border-accent/50 hover:bg-accent/5 transition-all cursor-pointer">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-text-secondary/10 rounded-xl hover:border-accent/50 hover:bg-accent/5 transition-all cursor-pointer">
               <FiImage size={32} className="text-text-secondary mb-2" />
               <span className="text-sm text-text-secondary">{t('modals:create_story.add_media')}</span>
               <input type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
@@ -170,7 +170,7 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
 
           <textarea
             placeholder={t('modals:create_story.placeholder')}
-            className="w-full p-4 bg-bg-surface border border-white/5 rounded-xl shadow-neu-inner text-text-primary focus:outline-none focus:ring-1 focus:ring-accent resize-none h-24"
+            className="w-full p-4 bg-bg-surface border border-text-secondary/10 rounded-xl shadow-neu-inner text-text-primary focus:outline-none focus:ring-1 focus:ring-accent resize-none h-24"
             value={text}
             onChange={e => setText(e.target.value)}
           />
@@ -179,7 +179,7 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
             <button 
               type="button"
               onClick={() => setShowPrivacySettings(true)}
-              className="flex items-center justify-center gap-2 text-xs bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-text-secondary transition-colors mb-4 mx-auto backdrop-blur-md border border-white/5 shadow-sm"
+              className="flex items-center justify-center gap-2 text-xs bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 px-4 py-2 rounded-full text-text-secondary transition-colors mb-4 mx-auto backdrop-blur-md border border-text-secondary/10 shadow-sm"
             >
               <FiLock size={14} className="text-accent" />
               <span className="font-medium">
@@ -192,7 +192,7 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
             <button 
               type="submit" 
               disabled={useStoryStore(state => state.isLoading)}
-              className="w-full py-3 bg-accent text-white font-bold rounded-xl shadow-[0_0_15px_rgba(var(--accent),0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-accent text-white font-bold rounded-xl shadow-neu-icon hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               {t('modals:create_story.post_button')}
             </button>
@@ -219,35 +219,35 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
 
       {showPrivacySettings && (
         <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-bg-main w-full max-w-sm rounded-3xl border border-white/10 flex flex-col max-h-[85vh] shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-black/20">
+          <div className="bg-bg-main w-full max-w-sm rounded-3xl border border-text-secondary/10 flex flex-col max-h-[85vh] shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-text-secondary/10 flex justify-between items-center bg-black/20">
               <div className="flex items-center gap-2">
                 <FiUsers className="text-accent" size={20} />
                 <h3 className="font-bold text-text-primary text-lg">{t('modals:create_story.privacy.label')}</h3>
               </div>
-              <button onClick={() => setShowPrivacySettings(false)} className="text-text-secondary hover:text-white p-1 bg-white/5 rounded-full transition-colors">
+              <button onClick={() => setShowPrivacySettings(false)} className="text-text-secondary hover:text-text-primary p-1 bg-black/5 dark:bg-white/5 rounded-full transition-colors">
                 <FiX size={18} />
               </button>
             </div>
             
             <div className="p-2 flex flex-col overflow-y-auto custom-scrollbar">
               <div className="p-3 space-y-4">
-                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors border border-transparent hover:border-text-secondary/10">
                   <span className="text-text-primary font-medium">{t('modals:create_story.privacy.option_all')}</span>
                   <input type="radio" name="privacy" checked={privacyMode === 'ALL'} onChange={() => { setPrivacyMode('ALL'); setSelectedUsers([]); }} className="accent-accent w-5 h-5" />
                 </label>
-                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors border border-transparent hover:border-text-secondary/10">
                   <span className="text-text-primary font-medium">{t('modals:create_story.privacy.option_exclude')}</span>
                   <input type="radio" name="privacy" checked={privacyMode === 'EXCLUDE'} onChange={() => { setPrivacyMode('EXCLUDE'); setSelectedUsers([]); }} className="accent-accent w-5 h-5" />
                 </label>
-                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                <label className="flex items-center justify-between cursor-pointer p-3 rounded-xl hover:bg-black/5 dark:hover:bg-black/5 dark:bg-white/5 transition-colors border border-transparent hover:border-text-secondary/10">
                   <span className="text-text-primary font-medium">{t('modals:create_story.privacy.option_only')}</span>
                   <input type="radio" name="privacy" checked={privacyMode === 'ONLY'} onChange={() => { setPrivacyMode('ONLY'); setSelectedUsers([]); }} className="accent-accent w-5 h-5" />
                 </label>
               </div>
 
               {privacyMode !== 'ALL' && (
-                <div className="mt-2 border-t border-white/5 pt-4 px-3">
+                <div className="mt-2 border-t border-text-secondary/10 pt-4 px-3">
                   <p className="text-[11px] font-bold text-text-secondary mb-3 uppercase tracking-wider px-2">{t('modals:create_story.privacy.select_contacts')}</p>
                   <div className="space-y-1">
                     {contacts.map((contact: { id: string; encryptedProfile?: string; username?: string; avatarUrl?: string; [key: string]: unknown }) => (
@@ -264,7 +264,7 @@ export default function CreateStoryModal({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-black/40">
+            <div className="p-4 border-t border-text-secondary/10 bg-black/40">
               <button onClick={() => setShowPrivacySettings(false)} className="w-full bg-accent text-white py-3.5 rounded-2xl font-bold shadow-neu-pressed hover:scale-[1.02] active:scale-95 transition-all">
                 {t('modals:create_story.privacy.save')}
               </button>
