@@ -128,6 +128,31 @@ router.put('/me',
 
       if (encryptedProfile !== undefined && (!existingUser || encryptedProfile !== existingUser.encryptedProfile)) {
         await emitEventToUser(userId, 'user:updated', { id: updatedUser.id as UserId, encryptedProfile: updatedUser.encryptedProfile })
+
+        // BUGFIX: profile update hanya dikirim ke diri sendiri, sehingga kontak lain
+        // di chatlist/header tidak pernah melihat nama/avatar baru sampai mereka
+        // menerima pesan baru (yang menyertakan encryptedProfile terbaru).
+        // Broadcast ke semua pengguna yang berbagi percakapan dengan user ini.
+        try {
+          const memberships = await prisma.userHiddenConversation.findMany({
+            where: { userId },
+            select: { conversationId: true }
+          })
+          const convIds = memberships.map(m => m.conversationId)
+          if (convIds.length > 0) {
+            const peers = await prisma.userHiddenConversation.findMany({
+              where: { conversationId: { in: convIds }, userId: { not: userId } },
+              select: { userId: true },
+              distinct: ['userId']
+            })
+            const peerPayload = { id: updatedUser.id as UserId, encryptedProfile: updatedUser.encryptedProfile }
+            for (const p of peers) {
+              await emitEventToUser(p.userId, 'user:updated', peerPayload)
+            }
+          }
+        } catch (broadcastErr) {
+          console.warn('[Profile] Failed to broadcast profile update to peers:', broadcastErr)
+        }
       }
 
       res.json(updatedUser)

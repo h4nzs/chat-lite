@@ -28,7 +28,11 @@ async function doSyncMessages() {
     const messageStore = useMessageStore.getState();
     for (const conv of conversations) {
       if (conv.id.startsWith('burner_')) continue;
-      if (conv.isGroup && !conv.decryptedMetadata) continue;
+      // BUGFIX: sebelumnya percakapan grup dengan metadata yang belum terdekripsi
+      // di-skip, sehingga pesan grup yang masuk saat offline tidak pernah diambil
+      // saat reconnect. loadMessagesForConversation memproses control message
+      // (GROUP_KEY_DISTRIBUTION / METADATA_UPDATED) lebih dulu, jadi kunci + metadata
+      // akan terpasang sebelum pesan didekripsi.
       await messageStore.loadMessagesForConversation(conv.id);
     }
     // Kirim pesan offline yang tertahan (idempotent, self-guarded)

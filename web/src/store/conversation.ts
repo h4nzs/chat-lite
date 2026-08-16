@@ -267,6 +267,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
                      if (Array.isArray(metaParticipants) && metaParticipants.length > 0) {
                          import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(c.id, metaParticipants));
                      }
+                     // BUGFIX: persist decryptedMetadata ke Shadow Vault agar reload berikutnya
+                     // memakai cache (ratchet sender-key sudah maju lewat N=0; dekripsi ulang
+                     // metadata dari N=0 akan gagal → "Unknown Group" + pesan hilang).
+                     import('@lib/shadowVaultDb').then(m => m.shadowVault.saveConversation({ ...c, decryptedMetadata } as Conversation).catch(() => {}));
                  }
              } catch (e) {
                  console.warn("Failed to decrypt metadata for group", e);
@@ -557,6 +561,10 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
     (async () => {
       const { useMessageStore } = await import('./message');
       useMessageStore.getState().clearMessagesForConversation(conversationId);
+      // Persist penghapusan ke Shadow Vault agar percakapan tidak "hidup kembali"
+      // saat reload (loadConversations membaca dari IndexedDB).
+      const { shadowVault } = await import('@lib/shadowVaultDb');
+      await shadowVault.deleteConversation(conversationId);
     })();
 
     set(state => {

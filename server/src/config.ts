@@ -18,8 +18,9 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 }
 
 // Warn if CSRF_SECRET is not explicitly set (recommended for defense in depth)
-if (!process.env.CSRF_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️  CSRF_SECRET not set. Falling back to JWT_SECRET for CSRF protection. For better security isolation, set CSRF_SECRET to an independent random value.');
+const csrfSecretRaw = (process.env.CSRF_SECRET || '').trim();
+if (!csrfSecretRaw && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️  CSRF_SECRET not set (or empty). Falling back to JWT_SECRET for CSRF protection. For better security isolation, set CSRF_SECRET to an independent random value in your PRODUCTION .env file (the one copied over server/.env on deploy).');
 }
 
 export const env = {
@@ -38,7 +39,7 @@ export const env = {
     }
     return 'dev-secret'
   })(),
-  csrfSecret: process.env.CSRF_SECRET || process.env.JWT_SECRET || (() => {
+  csrfSecret: csrfSecretRaw || process.env.JWT_SECRET || (() => {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('CSRF_SECRET is required in production environment')
     }

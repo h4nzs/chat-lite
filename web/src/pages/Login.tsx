@@ -182,32 +182,48 @@ export default function Login() {
         useAuthStore.getState().setAccessToken(result.accessToken);
         useAuthStore.getState().setUser(result.user);
 
+        // BUGFIX (isUnlocking): tahan modal "New Device Detected" selama proses
+        // dekripsi/regenerasi kunci biometric yang lambat berlangsung — sama seperti
+        // jalur password. Tanpa ini modal recovery muncul (flash) sebelum kunci settle.
+        useAuthStore.setState({ isUnlocking: true });
+
+        try {
         // E. MAGIC UNLOCK: Jika PRF berhasil membuka Recovery Phrase
         if (recoveryPhrase) {
-            // Kita punya Phrase! Kita bisa regenerasi semua kunci tanpa password user.
-            // Buat password sementara untuk sesi lokal ini agar bisa disimpan di IDB
+            // Kita punya Phrase! Regenerasi kunci dari phrase ke MEMORI saja —
+            // JANGAN menimpa bundle terenkripsi-password di IndexedDB. Sebelumnya
+            // bundle IDB ditimpa dengan kunci acak (sessionPassword), sehingga
+            // unlock via PASSWORD menjadi gagal ("incorrect") setelah unlock biometric.
             const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
-            const sessionPassword = sodium.to_hex(sodium.randombytes_buf(16)); 
-            
+            const sessionPassword = sodium.to_hex(sodium.randombytes_buf(16));
+
             // Regenerasi bundle kunci dari phrase
             const { encryptedPrivateKeys } = await restoreFromPhrase(recoveryPhrase, sessionPassword);
-            
-            // Simpan ke IDB
-            await saveEncryptedKeys(encryptedPrivateKeys);
-            await saveDeviceAutoUnlockKey(sessionPassword);
-            await setDeviceAutoUnlockReady(true);
-            
-            toast.success(t('auth:status.vault_unlocked'));
+            const dec = await retrievePrivateKeys(encryptedPrivateKeys, sessionPassword);
+
+            if (dec.success) {
+              // Set kunci di RAM (hasRestoredKeys = true) tanpa menyentuh IDB.
+              await useAuthStore.getState().setDecryptedKeys(dec.keys);
+              toast.success(t('auth:status.vault_unlocked'));
+            }
         } else if (result.encryptedPrivateKey) {
             // Fallback: Jika PRF tidak jalan/tidak disetup, pakai bundle dari server (tapi masih terkunci password)
             const { saveEncryptedKeys } = await import("@lib/keyStorage");
             await saveEncryptedKeys(result.encryptedPrivateKey);
         }
 
-        // Try auto-unlock (akan sukses jika PRF jalan tadi)
-        // Ini secara internal akan memanggil setHasRestoredKeys(true) jika berhasil
+        // Jika biometric sudah membuka kunci (hasRestoredKeys true), JANGAN coba
+        // auto-unlock berbasis sessionStorage ataupun meminta password — itu yang
+        // membuat modal password muncul berulang meskipun vault sudah terbuka.
+        if (useAuthStore.getState().hasRestoredKeys) {
+          await useAuthStore.getState().loadBlockedUsers();
+          navigate("/chat");
+          return;
+        }
+
+        // Try auto-unlock (hanya relevan bila kunci password + auto-unlock key tersedia)
         const autoUnlockSuccess = await useAuthStore.getState().tryAutoUnlock();
-        
+
         if (!autoUnlockSuccess) {
              // Jika PRF gagal/belum setup, user harus input password manual untuk dekripsi
              if (localStorage.getItem('nyx_bio_vault') && !recoveryPhrase) {
@@ -215,7 +231,7 @@ export default function Login() {
                 toast.error(t('auth:errors.biometric_corrupt'));
                 localStorage.removeItem('nyx_bio_vault'); 
              }
-             
+
              const hasKeys = await getEncryptedKeys();
              if (hasKeys) {
                 useModalStore.getState().showPasswordPrompt(async (password) => {
@@ -269,10 +285,11 @@ export default function Login() {
         // BUGFIX: JANGAN navigate("/chat") tanpa syarat — bila ini perangkat baru
         // (kunci lokal belum ada), user harus menyelesaikan recovery dulu.
         // App.tsx routing akan redirect otomatis SAAT hasRestoredKeys jadi true.
-        // Navigasi paksa di sini membuat user "masuk" beberapa detik setelah
-        // modal Identity Recovery muncul, padahal recovery belum diselesaikan.
         if (useAuthStore.getState().hasRestoredKeys) {
           navigate("/chat");
+        }
+        } finally {
+          useAuthStore.setState({ isUnlocking: false });
         }
                             }
                             } catch (err: unknown) {

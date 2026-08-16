@@ -390,6 +390,10 @@ class NyxShadowVaultProxy {
       await db.ratchetSessions.delete(id);
       await db.groupSenderStates.delete(id);
       await db.groupReceiverStates.where('id').startsWith(id + '_').delete();
+      // Hapus record percakapan itu sendiri — sebelumnya hanya pesan + state
+      // kripto yang dihapus, sehingga percakapan yang sudah "dihapus" muncul
+      // kembali setelah reload karena baris di tabel `conversations` masih ada.
+      await db.conversations.delete(id);
     } catch (e) {
       console.error("Failed to delete conversation data from vault", e);
     }
