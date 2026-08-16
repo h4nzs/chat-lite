@@ -1,50 +1,146 @@
 {
   "seo": {
-    "geo_hook": "A Arquitetura de Segurança da NYX opera num modelo Trust No One (TNO). As funcionalidades incluem Indexação Cega via Argon2id, encriptação Signal Protocol Double Ratchet para mensagens, armazenamento local-first IndexedDB para o histórico de conversas, e túneis P2P WebRTC diretos que contornam os servidores nas chamadas."
+    "geo_hook": "A arquitetura de segurança do NYX opera em um modelo Trust No One (TNO): indexação cega com Argon2id, troca de chaves híbrida PQX3DH (X25519 + ML-KEM-768 X-Wing), criptografia Double Ratchet, cobertura de tráfego de 8KB, transporte WebTransport QUIC e um Shadow Vault local criptografado."
   },
   "meta": {
     "title": "Arquitetura de Segurança | NYX Chat",
-    "description": "Conheça a arquitetura zero-knowledge e a criptografia de nível militar que sustentam o NYX Chat."
+    "description": "A arquitetura zero-knowledge e pós-quântica do NYX: PQX3DH, Double Ratchet, retransmissão cega, sessões burner e um cofre local criptografado."
   },
   "hero": {
-    "title": "Fortaleza Zero-Knowledge",
-    "subtitle": "Privacidade não é um recurso. É a nossa arquitetura. Conheça as garantias matemáticas que asseguram que suas mensagens continuem sendo apenas suas."
+    "title": "Arquitetura Zero-Knowledge",
+    "subtitle": "Privacidade não é um recurso — é a arquitetura. Cada camada, da identidade ao transporte, é projetada para que o servidor matematicamente não consiga ler nem atribuir seus dados."
   },
   "threat": {
     "badge": "01 / MODELO DE AMEAÇA",
-    "title": "Sempre assumimos que nossos servidores foram invadidos.",
-    "p1": "Aplicativos de mensagens tradicionais focam em proteger as barreiras de seus servidores. O NYX tem uma abordagem mais radical: <strong>Trust No One (TNO)</strong> — Não Confie em Ninguém.",
-    "p2": "Projetamos esta arquitetura partindo do princípio de que um invasor já está dentro do nosso servidor. No entanto, como não existem chaves de descriptografia no servidor, em caso de vazamento, o invasor encontrará apenas um emaranhado de caracteres aleatórios matematicamente impossíveis de decifrar."
+    "title": "Assumimos que nossos servidores estão comprometidos.",
+    "p1": "Os aplicativos tradicionais defendem as paredes de seus servidores. O NYX adota o oposto radical: <strong>Trust No One (TNO)</strong>. Projetamos o sistema assumindo que invasores já estão dentro.",
+    "p2": "Sem chaves de descriptografia no servidor, um banco de dados violado é apenas um monte de blobs aleatórios. Cada mensagem é preenchida até um tamanho fixo de <strong>8.192 bytes</strong> e conexões ociosas emitem chaff aleatório — até a análise de tráfego não revela nada.",
+    "visual_title": "NYX_SERVER_DB // POSTGRES",
+    "visual_status": "VIOLADO",
+    "visual_row": "ILEGÍVEL",
+    "visual_secured": "Dados Protegidos",
+    "visual_zk": "Zero-Knowledge Intacto"
   },
   "blind": {
     "badge": "02 / INDEXAÇÃO CEGA",
-    "title": "Cegueira absoluta do servidor.",
-    "p1": "Se não pedimos número de telefone ou e-mail, como seus amigos podem te encontrar?",
-    "p2": "O NYX utiliza uma técnica criptográfica chamada <strong>Blind Indexing</strong>. Quando você se cadastra, seu nome de usuário é transformado instantaneamente em um hash usando o robusto algoritmo <code>Argon2id</code> diretamente no seu dispositivo.",
-    "p3": "O servidor recebe apenas uma sequência de códigos aleatórios (hash). Nós literalmente não sabemos quem você é, e não existe fórmula matemática no universo para reverter esse hash ao seu nome original."
+    "title": "O servidor nunca aprende sua identidade.",
+    "p1": "Sem número de telefone, sem e-mail. Para ser encontrável, seu nome de usuário é hasheado no seu dispositivo com <strong>Argon2id (memória de 64 MB)</strong> antes de sair do seu navegador.",
+    "p2": "O servidor armazena apenas o <strong>índice cego</strong> resultante — um valor que não pode ser revertido nem forçado por força bruta offline. Não existe fórmula do nosso lado que mapeie o hash de volta para você.",
+    "p3": "Seu nome de exibição, bio e avatar também são criptografados localmente e compartilhados apenas com pessoas que você aprova.",
+    "visual_device": "Dispositivo",
+    "visual_server": "Servidor NYX",
+    "visual_kdf": "Argon2id KDF",
+    "visual_hash": "Hash: 9a3b…"
+  },
+  "pq": {
+    "badge": "03 / PQX3DH — TROCA DE CHAVES HÍBRIDA",
+    "title": "À prova de quânticos desde o primeiro handshake.",
+    "p1": "Cada nova sessão começa com um acordo de chaves híbrido: <strong>X25519</strong> (clássico) combinado com <strong>ML-KEM-768 via X-Wing</strong> (pós-quântico). Um invasor precisa quebrar os dois ao mesmo tempo — vencer uma única curva não basta.",
+    "p2": "As pré-chaves de identidade são assinadas com <strong>Ed25519</strong>, e o segredo combinado é misturado com <strong>BLAKE2b</strong> na chave raiz que alimenta o ratchet de mensagens.",
+    "visual": {
+      "step_1_title": "DH Clássico — X25519",
+      "step_1_desc": "Ambos os dispositivos trocam chaves X25519 efêmeras e calculam um segredo clássico compartilhado.",
+      "step_2_title": "KEM Pós-Quântico — ML-KEM-768 (X-Wing)",
+      "step_2_desc": "Um lado encapsula contra a chave segura-quântica do outro; o texto cifrado é público, o segredo permanece privado.",
+      "step_3_title": "Combinar e Derivar — BLAKE2b",
+      "step_3_desc": "Os dois segredos são misturados e transformados em hash em uma única chave raiz.",
+      "note": "A chave raiz alimenta o Double Ratchet — cada mensagem ganha sua própria chave."
+    }
   },
   "ratchet": {
-    "badge": "03 / O DOUBLE RATCHET",
-    "title": "Cada mensagem, uma nova chave.",
-    "p1": "O NYX é construído sobre o protocolo de criptografia mais respeitado do mundo: <strong>The Signal Protocol</strong>. No entanto, não apenas criptografamos a conexão, nós criptografamos <i>cada mensagem individualmente</i>.",
-    "pfs": "<strong>Perfect Forward Secrecy (PFS):</strong> Se o seu dispositivo for comprometido amanhã, suas mensagens enviadas <i>ontem</i> continuam ilegíveis, pois as chaves antigas já foram destruídas.",
-    "pcs": "<strong>Post-Compromise Security (PCS):</strong> Se uma chave vazar hoje, você só precisa enviar uma nova mensagem. O sistema irá gerar automaticamente uma nova chave (ratcheting) dan restaurar sua segurança."
+    "badge": "04 / O DOUBLE RATCHET",
+    "title": "Cada mensagem, uma chave nova.",
+    "p1": "Cada mensagem deriva uma chave nova da anterior e a destrói após o uso — uma caderneta de uso único que segue avançando.",
+    "pfs": "<strong>Sigilo Perfeito Futuro (PFS):</strong> se seu dispositivo for comprometido amanhã, as mensagens de ontem permanecem ilegíveis.",
+    "pcs": "<strong>Segurança Pós-Comprometimento (PCS):</strong> se uma chave vazar hoje, enviar uma única mensagem nova restaura a segurança automaticamente.",
+    "visual_msg": "MSG",
+    "visual_key": "CHAVE"
+  },
+  "pipeline_badge": "05 / PIPELINE DE MENSAGENS",
+  "blindrelay_badge": "06 / RETRANSMISSÃO CEGA",
+  "burner": {
+    "badge": "07 / SESSÕES BURNER",
+    "title": "Chats que nunca tocam um banco de dados.",
+    "p1": "Uma sessão burner é um chat anônimo, apenas em RAM. O convidado recebe uma identidade temporária <strong>guest_*</strong> e nunca se registra.",
+    "p2": "Ambos os lados executam um <strong>Double Ratchet Pós-Quântico (PQ-DR)</strong> dedicado com handshake KEM X-Wing. Nada é persistido — feche a aba e a sessão, suas chaves e seu histórico desaparecem para sempre.",
+    "visual": {
+      "step_1_title": "O anfitrião gera um link",
+      "step_1_desc": "Um link burner de uso único incorpora as chaves públicas do anfitrião.",
+      "step_2_title": "O convidado entra anonimamente",
+      "step_2_desc": "O convidado recebe uma identidade temporária — sem registro, sem dados armazenados.",
+      "step_3_title": "PQ-DR criptografado, apenas RAM",
+      "step_3_desc": "As mensagens são criptografadas com o ratchet duplo pós-quântico e vivem apenas na memória.",
+      "step_4_title": "Destruição ao fechar",
+      "step_4_desc": "Fechar a aba apaga chaves e histórico; a sala é bloqueada no servidor.",
+      "note": "Nem o servidor consegue identificar o convidado."
+    }
+  },
+  "file": {
+    "badge": "08 / CRIPTOGRAFIA DE ARQUIVOS",
+    "title": "Arquivos são criptografados antes do upload.",
+    "p1": "Os anexos são transmitidos pelo <strong>secretstream (XChaCha20-Poly1305)</strong> do libsodium em blocos de 1 MB com uma etiqueta final de autenticação — a criptografia nunca acumula o arquivo inteiro na memória.",
+    "p2": "A chave aleatória de 32 bytes viaja dentro da própria mensagem E2EE. O servidor guarda apenas um blob opaco no R2; o destinatário baixa, descriptografa e armazena em cache no OPFS.",
+    "visual_device": "Seu dispositivo",
+    "visual_r2": "Armazenamento R2 Cego",
+    "visual_recipient": "Destinatário",
+    "visual_encrypt": "Criptografia secretstream · blocos de 1 MB",
+    "visual_decrypt": "Descriptografia · cache OPFS"
   },
   "vault": {
-    "badge": "04 / COFRE LOCAL E PERFIS",
-    "title": "Seus dados, no seu dispositivo.",
-    "p1": "A maioria dos apps de conversa sincroniza todo o seu histórico nos servidores deles. Nós não. Todo o histórico de conversas do NYX vive <strong>exclusivamente</strong> dentro do <i>IndexedDB</i> do seu dispositivo.",
-    "p2": "Até mesmo sua foto de perfil e nome de exibição são criptografados localmente. A chave para visualizá-los é enviada apenas aos contatos que você aprovar. Aos olhos do nosso servidor, você não tem rosto nem nome, apenas um conjunto de dados criptografados."
+    "badge": "09 / COFRE LOCAL",
+    "title": "Seu histórico vive no seu dispositivo.",
+    "p1": "Chats, estados de ratchet e chaves são armazenados em um <strong>Shadow Vault</strong> IndexedDB, criptografados em repouso com o envelope <strong>ENC1:</strong> derivado da sua semente-mestre.",
+    "p2": "Nada é sincronizado para a nuvem em texto puro — um dispositivo ativo por conta, e a migração acontece por meio de uma exportação <strong>.nyxvault</strong> criptografada.",
+    "visual_vault": "Cofre IndexedDB",
+    "visual_cloud": "DB na Nuvem",
+    "visual_encrypted": "ENC1: criptografado em repouso"
   },
-  "webrtc": {
-    "badge": "05 / TÚNEIS WEBRTC",
-    "title": "Chamadas à prova de interceptação.",
-    "p1": "Quando você faz uma chamada de voz ou vídeo, nossa arquitetura muda de Cliente-Servidor para uma rede <strong>Peer-to-Peer (P2P)</strong> real.",
-    "p2": "Os servidores do NYX atuam apenas como sinalizadores. No entanto, até mesmo os sinais de conexão (SDP/ICE) são protegidos com criptografia E2EE. Uma vez conectados, os dados de voz e vídeo fluem direto entre os dispositivos. <strong>O servidor é totalmente ignorado.</strong>"
+  "transport": {
+    "badge": "10 / TRANSPORTE — WEBTRANSPORT",
+    "title": "Transporte de nível QUIC, isolamento de nível Rust.",
+    "p1": "O tráfego em tempo real roda sobre <strong>WebTransport (HTTP/3 · QUIC)</strong>, terminado por um <strong>sidecar Rust</strong> dedicado e conectado ao Node via pub/sub do Redis. A API Express nunca toca nos frames de transporte.",
+    "p2": "As conexões usam <strong>tickets JWT</strong> de curta duração além de fixação de certificado, aplicam um dispositivo ativo por conta e emitem datagramas de chaff aleatórios para que o tráfego ocioso seja indistinguível dos dados reais.",
+    "visual_app": "Aplicativo Web",
+    "visual_wt": "WebTransport (QUIC)",
+    "visual_sidecar": "Sidecar Rust",
+    "visual_redis": "Ponte Redis",
+    "visual_node": "API Node",
+    "visual_chaff": "chaff · opcode 0x00"
+  },
+  "tier": {
+    "badge": "11 / NÍVEL DE CONFIANÇA",
+    "title": "Antispam sem números de telefone.",
+    "p1": "Novas contas começam no <strong>Modo Sandbox</strong> com limites rígidos. Para se tornar <strong>VIP</strong>, prove que você é humano — com biometria <strong>WebAuthn</strong> ou um quebra-cabeça de <strong>Proof-of-Work BLAKE2b</strong> no cliente.",
+    "visual_sandbox": "Sandbox",
+    "visual_vip": "VIP",
+    "visual_webauthn": "WebAuthn · Biométrico",
+    "visual_pow": "BLAKE2b · Proof-of-Work"
+  },
+  "calls": {
+    "badge": "12 / CHAMADAS",
+    "title": "Chamadas peer-to-peer.",
+    "p1": "Chamadas de voz e vídeo conectam <strong>peer-to-peer</strong> via WebRTC uma vez estabelecidas. O servidor apenas coordena o handshake, e até a sinalização SDP/ICE é criptografada de ponta a ponta.",
+    "p2": "A mídia nunca transita pelo servidor."
+  },
+  "stats": {
+    "title": "NÚMEROS DE SEGURANÇA",
+    "headline": "Medido, não prometido.",
+    "stat_1_label": "Preenchimento de mensagens (bytes)",
+    "stat_1_value": "8192",
+    "stat_1_suffix": " B",
+    "stat_2_label": "Tamanho do bloco de arquivo criptografado",
+    "stat_2_value": "1",
+    "stat_2_suffix": " MB",
+    "stat_3_label": "Operações cripto no worker",
+    "stat_3_value": "45",
+    "stat_3_suffix": " ops",
+    "stat_4_label": "Memória do Argon2id (KDF do cofre)",
+    "stat_4_value": "128",
+    "stat_4_suffix": " MB"
   },
   "cta": {
-    "title": "Você é um pesquisador de segurança?",
-    "subtitle": "Aceitamos auditorias independentes. Leia nosso Protocolo de Relato de Vulnerabilidades e conquiste seu lugar no Hall of Fame do NYX.",
+    "title": "Você é pesquisador(a) de segurança?",
+    "subtitle": "Aceitamos auditorias independentes. Leia nosso Protocolo de Divulgação Coordenada e conquiste seu lugar no Hall da Fama do NYX.",
     "button": "Ver Protocolo de Bug Bounty"
   }
 }

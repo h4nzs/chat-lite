@@ -39,22 +39,23 @@ export default function LanguageSwitcher({ isAbsolute = true, currentLangCode = 
     <div className={containerClass}>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-surface text-text-primary shadow-[3px_3px_6px_rgba(0,0,0,0.2),-3px_-3px_6px_rgba(255,255,255,0.1)] hover:shadow-[inset_1px_1px_3px_rgba(0,0,0,0.2)] transition-all font-bold text-sm focus:outline-none">
+          <button className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-bg-surface text-text-primary transition-all font-bold text-sm cursor-pointer focus:outline-none" style={{ boxShadow: 'var(--shadow-neu-icon)' }}>
             <FiGlobe className="text-accent" />
             <span>{currentLang.short}</span>
           </button>
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
-          <DropdownMenu.Content 
-            className="z-[100] min-w-[150px] bg-bg-surface rounded-xl p-2 shadow-[8px_8px_16px_rgba(0,0,0,0.4),-8px_-8px_16px_rgba(255,255,255,0.05)] border border-white/5 animate-in fade-in zoom-in-95 duration-200 mt-2"
+          <DropdownMenu.Content
+            className="z-[100] min-w-[150px] bg-bg-surface rounded-2xl p-2 animate-in fade-in zoom-in-95 duration-200 mt-2"
+            style={{ boxShadow: 'var(--shadow-neu-flat)' }}
             align="end"
           >
             {LANGUAGES.map((l) => (
               <DropdownMenu.Item 
                 key={l.code}
                 onClick={() => changeLanguage(l.code)}
-                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer outline-none hover:bg-white/5 focus:bg-white/5 transition-colors group"
+                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer outline-none hover:bg-black/5 dark:hover:bg-white/10 transition-colors group"
               >
                 <span className={`font-medium ${currentLang.code === l.code ? 'text-accent' : 'text-text-primary group-hover:text-accent'}`}>
                   {l.label}

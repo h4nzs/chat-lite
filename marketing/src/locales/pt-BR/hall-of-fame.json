@@ -4,7 +4,7 @@
   },
   "meta": {
     "title": "Hall da Fama de Segurança | NYX Chat",
-    "description": "Homenageando os pesquisadores de segurança de elite que ajudam a proteger a arquitetura Zero-Knowledge do NYX."
+    "description": "Homenageando os pesquisadores de segurança de elite e hackers de chapéu branco que ajudam a proteger a arquitetura Zero-Knowledge do NYX."
   },
   "hero": {
     "badge": "HALL DA FAMA",
@@ -12,7 +12,7 @@
     "subtitle": "A segurança não é um estado de repouso; é uma operação contínua. Honramos os criptógrafos que rompem nossos muros e relatam de forma responsável."
   },
   "protocol": {
-    "badge": "PROTOCOLO CONFIDENCIAL",
+    "badge": "Protocolo de Divulgação",
     "title": "Relatando uma Vulnerabilidade",
     "warning": "NÃO ABRA UMA ISSUE PÚBLICA",
     "p1": "Sob nenhuma circunstância você deve relatar vulnerabilidades críticas via GitHub Issues públicas. Fazer isso compromete todos os usuários do NYX.",
@@ -31,13 +31,16 @@
     "out_1": "Ataques volumétricos (DDoS, Spam).",
     "out_2": "Phishing ou Engenharia Social.",
     "out_3": "Bugs de UI/UX sem impacto na privacidade.",
-    "out_4": "Falhas teóricas sem Prova de Conceito (PoC)."
+    "out_4": "Falhas teóricas sem Prova de Conceito (PoC).",
+    "in_6": "Bypass da troca de chaves híbrida PQX3DH / ML-KEM.",
+    "in_7": "Anonimato da sessão Burner (PQ-DR) ou recuperação de sessão.",
+    "in_8": "Integridade do sidecar WebTransport / ponte Redis."
   },
   "table": {
     "badge": "O REGISTRO",
     "title": "Pesquisadores Reconhecidos",
     "th_operative": "OPERATIVO / ALIAS",
-    "th_date": "DATA DA BRECHA",
+    "th_date": "Data de Divulgação",
     "th_vuln": "CLASSE DA VULNERABILIDADE",
     "th_link": "PORTFÓLIO",
     "empty_state": "DISPONÍVEL PARA O PRIMEIRO DESCOBRIDOR"

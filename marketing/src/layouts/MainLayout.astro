@@ -1,23 +1,41 @@
 ---
 // marketing/src/layouts/MainLayout.astro
 import '../index.css';
-import SEO from '../components/SEO.astro'; // 👈 Import komponen SEO Astro
+import SEO from '../components/SEO.astro'; // Komponen SEO Astro
 
 const { title, description, canonicalUrl, schemaMarkup } = Astro.props;
 ---
 
-<html lang="en" class="dark" data-accent="purple">
+<html lang="en" data-theme="light" data-accent="purple">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} - NYX</title>
     <link rel="icon" type="image/png" href="/pwa-512x512.png" />
-    <SEO 
-      title={`${title} - NYX`} 
-      description={description} 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <SEO
+      title={`${title} - NYX`}
+      description={description}
       canonicalUrl={canonicalUrl}
       schemaMarkup={schemaMarkup}
     />
+    <script is:inline>
+      // Theme init: read persisted preference before first paint, default = light.
+      (function () {
+        try {
+          var stored = localStorage.getItem('nyx_theme');
+          var theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <slot />

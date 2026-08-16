@@ -12,7 +12,7 @@
     "subtitle": "Keamanan bukanlah kondisi yang diam; melainkan operasi yang terus berjalan. Kami menghormati kriptografer dan peneliti yang berhasil menembus pertahanan kami dan melaporkannya secara bertanggung jawab."
   },
   "protocol": {
-    "badge": "PROTOKOL RAHASIA",
+    "badge": "Protokol Pengungkapan",
     "title": "Melaporkan Kerentanan",
     "warning": "DILARANG MEMBUAT ISSUE PUBLIK",
     "p1": "Dalam keadaan apa pun, Anda tidak boleh melaporkan celah keamanan kritis melalui GitHub Issues atau PR publik. Hal ini akan membahayakan seluruh pengguna NYX.",
@@ -31,13 +31,16 @@
     "out_1": "Serangan volumetrik (DDoS, Spam).",
     "out_2": "Phishing atau Rekayasa Sosial.",
     "out_3": "Bug UI/UX tanpa dampak privasi.",
-    "out_4": "Celah teoritis tanpa Bukti Konsep (PoC)."
+    "out_4": "Celah teoritis tanpa Bukti Konsep (PoC).",
+    "in_6": "Bypass pertukaran kunci hibrida PQX3DH / ML-KEM.",
+    "in_7": "Anonimitas sesi Burner (PQ-DR) atau pemulihan sesi.",
+    "in_8": "Integritas sidecar WebTransport / jembatan Redis."
   },
   "table": {
     "badge": "REGISTRI KEHORMATAN",
     "title": "Peneliti yang Diakui",
     "th_operative": "OPERATIF / HANDLE",
-    "th_date": "TANGGAL RETAS",
+    "th_date": "Tanggal Pengungkapan",
     "th_vuln": "KELAS KERENTANAN",
     "th_link": "PORTOFOLIO",
     "empty_state": "TERSEDIA UNTUK PENEMU PERTAMA"

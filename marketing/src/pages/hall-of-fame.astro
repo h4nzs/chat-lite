@@ -3,6 +3,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 import Footer from '../components/Footer.astro';
 import '../index.css';
 import { getLangFromUrl, useTranslations } from '../utils/i18n';
+import { FiAlertTriangle, FiShield, FiAward, FiCheck, FiX } from 'react-icons/fi';
 
 const { lang: propLang } = Astro.props;
 const lang = propLang || Astro.currentLocale || getLangFromUrl(Astro.url);
@@ -10,7 +11,9 @@ const langPrefix = lang === 'en' ? '' : `/${lang}`;
 const t = useTranslations(lang);
 
 const title = t('hall-of-fame:meta.title') !== 'hall-of-fame:meta.title' ? t('hall-of-fame:meta.title') : 'Security Hall of Fame | NYX Chat';
-const description = t('hall-of-fame:meta.description') !== 'hall-of-fame:meta.description' ? t('hall-of-fame:meta.description') : 'Honoring the elite security researchers and white-hat operatives who help secure the NYX Zero-Knowledge architecture.';
+const description = t('hall-of-fame:meta.description') !== 'hall-of-fame:meta.description' ? t('hall-of-fame:meta.description') : 'Honoring the security researchers who help secure the NYX Zero-Knowledge architecture.';
+const homeLabel = t('common:home') !== 'common:home' ? t('common:home') : 'Home';
+const navHof = t('common:nav.hall_of_fame') !== 'common:nav.hall_of_fame' ? t('common:nav.hall_of_fame') : 'Hall of Fame';
 
 const hofSchema = JSON.stringify({
   "@context": "https://schema.org",
@@ -27,7 +30,7 @@ const hofSchema = JSON.stringify({
   }
 });
 
-// Database of Elite Operatives (Easy to update)
+// Database of acknowledged researchers (easy to update)
 const hallOfFameData = [
   {
     operative: "faiqalfaruq",
@@ -37,133 +40,155 @@ const hallOfFameData = [
     linkText: "[GITHUB]"
   }
 ];
+
+const inScope = [
+  t('hall-of-fame:scope.in_1'),
+  t('hall-of-fame:scope.in_2'),
+  t('hall-of-fame:scope.in_3'),
+  t('hall-of-fame:scope.in_4'),
+  t('hall-of-fame:scope.in_5'),
+  t('hall-of-fame:scope.in_6'),
+  t('hall-of-fame:scope.in_7'),
+  t('hall-of-fame:scope.in_8'),
+];
+
+const outScope = [
+  t('hall-of-fame:scope.out_1'),
+  t('hall-of-fame:scope.out_2'),
+  t('hall-of-fame:scope.out_3'),
+  t('hall-of-fame:scope.out_4'),
+];
 ---
 
 <MainLayout title={title} description={description} canonicalUrl={Astro.url.pathname} schemaMarkup={hofSchema}>
-  <main class="w-full text-white bg-[#020202] font-sans selection:bg-red-500/30">
-    
-    <header class="max-w-4xl mx-auto px-6 pt-32 pb-20 text-center border-b border-gray-900">
-      <div class="inline-block px-3 py-1 mb-6 text-xs font-semibold text-red-500 bg-red-500/10 border border-red-500/20 rounded-full tracking-widest uppercase">
-        {t('hall-of-fame:hero.badge')}
-      </div>
-      <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-red-400 via-rose-500 to-red-700 uppercase font-mono">
-        {t('hall-of-fame:hero.title')}
-      </h1>
-      <p class="sr-only">
-        {t('hall-of-fame:seo.geo_hook') !== 'hall-of-fame:seo.geo_hook' ? t('hall-of-fame:seo.geo_hook') : 'NYX Chat Security Hall of Fame recognizes elite white-hat hackers and researchers who responsibly disclose vulnerabilities in our zero-knowledge architecture. Our bug bounty program focuses on E2EE bypasses, Signal Protocol integrity, WebAuthn PRF key security, and Argon2id blind indexing hash collisions.'}
-      </p>
-      <p class="text-xl text-gray-400 leading-relaxed max-w-2xl mx-auto border-l-2 border-red-500 pl-4 text-left italic">
-        "{t('hall-of-fame:hero.subtitle')}"
-      </p>
-    </header>
+  <div class="min-h-screen bg-bg-main text-text-primary relative overflow-x-clip">
+    <div class="aurora-blob w-[520px] h-[520px] -top-40 -right-40" style="background: radial-gradient(circle, hsl(var(--grad-end) / 0.10), transparent 60%);"></div>
+    <div class="aurora-blob w-[460px] h-[460px] top-1/3 -left-44" style="background: radial-gradient(circle, hsl(var(--grad-start) / 0.10), transparent 60%);"></div>
 
-    <section class="py-20 bg-[url('/noise.png')] bg-repeat opacity-95">
-      <div class="max-w-4xl mx-auto px-6">
-        <div class="bg-red-950/20 border border-red-900/50 rounded-2xl p-8 relative overflow-hidden">
-          <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-transparent"></div>
-          
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-12 h-12 bg-red-500/20 flex items-center justify-center rounded-lg border border-red-500/30 text-red-500">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+    <main class="max-w-5xl mx-auto px-6 py-10 md:py-14 relative">
+
+      <nav class="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-widest mb-12 animate-in fade-in duration-500">
+        <a href={lang === 'en' ? '/' : langPrefix} class="hover:text-accent transition-colors">{homeLabel}</a>
+        <span class="text-text-secondary/40">/</span>
+        <span class="text-accent">{navHof}</span>
+      </nav>
+
+      <!-- HERO -->
+      <header class="text-center mb-20 animate-in slide-in-from-bottom-4 duration-700">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 mb-6 text-xs font-bold text-accent bg-bg-surface rounded-full tracking-widest uppercase" style="box-shadow: var(--shadow-neu-icon)">
+          <FiAward size={14} /> {t('hall-of-fame:hero.badge')}
+        </div>
+        <h1 class="font-display font-black text-4xl md:text-6xl leading-[1.02] tracking-tight mb-6">
+          {t('hall-of-fame:hero.title')}
+        </h1>
+        <p class="sr-only">
+          {t('hall-of-fame:seo.geo_hook') !== 'hall-of-fame:seo.geo_hook' ? t('hall-of-fame:seo.geo_hook') : 'NYX Chat Security Hall of Fame recognizes white-hat hackers and researchers who responsibly disclose vulnerabilities in our zero-knowledge architecture.'}
+        </p>
+        <p class="text-lg md:text-xl text-text-secondary leading-relaxed max-w-2xl mx-auto border-l-2 border-accent pl-5 text-left italic">
+          "{t('hall-of-fame:hero.subtitle')}"
+        </p>
+      </header>
+
+      <!-- PROTOCOL -->
+      <section class="py-16 md:py-20">
+        <div class="max-w-4xl mx-auto">
+          <div class="card-neumorphic relative overflow-hidden">
+            <div class="flex items-center gap-4 mb-6">
+              <div class="icon-well w-12 h-12 flex-shrink-0 text-red-500"><FiAlertTriangle size={22} /></div>
+              <div>
+                <div class="text-[10px] text-text-secondary font-mono tracking-widest uppercase">{t('hall-of-fame:protocol.badge')}</div>
+                <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('hall-of-fame:protocol.title')}</h2>
+              </div>
             </div>
-            <div>
-              <div class="text-xs text-red-400 font-mono tracking-widest uppercase">{t('hall-of-fame:protocol.badge')}</div>
-              <h2 class="text-2xl font-bold text-white">{t('hall-of-fame:protocol.title')}</h2>
+
+            <div class="bg-red-500/5 border border-red-500/15 rounded-2xl p-5 mb-6">
+              <h3 class="text-red-500 font-bold font-mono text-base mb-2 flex items-center gap-2">
+                <FiAlertTriangle size={16} /> {t('hall-of-fame:protocol.warning')}
+              </h3>
+              <p class="text-text-secondary leading-relaxed" set:html={t('hall-of-fame:protocol.p1')}></p>
+            </div>
+
+            <p class="text-text-secondary text-lg leading-relaxed" set:html={t('hall-of-fame:protocol.p2')}></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCOPE -->
+      <section class="py-16 md:py-20">
+        <div class="max-w-5xl mx-auto">
+          <div class="text-center mb-12">
+            <div class="inline-block px-4 py-1.5 mb-4 text-xs font-bold text-text-secondary bg-bg-surface rounded-full tracking-widest uppercase font-mono" style="box-shadow: var(--shadow-neu-icon)">
+              {t('hall-of-fame:scope.badge')}
+            </div>
+            <h2 class="font-display text-3xl md:text-4xl font-bold tracking-tight">{t('hall-of-fame:scope.title')}</h2>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="card-neumorphic-flat p-8">
+              <h3 class="font-display text-xl font-bold text-green-600 dark:text-green-400 mb-6">{t('hall-of-fame:scope.in_scope_title')}</h3>
+              <ul class="space-y-4 text-text-secondary">
+                {inScope.map((item) => (
+                  <li class="flex items-start gap-3">
+                    <FiCheck class="text-green-500 mt-0.5 flex-shrink-0" size={18} />
+                    <span class="leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div class="card-neumorphic-flat p-8 opacity-90">
+              <h3 class="font-display text-xl font-bold text-text-secondary mb-6">{t('hall-of-fame:scope.out_scope_title')}</h3>
+              <ul class="space-y-4 text-text-secondary/80">
+                {outScope.map((item) => (
+                  <li class="flex items-start gap-3">
+                    <FiX class="text-red-400/70 mt-0.5 flex-shrink-0" size={18} />
+                    <span class="leading-relaxed line-through decoration-text-secondary/30">{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
-
-          <div class="bg-black/50 border border-red-500/20 p-4 rounded-lg mb-6">
-            <h3 class="text-red-500 font-bold font-mono text-lg mb-2 animate-pulse">&gt;&gt;&gt; {t('hall-of-fame:protocol.warning')} &lt;&lt;&lt;</h3>
-            <p class="text-gray-300" set:html={t('hall-of-fame:protocol.p1')}></p>
-          </div>
-          
-          <p class="text-gray-400 text-lg leading-relaxed" set:html={t('hall-of-fame:protocol.p2')}></p>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="py-20 border-b border-gray-900 bg-[#050505]">
-      <div class="max-w-5xl mx-auto px-6">
-        <div class="text-center mb-16">
-          <div class="inline-block px-3 py-1 mb-4 text-xs font-semibold text-gray-400 bg-gray-800 border border-gray-700 rounded-full font-mono">
-            {t('hall-of-fame:scope.badge')}
-          </div>
-          <h2 class="text-3xl font-bold text-white">{t('hall-of-fame:scope.title')}</h2>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div class="bg-green-950/10 border border-green-900/30 p-8 rounded-2xl">
-            <h3 class="text-xl font-bold text-green-400 mb-6 font-mono">{t('hall-of-fame:scope.in_scope_title')}</h3>
-            <ul class="space-y-4 text-gray-300">
-              <li class="flex items-center gap-3"><span class="text-green-500 font-mono">[*]</span> {t('hall-of-fame:scope.in_1')}</li>
-              <li class="flex items-center gap-3"><span class="text-green-500 font-mono">[*]</span> {t('hall-of-fame:scope.in_2')}</li>
-              <li class="flex items-center gap-3"><span class="text-green-500 font-mono">[*]</span> {t('hall-of-fame:scope.in_3')}</li>
-              <li class="flex items-center gap-3"><span class="text-green-500 font-mono">[*]</span> {t('hall-of-fame:scope.in_4')}</li>
-              <li class="flex items-center gap-3"><span class="text-green-500 font-mono">[*]</span> {t('hall-of-fame:scope.in_5')}</li>
-            </ul>
+      <!-- REGISTRY -->
+      <section class="py-16 md:py-20">
+        <div class="max-w-5xl mx-auto">
+          <div class="mb-10">
+            <div class="text-[10px] font-mono text-accent mb-2 tracking-widest uppercase">// {t('hall-of-fame:table.badge')}</div>
+            <h2 class="font-display text-3xl md:text-4xl font-bold tracking-tight">{t('hall-of-fame:table.title')}</h2>
           </div>
 
-          <div class="bg-gray-900/30 border border-gray-800 p-8 rounded-2xl">
-            <h3 class="text-xl font-bold text-gray-400 mb-6 font-mono">{t('hall-of-fame:scope.out_scope_title')}</h3>
-            <ul class="space-y-4 text-gray-500">
-              <li class="flex items-center gap-3"><span class="text-red-500/50 font-mono">[x]</span> {t('hall-of-fame:scope.out_1')}</li>
-              <li class="flex items-center gap-3"><span class="text-red-500/50 font-mono">[x]</span> {t('hall-of-fame:scope.out_2')}</li>
-              <li class="flex items-center gap-3"><span class="text-red-500/50 font-mono">[x]</span> {t('hall-of-fame:scope.out_3')}</li>
-              <li class="flex items-center gap-3"><span class="text-red-500/50 font-mono">[x]</span> {t('hall-of-fame:scope.out_4')}</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="py-24">
-      <div class="max-w-5xl mx-auto px-6">
-        <div class="mb-10">
-          <div class="text-xs font-mono text-cyan-500 mb-2">// {t('hall-of-fame:table.badge')}</div>
-          <h2 class="text-3xl font-bold text-white uppercase font-mono">{t('hall-of-fame:table.title')}</h2>
-        </div>
-
-        <div class="bg-[#050505] border border-gray-800 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.02)] font-mono text-sm">
-          <div class="bg-gray-900 border-b border-gray-800 px-4 py-2 flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full bg-red-500"></div>
-            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <div class="w-3 h-3 rounded-full bg-green-500"></div>
-            <span class="ml-2 text-gray-500 text-xs">root@nyx-server:~# cat /var/log/hall_of_fame.log</span>
-          </div>
-
-          <div class="overflow-x-auto p-1">
-            <table class="w-full text-left border-collapse min-w-[700px]">
+          <div class="card-neumorphic-flat p-2 md:p-4 overflow-x-auto">
+            <table class="w-full text-left border-separate border-spacing-y-2 md:border-spacing-y-3">
               <thead>
-                <tr class="text-gray-500 border-b border-gray-800/50">
-                  <th class="p-4 font-normal tracking-widest">{t('hall-of-fame:table.th_operative')}</th>
-                  <th class="p-4 font-normal tracking-widest">{t('hall-of-fame:table.th_date')}</th>
-                  <th class="p-4 font-normal tracking-widest">{t('hall-of-fame:table.th_vuln')}</th>
-                  <th class="p-4 font-normal tracking-widest">{t('hall-of-fame:table.th_link')}</th>
+                <tr class="text-xs uppercase tracking-widest text-text-secondary font-bold">
+                  <th class="py-3 px-5">{t('hall-of-fame:table.th_operative')}</th>
+                  <th class="py-3 px-5">{t('hall-of-fame:table.th_date')}</th>
+                  <th class="py-3 px-5">{t('hall-of-fame:table.th_vuln')}</th>
+                  <th class="py-3 px-5">{t('hall-of-fame:table.th_link')}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-800/50">
+              <tbody class="text-sm">
                 {hallOfFameData.length === 0 ? (
-                  <tr class="hover:bg-gray-900/50 transition-colors group">
-                    <td colspan="4" class="p-8 text-center">
-                      <div class="inline-block relative">
-                        <div class="absolute inset-0 bg-red-500 blur-md opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                        <span class="relative text-red-500 font-bold tracking-[0.2em] animate-pulse">
-                          &gt; {t('hall-of-fame:table.empty_state')} &lt;
-                        </span>
-                      </div>
+                  <tr>
+                    <td colspan="4" class="p-10 text-center">
+                      <span class="font-mono text-accent font-bold tracking-[0.2em] animate-pulse">
+                        &gt; {t('hall-of-fame:table.empty_state')} &lt;
+                      </span>
                     </td>
                   </tr>
                 ) : (
                   hallOfFameData.map((entry) => (
-                    <tr class="hover:bg-gray-900/50 transition-colors group">
-                      <td class="p-4 text-white font-bold">
-                        <span class="text-red-500/50 mr-2 font-normal">~</span>
+                    <tr class="hover:-translate-y-0.5 transition-transform duration-300">
+                      <td class="py-4 px-5 font-bold text-text-primary bg-bg-main rounded-l-2xl" style="box-shadow: var(--shadow-neu-icon)">
+                        <span class="text-accent/50 mr-2 font-normal">~</span>
                         {entry.operative}
                       </td>
-                      <td class="p-4 text-gray-400 text-xs tracking-wider">{entry.date}</td>
-                      <td class="p-4 text-yellow-500/90">{entry.vulnClass}</td>
-                      <td class="p-4">
-                        <a href={entry.link} target="_blank" rel="noopener noreferrer" class="text-cyan-500 hover:text-cyan-400 hover:underline text-xs tracking-widest font-bold">
+                      <td class="py-4 px-5 text-text-secondary text-xs tracking-wider bg-bg-main" style="box-shadow: var(--shadow-neu-icon)">{entry.date}</td>
+                      <td class="py-4 px-5 text-yellow-600 dark:text-yellow-500 bg-bg-main" style="box-shadow: var(--shadow-neu-icon)">{entry.vulnClass}</td>
+                      <td class="py-4 px-5 bg-bg-main rounded-r-2xl" style="box-shadow: var(--shadow-neu-icon)">
+                        <a href={entry.link} target="_blank" rel="noopener noreferrer" class="text-accent hover:text-text-primary hover:underline text-xs tracking-widest font-bold">
                           {entry.linkText}
                         </a>
                       </td>
@@ -174,9 +199,11 @@ const hallOfFameData = [
             </table>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <Footer lang={lang} />
-  </main>
+      <div class="mt-16">
+        <Footer lang={lang} />
+      </div>
+    </main>
+  </div>
 </MainLayout>

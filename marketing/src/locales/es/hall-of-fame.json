@@ -4,7 +4,7 @@
   },
   "meta": {
     "title": "Salón de la Fama de Seguridad | NYX Chat",
-    "description": "Honrando a los investigadores de seguridad de élite que ayudan a asegurar la arquitectura Zero-Knowledge de NYX."
+    "description": "Honrando a los investigadores de seguridad de élite y hackers de sombrero blanco que ayudan a asegurar la arquitectura de conocimiento cero de NYX."
   },
   "hero": {
     "badge": "SALÓN DE LA FAMA",
@@ -12,7 +12,7 @@
     "subtitle": "La seguridad no es un estado de reposo; es una operación continua. Honramos a los criptógrafos que rompen nuestros muros y lo reportan responsablemente."
   },
   "protocol": {
-    "badge": "PROTOCOLO CLASIFICADO",
+    "badge": "Protocolo de Divulgación",
     "title": "Reportar una Vulnerabilidad",
     "warning": "NO ABRIR UN ISSUE PÚBLICO",
     "p1": "Bajo ninguna circunstancia debe reportar vulnerabilidades críticas a través de GitHub Issues públicos. Hacerlo compromete a todos los usuarios de NYX.",
@@ -31,13 +31,16 @@
     "out_1": "Ataques volumétricos (DDoS, Spam).",
     "out_2": "Phishing o Ingeniería Social.",
     "out_3": "Errores de UI/UX sin impacto en privacidad.",
-    "out_4": "Fallas teóricas sin Prueba de Concepto (PoC)."
+    "out_4": "Fallas teóricas sin Prueba de Concepto (PoC).",
+    "in_6": "Bypass del intercambio de claves híbrido PQX3DH / ML-KEM.",
+    "in_7": "Anonimato de la sesión Burner (PQ-DR) o recuperación de sesión.",
+    "in_8": "Integridad del sidecar WebTransport / puente Redis."
   },
   "table": {
     "badge": "EL REGISTRO",
     "title": "Investigadores Reconocidos",
     "th_operative": "OPERATIVO / ALIAS",
-    "th_date": "FECHA DE BRECHA",
+    "th_date": "Fecha de Divulgación",
     "th_vuln": "CLASE DE VULNERABILIDAD",
     "th_link": "PORTAFOLIO",
     "empty_state": "DISPONIBLE PARA EL PRIMER DESCUBRIDOR"

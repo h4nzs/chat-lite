@@ -35,24 +35,25 @@ const navItems = [
 ---
 
 <MainLayout title={title} description={description} canonicalUrl={Astro.url.pathname} schemaMarkup={techArticleSchema}>
-  <div class="min-h-screen bg-bg-main text-text-primary font-sans selection:bg-accent selection:text-white">
-    
-    <header class="sticky top-0 z-50 bg-bg-surface/80 backdrop-blur-xl border-b border-white/5 shadow-sm">
+  <div class="min-h-screen bg-bg-main text-text-primary font-sans relative overflow-x-clip">
+
+    <header class="sticky top-0 z-50 bg-bg-surface/80 backdrop-blur-xl border-b border-text-secondary/10">
       <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
         <a href={lang === 'en' ? '/' : langPrefix} class="flex items-center gap-2 text-text-secondary hover:text-accent transition-colors text-sm font-bold tracking-wide uppercase">
           <FiArrowLeft size={16} /> {t('privacy:back')}
         </a>
         <div class="font-mono text-[10px] text-text-secondary uppercase tracking-[0.2em] flex items-center gap-2">
-          <FiShield className="text-accent" /> {t('privacy:title')}
+          <span class="icon-well w-7 h-7"><FiShield size={13} /></span>
+          {t('privacy:title')}
         </div>
       </div>
     </header>
 
-    <main class="max-w-5xl mx-auto px-6 py-12 flex flex-col md:flex-row gap-12">
+    <main class="max-w-5xl mx-auto px-6 py-12 flex flex-col md:flex-row gap-12 relative">
       <aside class="md:w-64 flex-shrink-0 hidden md:block">
-        <nav class="sticky top-28 space-y-2" id="toc-nav">
+        <nav class="sticky top-28 card-neumorphic-flat p-4 space-y-2" id="toc-nav">
           {navItems.map((item) => (
-            <a href={`#${item.id}`} class="nav-link block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-text-secondary hover:bg-white/5 hover:text-text-primary border border-transparent">
+            <a href={`#${item.id}`} class="nav-link block w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 text-text-secondary hover:bg-bg-surface hover:text-text-primary">
               {item.label}
             </a>
           ))}
@@ -61,22 +62,22 @@ const navItems = [
 
       <div class="flex-1 min-w-0">
         <div class="mb-16">
-          <h1 class="text-4xl sm:text-5xl font-black mb-4 tracking-tighter bg-gradient-to-r from-white to-text-secondary bg-clip-text text-transparent">{t('privacy:title')}</h1>
-          <p class="text-lg text-text-secondary max-w-2xl">{t('privacy:subtitle')}</p>
-          <div class="mt-6 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 text-accent text-xs font-mono font-bold border border-accent/20">
-            <span class="w-2 h-2 rounded-full bg-accent animate-pulse shadow-[0_0_8px_rgba(var(--color-accent),0.8)]"></span>
+          <h1 class="font-display font-bold text-4xl sm:text-5xl mb-4 tracking-tight leading-tight">{t('privacy:title')}</h1>
+          <p class="text-lg text-text-secondary max-w-2xl leading-relaxed">{t('privacy:subtitle')}</p>
+          <div class="mt-6 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-bg-surface text-accent text-xs font-mono font-bold" style="box-shadow: var(--shadow-neu-icon)">
+            <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
             {t('privacy:last_updated')}
           </div>
         </div>
 
-        <section id="privacy" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]"><FiLock size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:privacy.title')}</h2>
+        <section id="privacy" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiLock size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:privacy.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
+          <div class="max-w-none text-text-secondary leading-relaxed">
             <p class="text-lg text-text-primary font-medium mb-4">{t('privacy:privacy.intro')}</p>
-            <h3 class="text-lg font-bold text-text-primary mt-8 mb-3 border-b border-white/5 pb-2">{t('privacy:privacy.minimization_title')}</h3>
+            <h3 class="font-display text-lg font-bold text-text-primary mt-8 mb-3 border-b border-text-secondary/10 pb-2">{t('privacy:privacy.minimization_title')}</h3>
             <ul class="list-disc pl-5 space-y-3">
               <li set:html={t('privacy:privacy.minimization_1')} />
               <li set:html={t('privacy:privacy.minimization_2')} />
@@ -85,7 +86,7 @@ const navItems = [
               <li set:html={t('privacy:privacy.minimization_5')} />
             </ul>
 
-            <h3 class="text-lg font-bold text-text-primary mt-8 mb-3 border-b border-white/5 pb-2">{t('privacy:privacy.logging_title')}</h3>
+            <h3 class="font-display text-lg font-bold text-text-primary mt-8 mb-3 border-b border-text-secondary/10 pb-2">{t('privacy:privacy.logging_title')}</h3>
             <p>{t('privacy:privacy.logging_desc')}</p>
             <ul class="list-disc pl-5 space-y-2 mt-2">
               <li>{t('privacy:privacy.logging_1')}</li>
@@ -95,23 +96,23 @@ const navItems = [
           </div>
         </section>
 
-        <section id="terms" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]"><FiGlobe size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:terms.title')}</h2>
+        <section id="terms" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiGlobe size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:terms.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
-            
-            <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-5 mb-6 not-prose">
-              <h3 class="flex items-center gap-2 text-red-400 font-bold mb-2">
+          <div class="max-w-none text-text-secondary leading-relaxed">
+
+            <div class="bg-red-500/5 border border-red-500/15 rounded-2xl p-6 mb-6">
+              <h3 class="flex items-center gap-2 text-red-500 font-bold mb-2">
                 <FiAlertTriangle /> {t('privacy:terms.liability_title')}
               </h3>
-              <div class="text-sm text-red-200/80 m-0 leading-relaxed">
+              <div class="text-sm text-red-600/90 dark:text-red-400/90 leading-relaxed">
                 <p class="mb-3" set:html={t('privacy:terms.liability_desc')}></p>
-                
-                <p class="block mt-3 border-t border-red-500/20 pt-3">
-                  {t('privacy:terms.help_guidance')} 
-                  <a href={`${langPrefix}/help`} class="text-white underline hover:text-accent font-semibold">
+
+                <p class="block mt-3 border-t border-red-500/15 pt-3">
+                  {t('privacy:terms.help_guidance')}
+                  <a href={`${langPrefix}/help`} class="text-accent underline hover:text-text-primary font-semibold">
                     {t('common:help')}
                   </a>.
                 </p>
@@ -125,63 +126,63 @@ const navItems = [
           </div>
         </section>
 
-        <section id="licensing" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]"><FiShield size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:licensing.title')}</h2>
+        <section id="licensing" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiShield size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:licensing.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
+          <div class="max-w-none text-text-secondary leading-relaxed">
             <p set:html={t('privacy:licensing.intro')} />
-            <h3 class="text-lg font-bold text-text-primary mt-6 mb-3">{t('privacy:licensing.agpl_title')}</h3>
+            <h3 class="font-display text-lg font-bold text-text-primary mt-6 mb-3">{t('privacy:licensing.agpl_title')}</h3>
             <p set:html={t('privacy:licensing.agpl_desc')} />
-            
-            <div class="bg-bg-surface border border-white/10 rounded-xl p-5 mt-6 not-prose">
-              <h3 class="font-bold text-text-primary mb-2">{t('privacy:licensing.commercial_title')}</h3>
-              <p class="text-sm mb-4 text-text-secondary">
+
+            <div class="card-neumorphic-flat p-6 mt-6">
+              <h3 class="font-display font-bold text-text-primary mb-2 text-lg">{t('privacy:licensing.commercial_title')}</h3>
+              <p class="text-sm mb-5 text-text-secondary leading-relaxed">
                 {t('privacy:licensing.commercial_desc')}
               </p>
-              <a href={`${langPrefix}/commercial`} class="inline-flex items-center gap-2 text-xs font-bold bg-white text-black px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+              <a href={`${langPrefix}/commercial`} class="btn-primary inline-flex text-sm">
                 {t('privacy:licensing.contact_btn')}
               </a>
             </div>
           </div>
         </section>
 
-        <section id="cookies" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]"><FiDatabase size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:cookies.title')}</h2>
+        <section id="cookies" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiDatabase size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:cookies.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
+          <div class="max-w-none text-text-secondary leading-relaxed">
             <p class="mb-4">{t('privacy:cookies.intro')}</p>
-            
-            <div class="overflow-x-auto rounded-xl border border-white/5 shadow-sm not-prose">
+
+            <div class="card-neumorphic-flat p-2 overflow-x-auto">
               <table class="w-full text-left text-sm whitespace-nowrap">
-                <thead class="bg-black/20 text-text-secondary text-xs uppercase tracking-wider">
+                <thead class="bg-bg-main text-text-secondary text-xs uppercase tracking-wider">
                   <tr>
                     <th class="p-4 font-bold">{t('privacy:cookies.table_type')}</th>
                     <th class="p-4 font-bold">{t('privacy:cookies.table_item')}</th>
                     <th class="p-4 font-bold">{t('privacy:cookies.table_purpose')}</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-white/5 text-text-secondary">
-                  <tr class="hover:bg-white/5 transition-colors">
-                    <td class="p-4"><span class="px-2 py-1 rounded bg-blue-500/10 text-blue-400 text-xs">HttpOnly Cookie</span></td>
+                <tbody class="divide-y divide-text-secondary/10 text-text-secondary">
+                  <tr class="hover:bg-bg-main transition-colors">
+                    <td class="p-4"><span class="px-2 py-1 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs">HttpOnly Cookie</span></td>
                     <td class="p-4 font-mono text-accent">at / rt / csrf</td>
                     <td class="p-4">{t('privacy:cookies.cookie_desc')}</td>
                   </tr>
-                  <tr class="hover:bg-white/5 transition-colors">
-                    <td class="p-4"><span class="px-2 py-1 rounded bg-purple-500/10 text-purple-400 text-xs">IndexedDB</span></td>
+                  <tr class="hover:bg-bg-main transition-colors">
+                    <td class="p-4"><span class="px-2 py-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs">IndexedDB</span></td>
                     <td class="p-4 font-mono text-accent">nyx_vault / keys</td>
                     <td class="p-4">{t('privacy:cookies.idb_keys_desc')}</td>
                   </tr>
-                  <tr class="hover:bg-white/5 transition-colors">
-                    <td class="p-4"><span class="px-2 py-1 rounded bg-purple-500/10 text-purple-400 text-xs">IndexedDB</span></td>
+                  <tr class="hover:bg-bg-main transition-colors">
+                    <td class="p-4"><span class="px-2 py-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs">IndexedDB</span></td>
                     <td class="p-4 font-mono text-accent">shadow_vault</td>
                     <td class="p-4">{t('privacy:cookies.idb_vault_desc')}</td>
                   </tr>
-                  <tr class="hover:bg-white/5 transition-colors">
-                    <td class="p-4"><span class="px-2 py-1 rounded bg-orange-500/10 text-orange-400 text-xs">Persistent Storage</span></td>
+                  <tr class="hover:bg-bg-main transition-colors">
+                    <td class="p-4"><span class="px-2 py-1 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs">Persistent Storage</span></td>
                     <td class="p-4 font-mono text-accent">deviceId / installationId</td>
                     <td class="p-4">{t('privacy:cookies.id_desc')}</td>
                   </tr>
@@ -191,15 +192,15 @@ const navItems = [
           </div>
         </section>
 
-        <section id="ai" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5_rgba(0,0,0,0.2)]"><FiCpu size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:ai.title')}</h2>
+        <section id="ai" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiCpu size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:ai.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
+          <div class="max-w-none text-text-secondary leading-relaxed">
             <p set:html={t('privacy:ai.intro')} />
-            
-            <h3 class="text-lg font-bold text-text-primary mt-6 mb-3">{t('privacy:ai.smart_reply_title')}</h3>
+
+            <h3 class="font-display text-lg font-bold text-text-primary mt-6 mb-3">{t('privacy:ai.smart_reply_title')}</h3>
             <p set:html={t('privacy:ai.smart_reply_desc')} />
             <ul class="list-disc pl-5 space-y-2 mt-2">
               <li>{t('privacy:ai.smart_reply_1')}</li>
@@ -209,33 +210,33 @@ const navItems = [
           </div>
         </section>
 
-        <section id="security" class="mb-12 scroll-mt-24 content-section">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="p-2 rounded-lg bg-accent/10 text-accent shadow-[inset_2px_2px_5_rgba(0,0,0,0.2)]"><FiShield size={24} /></div>
-            <h2 class="text-2xl font-bold text-text-primary tracking-tight">{t('privacy:security.title')}</h2>
+        <section id="security" class="mb-14 scroll-mt-28 content-section">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="icon-well w-12 h-12 flex-shrink-0"><FiShield size={22} /></div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('privacy:security.title')}</h2>
           </div>
-          <div class="prose dark:prose-invert max-w-none text-text-secondary leading-relaxed">
+          <div class="max-w-none text-text-secondary leading-relaxed">
             <p>{t('privacy:security.intro')}</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 not-prose">
-              <div class="bg-bg-surface p-4 rounded-xl border border-white/5">
-                <h3 class="font-bold text-text-primary mb-1">{t('privacy:security.signal_title')}</h3>
-                <p class="text-xs text-text-secondary">{t('privacy:security.signal_desc')}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+              <div class="card-neumorphic-flat p-5">
+                <h3 class="font-display font-bold text-text-primary mb-1">{t('privacy:security.signal_title')}</h3>
+                <p class="text-xs text-text-secondary leading-relaxed">{t('privacy:security.signal_desc')}</p>
               </div>
-              <div class="bg-bg-surface p-4 rounded-xl border border-white/5">
-                <h3 class="font-bold text-text-primary mb-1">{t('privacy:security.webauthn_title')}</h3>
-                <p class="text-xs text-text-secondary">{t('privacy:security.webauthn_desc')}</p>
+              <div class="card-neumorphic-flat p-5">
+                <h3 class="font-display font-bold text-text-primary mb-1">{t('privacy:security.webauthn_title')}</h3>
+                <p class="text-xs text-text-secondary leading-relaxed">{t('privacy:security.webauthn_desc')}</p>
               </div>
-              <div class="bg-bg-surface p-4 rounded-xl border border-white/5">
-                <h3 class="font-bold text-text-primary mb-1">{t('privacy:security.memory_title')}</h3>
-                <p class="text-xs text-text-secondary">{t('privacy:security.memory_desc')}</p>
+              <div class="card-neumorphic-flat p-5">
+                <h3 class="font-display font-bold text-text-primary mb-1">{t('privacy:security.memory_title')}</h3>
+                <p class="text-xs text-text-secondary leading-relaxed">{t('privacy:security.memory_desc')}</p>
               </div>
-              <div class="bg-bg-surface p-4 rounded-xl border border-white/5">
-                <h3 class="font-bold text-text-primary mb-1">{t('privacy:security.migration_title')}</h3>
-                <p class="text-xs text-text-secondary">{t('privacy:security.migration_desc')}</p>
+              <div class="card-neumorphic-flat p-5">
+                <h3 class="font-display font-bold text-text-primary mb-1">{t('privacy:security.migration_title')}</h3>
+                <p class="text-xs text-text-secondary leading-relaxed">{t('privacy:security.migration_desc')}</p>
               </div>
-              <div class="bg-bg-surface p-4 rounded-xl border border-white/5">
-                <h3 class="font-bold text-text-primary mb-1">{t('privacy:security.hardware_binding_title')}</h3>
-                <p class="text-xs text-text-secondary">{t('privacy:security.hardware_binding_desc')}</p>
+              <div class="card-neumorphic-flat p-5">
+                <h3 class="font-display font-bold text-text-primary mb-1">{t('privacy:security.hardware_binding_title')}</h3>
+                <p class="text-xs text-text-secondary leading-relaxed">{t('privacy:security.hardware_binding_desc')}</p>
               </div>
             </div>
           </div>
@@ -262,12 +263,13 @@ const navItems = [
     });
 
     navLinks.forEach(link => {
-      link.classList.remove('bg-accent/10', 'border-accent/20', 'text-accent', 'shadow-inner');
-      link.classList.add('text-text-secondary', 'border-transparent');
-      
+      const el = link as HTMLElement;
+      el.classList.remove('bg-bg-surface', 'text-accent');
+      el.style.boxShadow = 'none';
+
       if (link.getAttribute('href') === `#${currentId}`) {
-        link.classList.remove('text-text-secondary', 'border-transparent');
-        link.classList.add('bg-accent/10', 'border-accent/20', 'text-accent', 'shadow-inner');
+        el.classList.add('bg-bg-surface', 'text-accent');
+        el.style.boxShadow = 'var(--shadow-neu-icon)';
       }
     });
   }

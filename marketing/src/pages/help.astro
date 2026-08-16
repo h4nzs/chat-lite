@@ -3,9 +3,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 import Footer from '../components/Footer.astro';
 import '../index.css';
 import { getLangFromUrl, useTranslations } from '../utils/i18n';
-import { 
-  FiChevronLeft, FiHelpCircle, FiRefreshCw, 
-  FiUserCheck, FiKey, FiCloudOff, FiAlertCircle
+import {
+  FiChevronLeft, FiHelpCircle, FiRefreshCw,
+  FiUserCheck, FiKey, FiCloudOff, FiAlertCircle,
+  FiZap, FiEyeOff, FiShield, FiChevronDown
 } from 'react-icons/fi';
 
 const { lang: propLang } = Astro.props;
@@ -16,35 +17,56 @@ const t = useTranslations(lang);
 const title = t('help:title');
 const description = t('help:seo.description') !== 'help:seo.description' ? t('help:seo.description') : 'Get help with NYX E2EE chat, account recovery, and security features.';
 
+const homeLabel = t('common:home') !== 'common:home' ? t('common:home') : 'Home';
+const topicsLabel = t('help:topics') !== 'help:topics' ? t('help:topics') : 'Topics';
+
 const categories = [
-  { id: 'migration', icon: FiRefreshCw, title: t('help:move_account.title') },
-  { id: 'sandbox', icon: FiUserCheck, title: t('help:sandbox_mode.title') },
-  { id: 'password', icon: FiKey, title: t('help:forgot_password.title') },
-  { id: 'sync', icon: FiCloudOff, title: t('help:sync_issues.title') },
-  { id: 'lost', icon: FiAlertCircle, title: t('help:lost_phrase.title') },
+  { id: 'migration', icon: FiRefreshCw, title: t('help:move_account.title'), tone: 'accent' },
+  { id: 'sandbox', icon: FiUserCheck, title: t('help:sandbox_mode.title'), tone: 'accent' },
+  { id: 'password', icon: FiKey, title: t('help:forgot_password.title'), tone: 'yellow' },
+  { id: 'sync', icon: FiCloudOff, title: t('help:sync_issues.title'), tone: 'accent' },
+  { id: 'lost', icon: FiAlertCircle, title: t('help:lost_phrase.title'), tone: 'red' },
 ];
+
+const faqItems = [
+  { icon: FiZap, title: t('help:burner.title'), desc: t('help:burner.desc') },
+  { icon: FiEyeOff, title: t('help:zkfiles.title'), desc: t('help:zkfiles.desc') },
+  { icon: FiShield, title: t('help:backup.title'), desc: t('help:backup.desc') },
+];
+
+const toneClasses: Record<string, string> = {
+  accent: 'text-accent',
+  yellow: 'text-yellow-600 dark:text-yellow-500',
+  red: 'text-red-500',
+};
 ---
 
 <MainLayout title={title} description={description} canonicalUrl={Astro.url.pathname}>
-  <div class="min-h-screen bg-bg-main text-text-primary p-4 md:p-8">
-    <main class="max-w-4xl mx-auto">
-      
-      <nav class="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-widest mb-8 animate-in fade-in duration-500">
-        <a href={lang === 'en' ? '/' : langPrefix} class="hover:text-accent transition-colors">{t('common:home') !== 'common:home' ? t('common:home') : 'Home'}</a>
-        <span>/</span>
+  <div class="min-h-screen bg-bg-main text-text-primary relative overflow-x-clip">
+    <div class="aurora-blob w-[480px] h-[480px] -top-40 -right-40" style="background: radial-gradient(circle, hsl(var(--grad-end) / 0.10), transparent 60%);"></div>
+
+    <main class="max-w-5xl mx-auto px-6 py-10 md:py-14 relative">
+
+      <nav class="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-widest mb-10 animate-in fade-in duration-500">
+        <a href={lang === 'en' ? '/' : langPrefix} class="hover:text-accent transition-colors">{homeLabel}</a>
+        <span class="text-text-secondary/40">/</span>
         <span class="text-accent">{title}</span>
       </nav>
 
-      <div class="flex flex-col md:flex-row gap-12">
-        
+      <div class="flex flex-col md:flex-row gap-10">
+
         <aside class="md:w-64 flex-shrink-0 hidden md:block">
-          <div class="sticky top-8 bg-bg-surface rounded-2xl p-6 border border-white/5 shadow-neu-flat-dark">
-            <h3 class="text-sm font-black uppercase tracking-tighter mb-4 flex items-center gap-2">
-              <FiHelpCircle class="text-accent" /> {t('help:topics') !== 'help:topics' ? t('help:topics') : 'Topics'}
+          <div class="sticky top-8 card-neumorphic-flat p-6">
+            <h3 class="text-sm font-black uppercase tracking-tighter mb-5 flex items-center gap-2">
+              <div class="icon-well w-8 h-8 mr-1"><FiHelpCircle size={16} /></div>
+              <span>{topicsLabel}</span>
             </h3>
             <nav class="space-y-1">
               {categories.map(cat => (
-                <a href={`#${cat.id}`} class="block py-2 text-sm text-text-secondary hover:text-accent transition-colors font-medium border-l-2 border-transparent hover:border-accent pl-2">
+                <a
+                  href={`#${cat.id}`}
+                  class="block py-2.5 px-3 text-sm text-text-secondary hover:text-accent transition-colors font-medium rounded-xl hover:bg-bg-main"
+                >
                   {cat.title}
                 </a>
               ))}
@@ -53,101 +75,144 @@ const categories = [
         </aside>
 
         <div class="flex-1 space-y-16">
-          <header class="mb-12 border-b border-white/5 pb-8 animate-in slide-in-from-bottom-4 duration-700">
-            <div class="flex items-center gap-4 mb-4">
-              <a href={lang === 'en' ? '/' : langPrefix} aria-label="Back" class="p-2.5 rounded-full text-text-secondary bg-bg-main shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2),inset_-2px_-2px_5px_rgba(255,255,255,0.1)] hover:text-accent transition-all">
+          <header class="mb-12 pb-8 border-b border-text-secondary/10 animate-in slide-in-from-bottom-4 duration-700">
+            <div class="flex items-center gap-5">
+              <a
+                href={lang === 'en' ? '/' : langPrefix}
+                aria-label="Back"
+                class="icon-well w-12 h-12 flex-shrink-0 hover:text-accent"
+              >
                 <FiChevronLeft size={24} />
               </a>
-              <h1 class="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-white to-text-secondary bg-clip-text text-transparent">{title}</h1>
+              <h1 class="font-display font-bold text-4xl md:text-5xl tracking-tight leading-tight">{title}</h1>
             </div>
           </header>
 
           <section id="migration" class="scroll-mt-24 group">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]">
-                <FiRefreshCw size={24} />
+            <div class="flex items-center gap-4 mb-6">
+              <div class={`icon-well w-12 h-12 ${toneClasses.accent}`}>
+                <FiRefreshCw size={22} />
               </div>
-              <h2 class="text-2xl font-bold tracking-tight">{t('help:move_account.title')}</h2>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('help:move_account.title')}</h2>
             </div>
-            <div class="bg-bg-surface p-6 rounded-2xl border border-white/5 text-text-secondary shadow-sm">
-              <p class="mb-4">{t('help:move_account.desc')}</p>
+            <div class="card-neumorphic-flat text-text-secondary">
+              <p class="mb-4 leading-relaxed">{t('help:move_account.desc')}</p>
               <ul class="list-disc list-inside ml-4 space-y-3">
                 <li>
                   <span class="font-bold text-text-primary">{t('help:move_account.migration_label')}</span>{' '}
-                  <span set:html={t('help:move_account.migration_text') !== 'help:move_account.migration_text' ? t('help:move_account.migration_text') : 'Go to <span class="font-mono bg-black/30 p-1 rounded">Settings &gt; Transfer to New Device</span>. This creates a secure, direct tunnel to your new phone via QR code.'} />
+                  <span set:html={t('help:move_account.migration_text') !== 'help:move_account.migration_text' ? t('help:move_account.migration_text') : 'Go to <span class="font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary">Settings &gt; Transfer to New Device</span>. This creates a secure, direct tunnel to your new phone via QR code.'} />
                 </li>
                 <li>
                   <span class="font-bold text-text-primary">{t('help:move_account.backup_label')}</span>{' '}
-                  <span set:html={t('help:move_account.backup_text') !== 'help:move_account.backup_text' ? t('help:move_account.backup_text') : 'Go to <span class="font-mono bg-black/30 p-1 rounded">Settings &gt; Export Vault</span>. Save the <code>.nyxvault</code> file and import it on your new device login screen.'} />
+                  <span set:html={t('help:move_account.backup_text') !== 'help:move_account.backup_text' ? t('help:move_account.backup_text') : 'Go to <span class="font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary">Settings &gt; Export Vault</span>. Save the <code>.nyxvault</code> file and import it on your new device login screen.'} />
                 </li>
               </ul>
             </div>
           </section>
 
           <section id="sandbox" class="scroll-mt-24 group">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]">
-                <FiUserCheck size={24} />
+            <div class="flex items-center gap-4 mb-6">
+              <div class={`icon-well w-12 h-12 ${toneClasses.accent}`}>
+                <FiUserCheck size={22} />
               </div>
-              <h2 class="text-2xl font-bold tracking-tight">{t('help:sandbox_mode.title')}</h2>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('help:sandbox_mode.title')}</h2>
             </div>
-            <div class="bg-bg-surface p-6 rounded-2xl border border-white/5 text-text-secondary">
-              <p class="mb-3" set:html={t('help:sandbox_mode.desc') !== 'help:sandbox_mode.desc' ? t('help:sandbox_mode.desc') : 'To prevent spam bots without collecting personal data (like phone numbers), new accounts start in <strong>Sandbox Mode</strong> with limited messaging quotas.'} />
-              <p set:html={t('help:sandbox_mode.upgrade_text') !== 'help:sandbox_mode.upgrade_text' ? t('help:sandbox_mode.upgrade_text') : 'You can upgrade to <strong>VIP Status</strong> instantly for free by verifying you are human. Go to <span class="font-mono bg-black/30 p-1 rounded">Settings &gt; Upgrade to VIP</span> and choose either <strong>Biometric Verification</strong> (Fingerprint/FaceID) or <strong>Proof of Work</strong> (CPU Mining).'} />
+            <div class="card-neumorphic-flat text-text-secondary">
+              <p class="mb-3 leading-relaxed" set:html={t('help:sandbox_mode.desc') !== 'help:sandbox_mode.desc' ? t('help:sandbox_mode.desc') : 'To prevent spam bots without collecting personal data (like phone numbers), new accounts start in <strong>Sandbox Mode</strong> with limited messaging quotas.'} />
+              <p class="leading-relaxed" set:html={t('help:sandbox_mode.upgrade_text') !== 'help:sandbox_mode.upgrade_text' ? t('help:sandbox_mode.upgrade_text') : 'You can upgrade to <strong>VIP Status</strong> instantly for free by verifying you are human. Go to <span class="font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary">Settings &gt; Upgrade to VIP</span> and choose either <strong>Biometric Verification</strong> (Fingerprint/FaceID) or <strong>Proof of Work</strong> (CPU Mining).'} />
             </div>
           </section>
 
           <section id="password" class="scroll-mt-24 group">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 group-hover:scale-110 transition-transform shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]">
-                <FiKey size={24} />
+            <div class="flex items-center gap-4 mb-6">
+              <div class={`icon-well w-12 h-12 ${toneClasses.yellow}`}>
+                <FiKey size={22} />
               </div>
-              <h2 class="text-2xl font-bold tracking-tight">{t('help:forgot_password.title')}</h2>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('help:forgot_password.title')}</h2>
             </div>
-            <div class="bg-yellow-500/5 border border-yellow-500/20 p-6 rounded-2xl relative overflow-hidden">
-               <div class="absolute -right-4 -top-4 opacity-10"><FiKey size={120} /></div>
-               <p class="text-yellow-200/80 mb-4 italic leading-relaxed" set:html={t('help:forgot_password.desc') !== 'help:forgot_password.desc' ? t('help:forgot_password.desc') : 'Because we don\'t have your email, we cannot send you a reset link. You must use your <strong>Recovery Phrase</strong>.'} />
-               <ul class="list-disc list-inside ml-4 space-y-2 text-text-secondary">
-                 <li>{t('help:forgot_password.step1')}</li>
-                 <li>{t('help:forgot_password.step2')}</li>
-                 <li>{t('help:forgot_password.step3')}</li>
-               </ul>
-               <p class="mt-4 text-yellow-500 text-sm" set:html={t('help:forgot_password.warning') !== 'help:forgot_password.warning' ? t('help:forgot_password.warning') : 'Note: Restoring from a phrase resets your identity keys. You will regain access to your account ID, but <strong>chat history will be lost</strong> unless you have a Vault Backup.'} />
+            <div class="card-neumorphic-flat relative overflow-hidden">
+              <div class="absolute -right-6 -top-6 opacity-[0.07]"><FiKey size={120} /></div>
+              <p class="text-yellow-600 dark:text-yellow-400 mb-4 italic leading-relaxed" set:html={t('help:forgot_password.desc') !== 'help:forgot_password.desc' ? t('help:forgot_password.desc') : 'Because we don\'t have your email, we cannot send you a reset link. You must use your <strong>Recovery Phrase</strong>.'} />
+              <ul class="list-disc list-inside ml-4 space-y-2 text-text-secondary">
+                <li>{t('help:forgot_password.step1')}</li>
+                <li>{t('help:forgot_password.step2')}</li>
+                <li>{t('help:forgot_password.step3')}</li>
+              </ul>
+              <p class="mt-4 text-yellow-600 dark:text-yellow-500 text-sm" set:html={t('help:forgot_password.warning') !== 'help:forgot_password.warning' ? t('help:forgot_password.warning') : 'Note: Restoring from a phrase resets your identity keys. You will regain access to your account ID, but <strong>chat history will be lost</strong> unless you have a Vault Backup.'} />
             </div>
           </section>
 
           <section id="sync" class="scroll-mt-24 group">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]">
-                <FiCloudOff size={24} />
+            <div class="flex items-center gap-4 mb-6">
+              <div class={`icon-well w-12 h-12 ${toneClasses.accent}`}>
+                <FiCloudOff size={22} />
               </div>
-              <h2 class="text-2xl font-bold tracking-tight">{t('help:sync_issues.title')}</h2>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('help:sync_issues.title')}</h2>
             </div>
-            <div class="bg-bg-surface p-6 rounded-2xl border border-white/5 text-text-secondary leading-relaxed">
+            <div class="card-neumorphic-flat text-text-secondary leading-relaxed">
               <p class="mb-4" set:html={t('help:sync_issues.desc') !== 'help:sync_issues.desc' ? t('help:sync_issues.desc') : 'NYX is <strong>Local-First</strong>. Messages live on your device, not the cloud. If you use NYX on multiple devices (e.g. Phone + Laptop), they act as independent clients.'} />
               <p>{t('help:sync_issues.future_text')}</p>
             </div>
           </section>
 
           <section id="lost" class="scroll-mt-24 group">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="p-3 rounded-xl bg-red-500/10 text-red-500 group-hover:scale-110 transition-transform shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]">
-                <FiAlertCircle size={24} />
+            <div class="flex items-center gap-4 mb-6">
+              <div class={`icon-well w-12 h-12 ${toneClasses.red}`}>
+                <FiAlertCircle size={22} />
               </div>
-              <h2 class="text-2xl font-bold tracking-tight text-red-400">{t('help:lost_phrase.title')}</h2>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight text-red-500">{t('help:lost_phrase.title')}</h2>
             </div>
-            <div class="bg-red-500/5 border border-red-500/20 p-6 rounded-2xl">
+            <div class="card-neumorphic-flat">
               <p class="mb-2 font-semibold text-red-500">{t('help:lost_phrase.irrecoverable')}</p>
-              <p class="text-text-secondary leading-relaxed m-0">{t('help:lost_phrase.desc')}</p>
+              <p class="text-text-secondary leading-relaxed">{t('help:lost_phrase.desc')}</p>
             </div>
           </section>
 
-        </div> </div> <footer class="mt-20 pt-8 border-t border-white/5 text-center text-text-secondary">
-        <p class="text-xs uppercase tracking-[0.2em] font-bold opacity-30">
-          {t('help:footer_tagline') !== 'help:footer_tagline' ? t('help:footer_tagline') : 'NYX Intelligence Base • Security Level 0'}
-        </p>
-      </footer>
+          <!-- FAQ -->
+          <section id="faq" class="scroll-mt-24">
+            <div class="flex items-center gap-4 mb-8">
+              <div class={`icon-well w-12 h-12 ${toneClasses.accent}`}>
+                <FiHelpCircle size={22} />
+              </div>
+              <h2 class="font-display text-2xl md:text-3xl font-bold tracking-tight">{t('landing:faq.title') !== 'landing:faq.title' ? t('landing:faq.title') : 'Frequently Asked Questions'}</h2>
+            </div>
+            <div class="space-y-4">
+              {faqItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                <div class="card-neumorphic-flat p-0 overflow-hidden">
+                  <details class="group">
+                    <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-text-primary hover:text-accent transition-colors gap-4">
+                      <span class="flex items-center gap-3">
+                        <span class={`icon-well w-9 h-9 flex-shrink-0 ${toneClasses.accent}`}><Icon size={18} /></span>
+                        <span class="font-display text-lg">{item.title}</span>
+                      </span>
+                      <span class="transition group-open:rotate-180 text-accent flex-shrink-0">
+                        <FiChevronDown size={22} />
+                      </span>
+                    </summary>
+                    <div class="text-text-secondary px-6 pb-6 pt-0 leading-relaxed">
+                      {item.desc}
+                    </div>
+                  </details>
+                </div>
+                );
+              })}
+            </div>
+          </section>
 
+          <footer class="mt-20 pt-8 border-t border-text-secondary/10 text-center text-text-secondary">
+            <p class="text-xs uppercase tracking-[0.25em] font-bold opacity-50">
+              {t('help:footer_tagline') !== 'help:footer_tagline' ? t('help:footer_tagline') : 'NYX Help Center'}
+            </p>
+          </footer>
+
+        </div>
+      </div>
+
+      <div class="mt-16">
+        <Footer lang={lang} />
+      </div>
     </main>
   </div>
 </MainLayout>

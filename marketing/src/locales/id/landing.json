@@ -7,7 +7,7 @@
     "title_prefix": "PERCAKAPAN",
     "title_highlight": "PRIBADI",
     "title_suffix": "DIAMANKAN OLEH ANDA",
-    "description": "Pesan terenkripsi end-to-end dengan desain industrial yang nyata. Tanpa nomor telepon ataupun email. Tanpa pelacak. Hanya Anda dan data Anda.",
+    "description": "Pesan terenkripsi end-to-end dengan antarmuka yang halus dan elegan. Tanpa nomor telepon ataupun email. Tanpa pelacak. Hanya Anda dan data Anda.",
     "cta_start": "MULAI SEKARANG",
     "cta_source": "KODE SUMBER"
   },
@@ -58,8 +58,8 @@
       "desc": "Daftar hanya dengan Username. Identitas asli Anda tetap aman. Tidak ada yang bisa 'menyimpan kontak Anda' tanpa izin."
     },
     "tactile": {
-      "title": "MUTATED NEUMORPHIC",
-      "desc": "Antarmuka neumorphic termutasi dengan kedalaman pahatan dan gradasi elegan untuk rasa fisik premium."
+      "title": "NEUMORFIK HALUS",
+      "desc": "Antarmuka neumorfik yang halus dengan kedalaman lembut untuk nuansa premium yang menenangkan."
     }
   },
   "how_it_works": {
@@ -94,6 +94,60 @@
     "a3": "Saat mendaftar, Anda diberikan 24 kata frasa pemulihan. Ini adalah satu-satunya cara untuk memulihkan identitas Anda. Simpan dengan aman secara offline. Kami tidak dapat memulihkannya untuk Anda.",
     "q4": "Apakah NYX kebal terhadap komputer kuantum?",
     "a4": "Ya, kami mengimplementasikan pendekatan hibrida yang menggabungkan X25519 klasik dan algoritma pasca-kuantum ML-KEM-768 (X-Wing) dalam Web Worker WebAssembly khusus."
+  },
+  "pipeline": {
+    "title": "CARA NYX MELINDUNGI PESAN ANDA",
+    "headline": "Satu pesan. Tiga lapis keheningan.",
+    "subtitle": "Saksikan bagaimana satu pesan bepergian — terenkripsi di perangkat Anda, buta saat melewati server, dan terdekripsi hanya di tempat yang seharusnya.",
+    "sender": "Anda",
+    "server": "Server NYX",
+    "recipient": "Penerima",
+    "step_1": "Dienkripsi di perangkat Anda",
+    "step_2": "Relai buta — server tidak melihat apa pun",
+    "step_3": "Didekripsi hanya di perangkat penerima",
+    "proof_1": "Server melihat: tidak ada",
+    "proof_2": "Kunci tidak pernah meninggalkan perangkat",
+    "proof_3": "Privasi bawaan"
+  },
+  "signup": {
+    "title": "TANPA NOMOR TELEPON. SELAMANYA.",
+    "headline": "Bahkan Signal pun masih meminta nomor Anda.",
+    "subtitle": "NYX tidak — karena dirancang untuk tidak membutuhkannya.",
+    "signal_label": "SIGNAL",
+    "signal_1": "Nomor telepon",
+    "signal_2": "Kode verifikasi SMS",
+    "signal_3": "Setup profil",
+    "signal_note": "Masih membutuhkan nomor telepon",
+    "nyx_label": "NYX",
+    "nyx_1": "Pilih username",
+    "nyx_2": "Kunci dibuat di perangkat Anda",
+    "nyx_3": "Frasa pemulihan 24 kata",
+    "nyx_note": "Anonim sejak awal",
+    "nyx_badge": "TANPA NOMOR HP"
+  },
+  "stats": {
+    "title": "ANGKA YANG BERBICARA LEMBUT",
+    "headline": "Dibangun dari lebih sedikit, bukan lebih banyak.",
+    "stat_1_label": "Nomor telepon dikumpulkan",
+    "stat_1_value": "0",
+    "stat_2_label": "Pelacak",
+    "stat_2_value": "0",
+    "stat_3_label": "Enkripsi end-to-end",
+    "stat_3_value": "100%",
+    "stat_4_label": "Riwayat cloud tersimpan",
+    "stat_4_value": "0"
+  },
+  "blind": {
+    "title": "RELAI BUTA, LITERAL",
+    "headline": "Bukan hanya itu saja.",
+    "subtitle": "Kami tidak tahu siapa yang mengirim pesan — kami hanya mengirimkannya ke tempat yang Anda tuju.",
+    "sender_label": "Pengirim",
+    "server_label": "Server NYX",
+    "recipient_label": "Penerima",
+    "from_unknown": "from: ???",
+    "to_label": "to:",
+    "server_note": "Kami hanya melihat alamat tujuan, tidak pernah pengirimnya",
+    "burner_note": "Di sesi Burner, kami bahkan tidak bisa mengidentifikasi Anda sama sekali."
   },
   "cta": {
     "title": "AMBIL KEMBALI PRIVASI ANDA.",

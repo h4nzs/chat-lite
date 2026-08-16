@@ -7,7 +7,7 @@
     "title_prefix": "CONVERSAS",
     "title_highlight": "PRIVADAS",
     "title_suffix": "PROTEGIDAS POR VOCÊ",
-    "description": "Mensagens com criptografia de ponta a ponta e um design industrial autêntico. Sem números de telefone ou e-mails. Sem rastreadores. Apenas você e seus dados.",
+    "description": "Mensagens com criptografia de ponta a ponta e uma interface suave e elegante. Sem números de telefone ou e-mails. Sem rastreadores. Apenas você e seus dados.",
     "cta_start": "COMECE AGORA",
     "cta_source": "CÓDIGO FONTE"
   },
@@ -58,8 +58,8 @@
       "desc": "O único chat web que transforma sua senha em uma chave de criptografia de nível militar, usando um hash resistente a ataques de memória."
     },
     "tactile": {
-      "title": "DESIGN TÁTIL",
-      "desc": "Interface neumórfica com profundidade esculpida e textura granulada para uma sensação física premium."
+      "title": "NEOMORFISMO REFINADO",
+      "desc": "Interface neomórfica suave com profundidade delicada para uma sensação premium e acolhedora."
     },
     "post_quantum": {
       "title": "SEGURANÇA PÓS-QUÂNTICA",
@@ -102,6 +102,60 @@
     "a3": "Sim, o NYX é de código aberto e totalmente gratuito. Sem cobranças ocultas, sem anúncios e sem rastreamento de dados.",
     "q4": "Como eu recupero minha conta?",
     "a4": "Ao se cadastrar, você recebe uma frase de recuperação de 24 palavras. Essa é a ÚNICA maneira de recuperar sua conta, mas lembre-se de que você não poderá acessar seu histórico de mensagens. E nós não guardamos essa frase."
+  },
+  "pipeline": {
+    "title": "COMO O NYX PROTEGE SUA MENSAGEM",
+    "headline": "Uma mensagem. Três camadas de silêncio.",
+    "subtitle": "Veja como uma única mensagem viaja — criptografada no seu dispositivo, cega ao passar pelo servidor e decifrada apenas onde deve estar.",
+    "sender": "Você",
+    "server": "Servidor NYX",
+    "recipient": "Destinatário",
+    "step_1": "Criptografado no seu dispositivo",
+    "step_2": "Retransmissão cega — o servidor não vê nada",
+    "step_3": "Decifrado apenas no destinatário",
+    "proof_1": "O servidor vê: nada",
+    "proof_2": "As chaves nunca saem do seu dispositivo",
+    "proof_3": "Privacidade por padrão"
+  },
+  "signup": {
+    "title": "SEM NÚMERO DE TELEFONE. NUNCA.",
+    "headline": "Até o Signal ainda pede o seu telefone.",
+    "subtitle": "O NYX não — porque foi projetado para não precisar.",
+    "signal_label": "SIGNAL",
+    "signal_1": "Número de telefone",
+    "signal_2": "Código de verificação SMS",
+    "signal_3": "Configuração do perfil",
+    "signal_note": "Ainda exige um número de telefone",
+    "nyx_label": "NYX",
+    "nyx_1": "Escolha um nome de usuário",
+    "nyx_2": "Chaves geradas no seu dispositivo",
+    "nyx_3": "Frase de recuperação de 24 palavras",
+    "nyx_note": "Anônimo por design",
+    "nyx_badge": "SEM TELEFONE"
+  },
+  "stats": {
+    "title": "NÚMEROS QUE FALAM BAIXO",
+    "headline": "Construído com menos, não com mais.",
+    "stat_1_label": "Números de telefone coletados",
+    "stat_1_value": "0",
+    "stat_2_label": "Rastreadores",
+    "stat_2_value": "0",
+    "stat_3_label": "Criptografia de ponta a ponta",
+    "stat_3_value": "100%",
+    "stat_4_label": "Histórico armazenado na nuvem",
+    "stat_4_value": "0"
+  },
+  "blind": {
+    "title": "RETRANSMISSÃO CEGA, LITERALMENTE",
+    "headline": "E não para por aí.",
+    "subtitle": "Não sabemos quem enviou a mensagem — apenas a encaminhamos para onde você apontou.",
+    "sender_label": "Remetente",
+    "server_label": "Servidor NYX",
+    "recipient_label": "Destinatário",
+    "from_unknown": "from: ???",
+    "to_label": "to:",
+    "server_note": "Só vemos o endereço, nunca o remetente",
+    "burner_note": "Nas sessões Burner, não conseguimos nem identificá-lo."
   },
   "cta": {
     "title": "RECUPERE SUA PRIVACIDADE.",

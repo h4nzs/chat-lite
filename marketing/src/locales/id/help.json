@@ -6,9 +6,9 @@
     "title": "Bagaimana cara memindahkan akun ke perangkat baru?",
     "desc": "Karena NYX menyimpan kunci dan riwayat Anda secara lokal untuk privasi maksimal, Anda tidak bisa hanya masuk untuk melihat pesan lama. Anda memiliki dua cara aman untuk pindah:",
     "migration_label": "Migrasi Perangkat (Direkomendasikan):",
-    "migration_text": "Buka <span class=\"font-mono bg-black/30 p-1 rounded\">Pengaturan &gt; Transfer ke Perangkat Baru</span>. Ini membuat terowongan langsung yang aman ke ponsel baru Anda melalui kode QR.",
+    "migration_text": "Buka <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Pengaturan &gt; Transfer ke Perangkat Baru</span>. Ini membuat terowongan langsung yang aman ke ponsel baru Anda melalui kode QR.",
     "backup_label": "Cadangan Vault:",
-    "backup_text": "Buka <span class=\"font-mono bg-black/30 p-1 rounded\">Pengaturan &gt; Ekspor Vault</span>. Simpan file <code>.nyxvault</code> dan impor di layar masuk perangkat baru Anda."
+    "backup_text": "Buka <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Pengaturan &gt; Ekspor Vault</span>. Simpan file <code>.nyxvault</code> dan impor di layar masuk perangkat baru Anda."
   },
   "burner": {
     "title": "Apa itu Sesi Chat Burner?",
@@ -25,7 +25,7 @@
   "sandbox_mode": {
     "title": "Mengapa akun saya di \"Mode Sandbox\"?",
     "desc": "Untuk mencegah bot spam tanpa mengumpulkan data pribadi (seperti nomor telepon), akun baru dimulai dalam <strong>Mode Sandbox</strong> dengan kuota pengiriman pesan terbatas.",
-    "upgrade_text": "Anda dapat meningkatkan ke <strong>Status VIP</strong> secara instan dan gratis dengan memverifikasi bahwa Anda adalah manusia. Buka <span class=\"font-mono bg-black/30 p-1 rounded\">Pengaturan &gt; Tingkatkan ke VIP</span> dan pilih antara <strong>Verifikasi Biometrik</strong> (Sidik Jari/FaceID) atau <strong>Proof of Work</strong> (CPU Mining)."
+    "upgrade_text": "Anda dapat meningkatkan ke <strong>Status VIP</strong> secara instan dan gratis dengan memverifikasi bahwa Anda adalah manusia. Buka <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Pengaturan &gt; Tingkatkan ke VIP</span> dan pilih antara <strong>Verifikasi Biometrik</strong> (Sidik Jari/FaceID) atau <strong>Proof of Work</strong> (CPU Mining)."
   },
   "forgot_password": {
     "title": "Saya lupa kata sandi. Apa yang harus saya lakukan?",
@@ -45,7 +45,7 @@
     "irrecoverable": "Akun Anda secara matematis tidak dapat dipulihkan.",
     "desc": "Kami tidak menyimpan frasa atau kata sandi Anda. Jika Anda kehilangannya, tidak ada seorang pun di dunia ini—termasuk kami—yang dapat mendekripsi data Anda. Harap catat frasa Anda dan simpan dengan aman secara offline."
   },
-  "footer_tagline": "Pangkalan Intelijen NYX • Tingkat Keamanan 0",
+  "footer_tagline": "Pusat Bantuan NYX — Privasi dulu, selalu.",
   "seo": {
     "description": "Dapatkan bantuan dengan chat terenkripsi NYX, pemulihan akun, dan fitur keamanan."
   }

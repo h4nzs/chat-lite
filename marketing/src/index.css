@@ -3,6 +3,9 @@
 @source "../../web/src/components";
 @source "../../web/src/pages";
 
+/* Dark variant follows the data-theme attribute (not OS preference) */
+@custom-variant dark ([data-theme='dark'] &);
+
 @theme {
   /* Screens */
   --breakpoint-md: 768px;
@@ -30,16 +33,25 @@
   --color-text-primary: hsl(var(--text-primary));
   --color-text-secondary: hsl(var(--text-secondary));
 
-  /* Mutated Neumorphism Shadows */
-  --shadow-mutated-outset: 6px 6px 16px #04060b, -6px -6px 16px #162039;
-  --shadow-mutated-inset: inset 4px 4px 10px #04060b, inset -4px -4px 10px #162039;
+  /* Soft Neumorphism Shadows (aligned with the web app tokens) */
+  --shadow-neu-flat: 6px 6px 12px hsl(var(--shadow-dark)), -6px -6px 12px hsl(var(--shadow-light));
+  --shadow-neu-pressed: inset 6px 6px 10px hsl(var(--shadow-dark)), inset -6px -6px 10px hsl(var(--shadow-light));
+  --shadow-neu-icon: 3px 3px 6px hsl(var(--shadow-dark)), -3px -3px 6px hsl(var(--shadow-light));
+  --shadow-neu-icon-pressed: inset 2px 2px 5px hsl(var(--shadow-dark)), inset -2px -2px 5px hsl(var(--shadow-light));
+  --shadow-neu-float: 20px 20px 60px hsl(var(--shadow-dark)), -20px -20px 60px hsl(var(--shadow-light));
+
+  /* Aurora gradient (same as the web app) */
+  --background-image-aurora-gradient: linear-gradient(to right, hsl(var(--grad-start)), hsl(var(--grad-end)));
 
   /* Fonts */
-  --font-sans: 'Inter', sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
 
   /* Animations & Keyframes */
   --animate-fade-in: fadeIn 0.3s ease-out;
   --animate-fade-in-up: fadeInUp 0.3s ease-out;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-float-delayed: float 9s ease-in-out 1.5s infinite;
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -49,107 +61,156 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
 }
 
 @utility btn {
-  @apply px-4 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center border border-[#1e293b] hover:brightness-110;
+  @apply px-5 py-2.5 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center;
   @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-main focus:outline-none;
 }
 
 @utility btn-primary {
-  @apply btn text-[#06b6d4] bg-[#0d1322];
-  box-shadow: var(--shadow-mutated-outset);
+  @apply btn bg-bg-surface text-accent;
+  box-shadow: var(--shadow-neu-flat);
+  &:hover { box-shadow: var(--shadow-neu-icon); transform: translateY(-1px); }
+  &:active { box-shadow: var(--shadow-neu-pressed); }
 }
 
 @utility btn-secondary {
-  @apply btn bg-[#0d1322] text-[#2563eb] hover:bg-[#0d1322]/80;
-  box-shadow: var(--shadow-mutated-outset);
+  @apply btn bg-bg-surface text-text-primary;
+  box-shadow: var(--shadow-neu-icon);
+  &:hover { box-shadow: var(--shadow-neu-flat); }
+  &:active { box-shadow: var(--shadow-neu-pressed); }
 }
 
 @utility btn-destructive {
-  @apply btn bg-[#0d1322] text-red-500 hover:brightness-110;
-  box-shadow: var(--shadow-mutated-outset);
-}
-
-@utility btn-destructive-neumorphic {
-  @apply btn bg-[#0d1322] text-red-500 hover:brightness-110;
-  box-shadow: var(--shadow-mutated-outset);
+  @apply btn bg-bg-surface text-red-500;
+  box-shadow: var(--shadow-neu-flat);
 }
 
 @utility input-neumorphic {
-  @apply bg-[#0d1322] text-text-primary rounded-lg px-4 py-3 focus:outline-none focus:ring-1 focus:ring-[#06b6d4] transition-all duration-200 border border-[#1e293b];
-  box-shadow: var(--shadow-mutated-inset);
+  @apply bg-bg-surface text-text-primary rounded-2xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-accent transition-all duration-200;
+  box-shadow: var(--shadow-neu-pressed);
 }
 
 @utility card-neumorphic {
-  @apply bg-[#0d1322] rounded-xl p-6 transition-all duration-200 border border-[#1e293b];
-  box-shadow: var(--shadow-mutated-outset);
+  @apply bg-bg-surface rounded-3xl p-6 transition-all duration-300;
+  box-shadow: var(--shadow-neu-flat);
+  &:hover { box-shadow: var(--shadow-neu-icon); transform: translateY(-2px); }
+}
+
+@utility card-neumorphic-flat {
+  @apply bg-bg-surface rounded-3xl p-6;
+  box-shadow: var(--shadow-neu-icon);
+}
+
+@utility icon-well {
+  @apply inline-flex items-center justify-center bg-bg-main rounded-full text-accent;
+  box-shadow: var(--shadow-neu-pressed);
+}
+
+@utility text-gradient-aurora {
+  background-image: var(--background-image-aurora-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @utility toggle-neumorphic {
-  @apply relative inline-flex items-center h-7 w-12 flex-shrink-0 rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-[#06b6d4] cursor-pointer border border-[#1e293b];
-  box-shadow: var(--shadow-mutated-inset);
+  @apply relative inline-flex items-center h-7 w-12 flex-shrink-0 rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer bg-bg-surface;
+  box-shadow: var(--shadow-neu-pressed);
 }
 
 @utility toggle-neumorphic-thumb {
-  @apply inline-block h-5 w-5 transform rounded-full ring-0 transition duration-200 ease-in-out bg-[#06b6d4];
-  box-shadow: 2px 2px 4px #04060b, -2px -2px 4px #162039;
+  @apply inline-block h-5 w-5 transform rounded-full ring-0 transition duration-200 ease-in-out bg-accent;
+  box-shadow: var(--shadow-neu-icon);
 }
 
 @layer base {
-  :root {
-    --bg-main: 225 46% 5%;       /* #070a13 */
-    --bg-surface: 223 45% 9%;    /* #0d1322 */
-    --border: 217 33% 17%;       /* #1e293b */
-    --ring: 190 95% 43%;         /* Cyan #06b6d4 */
+  :root,
+  html[data-theme='light'] {
+    /* Soft, warm neutral palette — elegant light mode (aligned with the app) */
+    --bg-main: 220 16% 90%;          /* Slate 200 — soft canvas */
+    --bg-surface: 220 16% 90%;       /* Same as main for soft UI */
+    --border: 215 20% 65%;           /* Slate 400 */
+    --ring: 263 100% 62%;            /* Purple 500 */
 
-    --text-primary: 210 40% 98%;   
-    --text-secondary: 215 20% 70%; 
+    --text-primary: 222 47% 11%;     /* Slate 900 */
+    --text-secondary: 215 25% 45%;   /* Slate 500 */
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 217 33% 17%;       
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 20% 96%;
+    --secondary-foreground: 222 47% 11%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --shadow-color: 222 47% 5%;
+    --shadow-color: 220 20% 80%;
 
-    --accent: 190 95% 43%;
+    /* Aurora Gradient */
+    --grad-start: 180 100% 33%;      /* Teal */
+    --grad-end: 263 100% 37%;        /* Deep Indigo */
+
+    /* Soft Neumorphism Shadows */
+    --shadow-light: 0 0% 100%;       /* White */
+    --shadow-dark: 220 10% 82%;      /* Darker gray for soft shadow */
+
+    --accent: 263 100% 62%;          /* Purple 500 */
     --accent-foreground: 210 40% 98%;
   }
 
-  .light {
-    --bg-main: 225 46% 5%;       /* Enforce Dark Theme exclusively for Marketing */
-    --bg-surface: 223 45% 9%;    
-    --border: 217 33% 17%;       
-    --ring: 190 95% 43%;         
+  html[data-theme='dark'] {
+    /* Neutral dark gray — same as the app's dark mode */
+    --bg-main: 0 0% 10%;
+    --bg-surface: 0 0% 13%;
+    --border: 0 0% 20%;
+    --ring: 263 100% 72%;
 
-    --text-primary: 210 40% 98%;   
-    --text-secondary: 215 20% 70%; 
+    --text-primary: 210 40% 98%;
+    --text-secondary: 215 20% 70%;
 
     --primary: 210 40% 98%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 217 33% 17%;
+    --secondary: 0 0% 20%;
     --secondary-foreground: 210 40% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --shadow-color: 222 47% 5%;
+    --shadow-color: 0 0% 4%;
+
+    --grad-start: 180 100% 33%;
+    --grad-end: 263 100% 37%;
+
+    --shadow-light: 0 0% 25%;
+    --shadow-dark: 0 0% 4%;
+
+    --accent: 263 100% 72%;
+    --accent-foreground: 222 47% 11%;
   }
 
   html, body, #root {
     @apply h-dvh min-h-dvh text-text-primary;
     background-color: hsl(var(--bg-main));
-    min-height: 100vh; 
+    min-height: 100vh;
   }
 
   body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Elegant serif display helper */
+  .font-display {
+    font-family: 'Fraunces', ui-serif, Georgia, serif;
   }
 
   /* Custom Scrollbar */
@@ -172,62 +233,40 @@
     @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
   }
 
-  .text-display {
-    @apply text-4xl font-bold leading-tight;
-  }
-
-  .text-heading {
-    @apply text-2xl font-bold leading-snug;
-  }
-
-  .text-subheading {
-    @apply text-lg font-semibold leading-relaxed;
-  }
-
-  .text-body {
-    @apply text-base leading-normal;
-  }
-
-  .text-caption {
-    @apply text-sm leading-relaxed text-text-secondary;
-  }
-
   button,
   a,
   input[type="text"],
   input[type="password"],
   input[type="email"],
   textarea {
-    @apply transition-all duration-200 ease-in-out;
-    @apply focus:outline-none focus-visible:ring-1 focus-visible:ring-offset-2 focus-visible:ring-[#06b6d4] focus-visible:ring-offset-bg-surface;
+    @apply transition-all duration-300 ease-in-out;
+    @apply focus:outline-none focus-visible:ring-1 focus-visible:ring-offset-2 focus-visible:ring-accent focus-visible:ring-offset-bg-surface;
+  }
+
+  /* Soft aurora blob for hero backgrounds */
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* Smooth theme transition */
+  html, body {
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 }
 
 .user-color-name {
   color: var(--user-color);
 }
-.dark .user-color-name {
-  filter: brightness(1.5);
-}
 
 .glass-toast {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   outline: none !important;
-  box-shadow: var(--shadow-mutated-outset) !important;
-  border: 1px solid #1e293b !important;
-  background-color: #0d1322 !important;
-  color: #fff !important;
-}
-
-/* Custom Neumorphic Shadow for small elements */
-.shadow-neumorphic-convex-sm {
-  box-shadow: 2px 2px 4px #04060b, -2px -2px 4px #162039;
-}
-.shadow-neumorphic-convex-sm:active {
-  box-shadow: inset 1px 1px 2px #04060b, inset -1px -1px 2px #162039;
-}
-
-.shadow-neumorphic-bubble {
-  box-shadow: var(--shadow-mutated-outset);
+  box-shadow: var(--shadow-neu-flat) !important;
+  background-color: hsl(var(--bg-surface)) !important;
+  color: hsl(var(--text-primary)) !important;
 }

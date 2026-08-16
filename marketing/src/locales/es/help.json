@@ -6,9 +6,9 @@
     "title": "¿Cómo muevo mi cuenta a un nuevo dispositivo?",
     "desc": "Dado que NYX almacena sus claves e historial localmente para máxima privacidad, no puede simplemente iniciar sesión para ver mensajes antiguos. Tiene dos formas seguras de moverse:",
     "migration_label": "Migración de Dispositivo (Recomendado):",
-    "migration_text": "Vaya a <span class=\"font-mono bg-black/30 p-1 rounded\">Configuración &gt; Transferir a Nuevo Dispositivo</span>. Esto crea un túnel seguro y directo a su nuevo teléfono mediante un código QR.",
+    "migration_text": "Vaya a <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Configuración &gt; Transferir a Nuevo Dispositivo</span>. Esto crea un túnel seguro y directo a su nuevo teléfono mediante un código QR.",
     "backup_label": "Respaldo de Bóveda:",
-    "backup_text": "Vaya a <span class=\"font-mono bg-black/30 p-1 rounded\">Configuración &gt; Exportar Bóveda</span>. Guarde el archivo <code>.nyxvault</code> e impórtelo en la pantalla de inicio de sesión de su nuevo dispositivo."
+    "backup_text": "Vaya a <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Configuración &gt; Exportar Bóveda</span>. Guarde el archivo <code>.nyxvault</code> e impórtelo en la pantalla de inicio de sesión de su nuevo dispositivo."
   },
   "burner": {
     "title": "¿Qué es una Sesión de Chat Burner?",
@@ -25,7 +25,7 @@
   "sandbox_mode": {
     "title": "¿Por qué mi cuenta está en \"Modo Sandbox\"?",
     "desc": "Para prevenir bots de spam sin recolectar datos personales (como números de teléfono), las cuentas nuevas comienzan en <strong>Modo Sandbox</strong> con cuotas de mensajería limitadas.",
-    "upgrade_text": "Puede actualizar al <strong>Estado VIP</strong> instantáneamente y gratis verificando que es humano. Vaya a <span class=\"font-mono bg-black/30 p-1 rounded\">Configuración &gt; Actualizar a VIP</span> y elija entre <strong>Verificación Biométrica</strong> (Huella/FaceID) o <strong>Prueba de Trabajo</strong> (Minería de CPU)."
+    "upgrade_text": "Puede actualizar al <strong>Estado VIP</strong> instantáneamente y gratis verificando que es humano. Vaya a <span class=\"font-mono bg-bg-main px-1.5 py-0.5 rounded-md text-text-primary\">Configuración &gt; Actualizar a VIP</span> y elija entre <strong>Verificación Biométrica</strong> (Huella/FaceID) o <strong>Prueba de Trabajo</strong> (Minería de CPU)."
   },
   "forgot_password": {
     "title": "Olvidé mi contraseña. ¿Qué hago?",
@@ -45,7 +45,7 @@
     "irrecoverable": "Su cuenta es matemáticamente irrecuperable.",
     "desc": "No almacenamos su frase ni su contraseña. Si las pierde, nadie en la Tierra, incluidos nosotros, puede descifrar sus datos. Por favor, anote su frase dan guárdela de forma segura fuera de línea."
   },
-  "footer_tagline": "Base de Inteligencia NYX • Nivel de Seguridad 0",
+  "footer_tagline": "Centro de ayuda de NYX — Privacidad primero, siempre.",
   "seo": {
     "description": "Obtenga ayuda con el chat cifrado de NYX, recuperación de cuenta dan funciones de seguridad."
   }

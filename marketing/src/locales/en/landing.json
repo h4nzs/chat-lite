@@ -7,7 +7,7 @@
     "title_prefix": "PRIVATE",
     "title_highlight": "CONVERSATIONS",
     "title_suffix": "SECURED BY YOU",
-    "description": "End-to-end encrypted messaging with a tactile, industrial design. No phone numbers. No trackers. Just you and your data.",
+    "description": "End-to-end encrypted messaging with a soft, elegant interface. No phone numbers. No trackers. Just you and your data.",
     "cta_start": "GET STARTED",
     "cta_source": "SOURCE CODE"
   },
@@ -58,8 +58,8 @@
       "desc": "Sign up with just a Username. Your real identity stays safe. No one can 'save your contact' without permission."
     },
     "tactile": {
-      "title": "MUTATED NEUMORPHIC",
-      "desc": "A mutated neumorphic interface with chiseled depth and elegant gradients for a premium physical feel."
+      "title": "REFINED NEUMORPHIC",
+      "desc": "A smooth neumorphic interface with soft, tactile depth for a gentle, premium feel."
     }
   },
   "how_it_works": {
@@ -94,6 +94,60 @@
     "a3": "Upon registration, you are given a 24-word recovery phrase. This phrase is the sole backup of your identity keys. Store it securely offline. We cannot recover it for you.",
     "q4": "Is NYX truly quantum-resistant?",
     "a4": "Yes, we implement a hybrid approach combining classical X25519 and the post-quantum ML-KEM-768 (X-Wing) algorithm inside a dedicated WebAssembly Web Worker."
+  },
+  "pipeline": {
+    "title": "HOW NYX PROTECTS A MESSAGE",
+    "headline": "One message. Three layers of silence.",
+    "subtitle": "Watch how a single message travels — encrypted on your device, blind through the server, decrypted only where it belongs.",
+    "sender": "You",
+    "server": "NYX Server",
+    "recipient": "Recipient",
+    "step_1": "Encrypted on your device",
+    "step_2": "Blind relay — the server sees nothing",
+    "step_3": "Decrypted only on the recipient",
+    "proof_1": "Server sees: nothing",
+    "proof_2": "Keys never leave your device",
+    "proof_3": "Privacy by default"
+  },
+  "signup": {
+    "title": "NO PHONE NUMBER. EVER.",
+    "headline": "Even Signal still asks for your phone.",
+    "subtitle": "NYX does not — because it was designed not to need it.",
+    "signal_label": "SIGNAL",
+    "signal_1": "Phone number",
+    "signal_2": "SMS verification code",
+    "signal_3": "Profile setup",
+    "signal_note": "Still requires a phone number",
+    "nyx_label": "NYX",
+    "nyx_1": "Choose a username",
+    "nyx_2": "Keys generated on your device",
+    "nyx_3": "24-word recovery phrase",
+    "nyx_note": "Anonymous by design",
+    "nyx_badge": "NO PHONE REQUIRED"
+  },
+  "stats": {
+    "title": "QUIET NUMBERS",
+    "headline": "Built on fewer, not more.",
+    "stat_1_label": "Phone numbers collected",
+    "stat_1_value": "0",
+    "stat_2_label": "Trackers",
+    "stat_2_value": "0",
+    "stat_3_label": "End-to-end encryption",
+    "stat_3_value": "100%",
+    "stat_4_label": "Cloud history stored",
+    "stat_4_value": "0"
+  },
+  "blind": {
+    "title": "BLIND RELAY, LITERALLY",
+    "headline": "And it doesn't stop there.",
+    "subtitle": "We don't know who sent the message — we only route it to where you pointed.",
+    "sender_label": "Sender",
+    "server_label": "NYX Server",
+    "recipient_label": "Recipient",
+    "from_unknown": "from: ???",
+    "to_label": "to:",
+    "server_note": "We only see the address, never the sender",
+    "burner_note": "In Burner sessions, we can't identify you at all."
   },
   "cta": {
     "title": "TAKE BACK YOUR PRIVACY.",

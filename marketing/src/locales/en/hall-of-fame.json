@@ -4,7 +4,7 @@
   },
   "meta": {
     "title": "Security Hall of Fame | NYX Chat",
-    "description": "Honoring the elite security researchers and white-hat operatives who help secure the NYX Zero-Knowledge architecture."
+    "description": "Honoring the elite security researchers and white-hat hackers who help secure the NYX Zero-Knowledge architecture."
   },
   "hero": {
     "badge": "SECURITY HALL OF FAME",
@@ -12,7 +12,7 @@
     "subtitle": "Security is not a state of rest; it is a continuous operation. We honor the cryptographers and researchers who successfully breach our walls and responsibly report it."
   },
   "protocol": {
-    "badge": "CLASSIFIED PROTOCOL",
+    "badge": "Disclosure Protocol",
     "title": "Reporting a Vulnerability",
     "warning": "DO NOT OPEN A PUBLIC ISSUE",
     "p1": "Under no circumstances should you report critical security vulnerabilities via public GitHub Issues or PRs. Doing so compromises all active NYX deployments.",
@@ -31,13 +31,16 @@
     "out_1": "Volumetric attacks (DDoS, Spamming).",
     "out_2": "Phishing or Social Engineering.",
     "out_3": "UI/UX bugs with no privacy impact.",
-    "out_4": "Theoretical flaws without a Proof of Concept (PoC)."
+    "out_4": "Theoretical flaws without a Proof of Concept (PoC).",
+    "in_6": "PQX3DH / ML-KEM hybrid key exchange bypass.",
+    "in_7": "Burner session (PQ-DR) anonymity or session recovery.",
+    "in_8": "WebTransport sidecar / Redis bridge integrity."
   },
   "table": {
     "badge": "THE REGISTRY",
     "title": "Acknowledged Researchers",
     "th_operative": "OPERATIVE / HANDLE",
-    "th_date": "BREACH DATE",
+    "th_date": "Disclosure Date",
     "th_vuln": "VULNERABILITY CLASS",
     "th_link": "PORTFOLIO",
     "empty_state": "AVAILABLE FOR THE FIRST FINDER"

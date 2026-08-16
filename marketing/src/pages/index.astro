@@ -3,10 +3,13 @@ import MainLayout from '../layouts/MainLayout.astro';
 import Footer from '../components/Footer.astro';
 import '../index.css';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ThemeToggle from '../components/ThemeToggle';
+import EncryptedFlow from '../components/EncryptedFlow';
+import SignupComparison from '../components/SignupComparison';
+import StatStrip from '../components/StatStrip';
+import BlindRelay from '../components/BlindRelay';
 import { getLangFromUrl, useTranslations } from '../utils/i18n';
-import { FiGithub, FiUserPlus, FiMessageSquare, FiShield, FiArrowRight, FiHash, FiEyeOff, FiCheck, FiX, FiCpu, FiSun, FiMoon } from 'react-icons/fi';
-import { Image } from 'astro:assets';
-import mobileDarkImg from '../assets/screenshots/mobile-dark.png';
+import { FiGithub, FiUserPlus, FiMessageSquare, FiShield, FiArrowRight, FiHash, FiEyeOff, FiCheck, FiX, FiZap, FiChevronDown, FiSun, FiLock } from 'react-icons/fi';
 
 const { lang: propLang } = Astro.props;
 const lang = propLang || Astro.currentLocale || getLangFromUrl(Astro.url);
@@ -64,237 +67,371 @@ const landingSchema = JSON.stringify({
 ---
 
 <MainLayout title={title} description={description} canonicalUrl={Astro.url.pathname} schemaMarkup={landingSchema}>
-  <div class="min-h-screen font-sans text-text-primary overflow-y-auto relative bg-[#1a1a1a]"
-       style="background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.08), transparent 20%), radial-gradient(circle at 90% 80%, rgba(0,0,0,0.064), transparent 20%);">
-    
-    <div class="fixed inset-0 pointer-events-none z-0 opacity-15" style="background: url(&quot;data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E&quot;);"></div>
-
-    <div class="relative z-10">
-      <header class="p-4 flex justify-between items-center max-w-6xl mx-auto relative animate-in fade-in slide-in-from-top-4 duration-700">
-        <div class="flex items-center">
-          <img src="/pwa-192x192.png" alt="NYX Logo" class="w-8 h-8 mr-2" />
-          <span class="text-2xl font-bold tracking-tighter">NYX</span>
+  <div class="min-h-screen font-sans text-text-primary relative overflow-x-clip">
+    <!-- ================= HEADER ================= -->
+    <header class="px-6 lg:px-10 py-6 max-w-7xl mx-auto flex justify-between items-center animate-in fade-in slide-in-from-top-4 duration-700">
+      <a href={`${langPrefix}/`} class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl bg-bg-surface flex items-center justify-center transition-transform duration-300 group-hover:scale-105" style="box-shadow: var(--shadow-neu-icon)">
+          <img src="/pwa-192x192.png" alt="NYX Logo" class="w-6 h-6 rounded-lg" />
         </div>
-        <div class="flex items-center gap-4">
-          <a href={`${APP_URL}/login`} class="btn-secondary">
-            {t('landing:header.login')}
-          </a>
-          <div class="relative z-[100]">
-            <LanguageSwitcher currentLangCode={lang} client:load />
-          </div>
-        </div>
-      </header>
+        <span class="font-display text-3xl font-bold tracking-tight">NYX</span>
+      </a>
+      <div class="flex items-center gap-3">
+        <a href={`${APP_URL}/login`} class="btn-secondary">
+          {t('landing:header.login')}
+        </a>
+        <LanguageSwitcher currentLangCode={lang} isAbsolute={false} client:load />
+        <ThemeToggle client:load />
+      </div>
+    </header>
 
-      <main class="max-w-6xl mx-auto px-4 py-16 md:py-24">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div class="lg:col-span-7 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-            <div class="inline-block mb-4 px-4 py-1 rounded-full bg-bg-main shadow-mutated-inset text-accent text-xs md:text-sm font-bold tracking-wider uppercase border border-[#1e293b]">
-              {t('landing:hero.badge', { version: APP_VERSION })}
-            </div>
-            <h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none mb-6">
-              {t('landing:hero.title_prefix')}<br />
-              <span class="text-accent" style="text-shadow: 0 0 20px rgba(6, 182, 212, 0.4);">{t('landing:hero.title_highlight')}</span><br />
-              {t('landing:hero.title_suffix')}
-            </h1>
-            <p class="sr-only">
-              {t('landing:seo.geo_hook') !== 'landing:seo.geo_hook' ? t('landing:seo.geo_hook') : 'NYX is a zero-knowledge messaging application designed for absolute privacy. It utilizes the Signal Protocol (Double Ratchet) for end-to-end encryption and Argon2id for client-side identity hashing, allowing secure communication without requiring a phone number or email address.'}
-            </p>
-            <p class="text-lg md:text-xl text-text-secondary max-w-xl mb-8 leading-relaxed">
-              {t('landing:hero.description')}
-            </p>
-            <div class="flex flex-col sm:flex-row justify-start items-start gap-4">
-              <a href={`${APP_URL}/register`} class="btn-primary px-8 py-4 text-lg">
-                {t('landing:hero.cta_start')} <FiArrowRight className="ml-2" />
-              </a>
-              <a href="https://github.com/h4nzs/nyx-chat" target="_blank" rel="noopener noreferrer" class="btn-secondary px-8 py-4 text-lg">
-                <FiGithub className="mr-2" />
-                {t('landing:hero.cta_source')}
-              </a>
-            </div>
+    <!-- ================= HERO ================= -->
+    <main class="relative">
+      <!-- Soft aurora backdrop -->
+      <div class="aurora-blob w-[520px] h-[520px] -top-40 -left-40" style="background: radial-gradient(circle, hsl(var(--grad-start) / 0.22), transparent 65%);"></div>
+      <div class="aurora-blob w-[600px] h-[600px] top-20 -right-48" style="background: radial-gradient(circle, hsl(var(--grad-end) / 0.20), transparent 65%);"></div>
+
+      <div class="max-w-7xl mx-auto px-6 lg:px-10 pt-10 pb-24 md:pb-32 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative">
+        <!-- Left: copy -->
+        <div class="animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <div class="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full bg-bg-surface text-accent text-xs md:text-sm font-bold tracking-widest uppercase" style="box-shadow: var(--shadow-neu-icon)">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+            {t('landing:hero.badge', { version: APP_VERSION })}
           </div>
 
-          <div class="lg:col-span-5 flex justify-center lg:justify-end animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
-            <div class="relative w-full max-w-[280px] md:max-w-[320px]">
-              <div class="relative mx-auto border-[#1e293b] bg-[#0d1322] border-[10px] rounded-[2.5rem] shadow-mutated-outset overflow-hidden">
-                <div class="h-[32px] w-[3px] bg-[#1e293b] absolute -left-[13px] top-[72px] rounded-l-lg"></div>
-                <div class="h-[46px] w-[3px] bg-[#1e293b] absolute -left-[13px] top-[124px] rounded-l-lg"></div>
-                <div class="h-[46px] w-[3px] bg-[#1e293b] absolute -left-[13px] top-[178px] rounded-l-lg"></div>
-                <div class="h-[64px] w-[3px] bg-[#1e293b] absolute -right-[13px] top-[142px] rounded-r-lg"></div>
-                <div class="rounded-[2rem] overflow-hidden w-full h-auto aspect-[9/19] bg-bg-main relative">
-                  <Image 
-                    src={mobileDarkImg} 
-                    alt="App Screenshot" 
-                    loading="eager" 
-                    fetchpriority="high"
-                    widths={[260, 430]} 
-                    sizes="(max-width: 768px) 260px, 430px"
-                    class="object-cover object-top w-full h-full opacity-90 hover:scale-105 transition-transform duration-700" 
-                  />
-                </div>
+          <p class="font-sans text-sm font-bold uppercase tracking-[0.3em] text-text-secondary mb-3">
+            {t('landing:hero.title_prefix')}
+          </p>
+          <h1 class="font-display font-black leading-[0.95] tracking-tight mb-8">
+            <span class="block text-gradient-aurora text-[clamp(2.25rem,4.8vw,3.9rem)]">{t('landing:hero.title_highlight')}</span>
+            <span class="block text-text-primary mt-3 text-[clamp(1.4rem,2.6vw,2.9rem)]">{t('landing:hero.title_suffix')}</span>
+          </h1>
+
+          <p class="sr-only">
+            {t('landing:seo.geo_hook') !== 'landing:seo.geo_hook' ? t('landing:seo.geo_hook') : 'NYX is a zero-knowledge messaging application designed for absolute privacy. It utilizes the Signal Protocol (Double Ratchet) for end-to-end encryption and Argon2id for client-side identity hashing, allowing secure communication without requiring a phone number or email address.'}
+          </p>
+          <p class="text-lg md:text-xl text-text-secondary max-w-xl mb-10 leading-relaxed">
+            {t('landing:hero.description')}
+          </p>
+
+          <div class="flex flex-col sm:flex-row items-start gap-4 mb-12">
+            <a href={`${APP_URL}/register`} class="btn-primary px-8 py-4 text-base">
+              {t('landing:hero.cta_start')} <FiArrowRight className="ml-2" />
+            </a>
+            <a href="https://github.com/h4nzs/nyx-chat" target="_blank" rel="noopener noreferrer" class="btn-secondary px-8 py-4 text-base">
+              <FiGithub className="mr-2" />
+              {t('landing:hero.cta_source')}
+            </a>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold text-text-secondary">
+            <span class="flex items-center gap-2"><FiCheck className="text-accent" size={16} /> {t('landing:comparison.values.always_on')}</span>
+            <span class="flex items-center gap-2"><FiCheck className="text-accent" size={16} /> {t('landing:features.no_phone.title')}</span>
+            <span class="flex items-center gap-2"><FiCheck className="text-accent" size={16} /> {t('landing:features.burner_chat.title')}</span>
+          </div>
+        </div>
+
+        <!-- Right: floating neumorphic composition -->
+        <div class="relative hidden lg:block h-[560px] w-full max-w-[560px] mx-auto animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+          <!-- Main chat card -->
+          <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[330px] card-neumorphic p-5 animate-float">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-bg-main flex items-center justify-center font-display font-bold text-accent" style="box-shadow: var(--shadow-neu-pressed)">N</div>
+              <div class="flex-1">
+                <p class="font-bold text-sm leading-tight">NYX Secure Chat</p>
+                <p class="text-xs text-text-secondary flex items-center gap-1"><FiShield size={11} className="text-accent" /> {t('landing:comparison.values.always_on')}</p>
+              </div>
+              <div class="icon-well w-8 h-8"><FiLock size={14} /></div>
+            </div>
+            <div class="space-y-3">
+              <div class="bg-bg-main rounded-2xl rounded-bl-sm p-3 text-sm leading-relaxed" style="box-shadow: var(--shadow-neu-icon)">
+                This is zero-knowledge, right?
+              </div>
+              <div class="bg-bg-main rounded-2xl rounded-br-sm p-3 text-sm leading-relaxed ml-8" style="box-shadow: var(--shadow-neu-icon)">
+                Always. Only you can read this.
               </div>
             </div>
           </div>
-        </div>
-      </main>
 
-      <section class="py-16 md:py-24 bg-bg-main/50 backdrop-blur-sm">
-        <div class="max-w-4xl mx-auto px-4 text-center">
-          <h2 class="text-3xl md:text-4xl font-black mb-6 tracking-tighter">{t('landing:why.title')}</h2>
-          <p class="text-lg md:text-xl text-text-secondary mb-4">{t('landing:why.desc_1')}</p>
-          <p class="text-lg md:text-xl text-text-secondary">{t('landing:why.desc_2')}</p>
-        </div>
-      </section>
+          <!-- Post-quantum card -->
+          <div class="absolute -left-6 top-6 card-neumorphic-flat p-4 flex items-center gap-3 w-[220px] animate-float-delayed">
+            <div class="icon-well w-12 h-12"><FiShield size={22} /></div>
+            <div>
+              <p class="font-bold text-sm leading-tight">{t('landing:features.post_quantum.title')}</p>
+              <p class="text-xs text-text-secondary mt-0.5">ML-KEM-768 · X-Wing</p>
+            </div>
+          </div>
 
-      <section class="py-16 md:py-24">
-        <div class="max-w-5xl mx-auto px-4">
-          <h2 class="text-3xl md:text-4xl font-black text-center mb-12 tracking-tighter">{t('landing:comparison.title')}</h2>
-          <div class="bg-bg-surface rounded-3xl p-6 md:p-8 shadow-mutated-outset overflow-x-auto border border-[#1e293b]">
-            <table class="w-full min-w-[600px] border-separate border-spacing-y-4">
-              <thead>
-                <tr class="text-text-secondary text-sm uppercase tracking-wider">
-                  <th class="text-left py-4 px-6">{t('landing:comparison.headers.feature')}</th>
-                  <th class="py-4 px-4 font-normal">{t('landing:comparison.headers.wa')}</th>
-                  <th class="py-4 px-4 font-normal">{t('landing:comparison.headers.tg')}</th>
-                  <th class="py-4 px-6 text-accent font-black text-lg">{t('landing:comparison.headers.nyx')}</th>
+          <!-- Burner card -->
+          <div class="absolute -right-4 top-40 card-neumorphic-flat p-4 flex items-center gap-3 w-[210px] animate-float">
+            <div class="icon-well w-12 h-12"><FiZap size={22} /></div>
+            <div>
+              <p class="font-bold text-sm leading-tight">{t('landing:features.burner_chat.title')}</p>
+              <p class="text-xs text-text-secondary mt-0.5">RAM only</p>
+            </div>
+          </div>
+
+          <!-- Zero-knowledge pill -->
+          <div class="absolute left-4 bottom-8 card-neumorphic-flat px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold animate-float-delayed">
+            <FiEyeOff className="text-accent" size={14} /> Zero-knowledge
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================= WHY ================= -->
+    <section class="py-20 md:py-28">
+      <div class="max-w-4xl mx-auto px-6 text-center">
+        <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:why.title')}</p>
+        <h2 class="font-display font-bold text-4xl md:text-5xl leading-tight tracking-tight mb-8">
+          {t('landing:why.desc_1')}
+        </h2>
+        <p class="text-lg md:text-xl text-text-secondary leading-relaxed max-w-3xl mx-auto">
+          {t('landing:why.desc_2')}
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= COMPARISON ================= -->
+    <section class="py-20 md:py-24">
+      <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-14">
+          <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:comparison.title')}</p>
+        </div>
+        <div class="card-neumorphic p-4 md:p-8 overflow-x-auto">
+          <table class="w-full min-w-[600px] border-separate border-spacing-y-3">
+            <thead>
+              <tr class="text-text-secondary text-xs uppercase tracking-wider font-bold">
+                <th class="text-left py-3 px-4">{t('landing:comparison.headers.feature')}</th>
+                <th class="py-3 px-4 font-bold text-center">{t('landing:comparison.headers.wa')}</th>
+                <th class="py-3 px-4 font-bold text-center">{t('landing:comparison.headers.tg')}</th>
+                <th class="py-3 px-4 font-bold text-center text-accent">{t('landing:comparison.headers.nyx')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparisonData.map((row) => (
+                <tr class="group hover:-translate-y-0.5 transition-transform duration-300">
+                  <td class="py-4 px-4 font-bold text-text-primary bg-bg-main rounded-l-2xl" style="box-shadow: var(--shadow-neu-icon)">
+                    {row.feature}
+                  </td>
+                  <td class="py-4 px-4 text-center text-red-400 bg-bg-main font-semibold" style="box-shadow: var(--shadow-neu-icon)">
+                    <div class="flex items-center justify-center gap-2">
+                      {row.wa === t('landing:comparison.values.yes') || row.wa === t('landing:comparison.values.required')
+                        ? <><FiX /><span class="sr-only">Not Supported / Required:</span></>
+                        : null}
+                      {row.wa}
+                    </div>
+                  </td>
+                  <td class="py-4 px-4 text-center text-yellow-500 bg-bg-main font-semibold" style="box-shadow: var(--shadow-neu-icon)">
+                    {row.tg}
+                  </td>
+                  <td class="py-4 px-4 text-center text-accent font-black bg-bg-main rounded-r-2xl" style="box-shadow: var(--shadow-neu-icon)">
+                    <div class="flex items-center justify-center gap-2">
+                      <FiCheck className="text-xl" />
+                      <span class="sr-only">{t('landing:a11y.supported')}</span>
+                      {row.nyx}
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {comparisonData.map((row) => (
-                  <tr class="group hover:-translate-y-1 transition-transform">
-                    <td class="py-4 px-6 font-bold text-text-primary bg-bg-main rounded-l-xl shadow-sm border border-[#1e293b] border-r-0">
-                      {row.feature}
-                    </td>
-                    <td class="py-4 px-4 text-center text-red-500 bg-bg-main/50 border-y border-[#1e293b]">
-                      <div class="flex items-center justify-center gap-2">
-                        {row.wa === t('landing:comparison.values.yes') || row.wa === t('landing:comparison.values.required') 
-                          ? <><FiX/><span class="sr-only">Not Supported / Required:</span></> 
-                          : null} 
-                        {row.wa}
-                      </div>
-                    </td>
-                    <td class="py-4 px-4 text-center text-yellow-500 bg-bg-main/50 border-y border-[#1e293b]">
-                      {row.tg}
-                    </td>
-                    <td class="py-4 px-6 text-center text-green-500 font-bold bg-bg-main rounded-r-xl shadow-sm border border-[#1e293b] border-l-0">
-                      <div class="flex items-center justify-center gap-2">
-                        <FiCheck className="text-xl" /> 
-                        <span class="sr-only">{t('landing:a11y.supported')}</span>
-                        {row.nyx}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ENCRYPTED FLOW ================= -->
+    <EncryptedFlow
+      title={t('landing:pipeline.title')}
+      headline={t('landing:pipeline.headline')}
+      subtitle={t('landing:pipeline.subtitle')}
+      sender={t('landing:pipeline.sender')}
+      server={t('landing:pipeline.server')}
+      recipient={t('landing:pipeline.recipient')}
+      step1={t('landing:pipeline.step_1')}
+      step2={t('landing:pipeline.step_2')}
+      step3={t('landing:pipeline.step_3')}
+      proof1={t('landing:pipeline.proof_1')}
+      proof2={t('landing:pipeline.proof_2')}
+      proof3={t('landing:pipeline.proof_3')}
+      client:load
+    />
+
+    <!-- ================= SIGNAL VS NYX ================= -->
+    <SignupComparison
+      title={t('landing:signup.title')}
+      headline={t('landing:signup.headline')}
+      subtitle={t('landing:signup.subtitle')}
+      signalLabel={t('landing:signup.signal_label')}
+      signal1={t('landing:signup.signal_1')}
+      signal2={t('landing:signup.signal_2')}
+      signal3={t('landing:signup.signal_3')}
+      signalNote={t('landing:signup.signal_note')}
+      nyxLabel={t('landing:signup.nyx_label')}
+      nyx1={t('landing:signup.nyx_1')}
+      nyx2={t('landing:signup.nyx_2')}
+      nyx3={t('landing:signup.nyx_3')}
+      nyxNote={t('landing:signup.nyx_note')}
+      nyxBadge={t('landing:signup.nyx_badge')}
+      client:load
+    />
+
+    <!-- ================= STATS ================= -->
+    <StatStrip
+      title={t('landing:stats.title')}
+      headline={t('landing:stats.headline')}
+      items={[
+        { label: t('landing:stats.stat_1_label'), value: t('landing:stats.stat_1_value') },
+        { label: t('landing:stats.stat_2_label'), value: t('landing:stats.stat_2_value') },
+        { label: t('landing:stats.stat_3_label'), value: t('landing:stats.stat_3_value') },
+        { label: t('landing:stats.stat_4_label'), value: t('landing:stats.stat_4_value') },
+      ]}
+      client:load
+    />
+
+    <!-- ================= BLIND RELAY ================= -->
+    <BlindRelay
+      title={t('landing:blind.title')}
+      headline={t('landing:blind.headline')}
+      subtitle={t('landing:blind.subtitle')}
+      senderLabel={t('landing:blind.sender_label')}
+      serverLabel={t('landing:blind.server_label')}
+      recipientLabel={t('landing:blind.recipient_label')}
+      fromUnknown={t('landing:blind.from_unknown')}
+      toLabel={t('landing:blind.to_label')}
+      serverNote={t('landing:blind.server_note')}
+      burnerNote={t('landing:blind.burner_note')}
+      client:load
+    />
+
+    <!-- ================= FEATURES ================= -->
+    <section class="py-20 md:py-24">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-14">
+          <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:features.title')}</p>
+        </div>
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { icon: FiShield, title: t('landing:features.post_quantum.title'), desc: t('landing:features.post_quantum.desc') },
+            { icon: FiZap, title: t('landing:features.burner_chat.title'), desc: t('landing:features.burner_chat.desc') },
+            { icon: FiHash, title: t('landing:features.no_phone.title'), desc: t('landing:features.no_phone.desc') },
+            { icon: FiSun, title: t('landing:features.tactile.title'), desc: t('landing:features.tactile.desc') }
+          ].map((Feature) => (
+            <div class="card-neumorphic text-center flex flex-col items-center">
+              <div class="icon-well w-14 h-14 mb-5">
+                <Feature.icon size={26} />
+              </div>
+              <h3 class="font-display text-xl font-bold text-text-primary mb-2">{Feature.title}</h3>
+              <p class="text-text-secondary leading-relaxed text-sm">{Feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HOW IT WORKS ================= -->
+    <section class="py-20 md:py-24">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-16">
+          <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:how_it_works.title')}</p>
+        </div>
+        <div class="relative grid md:grid-cols-3 gap-12">
+          <div class="relative flex flex-col items-center text-center">
+            <div class="icon-well w-16 h-16 mb-5 z-10">
+              <FiUserPlus size={28} />
+            </div>
+            <span class="font-display font-black text-5xl text-accent/25 absolute -top-6 -right-2 md:right-8 select-none">{String(1).padStart(2, '0')}</span>
+            <h3 class="font-display text-2xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_1.title')}</h3>
+            <p class="text-text-secondary max-w-xs leading-relaxed">{t('landing:how_it_works.step_1.desc')}</p>
+            <div class="absolute top-8 left-[calc(50%+3rem)] w-full h-0.5 border-t border-dashed border-text-secondary/20 hidden md:block"></div>
+          </div>
+          <div class="relative flex flex-col items-center text-center">
+            <div class="icon-well w-16 h-16 mb-5 z-10">
+              <FiMessageSquare size={28} />
+            </div>
+            <span class="font-display font-black text-5xl text-accent/25 absolute -top-6 -right-2 md:right-8 select-none">{String(2).padStart(2, '0')}</span>
+            <h3 class="font-display text-2xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_2.title')}</h3>
+            <p class="text-text-secondary max-w-xs leading-relaxed">{t('landing:how_it_works.step_2.desc')}</p>
+            <div class="absolute top-8 left-[calc(50%+3rem)] w-full h-0.5 border-t border-dashed border-text-secondary/20 hidden md:block"></div>
+          </div>
+          <div class="relative flex flex-col items-center text-center">
+            <div class="icon-well w-16 h-16 mb-5 z-10">
+              <FiEyeOff size={28} />
+            </div>
+            <span class="font-display font-black text-5xl text-accent/25 absolute -top-6 -right-2 md:right-8 select-none">{String(3).padStart(2, '0')}</span>
+            <h3 class="font-display text-2xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_3.title')}</h3>
+            <p class="text-text-secondary max-w-xs leading-relaxed">{t('landing:how_it_works.step_3.desc')}</p>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="py-16 md:py-24 bg-[#070a13]">
-        <div class="max-w-6xl mx-auto px-4">
-          <h2 class="text-3xl md:text-4xl font-black text-center mb-12 tracking-tighter">{t('landing:features.title')}</h2>
-          <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: FiShield, title: t('landing:features.post_quantum.title'), desc: t('landing:features.post_quantum.desc') },
-              { icon: FiEyeOff, title: t('landing:features.burner_chat.title'), desc: t('landing:features.burner_chat.desc') },
-              { icon: FiHash, title: t('landing:features.no_phone.title'), desc: t('landing:features.no_phone.desc') },
-              { icon: FiSun, title: t('landing:features.tactile.title'), desc: t('landing:features.tactile.desc') }
-            ].map((Feature) => (
-              <div class="card-neumorphic text-center flex flex-col items-center">
-                <div class="inline-block p-4 bg-bg-main rounded-full shadow-mutated-inset mb-4 text-accent border border-[#1e293b]">
-                  <Feature.icon size={24} />
+    <!-- ================= TESTIMONIALS ================= -->
+    <section class="py-20 md:py-24">
+      <div class="max-w-4xl mx-auto px-6">
+        <div class="text-center mb-14">
+          <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:testimonials.title')}</p>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="card-neumorphic">
+            <p class="font-display text-xl italic text-text-primary mb-5 leading-relaxed">"{t('landing:testimonials.yosep')}"</p>
+            <p class="font-bold text-accent">Yosep.</p>
+            <p class="text-sm text-text-secondary">{t('landing:testimonials.yosep_role')}</p>
+          </div>
+          <div class="card-neumorphic">
+            <p class="font-display text-xl italic text-text-primary mb-5 leading-relaxed">"{t('landing:testimonials.sarah')}"</p>
+            <p class="font-bold text-accent">Sarah T.</p>
+            <p class="text-sm text-text-secondary">{t('landing:testimonials.sarah_role')}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="py-20 md:py-24">
+      <div class="max-w-3xl mx-auto px-6">
+        <div class="text-center mb-14">
+          <p class="font-sans text-xs font-bold uppercase tracking-[0.3em] text-accent mb-4">{t('landing:faq.title')}</p>
+        </div>
+        <div class="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div class="card-neumorphic p-0 overflow-hidden">
+              <details class="group">
+                <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-text-primary hover:text-accent transition-colors gap-4">
+                  <span class="font-display text-lg">{t(`landing:faq.q${i}`)}</span>
+                  <span class="transition group-open:rotate-180 text-accent flex-shrink-0">
+                    <FiChevronDown size={22} />
+                  </span>
+                </summary>
+                <div class="text-text-secondary px-6 pb-6 pt-0 leading-relaxed">
+                  {t(`landing:faq.a${i}`)}
                 </div>
-                <h3 class="text-xl font-bold text-text-primary mb-2">{Feature.title}</h3>
-                <p class="text-text-secondary leading-relaxed">{Feature.desc}</p>
-              </div>
-            ))}
+              </details>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CTA ================= -->
+    <section class="py-20 md:py-28">
+      <div class="max-w-5xl mx-auto px-6">
+        <div class="relative rounded-[2.5rem] p-10 md:p-16 text-center overflow-hidden bg-bg-surface" style="box-shadow: var(--shadow-neu-float)">
+          <div class="aurora-blob w-96 h-96 -top-32 -left-24" style="background: radial-gradient(circle, hsl(var(--grad-start) / 0.28), transparent 60%);"></div>
+          <div class="aurora-blob w-96 h-96 -bottom-32 -right-24" style="background: radial-gradient(circle, hsl(var(--grad-end) / 0.26), transparent 60%);"></div>
+          <div class="relative">
+            <h2 class="font-display font-black text-4xl md:text-6xl leading-tight tracking-tight mb-6">
+              {t('landing:cta.title')}
+            </h2>
+            <p class="text-lg md:text-xl text-text-secondary mb-10 max-w-2xl mx-auto leading-relaxed">{t('landing:cta.desc')}</p>
+            <a href={`${APP_URL}/register`} class="btn-primary px-10 py-4 text-lg inline-flex">
+              {t('landing:cta.button')} <FiArrowRight className="ml-2" />
+            </a>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="py-16 md:py-24">
-        <div class="max-w-6xl mx-auto px-4">
-          <h2 class="text-3xl md:text-4xl font-black text-center mb-16 tracking-tighter">{t('landing:how_it_works.title')}</h2>
-          <div class="relative grid md:grid-cols-3 gap-12">
-            <div class="relative flex flex-col items-center text-center">
-              <div class="inline-block p-4 bg-bg-main rounded-full shadow-mutated-inset mb-4 z-10 text-accent border border-[#1e293b]">
-                <FiUserPlus size={24} />
-              </div>
-              <h3 class="text-xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_1.title')}</h3>
-              <p class="text-text-secondary max-w-xs">{t('landing:how_it_works.step_1.desc')}</p>
-              <div class="absolute top-9 left-1/2 w-full h-0.5 border-t border-dashed border-[#1e293b] hidden md:block"></div>
-            </div>
-            <div class="relative flex flex-col items-center text-center">
-              <div class="inline-block p-4 bg-bg-main rounded-full shadow-mutated-inset mb-4 z-10 text-accent border border-[#1e293b]">
-                <FiMessageSquare size={24} />
-              </div>
-              <h3 class="text-xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_2.title')}</h3>
-              <p class="text-text-secondary max-w-xs">{t('landing:how_it_works.step_2.desc')}</p>
-              <div class="absolute top-9 left-1/2 w-full h-0.5 border-t border-dashed border-[#1e293b] hidden md:block"></div>
-            </div>
-            <div class="relative flex flex-col items-center text-center">
-              <div class="inline-block p-4 bg-bg-main rounded-full shadow-mutated-inset mb-4 z-10 text-accent border border-[#1e293b]">
-                <FiShield size={24} />
-              </div>
-              <h3 class="text-xl font-bold text-text-primary mb-2">{t('landing:how_it_works.step_3.title')}</h3>
-              <p class="text-text-secondary max-w-xs">{t('landing:how_it_works.step_3.desc')}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="py-16 md:py-24 bg-[#070a13]">
-        <div class="max-w-4xl mx-auto px-4">
-          <h2 class="text-3xl md:text-4xl font-black text-center mb-12 tracking-tighter">{t('landing:testimonials.title')}</h2>
-          <div class="grid md:grid-cols-2 gap-8">
-            <div class="card-neumorphic">
-              <p class="text-lg italic text-text-primary mb-4">"{t('landing:testimonials.yosep')}"</p>
-              <p class="font-bold text-[#06b6d4]">Yosep.</p>
-              <p class="text-sm text-text-secondary">{t('landing:testimonials.yosep_role')}</p>
-            </div>
-            <div class="card-neumorphic">
-              <p class="text-lg italic text-text-primary mb-4">"{t('landing:testimonials.sarah')}"</p>
-              <p class="font-bold text-[#06b6d4]">Sarah T.</p>
-              <p class="text-sm text-text-secondary">{t('landing:testimonials.sarah_role')}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="py-16 md:py-24">
-        <div class="max-w-3xl mx-auto px-4">
-          <h2 class="text-3xl md:text-4xl font-black text-center mb-12 tracking-tighter">{t('landing:faq.title')}</h2>
-          <div class="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div class="card-neumorphic p-0 overflow-hidden">
-                <details class="group">
-                  <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-text-primary hover:text-accent transition-colors">
-                    <span>{t(`landing:faq.q${i}`)}</span>
-                    <span class="transition group-open:rotate-180">
-                      <svg fill="none" height="24" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                    </span>
-                  </summary>
-                  <div class="text-text-secondary px-6 pb-6 pt-0 leading-relaxed">
-                    {t(`landing:faq.a${i}`)}
-                  </div>
-                </details>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section class="py-16 md:py-24">
-        <div class="max-w-4xl mx-auto px-4 text-center">
-          <h2 class="text-3xl md:text-4xl font-black mb-6 tracking-tighter">{t('landing:cta.title')}</h2>
-          <p class="text-lg text-text-secondary mb-8 max-w-2xl mx-auto">{t('landing:cta.desc')}</p>
-          <a href={`${APP_URL}/register`} class="btn-primary px-8 py-4 text-lg inline-flex">
-            {t('landing:cta.button')} <FiArrowRight className="ml-2" />
-          </a>
-        </div>
-      </section>
-
-      <Footer lang={lang} />
-    </div>
+    <Footer lang={lang} />
   </div>
 </MainLayout>

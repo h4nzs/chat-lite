@@ -1,17 +1,17 @@
 {
   "meta": {
     "title": "Política de Reembolso | NYX Chat",
-    "description": "Política de reembolso do NYX Chat e garantia de devolução do dinheiro em 7 dias."
+    "description": "Política de reembolso para pagamentos em criptomoeda do NYX Pro (NOWPayments). Garantia de devolução de 7 dias em cripto."
   },
   "title": "Política de Reembolso",
-  "last_updated": "Última atualização: Março de 2026",
-  "intro": "No NYX, priorizamos a sua privacidade e satisfação. Esta política descreve as condições sob as quais os reembolsos são fornecidos.",
-  "fiat_title": "1. Garantia de Devolução de 7 Dias (Fiat/Cartão de Crédito)",
-  "fiat_desc": "Se você fizer upgrade para o NYX Pro usando um cartão de crédito ou carteira eletrônica (via Midtrans) e não ficar satisfeito, você terá direito a um reembolso total em até 7 dias após a compra inicial. Devido à nossa arquitetura Zero-Knowledge, nunca pediremos motivos técnicos relacionados ao seu conteúdo de dados ou histórico de bate-papo para processar o seu reembolso.",
-  "crypto_title": "2. Pagamentos com Criptomoedas",
-  "crypto_desc": "Observe que os pagamentos feitos via Criptomoeda (NOWPayments) estão sujeitos às condições da rede. Devido à natureza irreversível das transações de blockchain e às voláteis taxas de gás, os pagamentos em criptomoedas geralmente são finais. Em casos excepcionais em que um reembolso é emitido, o valor do reembolso será deduzido das taxas de rede (gás) incorridas.",
+  "last_updated": "Última atualização: Agosto de 2026",
+  "intro": "No NYX, aceitamos pagamentos exclusivamente em criptomoeda. Esta política explica como funcionam os reembolsos para pagamentos cripto feitos por meio da NOWPayments e como sua privacidade permanece protegida durante todo o processo.",
+  "payments_title": "1. Pagamentos em Criptomoedas",
+  "payments_desc": "O NYX Pro é pago exclusivamente com criptomoedas por meio da NOWPayments — Bitcoin, Ethereum, USDT e outras moedas compatíveis. Cada compra gera uma fatura segura com valor fixo e um endereço de recebimento dedicado. Transações blockchain são finais e irreversíveis após a confirmação.",
+  "refund_title": "2. Termos de Reembolso — Garantia de 7 Dias",
+  "refund_desc": "Se você não ficar satisfeito com seu upgrade do NYX Pro, pode solicitar um reembolso total dentro de 7 dias após o pagamento. Os reembolsos são emitidos na mesma criptomoeda, de volta ao endereço ou carteira de pagamento original. As taxas de rede são de responsabilidade do solicitante e os reembolsos estão sujeitos às condições vigentes da rede. Apenas a transação original é elegível.",
   "zk_title": "3. Garantia Zero-Knowledge",
-  "zk_desc": "Sua privacidade permanece intacta. Reivindicar um reembolso não exige que você forneça acesso ao seu dispositivo, chaves de descriptografia ou qualquer conteúdo de bate-papo. Verificamos apenas o ID da Transação.",
+  "zk_desc": "Sua privacidade permanece intacta. Reivindicar um reembolso exige apenas o seu Transaction ou Order ID — nunca acesso ao seu dispositivo, chaves de descriptografia ou qualquer conteúdo de chat. Verificamos a transação on-chain e nada mais.",
   "how_to_claim_title": "4. Como Solicitar um Reembolso",
-  "how_to_claim_desc": "Para solicitar um reembolso, envie um e-mail para <strong>billing@nyx-app.my.id</strong> incluindo o seu <strong>Transaction ID</strong>. Nossa equipe processará os reembolsos elegíveis em 5-7 dias úteis."
+  "how_to_claim_desc": "Para solicitar um reembolso, envie um e-mail para <strong>billing@nyx-app.my.id</strong> com seu <strong>Transaction ou Order ID da NOWPayments</strong>. Nossa equipe verifica o pagamento on-chain e processa os reembolsos elegíveis em 3–5 dias úteis."
 }

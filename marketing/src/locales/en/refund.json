@@ -1,17 +1,17 @@
 {
   "meta": {
     "title": "Refund Policy | NYX Chat",
-    "description": "NYX Chat refund policy and 7-day money-back guarantee."
+    "description": "Refund policy for NYX Pro cryptocurrency payments (NOWPayments). 7-day money-back guarantee in crypto."
   },
   "title": "Refund Policy",
-  "last_updated": "Last Updated: March 2026",
-  "intro": "At NYX, we prioritize your privacy and satisfaction. This policy outlines the conditions under which refunds are provided.",
-  "fiat_title": "1. 7-Day Money-Back Guarantee (Fiat/Credit Card)",
-  "fiat_desc": "If you upgrade to NYX Pro using a credit card or e-wallet (via Midtrans) and are not satisfied, you are eligible for a full refund within 7 days of the initial purchase. Because of our Zero-Knowledge architecture, we will never ask for technical reasons related to your data content or chat history to process your refund.",
-  "crypto_title": "2. Cryptocurrency Payments",
-  "crypto_desc": "Please note that payments made via Cryptocurrency (NOWPayments) are subject to network conditions. Due to the irreversible nature of blockchain transactions and volatile gas fees, cryptocurrency payments are generally final. In exceptional cases where a refund is issued, the refund amount will be minus any network (gas) fees incurred.",
+  "last_updated": "Last Updated: August 2026",
+  "intro": "At NYX, we accept payments exclusively in cryptocurrency. This policy explains how refunds work for crypto payments made through NOWPayments, and how your privacy is protected throughout the process.",
+  "payments_title": "1. Crypto Payments",
+  "payments_desc": "NYX Pro is paid for exclusively with cryptocurrency via NOWPayments — Bitcoin, Ethereum, USDT, and other supported coins. Each checkout generates a secure invoice with a fixed amount and a dedicated receiving address. Blockchain transactions are final and cannot be reversed once confirmed.",
+  "refund_title": "2. Refund Terms — 7-Day Guarantee",
+  "refund_desc": "If you are not satisfied with your NYX Pro upgrade, you may request a full refund within 7 days of payment. Refunds are issued in the same cryptocurrency, back to the original paying address or wallet. Network transaction fees are borne by the requester, and refunds are subject to prevailing network conditions. Only the original transaction is eligible.",
   "zk_title": "3. Zero-Knowledge Assurance",
-  "zk_desc": "Your privacy remains intact. Claiming a refund does not require you to provide access to your device, decryption keys, or any chat content. We only verify the transaction ID.",
+  "zk_desc": "Your privacy remains intact. Claiming a refund requires only your Transaction or Order ID — never access to your device, decryption keys, or any chat content. We verify the transaction on-chain and nothing more.",
   "how_to_claim_title": "4. How to Claim a Refund",
-  "how_to_claim_desc": "To request a refund, please send an email to <strong>billing@nyx-app.my.id</strong> from your contact email (if provided) or specify your <strong>Transaction ID</strong>. Our team will process eligible refunds within 5-7 business days."
+  "how_to_claim_desc": "To request a refund, send an email to <strong>billing@nyx-app.my.id</strong> with your <strong>NOWPayments Transaction or Order ID</strong>. Our team verifies the payment on-chain and processes eligible refunds within 3–5 business days."
 }

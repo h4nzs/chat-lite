@@ -1,50 +1,146 @@
 {
   "seo": {
-    "geo_hook": "Arsitektur Keamanan NYX beroperasi pada model Trust No One (TNO). Fitur-fiturnya meliputi Blind Indexing melalui Argon2id, enkripsi Signal Protocol Double Ratchet untuk pesan, penyimpanan IndexedDB local-first untuk riwayat obrolan, dan terowongan P2P WebRTC langsung yang melewati server untuk panggilan."
+    "geo_hook": "Arsitektur Keamanan NYX berjalan pada model Trust No One (TNO): blind indexing Argon2id, pertukaran kunci hibrida PQX3DH (X25519 + ML-KEM-768 X-Wing), enkripsi Double Ratchet, traffic cover 8KB, transport WebTransport QUIC, dan Shadow Vault lokal terenkripsi."
   },
   "meta": {
     "title": "Arsitektur Keamanan | NYX Chat",
-    "description": "Pelajari arsitektur zero-knowledge dan enkripsi tingkat militer yang menggerakkan NYX Chat."
+    "description": "Arsitektur zero-knowledge dan pasca-kuantum NYX: PQX3DH, Double Ratchet, relai buta, sesi burner, dan vault lokal terenkripsi."
   },
   "hero": {
-    "title": "Benteng Zero-Knowledge",
-    "subtitle": "Privasi bukanlah sebuah fitur. Itu adalah arsitektur kami. Pelajari jaminan matematis yang memastikan pesan Anda tetap menjadi milik Anda."
+    "title": "Arsitektur Zero-Knowledge",
+    "subtitle": "Privasi bukan fitur — privasi adalah arsitekturnya. Setiap lapisan, dari identitas hingga transport, dirancang agar server secara matematis tidak dapat membaca atau mengaitkan data Anda."
   },
   "threat": {
-    "badge": "01 / THREAT MODEL",
-    "title": "Kami Selalu Berasumsi Server Kami Telah Diretas.",
-    "p1": "Aplikasi perpesanan tradisional fokus melindungi dinding server mereka. NYX memiliki pendekatan yang lebih radikal: <strong>Trust No One (TNO)</strong>.",
-    "p2": "Kami merancang arsitektur ini dengan asumsi bahwa peretas sudah berada di dalam server kami. Namun, karena tidak ada kunci dekripsi di server, jika terjadi kebocoran data, peretas hanya akan menemukan tumpukan karakter acak yang secara matematis mustahil untuk dipecahkan."
+    "badge": "01 / MODEL ANCAMAN",
+    "title": "Kami mengasumsikan server kami dibobol.",
+    "p1": "Aplikasi lain menjaga dinding server mereka. NYX mengambil arah yang berlawanan: <strong>Trust No One (TNO)</strong>. Kami merancang sistem dengan asumsi penyerang sudah berada di dalam.",
+    "p2": "Tanpa kunci dekripsi di server, database yang dibobol hanyalah tumpukan blob acak. Setiap pesan di-pad ke ukuran tetap <strong>8.192 byte</strong> dan koneksi idle memancarkan chaff acak — bahkan analisis lalu lintas pun tidak mengungkap apa pun.",
+    "visual_title": "NYX_SERVER_DB // POSTGRES",
+    "visual_status": "DIBOBOL",
+    "visual_row": "TIDAK TERBACA",
+    "visual_secured": "Data Terlindungi",
+    "visual_zk": "Zero-Knowledge Tetap Utuh"
   },
   "blind": {
     "badge": "02 / BLIND INDEXING",
-    "title": "Kebutaan Server Mutlak.",
-    "p1": "Jika kami tidak meminta nomor telepon atau email, bagaimana teman Anda bisa menemukan Anda?",
-    "p2": "NYX menggunakan teknik kriptografi bernama <strong>Blind Indexing</strong>. Saat Anda mendaftar, nama pengguna Anda langsung di-hash menggunakan algoritma berat <code>Argon2id</code> langsung di perangkat Anda.",
-    "p3": "Server hanya menerima serangkaian kode acak (hash). Kami secara harfiah tidak tahu siapa Anda, dan tidak ada rumus matematika di alam semesta ini untuk mengubah hash tersebut kembali menjadi nama asli Anda."
+    "title": "Server tidak pernah tahu identitas Anda.",
+    "p1": "Tanpa nomor telepon, tanpa email. Agar bisa ditemukan, username Anda di-hash di perangkat Anda dengan <strong>Argon2id (memori 64 MB)</strong> sebelum meninggalkan browser.",
+    "p2": "Server hanya menyimpan <strong>blind index</strong> — nilai yang tidak dapat dibalik atau dibruteforce secara offline. Tidak ada formula di sisi kami yang memetakan hash kembali ke Anda.",
+    "p3": "Nama tampilan, bio, dan avatar Anda juga dienkripsi secara lokal dan hanya dibagikan kepada orang yang Anda setujui.",
+    "visual_device": "Perangkat",
+    "visual_server": "Server NYX",
+    "visual_kdf": "Argon2id KDF",
+    "visual_hash": "Hash: 9a3b…"
+  },
+  "pq": {
+    "badge": "03 / PQX3DH — PERTUKARAN KUNCI HIBRIDA",
+    "title": "Aman kuantum sejak jabat tangan pertama.",
+    "p1": "Setiap sesi baru dimulai dengan kesepakatan kunci hibrida: <strong>X25519</strong> (klasik) digabung dengan <strong>ML-KEM-768 via X-Wing</strong> (pasca-kuantum). Penyerang harus memecahkan keduanya sekaligus — mengalahkan satu kurva saja tidak cukup.",
+    "p2": "Pre-key identitas ditandatangani dengan <strong>Ed25519</strong>, dan rahasia gabungan dicampur melalui <strong>BLAKE2b</strong> menjadi root key yang menyemai ratchet pesan.",
+    "visual": {
+      "step_1_title": "DH Klasik — X25519",
+      "step_1_desc": "Kedua perangkat bertukar kunci X25519 ephemeral dan menghitung rahasia klasik bersama.",
+      "step_2_title": "KEM Pasca-Kuantum — ML-KEM-768 (X-Wing)",
+      "step_2_desc": "Satu sisi melakukan enkapsulasi terhadap kunci aman-kuantum sisi lain; ciphertext bersifat publik, rahasianya tetap privat.",
+      "step_3_title": "Gabungkan & Turunkan — BLAKE2b",
+      "step_3_desc": "Kedua rahasia dipadukan dan di-hash menjadi satu root key.",
+      "note": "Root key menyemai Double Ratchet — setiap pesan mendapat kunci sendiri."
+    }
   },
   "ratchet": {
-    "badge": "03 / THE DOUBLE RATCHET",
-    "title": "Setiap Pesan, Kunci Baru.",
-    "p1": "NYX dibangun di atas protokol enkripsi paling dihormati di dunia: <strong>The Signal Protocol</strong>. Namun, kami tidak sekadar mengenkripsi jalur koneksi, kami mengenkripsi <i>setiap pesan secara individu</i>.",
-    "pfs": "<strong>Perfect Forward Secrecy (PFS):</strong> Jika perangkat Anda diretas besok, pesan Anda yang dikirim <i>kemarin</i> tetap tidak bisa dibaca, karena kunci lamanya sudah dihancurkan.",
-    "pcs": "<strong>Post-Compromise Security (PCS):</strong> Jika kunci Anda bocor hari ini, Anda hanya perlu mengirim satu pesan baru. Sistem akan otomatis memutar kunci baru (ratcheting) dan memulihkan keamanan Anda."
+    "badge": "04 / DOUBLE RATCHET",
+    "title": "Setiap pesan, kunci yang baru.",
+    "p1": "Setiap pesan menurunkan kunci baru dari kunci sebelumnya dan menghancurkannya setelah dipakai — one-time pad yang terus bergerak maju.",
+    "pfs": "<strong>Perfect Forward Secrecy (PFS):</strong> jika perangkat Anda dibobol besok, pesan yang Anda kirim kemarin tetap tidak terbaca.",
+    "pcs": "<strong>Post-Compromise Security (PCS):</strong> jika kunci bocor hari ini, mengirim satu pesan baru otomatis memulihkan keamanan.",
+    "visual_msg": "PSN",
+    "visual_key": "KUNCI"
+  },
+  "pipeline_badge": "05 / PIPELINE PESAN",
+  "blindrelay_badge": "06 / RELAI BUTA",
+  "burner": {
+    "badge": "07 / SESI BURNER",
+    "title": "Obrolan yang tidak pernah menyentuh database.",
+    "p1": "Sesi burner adalah obrolan anonim, RAM-only. Guest menerima identitas sementara <strong>guest_*</strong> dan tidak pernah mendaftar akun.",
+    "p2": "Kedua sisi menjalankan <strong>Post-Quantum Double Ratchet (PQ-DR)</strong> khusus dengan jabat tangan KEM X-Wing. Tidak ada yang dipersist — tutup tab, sesi, kunci, dan riwayatnya hilang selamanya.",
+    "visual": {
+      "step_1_title": "Host membuat tautan",
+      "step_1_desc": "Tautan burner sekali pakai memuat kunci publik host.",
+      "step_2_title": "Guest bergabung anonim",
+      "step_2_desc": "Guest mendapat identitas sementara — tanpa registrasi, tanpa data tersimpan.",
+      "step_3_title": "PQ-DR terenkripsi, RAM-only",
+      "step_3_desc": "Pesan dienkripsi dengan double ratchet pasca-kuantum dan hanya hidup di memori.",
+      "step_4_title": "Hancur saat ditutup",
+      "step_4_desc": "Menutup tab menghapus kunci dan riwayat; room masuk daftar hitam di sisi server.",
+      "note": "Bahkan server tidak bisa mengidentifikasi guest."
+    }
+  },
+  "file": {
+    "badge": "08 / ENKRIPSI FILE",
+    "title": "File dienkripsi sebelum diunggah.",
+    "p1": "Lampiran dialirkan melalui <strong>secretstream (XChaCha20-Poly1305)</strong> milik libsodium dalam potongan 1 MB dengan tag autentikasi akhir — enkripsi tidak pernah mem-buffer seluruh file di memori.",
+    "p2": "Kunci acak 32-byte berjalan di dalam pesan E2EE itu sendiri. Server hanya menyimpan blob buram di R2; penerima mengunduh, mendekripsi, dan men-cache-nya di OPFS.",
+    "visual_device": "Perangkat Anda",
+    "visual_r2": "Penyimpanan R2 Buta",
+    "visual_recipient": "Penerima",
+    "visual_encrypt": "Enkripsi secretstream · potongan 1 MB",
+    "visual_decrypt": "Dekripsi · cache OPFS"
   },
   "vault": {
-    "badge": "04 / LOCAL VAULT & PROFILES",
-    "title": "Data Anda, Di Perangkat Anda.",
-    "p1": "Sebagian besar aplikasi obrolan menyinkronkan seluruh riwayat Anda ke server mereka. Kami tidak. Seluruh riwayat percakapan NYX hidup <strong>secara eksklusif</strong> di dalam <i>IndexedDB</i> perangkat Anda.",
-    "p2": "Bahkan foto profil dan nama tampilan Anda dienkripsi secara lokal. Kunci untuk membukanya hanya dikirimkan kepada kontak yang Anda setujui. Di mata server kami, Anda tidak memiliki wajah dan nama, hanya seonggok data terenkripsi."
+    "badge": "09 / VAULT LOKAL",
+    "title": "Riwayat Anda hidup di perangkat Anda.",
+    "p1": "Obrolan, state ratchet, dan kunci disimpan di <strong>Shadow Vault</strong> IndexedDB, dienkripsi at-rest dengan envelope <strong>ENC1:</strong> yang diturunkan dari master seed Anda.",
+    "p2": "Tidak ada yang disinkronkan ke cloud dalam bentuk plaintext — satu perangkat aktif per akun, dan migrasi dilakukan lewat ekspor <strong>.nyxvault</strong> terenkripsi.",
+    "visual_vault": "Vault IndexedDB",
+    "visual_cloud": "DB Cloud",
+    "visual_encrypted": "ENC1: terenkripsi at-rest"
   },
-  "webrtc": {
-    "badge": "05 / WEBRTC TUNNELS",
-    "title": "Panggilan Tahan Sadap.",
-    "p1": "Saat Anda melakukan panggilan suara atau video, arsitektur kami berubah dari Client-Server menjadi jaringan <strong>Peer-to-Peer (P2P)</strong> sejati.",
-    "p2": "Server NYX hanya bertindak sebagai pencari jalan. Namun, bahkan sinyal koneksinya (SDP/ICE) dibungkus dengan enkripsi E2EE. Setelah terhubung, paket suara dan video mengalir langsung antar perangkat. <strong>Server benar-benar dilewati.</strong>"
+  "transport": {
+    "badge": "10 / TRANSPORT — WEBTRANSPORT",
+    "title": "Transport kelas QUIC, isolasi kelas Rust.",
+    "p1": "Lalu lintas real-time berjalan di atas <strong>WebTransport (HTTP/3 · QUIC)</strong>, dihentikan oleh <strong>sidecar Rust</strong> khusus dan dijembatani ke Node melalui pub/sub Redis. API Express tidak pernah menyentuh frame transport.",
+    "p2": "Koneksi memakai <strong>tiket JWT</strong> berumur pendek plus sertifikat pinning, memberlakukan satu perangkat aktif per akun, dan memancarkan datagram chaff acak sehingga lalu lintas idle tidak bisa dibedakan dari data asli.",
+    "visual_app": "Aplikasi Web",
+    "visual_wt": "WebTransport (QUIC)",
+    "visual_sidecar": "Sidecar Rust",
+    "visual_redis": "Jembatan Redis",
+    "visual_node": "API Node",
+    "visual_chaff": "chaff · opcode 0x00"
+  },
+  "tier": {
+    "badge": "11 / TINGKAT KEPERCAYAAN",
+    "title": "Anti-spam tanpa nomor telepon.",
+    "p1": "Akun baru mulai di <strong>Sandbox Mode</strong> dengan batas laju ketat. Untuk menjadi <strong>VIP</strong>, buktikan Anda manusia — dengan biometrik <strong>WebAuthn</strong> atau puzzle <strong>Proof-of-Work BLAKE2b</strong> di sisi klien.",
+    "visual_sandbox": "Sandbox",
+    "visual_vip": "VIP",
+    "visual_webauthn": "WebAuthn · Biometrik",
+    "visual_pow": "BLAKE2b · Proof-of-Work"
+  },
+  "calls": {
+    "badge": "12 / PANGGILAN",
+    "title": "Panggilan peer-to-peer.",
+    "p1": "Panggilan suara dan video terhubung <strong>peer-to-peer</strong> via WebRTC setelah terbentuk. Server hanya mengoordinasikan jabat tangan, dan bahkan sinyal SDP/ICE dienkripsi end-to-end.",
+    "p2": "Media tidak pernah transit melalui server."
+  },
+  "stats": {
+    "title": "ANGKA KEAMANAN",
+    "headline": "Terukur, bukan dijanjikan.",
+    "stat_1_label": "Padding pesan (byte)",
+    "stat_1_value": "8192",
+    "stat_1_suffix": " B",
+    "stat_2_label": "Ukuran potongan file terenkripsi",
+    "stat_2_value": "1",
+    "stat_2_suffix": " MB",
+    "stat_3_label": "Operasi kripto di worker",
+    "stat_3_value": "45",
+    "stat_3_suffix": " ops",
+    "stat_4_label": "Memori Argon2id (KDF vault)",
+    "stat_4_value": "128",
+    "stat_4_suffix": " MB"
   },
   "cta": {
-    "title": "Apakah Anda seorang Peneliti Keamanan?",
-    "subtitle": "Kami menyambut baik audit independen. Baca Protokol Pelaporan Kerentanan kami dan raih tempat Anda di Hall of Fame NYX.",
+    "title": "Anda peneliti keamanan?",
+    "subtitle": "Kami menyambut audit independen. Baca Protokol Pengungkapan Terkoordinasi kami dan raih tempat Anda di Hall of Fame NYX.",
     "button": "Lihat Protokol Bug Bounty"
   }
 }

@@ -1,49 +1,145 @@
 {
   "seo": {
-    "geo_hook": "NYX Security Architecture operates on a Trust No One (TNO) model. Features include Blind Indexing via Argon2id, Signal Protocol Double Ratchet encryption for messages, local-first IndexedDB storage for chat histories, and direct WebRTC P2P tunnels bypassing servers for calls."
+    "geo_hook": "NYX Security Architecture operates on a Trust No One (TNO) model: Argon2id blind indexing, PQX3DH hybrid key exchange (X25519 + ML-KEM-768 X-Wing), Double Ratchet encryption, 8KB traffic cover, WebTransport QUIC transport and an encrypted local Shadow Vault."
   },
   "meta": {
     "title": "Security Architecture | NYX Chat",
-    "description": "Discover the zero-knowledge architecture and military-grade encryption powering NYX Chat."
+    "description": "The zero-knowledge, post-quantum architecture of NYX: PQX3DH, Double Ratchet, blind relay, burner sessions, and an encrypted local vault."
   },
   "hero": {
-    "title": "Zero-Knowledge Fortress",
-    "subtitle": "Privacy is not a feature. It's our architecture. Explore the mathematical guarantees that keep your messages strictly yours."
+    "title": "Zero-Knowledge Architecture",
+    "subtitle": "Privacy is not a feature — it is the architecture. Every layer, from identity to transport, is engineered so the server mathematically cannot read or attribute your data."
   },
   "threat": {
     "badge": "01 / THREAT MODEL",
-    "title": "We Assume Our Servers Are Compromised.",
-    "p1": "Traditional messaging apps focus on protecting their server walls. NYX takes a more radical approach: <strong>Trust No One (TNO)</strong>.",
-    "p2": "We designed this architecture assuming hackers are already inside our servers. However, since there are no decryption keys on the server, a data breach yields nothing but cryptographically useless random characters."
+    "title": "We assume our servers are compromised.",
+    "p1": "Traditional apps defend their server walls. NYX takes the radical opposite: <strong>Trust No One (TNO)</strong>. We design the system assuming attackers are already inside.",
+    "p2": "With no decryption keys on the server, a breached database is nothing but random-looking blobs. Every message is padded to a fixed <strong>8,192 bytes</strong> and idle connections emit random chaff — so even traffic analysis reveals nothing.",
+    "visual_title": "NYX_SERVER_DB // POSTGRES",
+    "visual_status": "BREACHED",
+    "visual_row": "UNREADABLE",
+    "visual_secured": "Data Secured",
+    "visual_zk": "Zero-Knowledge Kept Intact"
   },
   "blind": {
     "badge": "02 / BLIND INDEXING",
-    "title": "Absolute Server Blindness.",
-    "p1": "If we don't ask for your phone number or email, how can your friends find you?",
-    "p2": "NYX uses a cryptographic technique called <strong>Blind Indexing</strong>. When you register, your username is heavily hashed using the <code>Argon2id</code> algorithm directly on your device.",
-    "p3": "The server only receives a random string of code (a hash). We literally don't know who you are, and there is no mathematical formula in the universe to reverse that hash back into your real name."
+    "title": "The server never learns your identity.",
+    "p1": "No phone number, no email. To be findable, your username is hashed on your device with <strong>Argon2id (64 MB memory)</strong> before it ever leaves your browser.",
+    "p2": "The server stores only the resulting <strong>blind index</strong> — a value that cannot be reversed or brute-forced offline. There is no formula on our side that maps the hash back to you.",
+    "p3": "Your display name, bio, and avatar are encrypted locally and shared only with people you approve.",
+    "visual_device": "Device",
+    "visual_server": "NYX Server",
+    "visual_kdf": "Argon2id KDF",
+    "visual_hash": "Hash: 9a3b…"
+  },
+  "pq": {
+    "badge": "03 / PQX3DH — HYBRID KEY EXCHANGE",
+    "title": "Quantum-safe from the very first handshake.",
+    "p1": "Every new session starts with a hybrid key agreement: <strong>X25519</strong> (classical) combined with <strong>ML-KEM-768 via X-Wing</strong> (post-quantum). An attacker must break both at once — defeating a single curve is not enough.",
+    "p2": "Identity pre-keys are signed with <strong>Ed25519</strong>, and the combined secret is mixed through <strong>BLAKE2b</strong> into the root key that seeds the message ratchet.",
+    "visual": {
+      "step_1_title": "Classical DH — X25519",
+      "step_1_desc": "Both devices exchange ephemeral X25519 keys and compute a shared classical secret.",
+      "step_2_title": "Post-Quantum KEM — ML-KEM-768 (X-Wing)",
+      "step_2_desc": "One side encapsulates against the other's quantum-safe key; the ciphertext is public, the secret stays private.",
+      "step_3_title": "Combine & Derive — BLAKE2b",
+      "step_3_desc": "Both secrets are blended and hashed into a single root key.",
+      "note": "Root key seeds the Double Ratchet — every message gets its own key."
+    }
   },
   "ratchet": {
-    "badge": "03 / THE DOUBLE RATCHET",
-    "title": "Every Message, A New Key.",
-    "p1": "NYX is built upon the world's most respected encryption protocol: <strong>The Signal Protocol</strong>. But we don't just encrypt the connection, we encrypt <i>every single message individually</i>.",
-    "pfs": "<strong>Perfect Forward Secrecy (PFS):</strong> If your device is compromised tomorrow, your messages sent <i>yesterday</i> remain unreadable because the old keys have already been destroyed.",
-    "pcs": "<strong>Post-Compromise Security (PCS):</strong> If your key leaks today, you only need to send one new message. The system will automatically \"ratchet\" a new key and restore your security."
+    "badge": "04 / THE DOUBLE RATCHET",
+    "title": "Every message, a brand-new key.",
+    "p1": "Each message derives a fresh key from the previous one and destroys it after use — a one-time pad that keeps moving forward.",
+    "pfs": "<strong>Perfect Forward Secrecy (PFS):</strong> if your device is compromised tomorrow, the messages you sent yesterday remain unreadable.",
+    "pcs": "<strong>Post-Compromise Security (PCS):</strong> if a key leaks today, sending a single new message automatically re-establishes security.",
+    "visual_msg": "MSG",
+    "visual_key": "KEY"
+  },
+  "pipeline_badge": "05 / MESSAGE PIPELINE",
+  "blindrelay_badge": "06 / BLIND RELAY",
+  "burner": {
+    "badge": "07 / BURNER SESSIONS",
+    "title": "Chats that never touch a database.",
+    "p1": "A burner session is an anonymous, RAM-only chat. The guest receives a temporary <strong>guest_*</strong> identity and never registers an account.",
+    "p2": "Both sides run a dedicated <strong>Post-Quantum Double Ratchet (PQ-DR)</strong> with an X-Wing KEM handshake. Nothing is persisted — close the tab and the session, its keys, and its history are gone forever.",
+    "visual": {
+      "step_1_title": "Host generates a link",
+      "step_1_desc": "A one-time burner link embeds the host's public keys.",
+      "step_2_title": "Guest joins anonymously",
+      "step_2_desc": "The guest gets a temporary identity — no registration, no data stored.",
+      "step_3_title": "PQ-DR encrypted, RAM-only",
+      "step_3_desc": "Messages are encrypted with the post-quantum double ratchet and live only in memory.",
+      "step_4_title": "Destroy on close",
+      "step_4_desc": "Closing the tab wipes keys and history; the room is blacklisted server-side.",
+      "note": "Not even the server can identify the guest."
+    }
+  },
+  "file": {
+    "badge": "08 / FILE ENCRYPTION",
+    "title": "Files are encrypted before upload.",
+    "p1": "Attachments are streamed through libsodium's <strong>secretstream (XChaCha20-Poly1305)</strong> in 1 MB chunks with a final authentication tag — encryption never buffers the whole file in memory.",
+    "p2": "The random 32-byte key travels inside the E2EE message itself. The server stores only an opaque blob in R2; the recipient downloads, decrypts, and caches it in OPFS.",
+    "visual_device": "Your device",
+    "visual_r2": "Blind R2 Storage",
+    "visual_recipient": "Recipient",
+    "visual_encrypt": "Secretstream encrypt · 1 MB chunks",
+    "visual_decrypt": "Decrypt · OPFS cache"
   },
   "vault": {
-    "badge": "04 / LOCAL VAULT & PROFILES",
-    "title": "Your Data, On Your Device.",
-    "p1": "Most chat apps sync your entire history to their cloud. We don't. Your entire NYX chat history lives <strong>exclusively</strong> inside your device's <i>IndexedDB</i>.",
-    "p2": "Even your profile picture and display name are encrypted locally. The key to unlock them is only sent to your approved contacts. To our servers, you have no face and no name—just an encrypted blob of data."
+    "badge": "09 / LOCAL VAULT",
+    "title": "Your history lives on your device.",
+    "p1": "Chats, ratchet states, and keys are stored in an IndexedDB <strong>Shadow Vault</strong>, encrypted at rest with the <strong>ENC1:</strong> envelope derived from your master seed.",
+    "p2": "Nothing is synced to the cloud in plaintext — one active device per account, and migration happens through an encrypted <strong>.nyxvault</strong> export.",
+    "visual_vault": "IndexedDB Vault",
+    "visual_cloud": "Cloud DB",
+    "visual_encrypted": "ENC1: encrypted at rest"
   },
-  "webrtc": {
-    "badge": "05 / WEBRTC TUNNELS",
-    "title": "Wiretap-Proof Calls.",
-    "p1": "When you make a voice or video call, our architecture shifts from Client-Server to a true <strong>Peer-to-Peer (P2P)</strong> network.",
-    "p2": "The NYX server only acts as a signaling pathfinder. But even the connection signals (SDP/ICE) are wrapped in E2EE encryption. Once connected, voice and video packets flow directly between devices. <strong>The server is completely bypassed.</strong>"
+  "transport": {
+    "badge": "10 / TRANSPORT — WEBTRANSPORT",
+    "title": "QUIC-grade transport, Rust-grade isolation.",
+    "p1": "Real-time traffic runs over <strong>WebTransport (HTTP/3 · QUIC)</strong>, terminated by a dedicated <strong>Rust sidecar</strong> and bridged to Node via Redis pub/sub. The Express API never touches transport frames.",
+    "p2": "Connections use short-lived <strong>JWT tickets</strong> plus certificate pinning, enforce one active device per account, and emit random chaff datagrams so idle traffic is indistinguishable from real data.",
+    "visual_app": "Web App",
+    "visual_wt": "WebTransport (QUIC)",
+    "visual_sidecar": "Rust Sidecar",
+    "visual_redis": "Redis Bridge",
+    "visual_node": "Node API",
+    "visual_chaff": "chaff · opcode 0x00"
+  },
+  "tier": {
+    "badge": "11 / TRUST TIER",
+    "title": "Anti-spam without phone numbers.",
+    "p1": "New accounts start in <strong>Sandbox Mode</strong> with strict rate limits. To become <strong>VIP</strong>, prove you are human — with <strong>WebAuthn</strong> biometrics or a client-side <strong>BLAKE2b Proof-of-Work</strong> puzzle.",
+    "visual_sandbox": "Sandbox",
+    "visual_vip": "VIP",
+    "visual_webauthn": "WebAuthn · Biometric",
+    "visual_pow": "BLAKE2b · Proof-of-Work"
+  },
+  "calls": {
+    "badge": "12 / CALLS",
+    "title": "Peer-to-peer calls.",
+    "p1": "Voice and video calls connect <strong>peer-to-peer</strong> over WebRTC once established. The server only coordinates the handshake, and even the SDP/ICE signaling is end-to-end encrypted.",
+    "p2": "Media never transits the server."
+  },
+  "stats": {
+    "title": "SECURITY NUMBERS",
+    "headline": "Measured, not promised.",
+    "stat_1_label": "Message padding (bytes)",
+    "stat_1_value": "8192",
+    "stat_1_suffix": " B",
+    "stat_2_label": "Encrypted file chunk size",
+    "stat_2_value": "1",
+    "stat_2_suffix": " MB",
+    "stat_3_label": "Crypto operations in the worker",
+    "stat_3_value": "45",
+    "stat_3_suffix": " ops",
+    "stat_4_label": "Argon2id memory (vault KDF)",
+    "stat_4_value": "128",
+    "stat_4_suffix": " MB"
   },
   "cta": {
-    "title": "Are you a Security Researcher?",
+    "title": "Are you a security researcher?",
     "subtitle": "We welcome independent audits. Read our Coordinated Disclosure Protocol and earn your place in the NYX Hall of Fame.",
     "button": "View Bug Bounty Protocol"
   }

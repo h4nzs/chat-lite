@@ -3,14 +3,17 @@ import MainLayout from '../layouts/MainLayout.astro';
 import Footer from '../components/Footer.astro';
 import '../index.css';
 import { getLangFromUrl, useTranslations } from '../utils/i18n';
-import { FiRefreshCcw, FiShield, FiCreditCard, FiLock, FiMail } from 'react-icons/fi';
+import { FiHash, FiRefreshCcw, FiShield, FiMail } from 'react-icons/fi';
 
 const { lang: propLang } = Astro.props;
 const lang = propLang || Astro.currentLocale || getLangFromUrl(Astro.url);
+const langPrefix = lang === 'en' ? '' : `/${lang}`;
 const t = useTranslations(lang);
 
 const title = t('refund:meta.title') !== 'refund:meta.title' ? t('refund:meta.title') : 'Refund Policy | NYX Chat';
-const description = t('refund:meta.description') !== 'refund:meta.description' ? t('refund:meta.description') : 'NYX Chat refund policy and 7-day money-back guarantee.';
+const description = t('refund:meta.description') !== 'refund:meta.description' ? t('refund:meta.description') : 'Refund policy for NYX Pro cryptocurrency payments.';
+const homeLabel = t('common:home') !== 'common:home' ? t('common:home') : 'Home';
+const navRefund = t('common:nav.refund') !== 'common:nav.refund' ? t('common:nav.refund') : 'Refund Policy';
 
 const schema = JSON.stringify({
   "@context": "https://schema.org",
@@ -23,78 +26,66 @@ const schema = JSON.stringify({
     "logo": "https://nyx-app.my.id/pwa-192x192.png"
   }
 });
+
+const sections = [
+  { icon: FiHash, title: t('refund:payments_title'), desc: t('refund:payments_desc'), raw: false },
+  { icon: FiRefreshCcw, title: t('refund:refund_title'), desc: t('refund:refund_desc'), raw: false },
+  { icon: FiShield, title: t('refund:zk_title'), desc: t('refund:zk_desc'), raw: false },
+  { icon: FiMail, title: t('refund:how_to_claim_title'), desc: t('refund:how_to_claim_desc'), raw: true },
+];
 ---
 
 <MainLayout title={title} description={description} canonicalUrl={Astro.url.pathname} schemaMarkup={schema}>
-  <div class="min-h-screen pt-24 pb-16 px-4 md:px-8 max-w-4xl mx-auto font-sans text-text-primary">
-    
-    <header class="text-center mb-16">
-      <div class="inline-flex items-center gap-2 px-3 py-1 mb-6 text-xs font-bold text-accent bg-accent/10 border border-accent/20 rounded-full tracking-widest uppercase">
-        <FiRefreshCcw size={14} /> {t('refund:title')}
-      </div>
-      <h1 class="text-4xl md:text-5xl font-black tracking-tighter mb-4 bg-gradient-to-r from-white via-white to-gray-500 bg-clip-text text-transparent">
-        {t('refund:title')}
-      </h1>
-      <p class="text-text-secondary text-sm font-mono opacity-60">
-        {t('refund:last_updated')}
-      </p>
-    </header>
+  <div class="min-h-screen bg-bg-main text-text-primary relative overflow-x-clip">
+    <div class="aurora-blob w-[480px] h-[480px] -top-40 -right-40" style="background: radial-gradient(circle, hsl(var(--grad-end) / 0.10), transparent 60%);"></div>
+    <div class="aurora-blob w-[420px] h-[420px] top-1/2 -left-44" style="background: radial-gradient(circle, hsl(var(--grad-start) / 0.10), transparent 60%);"></div>
 
-    <div class="space-y-8">
-      <p class="text-lg text-text-secondary leading-relaxed mb-8">
+    <main class="max-w-4xl mx-auto px-6 py-10 md:py-14 relative">
+
+      <nav class="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-widest mb-12 animate-in fade-in duration-500">
+        <a href={lang === 'en' ? '/' : langPrefix} class="hover:text-accent transition-colors">{homeLabel}</a>
+        <span class="text-text-secondary/40">/</span>
+        <span class="text-accent">{navRefund}</span>
+      </nav>
+
+      <header class="text-center mb-16 animate-in slide-in-from-bottom-4 duration-700">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 mb-6 text-xs font-bold text-accent bg-bg-surface rounded-full tracking-widest uppercase" style="box-shadow: var(--shadow-neu-icon)">
+          <FiRefreshCcw size={14} /> {t('refund:title')}
+        </div>
+        <h1 class="font-display font-black text-4xl md:text-5xl leading-[1.05] tracking-tight mb-5">
+          {t('refund:title')}
+        </h1>
+        <p class="text-text-secondary text-sm font-mono opacity-60">
+          {t('refund:last_updated')}
+        </p>
+      </header>
+
+      <p class="text-lg text-text-secondary leading-relaxed mb-10">
         {t('refund:intro')}
       </p>
 
-      <section class="card-neumorphic border-white/5">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="p-2 bg-[#0d1322] rounded-lg border border-[#1e293b] text-accent">
-            <FiCreditCard size={20} />
-          </div>
-          <h2 class="text-xl font-bold">{t('refund:fiat_title')}</h2>
-        </div>
-        <p class="text-text-secondary leading-relaxed pl-12">
-          {t('refund:fiat_desc')}
-        </p>
-      </section>
+      <div class="space-y-8">
+        {sections.map((item) => {
+          const Icon = item.icon;
+          return (
+            <section class="card-neumorphic">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="icon-well w-12 h-12 flex-shrink-0"><Icon size={22} /></div>
+                <h2 class="font-display text-xl md:text-2xl font-bold tracking-tight">{item.title}</h2>
+              </div>
+              {item.raw ? (
+                <p class="text-text-secondary leading-relaxed" set:html={item.desc}></p>
+              ) : (
+                <p class="text-text-secondary leading-relaxed">{item.desc}</p>
+              )}
+            </section>
+          );
+        })}
+      </div>
 
-      <section class="card-neumorphic border-white/5">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="p-2 bg-[#0d1322] rounded-lg border border-[#1e293b] text-yellow-500">
-            <FiLock size={20} />
-          </div>
-          <h2 class="text-xl font-bold">{t('refund:crypto_title')}</h2>
-        </div>
-        <p class="text-text-secondary leading-relaxed pl-12">
-          {t('refund:crypto_desc')}
-        </p>
-      </section>
-
-      <section class="card-neumorphic border-white/5">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="p-2 bg-[#0d1322] rounded-lg border border-[#1e293b] text-[#06b6d4]">
-            <FiShield size={20} />
-          </div>
-          <h2 class="text-xl font-bold">{t('refund:zk_title')}</h2>
-        </div>
-        <p class="text-text-secondary leading-relaxed pl-12">
-          {t('refund:zk_desc')}
-        </p>
-      </section>
-
-      <section class="card-neumorphic border-white/5 bg-accent/5">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="p-2 bg-accent/20 rounded-lg border border-accent/30 text-accent">
-            <FiMail size={20} />
-          </div>
-          <h2 class="text-xl font-bold">{t('refund:how_to_claim_title')}</h2>
-        </div>
-        <p class="text-text-secondary leading-relaxed pl-12" set:html={t('refund:how_to_claim_desc')} />
-      </section>
-
-    </div>
-
-    <div class="mt-24">
-      <Footer lang={lang} />
-    </div>
+      <div class="mt-24">
+        <Footer lang={lang} />
+      </div>
+    </main>
   </div>
 </MainLayout>
