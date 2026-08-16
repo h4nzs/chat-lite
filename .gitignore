@@ -29,6 +29,7 @@ vspostgre.session.sql
 **/*.sql
 
 .gemini/
+.opencode/
 gha-creds-*.json
 test-results/
 *.tgz
