@@ -18,6 +18,7 @@ import { checkAndRefillOneTimePreKeys, resetOneTimePreKeys } from "@utils/crypto
 import type { UserId, User, SubscriptionTier } from '@nyx/shared';
 import { executeLocalWipe } from "@lib/nukeProtocol";
 import i18n from '../i18n';
+import { prefetchAppChunks } from '@lib/prefetch';
 
 // ✅ Helper pendeteksi nama perangkat
 const getDeviceName = () => {
@@ -370,8 +371,23 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           if (me.systemAlert) {
             import('@utils/systemAlerts').then(m => m.processSystemAlert(me));
           }
+
+          // Prefetch lazy chunks di latar belakang agar tidak blink saat dipakai.
+          prefetchAppChunks();
         } else {
-          throw new Error("No valid session.");
+          // FALLBACK: refresh bisa gagal secara transien (network/race) sementara
+          // cookie akses `at` masih valid. Jangan langsung logout — coba validasi
+          // sesi langsung. Hanya logout jika sesi memang sudah tidak berlaku.
+          try {
+            const me = await api<User>("/api/users/me");
+            set({ user: me, hasRestoredKeys: await hasStoredKeys() });
+            localStorage.setItem("user", JSON.stringify(me));
+            await get().tryAutoUnlock();
+            get().loadBlockedUsers();
+            prefetchAppChunks();
+          } catch {
+            throw new Error("No valid session.");
+          }
         }
       } catch (error: unknown) {
         // Kasus normal saat berkunjung tanpa sesi — debug, bukan error
@@ -534,6 +550,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           localStorage.setItem("user", JSON.stringify(res.user));
 
           get().loadBlockedUsers();
+          prefetchAppChunks();
 
           if (restoredNotSynced) {
             try { await setupAndUploadPreKeyBundle(); } catch(e) { console.error("Failed to sync restored keys:", e); }
@@ -614,6 +631,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         localStorage.setItem("user", JSON.stringify(res.user));
 
         setupAndUploadPreKeyBundle().catch(e => console.error("Failed to upload initial pre-key bundle:", e));
+        prefetchAppChunks();
 
         return { phrase, userId: res.user.id };
         } finally {
@@ -816,19 +834,34 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         try {
           const { api } = await import('@lib/api');
           const { runExclusive } = await import('@lib/refreshLock');
-          const data = await runExclusive(async () =>
-            api<Record<string, unknown>>('/api/auth/refresh', {
-              method: 'POST',
-            })
-          );
 
-          if (data && typeof data === 'object' && 'accessToken' in data && typeof data.accessToken === 'string') {
-            set({ accessToken: data.accessToken });
-            return true;
+          // Retry hingga 3× — kegagalan refresh yang transien (network hiccup,
+          // rotasi konkuren dari tab lain, dsb.) tidak boleh memaksa logout.
+          // Berkat grace di server, menyajikan ulang rt yang baru dirotasi dalam
+          // beberapa detik justru menghasilkan token baru (bukan revoke family).
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const data = await runExclusive(async () =>
+                api<Record<string, unknown>>('/api/auth/refresh', {
+                  method: 'POST',
+                })
+              );
+
+              if (data && typeof data === 'object' && 'accessToken' in data && typeof data.accessToken === 'string') {
+                set({ accessToken: data.accessToken });
+                return true;
+              }
+              // Respons OK tanpa token — ulangi.
+              if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+            } catch (error) {
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+                continue;
+              }
+              console.debug('[Auth] Silent refresh failed:', error instanceof Error ? error.message : error);
+              return false;
+            }
           }
-          return false;
-        } catch (error) {
-          console.debug('[Auth] Silent refresh failed:', error instanceof Error ? error.message : error);
           return false;
         } finally {
           refreshPromise = null;
