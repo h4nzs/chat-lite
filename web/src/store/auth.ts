@@ -834,33 +834,23 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         try {
           const { api } = await import('@lib/api');
           const { runExclusive } = await import('@lib/refreshLock');
+          const { refreshWithRetry } = await import('@lib/refreshRetry');
 
           // Retry hingga 3× — kegagalan refresh yang transien (network hiccup,
           // rotasi konkuren dari tab lain, dsb.) tidak boleh memaksa logout.
           // Berkat grace di server, menyajikan ulang rt yang baru dirotasi dalam
           // beberapa detik justru menghasilkan token baru (bukan revoke family).
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              const data = await runExclusive(async () =>
-                api<Record<string, unknown>>('/api/auth/refresh', {
-                  method: 'POST',
-                })
-              );
+          const data = await refreshWithRetry(async () =>
+            runExclusive(async () =>
+              api<Record<string, unknown>>('/api/auth/refresh', {
+                method: 'POST',
+              })
+            )
+          );
 
-              if (data && typeof data === 'object' && 'accessToken' in data && typeof data.accessToken === 'string') {
-                set({ accessToken: data.accessToken });
-                return true;
-              }
-              // Respons OK tanpa token — ulangi.
-              if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-            } catch (error) {
-              if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-                continue;
-              }
-              console.debug('[Auth] Silent refresh failed:', error instanceof Error ? error.message : error);
-              return false;
-            }
+          if (data && typeof data.accessToken === 'string') {
+            set({ accessToken: data.accessToken });
+            return true;
           }
           return false;
         } finally {

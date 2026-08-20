@@ -5,10 +5,12 @@
 | Package | Runner | Command | Count |
 |---|---|---|---|
 | server | `node:test` via `tsx` (Jest config is dead — ignore it) | `pnpm --filter nyx-server run test` | 22 |
-| web | Vitest (jsdom) | `pnpm --filter nyx-web run test` | 29 |
-| everything | — | `pnpm -r --if-present run test` | 51 |
+| web | Vitest (jsdom) | `pnpm --filter nyx-web run test` | 35 |
+| everything | — | `pnpm -r --if-present run test` | 57 |
 
 Server tests are listed explicitly in `server/package.json` (`tsx --test tests/…`). They must **not** require Postgres/Redis — Prisma clients are faked (see `tests/sessionKeys.test.ts`).
+
+Web test files: `src/lib/__tests__/{burnerFileData,refreshLock}.test.ts` and `src/utils/__tests__/{date,sanitize,typeGuards,url}.test.ts`.
 
 Covered areas: password hashing, `safeEqualStrings`, JWT, `toRawServerMessage` (incl. a regression guard that `ciphertext` is never emitted), session-key blind relay, type guards, sanitize (XSS + secret redaction), URL helpers, date formatting.
 

@@ -24,6 +24,15 @@ Usually a DB connectivity symptom (see above). If it's a query error, check `Mes
 
 ## Frontend
 
+### Lazy-loaded feature "blinks" (full-screen Suspense) on first use
+Global modals (ContextMenu, CommandPalette, CallOverlay, UserInfoModal, …) and pages are `React.lazy` under a single `<Suspense fallback={<LoadingScreen/>}>`. Opening one before its chunk is fetched flashes the whole app. Mitigation: `lib/prefetch.ts` (`prefetchAppChunks`) preloads these chunks in the background after login/registration/bootstrap.
+
+### Group shows "Unknown" / group messages disappear
+Group metadata is encrypted at sender-key N=0; re-decrypting it after the ratchet advanced fails. Fix: the decrypted metadata is now persisted to the Shadow Vault on first success, so reloads reuse the cache instead of re-decrypting. If it still shows "Unknown", trigger `repairSecureSession` / a ghost sync to re-fetch the group key.
+
+### Deleted conversation (burner / soft-delete) reappears after reload
+`removeConversation`/`deleteConversation` used to clear only in-memory state or just messages — the `conversations` row stayed in IndexedDB. Both now also delete the conversation record from the Shadow Vault.
+
 ### CSP violation: "Missing 'unsafe-eval'" in `schemas-*.js`
 Zod 4 JIT (`Function()`) executed — the jitless flag wasn't set before schemas were created. The flag is a **direct mutation** of `globalThis.__zod_globalConfig.jitless` in `packages/shared/src/schemas.ts` and `web/src/zodSetup.ts`. Do not switch to `zod.config()` (tree-shaken in prod — zod has `sideEffects: false`). Never re-add `'unsafe-eval'` to the nginx CSP.
 
@@ -60,6 +69,31 @@ The SPA needs a fallback to `index.html` for unknown routes (nginx `try_files` i
 - Sidecar lost its Redis subscription (`Successfully subscribed to nyx:downstream` in its log).
 - Node↔sidecar channel names drift: `nyx:upstream:<op>` / `nyx:downstream`.
 - The single-active-device check (redisBridge) blocking a second device by design.
+
+## Auth / session (recent fixes)
+
+### "Refresh token reuse detected" logs + random 401s on uploads/presigned
+The refresh route rotates the `rt` cookie on every refresh. Two concurrent refreshes (multi-tab, or the burner `/drop` page alongside the main app) used to look like theft, revoking the whole family. Fixes:
+- **Server** (`auth.ts`): a 5 s grace window treats a same-device, recently-rotated duplicate as a benign concurrent refresh and continues the chain instead of revoking.
+- **Client** (`store/auth.ts` + `lib/refreshLock.ts`): `silentRefresh` is single-flight per tab and serialized across tabs (Web Locks API + localStorage fallback), and retries up to 3×.
+- `bootstrap()` falls back to a direct `GET /api/users/me` before logging out when refresh fails transiently.
+If you still see reuse logs on prod, the deploy is stale — confirm the latest `auth.ts` shipped.
+
+### `⚠️ CSRF_SECRET not set` even though it's in `.env`
+`config.ts` reads `CSRF_SECRET` and warns only when it's empty/whitespace **and** `NODE_ENV=production`. The prod env is copied from `/root/nyx-app/.env` over `server/.env` on deploy — set a non-empty `CSRF_SECRET` there (not just in `server/.env`). The config now trims the value, so `CSRF_SECRET=` (empty) is treated as unset.
+
+### App logs out intermittently on open / refresh
+- The `rt` cookie (30 d) may have been revoked earlier by a reuse false-positive (see above).
+- `bootstrap` now retries `silentRefresh` and falls back to validating the still-valid `at` cookie before logging out.
+
+### Biometric login then password login says "incorrect password"
+Biometric unlock used to regenerate the key bundle with a random session key and overwrite the password-encrypted bundle in IndexedDB, breaking password login. Fixed: biometric unlock now loads keys **in memory only** and never touches `nyx_encrypted_keys`. Users whose bundle was already overwritten by the old bug need one recovery pass.
+
+### "New Device Detected" flashes during biometric login
+The biometric flow now sets `isUnlocking` during key restore, same as the password flow, so the recovery modal does not appear until keys settle.
+
+### User's profile change doesn't propagate to other users' chatlist/header
+`PUT /api/users/me` now broadcasts `user:updated` to every peer sharing a conversation (`UserHiddenConversation`), not just to the user themselves. Previously peers only saw the new profile after a fresh message arrived.
 
 ## Database / deploy
 

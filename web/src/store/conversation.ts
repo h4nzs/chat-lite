@@ -253,31 +253,18 @@ export const useConversationStore = createWithEqualityFn<State & Actions>((set, 
         // because the sender key ratchet has advanced past N=0 (messages were decrypted
         // in the previous session), while metadata was encrypted at N=0.
         // Result: decryptedMetadata gets overwritten with undefined → "Unknown Group".
-        let decryptedMetadata = c.decryptedMetadata;
-        if (!decryptedMetadata && c.isGroup && c.encryptedMetadata) {
-             try {
-                 const decrypted = await decryptGroupMetadata(c.encryptedMetadata, c.id);
-                 if (decrypted) {
-                     decryptedMetadata = decrypted;
-                     // Cache participants so non-creator members can send messages even before
-                     // addOrUpdateConversation is called (which also caches). This handles the
-                     // initial load path where metadata is decrypted but addOrUpdateConversation
-                     // is not invoked.
-                     const metaParticipants = (decrypted as { participants?: string[] }).participants;
-                     if (Array.isArray(metaParticipants) && metaParticipants.length > 0) {
-                         import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(c.id, metaParticipants));
-                     }
-                     // BUGFIX: persist decryptedMetadata ke Shadow Vault agar reload berikutnya
-                     // memakai cache (ratchet sender-key sudah maju lewat N=0; dekripsi ulang
-                     // metadata dari N=0 akan gagal → "Unknown Group" + pesan hilang).
-                     import('@lib/shadowVaultDb').then(m => m.shadowVault.saveConversation({ ...c, decryptedMetadata } as Conversation).catch(() => {}));
-                 }
-             } catch (e) {
-                 console.warn("Failed to decrypt metadata for group", e);
-             }
-        } else {
-            if (c.isGroup && !decryptedMetadata) console.warn("[Metadata] Cannot decrypt metadata for group", c.id);
-        }
+        // BUGFIX: hasil dekripsi dipersist ke Shadow Vault (lihat lib/groupMetadata.ts).
+        const { resolveGroupMetadata } = await import('@lib/groupMetadata');
+        const decryptedMetadata = await resolveGroupMetadata(c, {
+          decrypt: decryptGroupMetadata,
+          save: async (conv) => {
+            const { shadowVault } = await import('@lib/shadowVaultDb');
+            await shadowVault.saveConversation(conv).catch(() => {});
+          },
+          cacheParticipants: (id, userIds) => {
+            import('@lib/keychainDb').then(m => m.saveCachedGroupParticipants(id, userIds));
+          },
+        });
 
         return {
           ...c,

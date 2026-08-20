@@ -1,0 +1,92 @@
+# 25 — Repository Infrastructure & Agent Automation
+
+Everything at the repository root that isn't the web/server/shared/marketing code: CI workflows, local Docker infra, agent (Gemini) automation, and the repo-level Markdown/JSON files. This closes the documentation gap for files outside `web/src`, `server/src`, `packages/shared`, and `marketing/src`.
+
+## 25.1 Root Markdown & policy files
+
+| File | Purpose |
+|---|---|
+| `README.md` | Project landing readme (philosophy, stack, deployment, docs index) |
+| `AGENTS.md` | Operational rules that agents/contributors must follow: shared-package rebuild order, frozen crypto formats, Zod jitless, broken-ESLint status, prod DB layout, WebTransport cert pinning, frontend gotchas, deploy secrets layout. **Read before touching crypto or CI.** |
+| `GEMINI.md` | Instructions for the Gemini coding agent (repo conventions, build/test commands, guardrails) |
+| `CHANGELOG.md` | Release history |
+| `CONTRIBUTING.md` | Contribution guide |
+| `CODE_OF_CONDUCT.md` | Community code of conduct |
+| `SECURITY.md` | Coordinated disclosure protocol / bug bounty (linked from the marketing `security` page CTA) |
+| `COMMERCIAL.md` | Commercial dual-licensing guide (AGPL vs proprietary) |
+| `.env.example` | Combined template: server vars (top) + `VITE_*` web vars (bottom) |
+
+## 25.2 Root config files
+
+| File | Purpose |
+|---|---|
+| `package.json` | pnpm workspace scripts (`build`, `test`, `lint`, `bump:*`, `version`) + dependency `resolutions` (security pins) + `pnpm.onlyBuiltDependencies` + `packageManager: pnpm@11.4.0` |
+| `pnpm-workspace.yaml` | Workspace packages (web, server, marketing, packages/shared) |
+| `pnpm-lock.yaml` | Frozen lockfile (CI installs with `--frozen-lockfile`) |
+| `docker-compose.yml` | Local dev stack: PostgreSQL 18, Redis, server (Express), web (nginx) — see §25.4 |
+
+## 25.3 Scripts & seed
+
+| File | Purpose |
+|---|---|
+| `scripts/update-md.mjs` | Version-bump hook (`pnpm version`) — updates version strings in `README.md`, `web/package.json`, `server/package.json`, `marketing/package.json`, `packages/shared/package.json` |
+| `server/scripts/reset-test-env.ts` | E2E DB+Redis wipe (guardrail: refuses in production / non-local DB) |
+| `server/prisma/seed.ts` | **Legacy/stale** — references removed columns (`email`, `username`, `participants`) and an old bcrypt schema. Do not rely on it; `prisma db push` is the real schema source. |
+
+## 25.4 Docker Compose (local dev alternative)
+
+`docker-compose.yml` defines four services for a containerized local environment:
+
+| Service | Image | Notes |
+|---|---|---|
+| `postgres` | `postgres:18-alpine` | env `POSTGRES_USER/PASSWORD/DB` from `.env`; persisted volume `postgres_data` |
+| `redis` | `redis:alpine` | cache + pub/sub |
+| `server` | `./server` (Dockerfile) | port 4000; `REDIS_URL=redis://redis:6379` (service hostname) |
+| `web` | `./web` (Dockerfile) | nginx + PWA, exposed on host port 3000 |
+
+Production does **not** use Compose — see `10-deployment-ops.md` (VPS + PM2 + Cloudflare Tunnel).
+
+## 25.5 CI/CD & agent workflows (`.github/workflows/`)
+
+| Workflow | Purpose |
+|---|---|
+| `ci.yml` | Build + unit tests + non-blocking lint + `pnpm audit --prod` + E2E (Postgres/Redis service containers) |
+| `deploy.yml` | On push to `main`: build web + server + Rust sidecar, zip, SCP to VPS, pm2 restart `nyx-api`/`nyx-sidecar`, overwrite `server/.env` with `/root/nyx-app/.env` |
+| `codeql.yml` | Static security analysis |
+| `gemini-dispatch.yml` | Route issues/PRs to the Gemini agent |
+| `gemini-invoke.yml` | Invoke the agent for a task |
+| `gemini-plan-execute.yml` | Plan-then-execute agent loop |
+| `gemini-review.yml` | Automated code review |
+| `gemini-scheduled-triage.yml` | Scheduled issue triage |
+
+## 25.6 Agent discoverability content (`marketing/public/`)
+
+These static files are served by the `wellKnown` route module for AI-agent/MCP discoverability (RFC 9727 linkset, OIDC, MCP Server Card SEP-1649, agent-skills index):
+
+| File | Served for |
+|---|---|
+| `auth.md` | `Auth.md` agent-skill content (OAuth/OIDC auth instructions) |
+| `index.md` | `agent-skills/index.json` source content |
+| `icons.svg`, `favicon.ico/png`, `pwa-192/512.png`, `noise.png` | brand assets |
+| `robots.txt`, `sitemap.xml`, `google*.html`, `yandex_*.html`, `nyx-live-index-*.txt` | SEO / search-engine verification |
+
+The `.well-known` endpoints themselves are documented in `22-backend-reference.md` §22.2 (`wellKnown.ts`) and `12-api-reference.md`.
+
+## 25.7 Server `types/` declarations
+
+`server/src/types/` holds ambient type declarations (not runtime code):
+
+| File | Purpose |
+|---|---|
+| `auth.d.ts` | `AuthPayload` (JWT payload shape: id, role, deviceId, jti) + `AuthJwtPayload` alias |
+| `express.d.ts` | Augments Express `Request` with `user`, `deviceId`, `jwtPayload`, `file` |
+| `socket.io.d.ts` | Legacy Socket.IO `Socket.user` augmentation (Socket.IO is no longer active — keep for type compat) |
+
+## 25.8 Web `types/` declarations
+
+| File | Purpose |
+|---|---|
+| `web/src/types/crypto-common.ts` | Shared crypto type aliases: `CryptoBuffer`, `SodiumKeyPair`, `GroupRatchetState`, `GroupRatchetHeader`, `DoubleRatchetHeader` |
+| `web/src/types/declarations.d.ts` | Global/module declarations |
+| `web/src/vite-env.d.ts` | Vite client type reference (generated) |
+| `web/src/SetupTests.ts` | Vitest setup: mocks `localStorage` and `Web Worker` + Buffer polyfill |

@@ -190,20 +190,17 @@ export default function Login() {
         try {
         // E. MAGIC UNLOCK: Jika PRF berhasil membuka Recovery Phrase
         if (recoveryPhrase) {
-            // Kita punya Phrase! Regenerasi kunci dari phrase ke MEMORI saja —
-            // JANGAN menimpa bundle terenkripsi-password di IndexedDB. Sebelumnya
-            // bundle IDB ditimpa dengan kunci acak (sessionPassword), sehingga
-            // unlock via PASSWORD menjadi gagal ("incorrect") setelah unlock biometric.
-            const sodium = await import('@lib/sodiumInitializer').then(m => m.getSodium());
-            const sessionPassword = sodium.to_hex(sodium.randombytes_buf(16));
-
-            // Regenerasi bundle kunci dari phrase
-            const { encryptedPrivateKeys } = await restoreFromPhrase(recoveryPhrase, sessionPassword);
-            const dec = await retrievePrivateKeys(encryptedPrivateKeys, sessionPassword);
-
-            if (dec.success) {
-              // Set kunci di RAM (hasRestoredKeys = true) tanpa menyentuh IDB.
-              await useAuthStore.getState().setDecryptedKeys(dec.keys);
+            // Regenerasi kunci dari phrase ke MEMORI saja — JANGAN menimpa bundle
+            // terenkripsi-password di IndexedDB (bug lama: password jadi "incorrect"
+            // setelah unlock biometric). Kontrak ini dijamin & diuji di
+            // `lib/biometricUnlockKeys.ts`.
+            const { unlockFromRecoveryPhrase } = await import('@lib/biometricUnlockKeys');
+            const ok = await unlockFromRecoveryPhrase(recoveryPhrase, {
+              restoreFromPhrase,
+              retrievePrivateKeys,
+              setDecryptedKeys: (keys) => useAuthStore.getState().setDecryptedKeys(keys),
+            });
+            if (ok) {
               toast.success(t('auth:status.vault_unlocked'));
             }
         } else if (result.encryptedPrivateKey) {

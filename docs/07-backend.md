@@ -24,9 +24,8 @@ See [12-api-reference.md](12-api-reference.md) for the complete endpoint catalog
 | Module | Purpose |
 |---|---|
 | `auth.ts` | Register, login, refresh (family reuse detection), logout/logout-all, recover (+challenge), WebAuthn register/login, transport-ticket, PoW challenge/verify, burner guest |
-| `users.ts` | Profile (me), key upload, onboarding, devices, block, search (blind-index), account deletion |
-| `conversations.ts` | Create (sandbox limit), sync, details, participants (opaque broadcasts), pin, key-rotation, leave, delete |
-| `messages.ts` | Store-and-forward send, pending fetch (14d window, 250 cap), blind delete (R2 file cleanup) |
+| `users.ts` | Profile (me), key upload, onboarding, devices, block, search (blind-index), account deletion — profile edits broadcast `user:updated` to conversation peers |
+| `conversations.ts` | Create (sandbox limit), sync, details, participants (opaque broadcasts), pin, key-rotation, leave, delete || `messages.ts` | Store-and-forward send, pending fetch (14d window, 250 cap), blind delete (R2 file cleanup) |
 | `keys.ts` | Prekey bundle upload/fetch (Redis-cached), OTPK lifecycle, initial session, TURN creds |
 | `sessionKeys.ts` | Blind relay of session keys + ratchet distribution |
 | `sessions.ts` | Session list + revoke by JTI (family revoke + Redis blacklist) |
@@ -84,4 +83,7 @@ All increment-based limits use the atomic Lua pattern (`RATE_LIMIT_LUA`) — nev
 - Timing-safe compares for: message `deleteSecret`, conversation `authSecret`, payment webhook HMACs.
 - `message:unsend` requires sender ownership OR a valid `deleteSecret`.
 - Broadcasts to recipients are parallelized (`Promise.all`), with a 500-recipient cap on both REST and socket paths.
-- Refresh reuse = full family revocation (containment), with the victim notified via `force_logout`.
+- Refresh reuse = full family revocation (containment), with the victim notified via `force_logout` — with a 5 s grace window for benign concurrent (multi-tab) refreshes.
+- `CSRF_SECRET` is trimmed before use; empty/whitespace falls back to `JWT_SECRET` with a warning pointing at the production `.env`.
+
+> **Full module catalog:** see [22-backend-reference.md](22-backend-reference.md) for the complete inventory of routes, middleware, bridge, utils, jobs, and Redis keys.

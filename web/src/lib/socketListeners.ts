@@ -14,11 +14,18 @@ import { RawServerMessageSchema, type RawServerMessage, type Message, type Parti
 let isInitialized = false;
 
 // Module-level state for offline sync (lives across reconnects)
-let syncCompleted = false;
+// Exported for unit tests only.
+export let syncCompleted = false;
 let unsubConversation: (() => void) | null = null;
 
+// Unit-test hook: reset the module-level sync flag between tests.
+export function resetSocketSyncForTests() {
+  syncCompleted = false;
+}
+
 // Shared sync function — accessible from both connect handler and subscription
-async function doSyncMessages() {
+// (exported for unit tests).
+export async function doSyncMessages() {
   if (syncCompleted) return;
   try {
     const conversations = useConversationStore.getState().conversations;

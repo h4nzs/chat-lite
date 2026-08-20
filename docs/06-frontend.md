@@ -9,7 +9,7 @@ React 19, Vite 8, TypeScript (strict + `noUncheckedIndexedAccess`), Zustand v5, 
 1. `main.tsx`: `import './zodSetup'` (Zod jitless — must stay first) → Sentry init → i18n init → **wait for i18n `initialized` before rendering** (prevents transient missingKey warnings) → render `<App/>` → `registerServiceWorker()`.
 2. `App.tsx`: `bootstrap()` (silent refresh) → routes; global modals are `React.lazy` + render-on-demand via store flags.
 
-## 6.3 State — 20 Zustand stores
+## 6.3 State — 21 Zustand stores
 
 | Store | Responsibility |
 |---|---|
@@ -55,6 +55,10 @@ Rules: prefer granular selectors (`useShallow`), never call `set()` in loops (ba
 
 Keychain writes go through a global write queue (`enqueueWrite` in `keychainDb.ts`).
 
+### Lazy-chunk prefetch
+
+Global modals and pages are `React.lazy` under a single `<Suspense fallback={<LoadingScreen/>}>`. `lib/prefetch.ts` (`prefetchAppChunks`) warms these chunks (pages, modals, and heavy utilities such as `fileUtils`, `webrtc`, `opfsStorage`, `biometricUnlock`, `html5-qrcode`, `dompurify`) in the background after login/registration/bootstrap — using `requestIdleCallback` + staggering so it never competes with user actions. This avoids the full-screen "blink" on first open of e.g. the context menu or command palette.
+
 ## 6.6 i18n
 
 - Locales: `public/locales/{en,es,id,pt-BR}`, 7 runtime namespaces: `common, auth, errors, chat, settings, modals, admin`.
@@ -86,3 +90,5 @@ Keychain writes go through a global write queue (`enqueueWrite` in `keychainDb.t
 | `VITE_SENTRY_DSN` | Sentry DSN |
 | `VITE_VAPID_PUBLIC_KEY` | Web Push VAPID |
 | `INDEXNOW_API_KEY` | Post-build SEO ping (optional) |
+
+> **Full module catalog:** see [21-frontend-reference.md](21-frontend-reference.md) for the complete inventory of stores, libs, pages, components, workers, hooks, and utils.

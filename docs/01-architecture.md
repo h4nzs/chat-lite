@@ -8,7 +8,7 @@ nyx-chat/
 │   ├── src/
 │   │   ├── components/       # UI components (~90 files)
 │   │   ├── pages/            # Lazy-loaded route pages (Login, Register, Chat, Settings…)
-│   │   ├── store/            # 20 Zustand stores
+│   │   ├── store/            # 21 Zustand stores
 │   │   ├── hooks/            # Reusable React hooks
 │   │   ├── lib/              # Infrastructure: api, transport, storage, crypto proxies
 │   │   ├── utils/            # Pure helpers (crypto.ts is the biggest; kept monolithic by design)
