@@ -1,0 +1,17 @@
+=== RUN A: syntax check (clean, http-context wrapper) ===
+10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+exit=
+
+=== RUN B: negative control (deliberate brace error) ===
+10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+2026/08/23 12:42:21 [emerg] 1#1: unknown directive "x" in /check/nginx.conf:67
+nginx: [emerg] unknown directive "x" in /check/nginx.conf:67
+nginx: configuration file /etc/nginx/nginx.conf test failed
+exit=
+--- exit codes re-captured (zsh-safe) ---
+run_a_exit=0
+run_b_exit=1
