@@ -13,6 +13,26 @@ import { Buffer } from 'buffer'
 import { redisClient } from '../lib/redis.js'
 // ✅ Menggunakan AuthJwtPayload dari paket shared
 import type { AuthJwtPayload, IDeviceTemplate, IPreKeyBundle } from '@nyx/shared'
+import { makeOtpkQuotaGate } from '../utils/otpkQuota.js'
+
+// === Kuota harian konsumsi OTPK per pasangan (requester, target) ===
+// Lua INCR+EXPIRE atomik — pola yang sama dengan limiter lain di repo.
+const OTPK_QUOTA_LUA = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`;
+
+const consumeOtpkQuota = makeOtpkQuotaGate(async (key, ttlSeconds) =>
+  Number(
+    await redisClient.eval(OTPK_QUOTA_LUA, {
+      keys: [key],
+      arguments: [String(ttlSeconds)]
+    })
+  )
+);
 
 const router: Router = Router()
 
@@ -170,6 +190,9 @@ router.get(
   async (req, res, next) => {
     try {
       const { userId } = req.params
+
+      // Kuota harian: tolak SEBELUM cache/DB/query konsumsi OTPK (fail-closed)
+      await consumeOtpkQuota((req.user as AuthJwtPayload).id, [String(userId)])
 
       // 1. Try to get device template from Redis
       let deviceTemplate: IDeviceTemplate | null = null;
@@ -365,6 +388,10 @@ router.post(
       if (!userIds || userIds.length === 0) {
         return res.json({});
       }
+
+      // Kuota harian: validasi SEMUA pasangan di depan agar request gagal-tutup
+      // sebelum ada satu pun OTPK dikonsumsi
+      await consumeOtpkQuota((req.user as AuthJwtPayload).id, userIds)
 
       const responseMap = new Map<string, Record<string, unknown>[]>();
       for (const uid of userIds) {
