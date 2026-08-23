@@ -167,3 +167,34 @@ Also re-check §10.5 items 3–5 (console free of CSP violations after hard relo
 - [ ] Remove the origin A-record exposure for `rt.` once tunneled.
 - [ ] Confirm origin firewall still allows only SSH + CF ranges (see assessment §L1).
 
+### Step 6 — Tunnel topology & origin binding (added 2026-08-23)
+
+Actual prod topology (confirmed with owner): **all** web/API traffic rides a Cloudflare
+Tunnel (`cloudflared` makes outbound-only connections; nothing listens on :80/:443 by design):
+
+```
+CF edge ──tunnel──► nginx :3000      (app.nyx-app.my.id static, nyx-app.my.id marketing)
+CF edge ──tunnel──► Express :4000    (api.nyx-app.my.id — DIRECT, bypasses nginx)
+P2P QUIC ─────────► sidecar :33333   (rt.nyx-app.my.id WebTransport)
+```
+
+Implications:
+
+1. **nginx XFF normalization (Steps 1–3) only protects hosts that traverse nginx.**
+   `api.*` reaches Express directly, so `req.ip` there can still resolve to a forged
+   XFF entry regardless of nginx config. The authoritative control for the API path is
+   now **code-side**: `cfAwareClientIp()` (`server/src/utils/clientIp.ts`, commit
+   `fc90a530`) keys rate limits, PoW and CSRF on `CF-Connecting-IP`, which the CF edge
+   always overwrites with the real client IP on both proxy and tunnel paths.
+2. After deploying `fc90a530`, re-run the Step 4a curls: forged `X-Forwarded-For`
+   must **no longer open fresh buckets** — identical `RateLimit-*` values expected
+   for any forged header value.
+3. Recommended hardening inside this topology (owner ops):
+   - Bind Express to loopback so the PM2 socket is not reachable even if the VPS
+     firewall slips: set `HOST=127.0.0.1` in the pm2 environment / `app.listen` host,
+     then restart `pm2 restart nyx-api`.
+   - Keep the VPS firewall deny-all inbound except SSH and the `rt.` QUIC port.
+   - Optional: route `api.*` through nginx too (tunnel → nginx :3001 → Express) for
+     uniform logging/limits; not required for security once (1) is deployed.
+
+
