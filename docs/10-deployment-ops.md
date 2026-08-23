@@ -21,7 +21,7 @@ On PR and push to `main`:
 | Job | Content |
 |---|---|
 | `build` | frozen-lockfile install → prisma generate → `pnpm run build` |
-| `unit` | `pnpm run test` (22 server + 29 web tests) |
+| `unit` | `pnpm run test` (33 server + 29 web tests) |
 | `lint` | non-blocking (`continue-on-error`) — typescript-eslint ≠ TS 7 |
 | `audit` | `pnpm audit --prod` |
 | `e2e` | Postgres+Redis services, `prisma db push` (consent env), Playwright chromium — transport specs auto-skip |
@@ -99,3 +99,71 @@ ls /root/backups/                       # nightly pg_dumps
 
 1. `git revert <bad commit>` → push → deploy reruns.
 2. DB has no automatic migration rollback — restore the latest nightly dump if a destructive `db push` shipped (downtime + `pg_restore`).
+
+## 10.9 Security hardening sync (2026-08-23)
+
+Remediation of `SECURITY-ASSESSMENT-2026-08-23.md` (plan: `.omo/plans/security-remediation.md`) landed in commits `d0ba35b0` (H1/H2/M1/M3), `9d520856` (M2 OTPK quota), `32814663` (L2 CSP), `9a6584d5` (nginx real_ip/XFF), `dd00d425` (I1 metadata). Everything below is **manual ops** — `deploy.yml` does **not** ship `web/nginx.conf`, so the VPS nginx config must be synced by hand, and it must be re-synced every time that file changes in the repo.
+
+> ⚠ **Ordering matters:** commit `d0ba35b0` sets Express `trust proxy = 2`. On the *current* (pre-sync) prod chain, `req.ip` resolves to the leftmost, attacker-forgeable XFF entry — the H1 rate-limit bypass is only fully closed **after** this nginx sync. Do the sync promptly; verify with the curls in step 4.
+
+### Step 1 — Refresh Cloudflare IP ranges
+
+The `set_real_ip_from` block in `web/nginx.conf` was fetched from <https://www.cloudflare.com/ips/> on 2026-08-23 and is marked VERIFY-AT-SYNC-TIME. Re-fetch and update any changed ranges before syncing:
+
+```bash
+curl -s https://www.cloudflare.com/ips-v4; echo ---; curl -s https://www.cloudflare.com/ips-v6
+```
+
+### Step 2 — Syntax check locally
+
+`web/nginx.conf` is an http-context **snippet** (starts with `include mime.types`), not a full main config — mounting it directly as `/etc/nginx/nginx.conf` fails with `"types" directive is not allowed here`. Wrap it:
+
+```bash
+cat > /tmp/opencode/nginx-wrap.conf <<'EOF'
+events { worker_connections 16; }
+http { include /check/nginx.conf; }
+EOF
+docker run --rm --add-host=server:127.0.0.1 \
+  -v "$PWD/web/nginx.conf":/check/nginx.conf:ro \
+  -v /tmp/opencode/nginx-wrap.conf:/etc/nginx/nginx.conf:ro \
+  nginx:alpine nginx -t
+# expect: syntax is ok / test is successful
+```
+
+(`--add-host=server:127.0.0.1` is needed because `proxy_pass http://server:4000` resolves the upstream hostname at parse time.)
+
+### Step 3 — Sync to VPS
+
+```bash
+ssh -i <key> root@<VPS> 'nginx -T 2>/dev/null | grep -m1 "configuration file"'   # locate active conf path
+ssh -i <key> root@<VPS> 'cp <conf-path> <conf-path>.bak.$(date +%F)'
+scp -i <key> web/nginx.conf root@<VPS>:<conf-path>
+ssh -i <key> root@<VPS> 'nginx -t && systemctl reload nginx'
+```
+
+If the VPS splits server blocks into `sites-*` includes instead of consuming this file whole, merge per-block and keep the top-of-http real_ip block in the main conf.
+
+### Step 4 — Post-sync verification
+
+```bash
+# a) Forged XFF must no longer split rate-limit buckets:
+#    both requests must report IDENTICAL RateLimit-* reset/remaining values.
+curl -sS -D - -o /dev/null -H 'X-Forwarded-For: 1.2.3.4'       https://api.nyx-app.my.id/api/csrf-token | grep -i ratelimit
+curl -sS -D - -o /dev/null -H 'X-Forwarded-For: 5.6.7.8'       https://api.nyx-app.my.id/api/csrf-token | grep -i ratelimit
+
+# b) Disallowed origin: HTTP 200, NO access-control-allow-origin header, NOT 500.
+curl -sS -D - -o /dev/null -H 'Origin: https://evil.example'   https://api.nyx-app.my.id/health
+
+# c) /api/keys mutations are CSRF-protected now: expect 403 EBADCSRFTOKEN.
+curl -sS -D - -o /dev/null -X POST https://api.nyx-app.my.id/api/keys/prekey-bundle \
+  -H 'Content-Type: application/json' -d '{"userIds":["x"]}'
+```
+
+Also re-check §10.5 items 3–5 (console free of CSP violations after hard reload).
+
+### Step 5 — L1 checklist (human / dashboard actions)
+
+- [ ] Front `rt.nyx-app.my.id:33333` with Cloudflare Tunnel or Spectrum so the sidecar origin stops answering publicly.
+- [ ] Remove the origin A-record exposure for `rt.` once tunneled.
+- [ ] Confirm origin firewall still allows only SSH + CF ranges (see assessment §L1).
+
