@@ -62,7 +62,7 @@ Machine-readable OAuth metadata is available at:
 | GET  | /api/conversations | List conversations |
 | GET  | /api/messages/{id} | Get messages |
 | POST | /api/messages | Send message |
-| GET  | /health | Health check |
+| GET  | https://api.nyx-app.my.id/health | Health check |
 
 ## Support
 

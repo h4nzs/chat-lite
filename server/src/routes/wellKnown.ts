@@ -149,10 +149,11 @@ router.get("/mcp/server-card.json", (_req: Request, res: Response) => {
       name: "NYX Chat API",
       version: "2.0.0"
     },
-    transport: {
-      type: "http",
-      endpoint: "https://api.nyx-app.my.id/api/ai/mcp"
-    },
+    // NOTE: There is intentionally NO server-side MCP transport endpoint.
+    // WebMCP tools live CLIENT-side (web/src/main.tsx registers them via
+    // navigator.modelContext), so agents reach NYX through the browser,
+    // not through a remote MCP HTTP server. The previously advertised
+    // https://api.nyx-app.my.id/api/ai/mcp never existed as a route.
     capabilities: {
       tools: {
         enabled: true,
