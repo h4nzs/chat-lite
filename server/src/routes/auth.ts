@@ -9,6 +9,7 @@ import { newJti, refreshExpiryDate, signAccessToken, verifyJwt, signTransportTic
 import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
 import { clearAuthCookies, revokeFamily } from '../utils/sessionUtils.js'
+import { resolvePowIdentity } from '../utils/powIdentity.js'
 import { env } from '../config.js'
 import { requireAuth } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
@@ -693,17 +694,16 @@ router.get('/pow/challenge', requireAuth, async (req, res, next) => {
     const fingerprint = req.headers['x-nyx-fingerprint'];
     const instId = req.headers['x-nyx-installation-id'];
 
-    if (!ip && !userId && !fingerprint && !instId) {
+    // Identitas rate-state dikunci ke userId dulu (route ini requireAuth —
+    // selalu tersedia & tidak bisa dipalsukan). Sebelumnya instId (header
+    // klien) diprioritaskan → difficulty bisa dipatok minimum dengan
+    // rotasi `x-nyx-installation-id` per request.
+    const identity = resolvePowIdentity({ userId, instId, fingerprint, ip });
+    if (!identity) {
       throw new ApiError(400, 'Cannot determine client identifier for PoW challenge.');
     }
-
-    // MULTI-LAYER IDENTIFICATION: 
-    // We prioritize Installation ID (IDB), then Fingerprint, then IP
-    const primaryId = instId || fingerprint || ip || userId;
+    const { primaryId, prefix } = identity;
     const stableHash = sodium.to_hex(sodium.crypto_generichash(32, Buffer.from(String(primaryId)), null)).slice(0, 16);
-
-    // Choose prefix based on most reliable available identifier
-    const prefix = instId ? 'pow:inst' : (fingerprint ? 'pow:fp' : (ip ? 'pow:ip' : 'pow:user'));
     const rateKey = `${prefix}:${stableHash}`;
 
     // INCR+EXPIRE atomik (Lua)
@@ -741,6 +741,19 @@ router.post('/pow/verify',
     try {
       const { nonce } = req.body;
       const userId = req.user!.id;
+
+      // Throttle verify per-user SEBELUM kerja Argon2 (16 MB per percobaan
+      // di VPS 1 core). INCR+EXPIRE atomik (Lua), jendela 1 jam.
+      const vCount = Number(await redisClient.eval(`
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`, { keys: [`rl:powverify:${userId}`], arguments: ['3600'] }));
+      if (!Number.isNaN(vCount) && vCount > 30) {
+        throw new ApiError(429, 'Too many verification attempts. Please try again later.');
+      }
 
       const challengeData = await redisClient.get(`pow:challenge:${userId}`);
       if (!challengeData) {

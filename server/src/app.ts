@@ -50,8 +50,11 @@ const app: Express = express();
 
 app.use(compression());
 
-// Trust Proxy: Wajib true karena di belakang Cloudflare & Nginx
-app.set('trust proxy', true);
+// Trust Proxy: tepat 2 hop — nginx (socket) + Cloudflare edge.
+// JANGAN `true`: XFF di-append di tiap hop sehingga entri paling kiri bisa
+// dipalsukan klien untuk bypass semua rate limit berbasis IP (temuan H1).
+// Dengan jumlah hop eksak, entri XFF palsu di kiri diabaikan Express.
+app.set('trust proxy', 2);
 
 // === SECURITY / CORS ===
 const isProd = env.nodeEnv === 'production';
@@ -259,9 +262,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes publik (Keys & Sessions untuk E2EE)
-app.use("/api/keys", keysRouter);
-
 app.post("/api/admin/cleanup", async (req, res) => {
   const providedKey = req.headers["x-admin-key"];
   const secretKey = process.env.CHAT_SECRET;
@@ -310,6 +310,11 @@ app.use((req, res, next) => {
   }
   doubleCsrfProtection(req, res, next);
 });
+
+// Keys router HARUS di-mount di bawah doubleCsrfProtection. Sebelumnya
+// diletakkan sebelum layer CSRF → mutasi pre-key bisa di-CSRF lintas situs
+// (cookie SameSite=None + form urlencoded tanpa preflight).
+app.use("/api/keys", keysRouter);
 
 app.get("/api/csrf-token", (req: Request, res: Response) => {
   const csrfToken = generateCsrfToken(req, res);

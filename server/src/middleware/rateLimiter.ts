@@ -4,10 +4,9 @@ import { RedisStore } from 'rate-limit-redis'
 import { redisClient } from '../lib/redis.js'
 import { Request } from 'express';
 
-// Secure IP Extractor: prioritas pada req.ip (dari socket/X-Forwarded-For yang sudah
-// diproses Express dengan `trust proxy: true`). Header `cf-connecting-ip` hanya dipakai
-// sebagai fallback bila req.ip tidak tersedia. Ini mencegah bypass rate limit dengan
-// men-spoof header cf-connecting-ip langsung ke origin.
+// Secure IP Extractor: prioritas pada req.ip (dari X-Forwarded-For yang sudah
+// diproses Express dengan `trust proxy` = jumlah hop eksak, lihat app.ts).
+// Header `cf-connecting-ip` hanya fallback bila req.ip tidak tersedia.
 const secureKeyGenerator = (req: Request): string => {
   const socketIp = req.ip && req.ip !== 'unknown' ? req.ip : undefined;
   const cfIp = typeof req.headers['cf-connecting-ip'] === 'string' ? req.headers['cf-connecting-ip'] : undefined;
@@ -77,21 +76,4 @@ export const uploadLimiter = rateLimit({
   })
 })
 
-// 4. OTP Limiter: Untuk endpoint verifikasi OTP
-// Batas: 5 percobaan per 15 menit per IP
-export const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 menit
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipRules,
-  keyGenerator: secureKeyGenerator,
-  validate: { trustProxy: false },
-  message: {
-    error: 'Too many OTP verification attempts. Please try again later.'
-  },
-  store: new RedisStore({
-    prefix: 'rl:otp:',
-    sendCommand: (...args: string[]) => redisClient.sendCommand(args)
-  })
-})
+
