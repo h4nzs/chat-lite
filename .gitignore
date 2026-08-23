@@ -30,6 +30,8 @@ vspostgre.session.sql
 
 .gemini/
 .opencode/
+.omo/
+.omop/
 gha-creds-*.json
 test-results/
 *.tgz
