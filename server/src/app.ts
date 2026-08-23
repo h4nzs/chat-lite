@@ -204,7 +204,10 @@ const corsMiddleware = cors({
       callback(null, true);
     } else {
       console.warn(`Blocked by CORS: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      // Deny WITHOUT throwing: an Error here would fall through to the generic
+      // error handler (Sentry.captureException + 500). callback(null, false)
+      // omits ACAO headers so the browser blocks the response instead.
+      callback(null, false);
     }
   },
   credentials: true,
