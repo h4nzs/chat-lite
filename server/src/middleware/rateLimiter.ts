@@ -3,17 +3,16 @@ import { env } from '../config.js'
 import { RedisStore } from 'rate-limit-redis'
 import { redisClient } from '../lib/redis.js'
 import { Request } from 'express';
+import { cfAwareClientIp } from '../utils/clientIp.js'
 
-// Secure IP Extractor: prioritas pada req.ip (dari X-Forwarded-For yang sudah
-// diproses Express dengan `trust proxy` = jumlah hop eksak, lihat app.ts).
-// Header `cf-connecting-ip` hanya fallback bila req.ip tidak tersedia.
+// Secure IP Extractor: prioritas pada CF-Connecting-IP — melalui edge/tunnel
+// Cloudflare header ini SELALU ditimpa CF dengan IP klien asli (tidak bisa
+// dipalsukan), sedangkan X-Forwarded-For membawa entri palsu di posisi depan
+// sehingga req.ip (hasil trust proxy) bisa jatuh ke entri terkontrol penyerang
+// bila trafik tidak melewati lapisan nginx yang menormalkan XFF.
 const secureKeyGenerator = (req: Request): string => {
-  const socketIp = req.ip && req.ip !== 'unknown' ? req.ip : undefined;
-  const cfIp = typeof req.headers['cf-connecting-ip'] === 'string' ? req.headers['cf-connecting-ip'] : undefined;
-  const clientIp = socketIp || cfIp || 'unknown';
-
   // Lempar teks IP (string) tersebut ke polisi library biar di-format dengan aman
-  return ipKeyGenerator(clientIp);
+  return ipKeyGenerator(cfAwareClientIp(req));
 };
 
 // Helper: Skip kalo di development ATAU kalau requestnya cuma OPTIONS (CORS Preflight)

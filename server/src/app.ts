@@ -9,7 +9,7 @@ import logger from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import mime from "mime";
-import { rateLimit } from "express-rate-limit";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { doubleCsrf } from "csrf-csrf";
 import { env } from "./config.js";
 import path from "path";
@@ -31,6 +31,7 @@ import storiesRoutes from "./routes/stories.js";
 import subscriptionsRouter from "./routes/subscriptions.js";
 import webpush from "web-push";
 import { generalLimiter } from "./middleware/rateLimiter.js";
+import { cfAwareClientIp } from "./utils/clientIp.js";
 import { reportRoutes } from "./routes/reports.js";
 import systemRouter from "./routes/system.js";
 import wellKnownRouter from "./routes/wellKnown.js";
@@ -235,7 +236,9 @@ if (isProd) {
       max: 1000, // Capped at 1000 to prevent resource exhaustion via CF Tunnel bypass.
       standardHeaders: true,
       legacyHeaders: false,
-      validate: { trustProxy: false }
+      validate: { trustProxy: false },
+      // Keying tahan-palsu sama seperti limiter /api (CF-Connecting-IP dulu).
+      keyGenerator: (req) => ipKeyGenerator(cfAwareClientIp(req))
     })
   );
 }
@@ -292,7 +295,9 @@ const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   getSessionIdentifier: (req) => {
     const iid = req.headers['x-nyx-installation-id'];
     if (typeof iid === 'string' && iid.length > 0) return `iid:${iid}`;
-    return `ip:${req.ip || 'unknown'}`;
+    // cfAwareClientIp: XFF bisa dipalsukan di jalur tunnel langsung ke Express;
+    // CF-Connecting-IP ditimpa edge Cloudflare sehingga tidak bisa dipalsukan.
+    return `ip:${cfAwareClientIp(req)}`;
   },
   cookieName: "x-csrf-token",
   cookieOptions: {

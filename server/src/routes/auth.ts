@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { zodValidate } from '../utils/validate.js'
 import { clearAuthCookies, revokeFamily } from '../utils/sessionUtils.js'
 import { resolvePowIdentity } from '../utils/powIdentity.js'
+import { cfAwareClientIp } from '../utils/clientIp.js'
 import { env } from '../config.js'
 import { requireAuth } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
@@ -689,7 +690,7 @@ router.get('/pow/challenge', requireAuth, async (req, res, next) => {
   try {
     const sodium = await getSodium();
     const salt = sodium.to_hex(sodium.randombytes_buf(16));
-    const ip = req.ip || req.socket.remoteAddress;
+    const ip = cfAwareClientIp(req);
     const userId = req.user?.id;
     const fingerprint = req.headers['x-nyx-fingerprint'];
     const instId = req.headers['x-nyx-installation-id'];
