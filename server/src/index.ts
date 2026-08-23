@@ -22,9 +22,12 @@ async function main() {
   startMessageSweeper()
   startSystemSweeper()
 
-  const PORT = process.env.PORT || 4000
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`)
+  const PORT = Number(process.env.PORT || 4000)
+  // Bind loopback by default: only cloudflared (same host) needs to reach us.
+  // Override with HOST=0.0.0.0 ONLY if an external proxy must connect directly.
+  const HOST = process.env.HOST || '127.0.0.1'
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running at http://${HOST}:${PORT}`)
   })
 }
 

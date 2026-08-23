@@ -190,9 +190,11 @@ Implications:
    must **no longer open fresh buckets** — identical `RateLimit-*` values expected
    for any forged header value.
 3. Recommended hardening inside this topology (owner ops):
-   - Bind Express to loopback so the PM2 socket is not reachable even if the VPS
-     firewall slips: set `HOST=127.0.0.1` in the pm2 environment / `app.listen` host,
-     then restart `pm2 restart nyx-api`.
+   - Express now binds to loopback **by default in code** (`server/src/index.ts`:
+     `HOST` env override, default `127.0.0.1`) so the PM2 socket is not reachable
+     even if the VPS firewall slips — cloudflared connects over loopback and keeps
+     working unchanged. After deploy, verify with `ss -tlnp | grep 4000`: it must
+     show `127.0.0.1:4000`, not `0.0.0.0:4000` / `*:4000`.
    - Keep the VPS firewall deny-all inbound except SSH and the `rt.` QUIC port.
    - Optional: route `api.*` through nginx too (tunnel → nginx :3001 → Express) for
      uniform logging/limits; not required for security once (1) is deployed.
