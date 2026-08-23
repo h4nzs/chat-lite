@@ -20,11 +20,10 @@
     <meta name="apple-mobile-web-app-title" content="NYX">
     <meta name="yandex-verification" content="3926b52b86cac4aa" />
 
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-
-    <noscript>
-      <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    </noscript>
+    <!-- Fonts: plain stylesheet (render-blocking but tiny). The old async
+         media-swap hack used an inline event handler attribute, which a strict
+         script-src CSP (no unsafe-inline) would block. -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
     <style>
       /* Dark mode default background to prevent white flash */
