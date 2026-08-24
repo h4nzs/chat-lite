@@ -178,10 +178,12 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
    * so everything upstream (socketListeners) is unchanged.
    */
   private connectWss(): void {
-    if (this.socket) return; // sudah terkoneksi / sedang menyambung
-
-    // Pindahkan pesan yang mengantri di worker WT ke antrean WSS agar tidak hilang.
+    // Pindahkan SEMUA pesan yang mengantri di worker WT ke antrean WSS SEBELUM
+    // guard early-return, agar tidak ada pesan user yang terbuang saat transisi
+    // mode (termasuk saat connectWss dipanggil ulang dengan socket yang sudah ada).
     this.drainWtQueueToWss();
+
+    if (this.socket) return; // sudah terkoneksi / sedang menyambung
 
     const origin = this.resolveApiOrigin();
     // Transports dapat dikunci via env (mis. VITE_WSS_TRANSPORTS=websocket)
@@ -372,9 +374,13 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
   private drainWtQueueToWss(): void {
     while (this.offlineQueue.length > 0) {
       const msg = this.offlineQueue.shift();
-      if (msg && (msg.type === 'SEND_STREAM' || msg.type === 'SEND_DATAGRAM') && msg.payload instanceof Uint8Array) {
+      if (!msg || !('payload' in msg) || !(msg.payload instanceof Uint8Array)) continue;
+      if (msg.type === 'SEND_STREAM' || msg.type === 'SEND_DATAGRAM') {
         this.wssOfflineQueue.push({ opCode: msg.opCode, payload: msg.payload });
       }
+      // START_HANDSHAKE (PQ handshake) adalah fitur WT-only; bukan pesan user dan
+      // akan dibangun ulang saat sesi WT berikutnya, jadi sengaja dibuang saat
+      // transisi WT→WSS.
     }
   }
 

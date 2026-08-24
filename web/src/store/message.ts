@@ -774,6 +774,16 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
 
     }
 
+    // [BUG-FIX H1] Watchdog untuk menjamin bubble optimistik mencapai status
+    // terminal (FAILED) bila callback emit transport tidak pernah fire.
+    let sendWatchdog: ReturnType<typeof setTimeout> | undefined;
+    const clearSendWatchdog = () => {
+      if (sendWatchdog) {
+        clearTimeout(sendWatchdog);
+        sendWatchdog = undefined;
+      }
+    };
+
     try {
       let ciphertext = '';
       let mkToStore: Uint8Array | undefined;
@@ -993,10 +1003,27 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         deleteSecret
       };
 
+      // [BUG-FIX H1] Sabuk-dan-gesper: jika callback emit transport tidak pernah
+      // fired (mis. transport mati di tengah pengiriman), paksa bubble optimistik
+      // menuju status terminal FAILED agar tidak menggantung di 'SENDING' selamanya.
+      sendWatchdog = setTimeout(() => {
+        if (!isReactionPayload && !shouldBeSilent) {
+          const pending = get().messages[conversationId]?.find(
+            (m) => m.id === `temp_${actualTempId}` || m.tempId === actualTempId
+          );
+          if (pending && pending.status === 'SENDING') {
+            get().updateMessage(conversationId, `temp_${actualTempId}`, { error: true, status: 'FAILED' });
+            toast.error(i18n.t('errors:failed_to_send_message_timeout', 'Failed to send message (Timeout).'));
+          }
+        }
+        sendWatchdog = undefined;
+      }, 20000);
+
       socket?.timeout(15000).emit(
         "message:send",
         sendPayload, 
         async (err: Error | null, res: { ok: boolean, msg?: RawServerMessage, error?: string }) => {
+          clearSendWatchdog();
           if (err) {
               console.error("Socket timeout or error:", err);
               if (!isReactionPayload && !shouldBeSilent) {
@@ -1136,6 +1163,7 @@ export const useMessageStore = createWithEqualityFn<State & Actions>((set, get) 
         });
 
     } catch (error) {
+      clearSendWatchdog();
       console.error("Failed to encrypt/send:", error);
       if (!isReactionPayload) {
          get().updateMessage(conversationId, `temp_${actualTempId}`, { error: true, status: 'FAILED' });
