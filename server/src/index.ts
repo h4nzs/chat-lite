@@ -13,12 +13,14 @@ async function main() {
   // 2. BARU kita load app dan kawan-kawannya (mereka aman sekarang karena Redis udah nyala)
   const { default: app } = await import('./app.js')
   const { initializeRedisBridge } = await import('./network/redisBridge.js')
+  const { attachWssGateway } = await import('./realtime/gateway.js')
   const { startMessageSweeper } = await import('./jobs/messageSweeper.js')
   const { startSystemSweeper } = await import('./jobs/systemSweeper.js')
 
   const httpServer = createServer(app)
 
   await initializeRedisBridge()
+  attachWssGateway(httpServer)
   startMessageSweeper()
   startSystemSweeper()
 
