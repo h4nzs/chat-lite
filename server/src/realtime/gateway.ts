@@ -126,6 +126,42 @@ const wsCtx: RealtimeContext = {
   pubClient,
 };
 
+// --- Multi-socket registry (multi-tab / multi-device) ---
+// Keyed by `${userId}:${deviceId}` → Set<Socket>. A single account can have
+// several live sockets (multiple browser tabs share the same JWT deviceId, or
+// several distinct devices). Using a Set per key means a new connection NEVER
+// evicts an existing one — every held socket receives downstream delivery.
+export type SocketRegistry = Map<string, Set<Socket>>;
+
+export function registerSocketInRegistry(registry: SocketRegistry, key: string, socket: Socket): void {
+  let set = registry.get(key);
+  if (!set) {
+    set = new Set<Socket>();
+    registry.set(key, set);
+  }
+  set.add(socket);
+}
+
+export function collectTargets(registry: SocketRegistry, userId: string, deviceId?: string | null): Socket[] {
+  if (deviceId) {
+    const set = registry.get(`${userId}:${deviceId}`);
+    return set ? [...set] : [];
+  }
+  const prefix = `${userId}:`;
+  const out: Socket[] = [];
+  for (const [k, set] of registry) {
+    if (k.startsWith(prefix)) out.push(...set);
+  }
+  return out;
+}
+
+export function removeSocketFromRegistry(registry: SocketRegistry, key: string, socket: Socket): void {
+  const set = registry.get(key);
+  if (!set) return;
+  set.delete(socket);
+  if (set.size === 0) registry.delete(key);
+}
+
 // Module-level refs so the process can drain cleanly on shutdown (pm2 reload,
 // rolling deploys) without leaving half-open sockets or a live Redis sub.
 let ioRef: Server | null = null;
@@ -147,8 +183,9 @@ export function attachWssGateway(httpServer: HttpServer): void {
     transports: ['websocket', 'polling'],
   });
 
-  // Local socket registry keyed by `${userId}:${deviceId}`.
-  const sockets = new Map<string, Socket>();
+  // Local socket registry keyed by `${userId}:${deviceId}` → Set<Socket>.
+  // Multi-tab safe: a new connection never evicts an existing one.
+  const sockets: SocketRegistry = new Map();
   ioRef = io;
 
   // --- Auth middleware: cookie-based (HttpOnly `at`), fallback to handshake.auth.token ---
@@ -171,10 +208,10 @@ export function attachWssGateway(httpServer: HttpServer): void {
     const userId = user.id;
     const deviceId = user.deviceId || socket.id;
     const key = `${userId}:${deviceId}`;
-    sockets.set(key, socket);
+    registerSocketInRegistry(sockets, key, socket);
 
     socket.on('disconnect', () => {
-      sockets.delete(key);
+      removeSocketFromRegistry(sockets, key, socket);
     });
 
     // --- Inbound: CHAT_MESSAGE ---
@@ -259,15 +296,10 @@ export function attachWssGateway(httpServer: HttpServer): void {
           }
         };
 
-        if (device_id) {
-          const sock = sockets.get(`${user_id}:${device_id}`);
-          if (sock) deliver(sock);
-        } else {
-          const prefix = `${user_id}:`;
-          for (const [k, sock] of sockets) {
-            if (k.startsWith(prefix)) deliver(sock);
-          }
-        }
+        const targets = device_id
+          ? collectTargets(sockets, user_id, device_id)
+          : collectTargets(sockets, user_id);
+        for (const sock of targets) deliver(sock);
       } catch (err) {
         console.error('[WS-Gateway] Failed to process downstream message:', err);
       }
