@@ -866,23 +866,57 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           const { runExclusive } = await import('@lib/refreshLock');
           const { refreshWithRetry } = await import('@lib/refreshRetry');
 
-          // Retry hingga 3× — kegagalan refresh yang transien (network hiccup,
-          // rotasi konkuren dari tab lain, dsb.) tidak boleh memaksa logout.
-          // Berkat grace di server, menyajikan ulang rt yang baru dirotasi dalam
-          // beberapa detik justru menghasilkan token baru (bukan revoke family).
-          const data = await refreshWithRetry(async () =>
-            runExclusive(async () =>
-              api<Record<string, unknown>>('/api/auth/refresh', {
-                method: 'POST',
-              })
-            )
-          );
+          const doRefresh = async () => {
+            // Retry hingga 3× — kegagalan refresh yang transien (network hiccup,
+            // rotasi konkuren dari tab lain, dsb.) tidak boleh memaksa logout.
+            // Berkat grace di server, menyajikan ulang rt yang baru dirotasi dalam
+            // beberapa detik justru menghasilkan token baru (bukan revoke family).
+            const data = await refreshWithRetry(async () =>
+              runExclusive(async () =>
+                api<Record<string, unknown>>('/api/auth/refresh', {
+                  method: 'POST',
+                })
+              )
+            );
+            if (data && typeof data.accessToken === 'string') {
+              set({ accessToken: data.accessToken });
+              return true;
+            }
+            return false;
+          };
 
-          if (data && typeof data.accessToken === 'string') {
-            set({ accessToken: data.accessToken });
-            return true;
+          // Cross-tab single-flight refresh.
+          //
+          // Two tabs racing POST /refresh send the SAME `rt` cookie; the server
+          // rotates it once and treats the second as a reuse attack → revokes the
+          // whole session family (both tabs logged out). `runExclusive` already
+          // serializes the POST via the Web Locks API (with a localStorage
+          // fallback), but the *second* tab must NOT blindly fire its own POST
+          // afterwards — by then its refresh token is stale and would re-trigger
+          // reuse detection.
+          //
+          // So, inside the lock we FIRST probe whether the session was already
+          // refreshed by the previous holder: a cheap authenticated GET. If it
+          // succeeds (the cookie was already rotated by the other tab) we skip our
+          // own POST /refresh entirely and report success. Only on failure do we
+          // proceed with the actual refresh.
+          //
+          // NOTE: we use the non-refreshing `api` (not `authFetch`) for the probe.
+          // `authFetch` auto-invokes silentRefresh() on 401, which would recurse
+          // into this same refreshPromise and deadlock inside the lock.
+          if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+            return await navigator.locks.request('nyx-silent-refresh', async () => {
+              try {
+                await api('/api/users/me');
+                return true; // session already valid → skip our own refresh
+              } catch {
+                return await doRefresh();
+              }
+            });
           }
-          return false;
+
+          // Fallback: no Web Locks support → original behavior unchanged.
+          return await doRefresh();
         } finally {
           refreshPromise = null;
         }
