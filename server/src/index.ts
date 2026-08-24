@@ -31,6 +31,26 @@ async function main() {
   httpServer.listen(PORT, HOST, () => {
     console.log(`🚀 Server running at http://${HOST}:${PORT}`)
   })
+
+  // Graceful shutdown (pm2 stop/reload sends SIGINT, rolling deploys SIGTERM):
+  // drain WSS sockets first so clients reconnect elsewhere instead of timing out.
+  let shuttingDown = false
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`\n${signal} received — draining realtime gateway…`)
+    try {
+      const { closeWssGateway } = await import('./realtime/gateway.js')
+      await closeWssGateway()
+    } catch {
+      // Gateway may not have been attached — nothing to drain.
+    }
+    httpServer.close(() => process.exit(0))
+    // Hard exit fallback if keep-alive connections refuse to drop.
+    setTimeout(() => process.exit(0), 5000).unref()
+  }
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+  process.on('SIGINT', () => void shutdown('SIGINT'))
 }
 
 main().catch((err) => {

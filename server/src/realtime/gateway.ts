@@ -12,6 +12,20 @@
 //
 // Outbound: a dedicated Redis subscriber listens on `nyx:downstream` and pushes
 // envelopes ONLY to the sockets we hold locally for that user/device.
+//
+// Horizontal-scaling contract (see docs/10-deployment-ops.md §10.10):
+// - Inbound is instance-agnostic: every event goes through the shared Redis
+//   relay (rate limits and active-device checks are Redis-backed), so any
+//   replica can process any socket's traffic.
+// - Outbound is broadcast-and-filter: EVERY replica receives `nyx:downstream`
+//   and delivers only to sockets it holds locally. Adding replicas requires no
+//   socket.io Redis adapter as long as delivery keeps flowing through this
+//   subscriber (never io.to(room).emit).
+// - The ONLY multi-instance caveat is the polling transport (long-polling
+//   requests must hit the same replica during handshake/upgrade). Either put a
+//   sticky-session LB in front of the replicas, or ship the client with
+//   VITE_WSS_TRANSPORTS=websocket so connections are a single upgraded TCP
+//   stream that any LB can route independently.
 
 import { Server, type Socket } from 'socket.io';
 import type { Server as HttpServer } from 'http';
@@ -112,6 +126,11 @@ const wsCtx: RealtimeContext = {
   pubClient,
 };
 
+// Module-level refs so the process can drain cleanly on shutdown (pm2 reload,
+// rolling deploys) without leaving half-open sockets or a live Redis sub.
+let ioRef: Server | null = null;
+let downstreamSubRef: typeof redisClient | null = null;
+
 export function attachWssGateway(httpServer: HttpServer): void {
   const io = new Server(httpServer, {
     path: '/socket.io',
@@ -130,6 +149,7 @@ export function attachWssGateway(httpServer: HttpServer): void {
 
   // Local socket registry keyed by `${userId}:${deviceId}`.
   const sockets = new Map<string, Socket>();
+  ioRef = io;
 
   // --- Auth middleware: cookie-based (HttpOnly `at`), fallback to handshake.auth.token ---
   io.use((socket, next) => {
@@ -203,6 +223,7 @@ export function attachWssGateway(httpServer: HttpServer): void {
 
   // --- Outbound: subscribe to nyx:downstream and push to local sockets only ---
   const downstreamSub = redisClient.duplicate();
+  downstreamSubRef = downstreamSub;
   downstreamSub
     .connect()
     .then(() => downstreamSub.subscribe('nyx:downstream', (message: string) => {
@@ -254,4 +275,27 @@ export function attachWssGateway(httpServer: HttpServer): void {
     .catch((err) => console.error('[WS-Gateway] Failed to subscribe to nyx:downstream:', err));
 
   console.log('🔌 WebSocket fallback gateway attached at /socket.io');
+}
+
+/**
+ * Graceful shutdown for rolling deploys / pm2 reload: stop consuming
+ * `nyx:downstream`, drop every client socket, then close the engine. Safe to
+ * call multiple times or when the gateway was never attached.
+ */
+export async function closeWssGateway(): Promise<void> {
+  if (downstreamSubRef) {
+    try {
+      await downstreamSubRef.unsubscribe('nyx:downstream');
+      await downstreamSubRef.quit();
+    } catch {
+      // Connection may already be gone — nothing to drain.
+    }
+    downstreamSubRef = null;
+  }
+  if (ioRef) {
+    ioRef.disconnectSockets(true);
+    ioRef.close();
+    ioRef = null;
+    console.log('[WS-Gateway] Closed — all fallback sockets drained.');
+  }
 }
