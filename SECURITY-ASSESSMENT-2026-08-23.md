@@ -18,14 +18,14 @@ In-repo remediation executed per `.omo/plans/security-remediation.md`. Findings 
 | Finding | Status | Commit |
 |---|---|---|
 | H2 — CSRF-reachable `/api/keys` | Fixed: router mounted below `doubleCsrfProtection` | `d0ba35b0` |
-| H1 — forged XFF / trust proxy (code half) | Fixed: `trust proxy = 2`; full fix requires §10.9 nginx sync | `d0ba35b0` |
-| H1/L1 — nginx real_ip + XFF overwrite + un-shadow `/api-docs` | Committed in repo; **PENDING MANUAL VPS SYNC** (`deploy.yml` does not ship `web/nginx.conf`) | `9a6584d5` |
+| H1 — forged XFF / trust proxy (code half) | Fixed in two layers: `trust proxy = 2` (`d0ba35b0`) + all limiter/PoW/CSRF keying moved to un-forgeable `CF-Connecting-IP` after live testing proved the tunnel path bypasses nginx | `d0ba35b0`, `fc90a530` |
+| H1/L1 — nginx real_ip + XFF overwrite + un-shadow `/api-docs` | Committed and synced to VPS; benefits app/marketing hosts. Live Burp probe showed `api.*` reaches Express **directly via CF Tunnel** (no nginx hop), so the API-side closure comes from the code fix above, not nginx | `9a6584d5`, `fc90a530` |
 | M1 — CORS deny → 500/Sentry flood | Fixed: deny without throwing (`callback(null, false)`; missed in `d0ba35b0`, caught by final verification wave) | `ba024dc2` |
 | M2 — OTPK depletion DoS | Fixed: per-(requester,target) daily quota (30/24h), fail-closed 429 on both consuming endpoints | `9d520856` |
 | M3 — PoW identity pinned by client header + dead otpLimiter | Fixed: userId-first identity, per-user verify throttle, dead limiter removed | `d0ba35b0` |
 | L2 — app-host CSP | Fixed: jsdelivr + `'unsafe-inline'` out of script-src; inline font-loader handler removed; marketing host intentionally unchanged (Turnstile) | `32814663` |
 | I1 — agent-discovery metadata drift | Fixed: stale `/api/ai/mcp` transport removed, `/health` claims absolutized, all advertised URLs verified resolvable | `dd00d425` |
-| L1 — origin infrastructure disclosure | **Open ops action** — CF Tunnel/Spectrum for `rt.`, remove origin A-record (§10.9 step 5) | — |
+| L1 — origin infrastructure disclosure | **Mitigated & verified live (2026-08-24)** — CF cannot proxy WebTransport so `rt.` stays direct; instead every TCP listener is loopback-bound (Express `b36541ac`, nginx `listen 127.0.0.1:3000`) + ufw default-deny. External probe: direct-to-IP :80/:3000/:4000 all TIMEOUT while tunnel paths return 200. Residual: direct DDoS on :33333 | — |
 
 ---
 
