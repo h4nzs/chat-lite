@@ -227,4 +227,41 @@ Implications:
    - Optional: route `api.*` through nginx too (tunnel → nginx :3001 → Express) for
      uniform logging/limits; not required for security once (1) is deployed.
 
+## 10.10 Realtime horizontal scaling (added 2026-08-24)
+
+The WSS fallback gateway (`server/src/realtime/gateway.ts`) was designed so a single
+Node process today can become N replicas later without protocol changes:
+
+**Why the design is already replica-safe**
+
+| Concern | Mechanism | Multi-instance status |
+|---|---|---|
+| Inbound events | Delegated to `realtimeHandlers.ts` which publishes via the shared Redis relay (`nyx:upstream`/`nyx:downstream`) | ✅ any replica can process any socket's traffic |
+| Rate limits | Redis Lua (`checkRateLimit`), shared counters | ✅ cluster-wide by construction |
+| Single-active-device check | Redis-backed with 60s local cache | ✅ safe across replicas |
+| Outbound delivery | Broadcast-and-filter: every replica subscribes `nyx:downstream`, delivers only to sockets it holds locally | ✅ no `@socket.io/redis-adapter` needed **as long as delivery keeps flowing through this subscriber — never introduce `io.to(room).emit` without adding the adapter** |
+| Rolling deploys | `closeWssGateway()` drains all sockets on SIGTERM/SIGINT before `httpServer.close()` (5s hard-exit fallback) | ✅ clients reconnect to another replica instead of timing out |
+
+**Checklist when scaling past one replica**
+
+1. **Sticky sessions OR websocket-only transports.** The polling transport
+   long-polls and must land on the same replica during handshake/upgrade. Either:
+   - put a sticky LB in front of the Express replicas (nginx `ip_hash`/cookie, HAProxy),
+     or
+   - build the web bundle with `VITE_WSS_TRANSPORTS=websocket` — a pure WebSocket
+     connection is one upgraded TCP stream that any stateless LB can route freely.
+2. **Run N × `pm2 scale nyx-api <N>`** behind that LB (each binds its own port via
+   `PORT`; keep `HOST=127.0.0.1`). Point cloudflared ingress at the LB instead of a
+   single :4000.
+3. **Redis & Postgres stay shared singletons** — they are already the coordination
+   layer; nothing else to change.
+4. **Memory budget**: each extra Node replica adds roughly the current RSS of
+   `nyx-api`. On the 1 GB + 1 GB swap VPS this caps practical replicas at ~2–3;
+   beyond that, move to a bigger box first.
+5. The Rust WebTransport sidecar keeps its own session map per replica — if you ever
+   run multiple sidecars, device targeting already tolerates unknown device IDs
+   (continue-on-nonmatch), but presence fan-out assumes one sidecar; treat multi-sidecar
+   as unsupported until it needs to exist.
+
+
 

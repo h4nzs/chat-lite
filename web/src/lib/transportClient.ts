@@ -184,9 +184,19 @@ export class NyxWebTransportClient extends EventEmitter<TransportEvents> {
     this.drainWtQueueToWss();
 
     const origin = this.resolveApiOrigin();
+    // Transports dapat dikunci via env (mis. VITE_WSS_TRANSPORTS=websocket)
+    // saat berjalan di belakang LB tanpa sticky-session: koneksi websocket
+    // murni adalah satu stream TCP yang bisa dirutekan ke replika mana pun,
+    // sedangkan polling fallback butuh affinity antar-replika.
+    const rawTransports = String(
+      import.meta.env.VITE_WSS_TRANSPORTS ?? 'websocket,polling'
+    )
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t): t is 'websocket' | 'polling' => t === 'websocket' || t === 'polling');
     const socket = io(origin, {
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      transports: rawTransports.length > 0 ? rawTransports : ['websocket', 'polling'],
       path: '/socket.io',
       reconnection: true,
     });
