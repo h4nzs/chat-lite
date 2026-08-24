@@ -57,7 +57,7 @@
   },
   "ai": {
     "title": "AI & Telemetri",
-    "intro": "NYX beroperasi dengan <strong>Nol Telemetri</strong>. Kami tidak melacak klik, waktu layar, atau penggunaan fitur Anda.",
+    "intro": "NYX menjalankan <strong>nol telemetri sisi klien</strong>: aplikasi tidak memuat skrip analitik, iklan, maupun pelacak, dan tidak pernah melaporkan penggunaan Anda. Satu-satunya pengecualian adalah <strong>pelaporan crash sisi server</strong>: ketika infrastruktur kami sendiri bermasalah, diagnostik yang telah dibersihkan (stack trace, tanpa header autentikasi dan materi kunci) dikirim ke Sentry (AS) agar layanan tetap andal.",
     "smart_reply_title": "Smart Reply (AI Opsional)",
     "smart_reply_desc": "Kami menyediakan fitur eksperimental \"Smart Reply\" menggunakan Google Gemini API. Fitur ini <strong>sepenuhnya Opt-In</strong>.",
     "smart_reply_1": "Pesan didekripsi secara lokal sebelum dikirim ke AI.",

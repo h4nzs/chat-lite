@@ -57,7 +57,7 @@
   },
   "ai": {
     "title": "AI & Telemetry",
-    "intro": "NYX operates with <strong>Zero Telemetry</strong>. We do not track your clicks, screen time, or feature usage.",
+    "intro": "NYX runs <strong>zero client-side telemetry</strong>: the app ships no analytics, ads, or tracking scripts, and never reports your usage. The only exception is <strong>server-side crash reporting</strong>: when our own infrastructure errors, sanitized diagnostics (stack traces, scrubbed of authentication headers and key material) are sent to Sentry (US) so we can keep the service reliable.",
     "smart_reply_title": "Smart Reply (Optional AI)",
     "smart_reply_desc": "We provide an experimental \"Smart Reply\" feature utilizing the Google Gemini API. This feature is <strong>strictly Opt-In</strong>.",
     "smart_reply_1": "Messages are decrypted locally before being sent to the AI.",

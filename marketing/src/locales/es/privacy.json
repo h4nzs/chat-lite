@@ -57,7 +57,7 @@
   },
   "ai": {
     "title": "IA y Telemetría",
-    "intro": "NYX opera con <strong>Cero Telemetría</strong>. No rastreamos sus clics, tiempo de pantalla o uso de funciones.",
+    "intro": "NYX ejecuta <strong>cero telemetría del lado del cliente</strong>: la aplicación no incluye scripts de análisis, publicidad ni rastreo, y nunca reporta su uso. La única excepción es el <strong>reporte de fallos del lado del servidor</strong>: cuando nuestra propia infraestructura falla, se envían diagnósticos depurados (trazas de pila, sin cabeceras de autenticación ni material de claves) a Sentry (EE. UU.) para mantener el servicio confiable.",
     "smart_reply_title": "Respuesta Inteligente (IA Opcional)",
     "smart_reply_desc": "Proporcionamos una función experimental de \"Respuesta Inteligente\" utilizando la API de Google Gemini. Esta función es <strong>estrictamente Opt-In</strong>.",
     "smart_reply_1": "Los mensajes se descifran localmente antes de enviarse a la IA.",
