@@ -2,7 +2,6 @@
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
 import { createWithEqualityFn } from "zustand/traditional";
-import * as Sentry from '@sentry/react';
 import { MinimalUserSchema } from '@nyx/shared';
 import { authFetch, api } from "@lib/api";
 import { disconnectSocket, connectSocket } from '@lib/transportClient';
@@ -354,7 +353,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
         set({ isBootstrapping: false });
         return;
       }
-      Sentry.addBreadcrumb({ category: 'lifecycle', message: 'Bootstrap start', level: 'info' });
 
       set({ isBootstrapping: true });
       try {
@@ -402,8 +400,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     login: async (usernameHash, password, restoredNotSynced = false) => {
-      Sentry.setTag('auth_method', restoredNotSynced ? 'restore_login' : 'password_login');
-      Sentry.addBreadcrumb({ category: 'auth', message: 'Login attempt', level: 'info' });
 
       privateKeysCache = null;
       set({ isInitializingCrypto: true });
@@ -640,8 +636,6 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     logout: async () => {
-      Sentry.addBreadcrumb({ category: 'auth', message: 'Logout', level: 'info' });
-      Sentry.setUser(null);
       try {
         if ('serviceWorker' in navigator && 'PushManager' in window) {
            const registration = await navigator.serviceWorker.ready;

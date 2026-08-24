@@ -42,7 +42,7 @@ export const triggerReceiveFeedback = () => {
 };
 
 /**
- * Log error to console AND attempt Sentry capture (fire-and-forget).
+ * Log error to console only (client telemetry removed by design).
  * Use this instead of .catch(console.error) for better production visibility.
  */
 export function captureAndLog(error: unknown, context?: string): void {
@@ -51,8 +51,5 @@ export function captureAndLog(error: unknown, context?: string): void {
   } else {
     console.error(error);
   }
-  // Fire-and-forget Sentry capture — avoids circular deps with Sentry init
-  try {
-    import('@sentry/react').then(S => S.captureException(error)).catch(() => {});
-  } catch {}
+  // Client-side telemetry removed by design (zero client telemetry policy)
 }

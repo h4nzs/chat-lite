@@ -4,10 +4,6 @@ import './zodSetup';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
-// Initialize Sentry error tracking BEFORE anything else
-import { initSentry } from '@lib/sentry';
-initSentry();
-
 import './i18n';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -121,26 +117,12 @@ if (typeof window !== 'undefined') {
 }
 
 // === GLOBAL ERROR HANDLING ===
-import * as Sentry from '@sentry/react';
-
-window.onerror = function (message, source, lineno, colno, error) {
-  if (import.meta.env.PROD) {
-    Sentry.captureException(error || new Error(String(message)), {
-      tags: { source: 'window.onerror' },
-      extra: { source, lineno, colno }
-    });
-  }
+// Client-side telemetry removed by design (zero client telemetry policy).
+window.onerror = function (message, source, lineno, colno) {
   console.error('[Global] Uncaught error:', message, 'at', source, lineno + ':' + colno);
 };
 
 window.addEventListener('unhandledrejection', function (event) {
-  if (import.meta.env.PROD) {
-    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-    Sentry.captureException(reason, {
-      tags: { source: 'unhandledrejection' },
-      extra: { promise: String(event.reason) }
-    });
-  }
   console.error('[Global] Unhandled Promise rejection:', event.reason);
 });
 

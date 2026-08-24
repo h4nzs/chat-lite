@@ -1,7 +1,6 @@
 // Copyright (c) 2026 [han]. All rights reserved.
 // This file is part of NYX, licensed under the AGPL-3.0.
 // For commercial licensing, contact [admin@nyx-app.my.id].
-import * as Sentry from '@sentry/react';
 import { transportClient, emitSessionKeyRequest } from './transportClient';
 import { useMessageStore } from '../store/message';
 import { useConversationStore } from '../store/conversation';
@@ -63,7 +62,6 @@ export function initSocketListeners() {
   });
 
   transportClient.on('connect', () => {
-    Sentry.addBreadcrumb({ category: 'socket', message: 'Connected', level: 'info' });
     useConnectionStore.getState().setStatus('connected');
     
     // User is active by default on connect
@@ -93,7 +91,6 @@ export function initSocketListeners() {
   });
 
   transportClient.on('disconnect', (reason) => {
-    Sentry.addBreadcrumb({ category: 'socket', message: `Disconnected: ${reason}`, level: 'warning' });
     useConnectionStore.getState().setStatus('disconnected');
 
     if (reason === 'Logged in on another device') {
@@ -118,13 +115,6 @@ export function initSocketListeners() {
     } else {
       rawMsg = RawServerMessageSchema.parse(payload);
     }
-
-    Sentry.addBreadcrumb({
-      category: 'message',
-      message: `Incoming message in conv=${rawMsg.conversationId.slice(0, 8)}`,
-      level: 'info',
-      data: { conversationId: rawMsg.conversationId },
-    });
 
     try {
       // Convert RawServerMessage to Message by applying branded types
@@ -214,7 +204,6 @@ export function initSocketListeners() {
 
   // 5. SECURITY & SESSIONS
   transportClient.on('force_logout', async (data: { jti: string }) => {
-     Sentry.addBreadcrumb({ category: 'auth', message: 'Force logout (session revoked)', level: 'warning', data: { jti: data.jti } });
      // Check if current session is revoked
      const { logout } = useAuthStore.getState();
      await logout();
@@ -222,7 +211,6 @@ export function initSocketListeners() {
   });
 
   transportClient.on('auth:banned', async (data: { reason: string }) => {
-     Sentry.captureMessage('User banned from platform', { level: 'warning', tags: { reason: data.reason } });
      const { logout } = useAuthStore.getState();
      await logout();
      window.location.href = `/login?reason=banned&msg=${encodeURIComponent(data.reason)}`;
@@ -253,12 +241,10 @@ export function initSocketListeners() {
   });
 
   transportClient.on('group:key_request_failed', (data: { conversationId: string; reason: string }) => {
-    Sentry.captureMessage('Group key request failed', { level: 'warning', tags: { conversationId: data.conversationId, reason: data.reason } });
     console.error(`Group Key Request Failed for ${data.conversationId}:`, data.reason);
   });
 
   transportClient.on('session:request_key_failed', (data: { sessionId: string; targetId: string; reason: string }) => {
-    Sentry.captureMessage('Session key request failed', { level: 'warning', tags: { sessionId: data.sessionId, targetId: data.targetId, reason: data.reason } });
     console.error(`Session Key Request Failed for ${data.sessionId}:`, data.reason);
   });
 

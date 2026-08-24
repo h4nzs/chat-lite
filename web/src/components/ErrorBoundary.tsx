@@ -2,7 +2,6 @@ import { Component, ReactNode, ErrorInfo } from 'react';
 import { FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
 import { withTranslation, WithTranslation } from 'react-i18next';
 import { sanitizeErrorLog } from '../utils/sanitize';
-import { captureException } from '@sentry/react';
 
 interface ErrorBoundaryProps extends WithTranslation {
   children: ReactNode;
@@ -28,18 +27,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     const safeError = sanitizeErrorLog(error);
     const safeComponentStack = sanitizeErrorLog(errorInfo.componentStack);
 
-    // Report to Sentry in production
-    if (import.meta.env.PROD) {
-      captureException(error, {
-        contexts: {
-          react: {
-            componentStack: safeComponentStack,
-          },
-        },
-      });
-    }
-
-    // Also log sanitized strings locally
+    // Local-only logging (client telemetry removed by design)
     console.error('Error caught by boundary:', safeError, '\nStack:', safeComponentStack);
   }
 
