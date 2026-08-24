@@ -17,6 +17,25 @@ let isInitialized = false;
 export let syncCompleted = false;
 let unsubConversation: (() => void) | null = null;
 
+// ONE-shot delayed retry for the offline sync poll. If the conversations list
+// hasn't loaded after the normal 8×500ms polling window (e.g. during a reconnect
+// storm), we schedule a single 15s retry instead of silently giving up. It is
+// cleared/superseded on the next connect or when a real sync actually starts,
+// and it is never re-armed (no infinite loop, no overlapping syncs).
+let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let finalRetryScheduled = false;
+
+function clearSyncRetryTimer() {
+  if (syncRetryTimer) {
+    clearTimeout(syncRetryTimer);
+    syncRetryTimer = null;
+  }
+}
+
+// Captured at connect time so a force_logout event from a *previous* session
+// (one established before the current login) is ignored as stale.
+let connectionLoginGeneration = 0;
+
 // Unit-test hook: reset the module-level sync flag between tests.
 export function resetSocketSyncForTests() {
   syncCompleted = false;
@@ -26,6 +45,8 @@ export function resetSocketSyncForTests() {
 // (exported for unit tests).
 export async function doSyncMessages() {
   if (syncCompleted) return;
+  // A real sync is starting (or being attempted) — supersede any pending retry.
+  clearSyncRetryTimer();
   try {
     const conversations = useConversationStore.getState().conversations;
     if (conversations.length === 0) return;
@@ -70,6 +91,12 @@ export function initSocketListeners() {
     // Offline Sync: fetch pending messages for all active conversations
     // Reset sync flag on each connect so new messages are fetched
     syncCompleted = false;
+    // Reset the one-shot retry state for this connection cycle.
+    clearSyncRetryTimer();
+    finalRetryScheduled = false;
+    // Capture the login generation so stale force_logout events from a prior
+    // session can be ignored.
+    connectionLoginGeneration = useAuthStore.getState().loginGeneration ?? 0;
 
     // Uses polling + Zustand subscription for reliable init regardless of load order
     let syncAttempts = 0;
@@ -81,6 +108,15 @@ export function initSocketListeners() {
         if (syncAttempts < maxSyncAttempts) {
           syncAttempts++;
           setTimeout(pollSyncMessages, 500);
+        } else if (!finalRetryScheduled) {
+          // Normal polling exhausted (conversations still empty after a reconnect
+          // storm). Schedule ONE delayed retry to catch up — no infinite loop,
+          // and it is cleared/superseded on the next connect or a real sync.
+          finalRetryScheduled = true;
+          syncRetryTimer = setTimeout(() => {
+            syncRetryTimer = null;
+            if (!syncCompleted) pollSyncMessages();
+          }, 15000);
         }
         return;
       }
@@ -204,8 +240,15 @@ export function initSocketListeners() {
 
   // 5. SECURITY & SESSIONS
   transportClient.on('force_logout', async (data: { jti: string }) => {
+     const auth = useAuthStore.getState();
+     // Guard (a): already logged out / no active session → ignore (stale event).
+     if (!auth.accessToken && !auth.user) return;
+     // Guard (b): stale event from a prior session. If a newer login occurred
+     // after this socket connection was established, the force_logout belongs to
+     // the old session and must not log out the current one.
+     if ((auth.loginGeneration ?? 0) > connectionLoginGeneration) return;
      // Check if current session is revoked
-     const { logout } = useAuthStore.getState();
+     const { logout } = auth;
      await logout();
      window.location.href = '/login?reason=revoked';
   });

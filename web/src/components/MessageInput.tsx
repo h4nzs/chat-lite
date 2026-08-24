@@ -214,10 +214,20 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
 }, [editingMessage, setHasTextUI]);
 
   // ✅ SUPER OPTIMIZATION: Throttle untuk emit Socket (Mencegah jaringan tersedak & responsif instan)
+  // Leading-edge throttle: emits promptly on the first keystroke, then at most
+  // once per 3s while typing. A final 'typing:stop' is emitted on send/clear.
   const throttledTypingSignal = useCallback(
-    throttle(() => { if (isConnected) onTyping(); }, 2000),
+    throttle(() => { if (isConnected) onTyping(); }, 3000),
     [isConnected, onTyping]
   );
+
+  // Emit a 'typing:stop' so the recipient's indicator clears immediately when we
+  // stop typing (on send) rather than waiting for the remote-side timeout.
+  const sendTypingStop = useCallback(() => {
+    const meId = useAuthStore.getState().user?.id;
+    const targetRecipients = conversation.participants?.filter(p => p.id !== meId)?.map(p => p.id) || [];
+    transportClient.sendEvent("typing:stop", { conversationId: conversation.id, targetRecipients });
+  }, [conversation.id, conversation.participants]);
 
   const debouncedFetchPreview = useCallback(
     debounce((inputText: string) => fetchTypingLinkPreview(inputText), 800),
@@ -367,6 +377,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
         await sendEdit(conversation.id, editingMessage.id, currentText);
         if (inputRef.current) inputRef.current.value = '';
         setHasTextUI(false);
+        if (isConnected) sendTypingStop();
         return;
     }
     
@@ -395,6 +406,7 @@ export default function MessageInput({ onSend, onTyping, onVoiceSend, conversati
     }
     
     clearTypingLinkPreview();
+    if (isConnected) sendTypingStop();
     setShowEmojiPicker(false);
     setShowPlusMenu(false);
     setShowTimerMenu(false);

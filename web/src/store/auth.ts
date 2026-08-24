@@ -115,6 +115,10 @@ type State = {
   // beberapa detik di device yang sama (jendela antara baseline false → true).
   isUnlocking: boolean;
   blockedUserIds: string[];
+  // Monotonic counter incremented on every successful login/registration.
+  // Used by socketListeners to ignore stale force_logout events from a previous
+  // session (see connectionLoginGeneration in socketListeners.ts).
+  loginGeneration: number;
 };
 
 type RegisterResponse = {
@@ -294,6 +298,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     hasRestoredKeys: false,
     isUnlocking: false,
     blockedUserIds: [],
+    loginGeneration: 0,
 
     setHasRestoredKeys: async (_hasKeys) => set({ hasRestoredKeys: await hasStoredKeys() }),
     setAccessToken: (token) => set({ accessToken: token }),
@@ -303,28 +308,58 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
     },
 
     tryAutoUnlock: async () => {
-      const autoUnlockKey = await getDeviceAutoUnlockKey();
-      const encryptedKeys = await getEncryptedKeys();
-
-      if (autoUnlockKey && encryptedKeys) {
-        set({ isInitializingCrypto: true });
-        try {
-          const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
-          const result = await retrievePrivateKeys(encryptedKeys, autoUnlockKey);
-          if (result.success) {
-            privateKeysCache = result.keys;
-            set({ hasRestoredKeys: true });
-            await setDeviceAutoUnlockReady(true);
-            
-            import('./auth').then(({ setupAndUploadPreKeyBundle }) => {
-              setupAndUploadPreKeyBundle().catch(e => console.warn("[Auto-Heal] Failed to upload keys:", e));
-            });
-            
-            return true;
-          }
-        } catch (e) { console.error("Error during auto-unlock:", e); } finally { set({ isInitializingCrypto: false }); }
+      let autoUnlockKey: string | undefined | null = null;
+      let encryptedKeys: string | undefined | null = null;
+      try {
+        autoUnlockKey = await getDeviceAutoUnlockKey();
+        encryptedKeys = await getEncryptedKeys();
+      } catch (e) {
+        // Reading the stored auto-unlock material failed — treat as "nothing to
+        // unlock", but surface the reason so it isn't a silent dead-end.
+        console.warn('[tryAutoUnlock] Failed to read stored unlock material:', e);
+        return false;
       }
-      return false;
+
+      // Normal path: no stored auto-unlock material → user must unlock manually.
+      // This is expected (e.g. fresh device), so no warning/toast here.
+      if (!autoUnlockKey || !encryptedKeys) {
+        return false;
+      }
+
+      set({ isInitializingCrypto: true });
+      try {
+        const { retrievePrivateKeys } = await import('@lib/crypto-worker-proxy');
+        const result = await retrievePrivateKeys(encryptedKeys, autoUnlockKey);
+        if (result.success) {
+          privateKeysCache = result.keys;
+          set({ hasRestoredKeys: true });
+          await setDeviceAutoUnlockReady(true);
+
+          import('./auth').then(({ setupAndUploadPreKeyBundle }) => {
+            setupAndUploadPreKeyBundle().catch(e => console.warn("[Auto-Heal] Failed to upload keys:", e));
+          });
+
+          return true;
+        }
+        // Decrypt failed (wrong/corrupted key) — give the user feedback instead of
+        // leaving them stuck at the recovery modal with zero signal.
+        const reason = result.reason ?? 'unknown';
+        console.warn(`[tryAutoUnlock] Auto-unlock failed (decrypt): ${reason}`);
+        toast.error(
+          'Auto-unlock failed. Please unlock manually with your password or recovery phrase.',
+          { id: 'auto-unlock-failed' }
+        );
+        return false;
+      } catch (e) {
+        console.warn('[tryAutoUnlock] Error during auto-unlock:', e);
+        toast.error(
+          'Auto-unlock failed. Please unlock manually with your password or recovery phrase.',
+          { id: 'auto-unlock-failed' }
+        );
+        return false;
+      } finally {
+        set({ isInitializingCrypto: false });
+      }
     },
 
     lockApp: async () => {
@@ -490,7 +525,8 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           user: res.user, 
           hasRestoredKeys: false, // Baseline as false, will be checked below
           isUnlocking: true,
-          blockedUserIds: [] 
+          blockedUserIds: [],
+          loginGeneration: get().loginGeneration + 1,
         });
         localStorage.setItem("user", JSON.stringify(res.user));
 
@@ -623,7 +659,7 @@ export const useAuthStore = createWithEqualityFn<State & Actions>((set, get) => 
           if (result.success) privateKeysCache = result.keys;
         } catch (_e) {}
 
-        set({ user: res.user, accessToken: res.accessToken });
+        set({ user: res.user, accessToken: res.accessToken, loginGeneration: get().loginGeneration + 1 });
         localStorage.setItem("user", JSON.stringify(res.user));
 
         setupAndUploadPreKeyBundle().catch(e => console.error("Failed to upload initial pre-key bundle:", e));

@@ -52,6 +52,28 @@ export function clearReconnectTimer() {
   }
 }
 
+// scheduleReconnect() no-ops while the document is hidden (it early-returns when
+// document.visibilityState !== 'visible'). Without a visibilitychange listener a
+// disconnect that happened (or was scheduled) while hidden could leave the app
+// disconnected forever until a manual reload. This listener re-arms the reconnect
+// exactly once when the tab becomes visible again and we are still disconnected.
+let visibilityListenerRegistered = false;
+
+function registerVisibilityListener() {
+  if (visibilityListenerRegistered || typeof document === 'undefined') return;
+  visibilityListenerRegistered = true;
+  document.addEventListener('visibilitychange', () => {
+    if (
+      document.visibilityState === 'visible' &&
+      useConnectionStore.getState().status === 'disconnected'
+    ) {
+      // scheduleReconnect guards against a duplicate timer (reconnectTimer check),
+      // so this is safe to call on every visible transition.
+      scheduleReconnect(() => useConnectionStore.getState().status);
+    }
+  });
+}
+
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   status: 'connecting',
   myDevices: [],
@@ -103,3 +125,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     }
   }
 }));
+
+// Register the visibilitychange listener once at module load so a reconnect is
+// re-armed when the tab returns to the foreground after being hidden.
+registerVisibilityListener();
