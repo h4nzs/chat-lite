@@ -161,11 +161,39 @@ curl -sS -D - -o /dev/null -X POST https://api.nyx-app.my.id/api/keys/prekey-bun
 
 Also re-check §10.5 items 3–5 (console free of CSP violations after hard reload).
 
-### Step 5 — L1 checklist (human / dashboard actions)
+### Step 5 — L1 hardening (updated 2026-08-24, "Option A" decision)
 
-- [ ] Front `rt.nyx-app.my.id:33333` with Cloudflare Tunnel or Spectrum so the sidecar origin stops answering publicly.
-- [ ] Remove the origin A-record exposure for `rt.` once tunneled.
-- [ ] Confirm origin firewall still allows only SSH + CF ranges (see assessment §L1).
+`rt.nyx-app.my.id` must stay **direct-to-origin**: Cloudflare does not proxy
+WebTransport sessions (edge terminates HTTP/3; tunnel is HTTP(S) off-ramp only),
+and Spectrum is out of budget. So `dig rt.nyx-app.my.id` keeps revealing the VPS
+IP (`103.169.207.156`). The mitigation is to make that knowledge worthless:
+
+1. **Loopback-bind every TCP listener** so nothing answers on the public IP:
+   - Express: default `HOST=127.0.0.1` since commit `b36541ac` (verify:
+     `ss -tlnp | grep 4000` → `127.0.0.1:4000`).
+   - nginx: both server blocks now `listen 127.0.0.1:3000;` (cloudflared connects
+     over loopback, unaffected). Verify after sync: `ss -tlnp | grep 3000`.
+   - Result: the ONLY public socket left is the QUIC sidecar on `:33333`, which is
+     designed for direct P2P (JWT auth + client-side cert-hash pinning).
+2. **Firewall default-deny inbound** (owner ops on the VPS):
+   ```bash
+   ufw default deny incoming
+   ufw allow 22/tcp          # or restrict to your admin IP(s)
+   ufw allow 33333/udp       # WebTransport sidecar (QUIC)
+   ufw enable && ufw status verbose
+   ```
+   cloudflared egress (:7844 outbound) is unaffected.
+3. ~~Front `rt.` with Tunnel/Spectrum~~ — not feasible today (no CF WebTransport
+   proxying); revisit if Cloudflare ships it or budget allows Spectrum.
+
+Residual risk (accepted, documented honestly):
+
+- **Direct-to-origin DDoS on :33333** bypasses Cloudflare absorption while `rt`
+  is direct. Impact is limited to realtime transport; REST API traffic rides the
+  tunnel and stays up.
+- If this IP ever appeared in historical DNS records (SecurityTrails etc.), removing
+  the A-record would not un-leak it — which is exactly why steps 1–2 (shrinking the
+  attack surface behind the IP) matter more than hiding the record itself.
 
 ### Step 6 — Tunnel topology & origin binding (added 2026-08-23)
 
