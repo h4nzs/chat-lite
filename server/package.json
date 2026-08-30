@@ -25,7 +25,7 @@
     "@google/generative-ai": "^0.24.1",
     "@nyx/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.9.1",
-    "@prisma/client": "^7.9.1",
+    "@prisma/client": "^7.10.0",
     "@sentry/node": "^10.70.0",
     "@sentry/profiling-node": "^10.70.0",
     "@simplewebauthn/server": "^13.3.2",
