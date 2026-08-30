@@ -24,7 +24,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1110.0",
     "@google/generative-ai": "^0.24.1",
     "@nyx/shared": "workspace:*",
-    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.9.1",
     "@sentry/node": "^10.70.0",
     "@sentry/profiling-node": "^10.70.0",
